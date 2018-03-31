@@ -17,10 +17,10 @@ Fully functional replica built 2018:
 ![Alt text](replica.jpg?raw=true "replica")
 
 Running pong written in Tiny Pascal:
-![Alt text](replica.jpg?raw=true "screen-1")
+![Alt text](screen-1.jpg?raw=true "screen-1")
 
 The graphic basic interpreter has just been started:
-![Alt text](replica.jpg?raw=true "screen-2")
+![Alt text](screen-2.jpg?raw=true "screen-2")
 
 The R65 computer has been built 1977-1979 by myself together with
 Rudolf Baumann, who has built his own JOB computer at the same time with similar
