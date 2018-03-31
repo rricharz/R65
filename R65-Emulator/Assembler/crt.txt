@@ -1,0 +1,1405 @@
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 01
+
+0001                   *                                16/08/82
+0002                   *
+0003                   ******************************************
+0004                   * CRT CONTROLLER FOR R65 COMPUTER SYSTEM *
+0005                   ******************************************
+0006                   *
+0007                   * EPROM REVISION 1              16/08/82
+0008                   * CC RRICHARZ RBAUMANN 1977-1982
+0009                   * VIDEO MEMORY AT $0400
+0010                   *
+0011                   PSTART  EQU $E000       START OF PROGRAM AREA
+0012                   DSTART  EQU $1780       START OF DATA AREA
+0013                   *
+0014                           TIT R65 CRT-CONTROLLER
+0015                   *
+0016                   *
+0017                   * VIDEO CONTROL FUNCTIONS
+0018                   *************************         CTRL
+0019                   *                             VCOD   ASCII
+0020                   * CURSOR DOWN           CDOWN   E9  X  18
+0021                   * CURSOR RIGHT          CRIGHT  E8  V  16
+0022                   * CURSOR LEFT           CLEFT   E7  C  03
+0023                   * CURSOR UP             CUP     E6  Z  1A
+0024                   * CURSOR HOME           CHOME   E5  A  01
+0025                   * INSERT CHAR           INSCHR  E4  U  15
+0026                   * DELETE CHAR           DELCHR  E3  Y  19
+0027                   * CLEAR LINE            CLRLIN  E2  E  17
+0028                   * CLEAR DISPLAY         CLRDSP  E1  Q  11
+0029                   * INSERT LINE           INSLIN  C4  D  04
+0030                   * DELETE LINE           DELLIN  C3  F  06
+0031                   * TOGGLE ALPHA/GRAPHICS TALGRA  E9  L  0C
+0032                   * ESCAPE                ESCAPE  91     1B
+0033                   * SET TABULATOR         SETTAB  8B
+0034                   * ROLL DOWN             RDOWN   89     02
+0035                   * TO RIGHT MARGIN       CRMARG  88
+0036                   * TO LEFT MARGIN        CLMARG  87
+0037                   * ROLL UP               RUP     86  H  08
+0038                   * REVERSE HOME          RVHOME  85  P  10
+0039                   * RESUME WRITING        RWRITE  84
+0040                   * QUIET WRITING         QWRITE  83
+0041                   * TOGGLE BLACK/WHITE    TBLWHI  82  E  05
+0042                   * CLEAR GRAPHIC DISPLAY CLRGRA  81
+0043                   *
+0044                   * OTHER CONTROL FUNCTIONS
+0045                   *************************
+0046                   *
+0047                   * PRINT ALL ON          PRTON       R  12
+0048                   * PRINT ALL OFF         PRTOFF      T  14
+0049                   * DISPLAY CONTROL CHAR  DSPCCH      S  13
+0050                   * CLEAR TABULATOR       CLRTAB      O  0F
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 02
+
+0051                   * INVERSE VIDEO         INVVID      N  0E
+0052                   * NORMAL VIDEO          NORVID      K  0B
+0053                   * CARRIAGE RETURN       EXCR       (M) 0D
+0054                   * LINE FEED             EXLF       (J) 0A
+0055                   * TABULATOR (8)         TAB         I  09
+0056                   * BELL                  BELL        G  07
+0057                   * PAD CHARACTER         PADCHR      @  00
+0058                   *
+0059                   * PROGRAMMABLE FUNCTION KEYS
+0060                   ****************************
+0061                   *
+0062                   * F0-F3 / SHIFT F0-F3               A0-A7
+0063                   *
+0064                   * SPECIAL CHARS
+0065                   ***************
+0066                   * RUBOUT                RUBOUT      7F/5F
+0067                   *
+0068                   * PAGE 0 VARIABLES
+0069                   ******************
+0070                   *
+0071  0000-                    ORG $E7
+0072                   *
+0073  00E7-            FETCH   BSS 2   DATA SUBROUTINE REG
+0074  00E9-            VIDPNT  BSS 2   VIDEO POINTER REG
+0075  00EB-            VIPNT2  BSS 2   SECOND VIDEO PNTR
+0076  00ED-            CURLIN  BSS 1   CURRENT LINE OF CURSOR
+0077  00EE-            CURPOS  BSS 1   CURRENT POSITION CURSOR
+0078  00EF-            SAVPC   BSS 1   SAVE PC
+0079                   *
+0080                   * PAGE 17 DATA REGISTERS
+0081                   ************************
+0082                   *
+0083  00F0-                    ORG DSTART
+0084                   *
+0085                   * PRESET BY RESET TO 0:
+0086                   *
+0087  1780-            VFLAG   BSS 1   VIDEO FLAG REGISTER
+0088                   *               BIT 7: INVERSE VIDEO
+0089                   *               BIT 6: GRAPHICS DISPLAYED
+0090                   *               BIT 5: GRAPHICS INITIALIZED
+0091                   *               BIT 4: DISPLAY CONTROL CHAR
+0092                   *               BIT 3: AUTOPRINT ON
+0093                   *               BIT 2: AUTO LINE FEED ON
+0094                   *               BIT 1: PRINTING QUIET
+0095                   *               BIT 0: NO VIDEO KEY EXECUTION
+0096                   *
+0097  1781-            SFLAG   BSS 1   SYSTEM FLAG REGISTER
+0098                   *               BIT 7: ESCAPE FLAG
+0099                   *
+0100  1782-            OFFSET  BSS 1   ROLL MEMORY OFFSET
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 03
+
+0101  1783-            LMARG   BSS 1   CURRENT LEFT MARGIN
+0102  1784-            VIDKEY  BSS 1   VIDEO IRQ SAVE KEY
+0103  1785-            CHAR    BSS 1   CHAR SAVE REGISTER
+0104                   *
+0105                   * PRESET BY RESET TO TABLE:
+0106                   *
+0107  1786-            FULL    BSS 3   LINE SAVE ROUTINE
+0108  1789-            NUMLIN  BSS 1   NUMBER OF LINES IN VIDMEM
+0109  178A-            NUMCHR  BSS 1   NUMBER OF CHARS PER LINE
+0110  178B-            UMARG   BSS 1   CURRENT UPPER MARGIN
+0111  178C-            VAUTOP  BSS 2   AUTOPRINT VECTOR
+0112  178E-            VFUNC   BSS 2   FUNCTION VECTOR
+0113  1790-            TABTB   BSS 8   TABULATOR TABLE
+0114                   *
+0115  1798-            DSPLIN  BSS 1   NUMBER OF DISPLAYED LINES
+0116                   *
+0117                           PAG
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 04
+
+0118                   *
+0119                   * INTERFACE CONTROL REGISTERS:
+0120                   *****************************
+0121                   *
+0122                   TIMER1  EQU $1747       TIMER 1 OF KIM-1
+0123                   PORTA2  EQU $1451       6552-2 PORT A (KEYBRD)
+0124                   DIRA2   EQU $1453       6552-2 DIRECTION-A REG
+0125                   TLL22   EQU $1458       6552-2 TIMER 2 L-LATCH
+0126                   SR2     EQU $145A       6552-2 SHIFT REGISTER
+0127                   ACR2    EQU $145B       6552-2 CONTROL REGISTER
+0128                   IFR2    EQU $145D       6522-2 IRQ FLAG REGISTER
+0129                   IER2    EQU $145E       6552-2 IRQ ENABLE REG
+0130                   CRTADR  EQU $1420       CRT CONTROLLER ADDRESS
+0131                   CRTDAT  EQU $1421       CRT CONTROLLER DATA REG
+0132                   PORTA1  EQU $1702       6530-003 PORT A
+0133                   DIRA1   EQU $1703       6530-003 DIRECTION
+0134                   MULTX   EQU $14E0       MULTIPLIER X-REGISTER
+0135                   MULTY   EQU $14E1       MULTIPLIER Y-REGISTER
+0136                   MULTR   EQU $14E2       MULTIPLIER DATA REGISTER
+0137                   PRTRSA  EQU $E836       RS232 PRINT ROUTINE
+0138                   CRTMEM  EQU $0400       CRT MEMORY START ADDRESS
+0139                   *
+0140                           PAG
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 05
+
+0141                   *
+0142                   * START OF PROGRAM
+0143                   *
+0144  1799-                    ORG PSTART
+0145                   *
+0146                   * VECTORS FOR SUBROUTINE CALLS
+0147                   ******************************
+0148                   *
+0149  E000- 4C 0B E5           JMP GETKEY      GET KEY FROM KEYBOARD
+0150  E003- 4C 26 E5           JMP GETCHR      GET KEY AND PRINT IT
+0151  E006- 4C 2C E5           JMP GETLIN      GET LINE FROM KEYBOARD
+0152  E009- 4C 84 E4           JMP PRTCHR      PRINT CHAR ON SCREEN
+0153  E00C- 6C 8C 17           JMP (VAUTOP)    AUTO PRINT CHAR
+0154  E00F- 4C A7 E2           JMP LOCRM       LOCATE ROLL MEMORY
+0155  E012- 4C C1 E2           JMP LOCRM3      COLATE USING OFFSET
+0156  E015- 4C A9 E5           JMP ICRTAL      INITIALIZE TO ALPHA
+0157  E018- 4C BF E5           JMP ICRTGR      INITIALIZE TO GRAPHICS
+0158  E01B- 4C 30 E6           JMP INITCR      INITIALIZE CRT-CONTROL
+0159  E01E- 4C 0B E6           JMP IGRAPH      INITIALIZE GRAPHICS
+0160  E021- 4C 45 E2           JMP FILL        FILL WITH A
+0161  E024- 4C EB E2           JMP ENDLIN      TEST END OF LINE
+0162  E027- 4C 99 E6           JMP PRTINF      PRINT ASCII STRING
+0163  E02A- 4C D7 E6           JMP PRTHEX      PRINT HEX CHAR
+0164  E02D- 4C C8 E6           JMP PRTBYT      PRINT BYTE
+0165  E030- 4C C4 E6           JMP PRTAX       PRINT 2 BYTES
+0166  E033- 4C 6B E6           JMP PRTREG      PRINT SAVED CP REG.
+0167                   *
+0168                   * KEYIRQ: KEYBOARD IRQ HANDLER
+0169                   ******************************
+0170                   * A AND X SAVED UPON ENTRY, Y AND VIDPNT
+0171                   * SAVED INTERNAL. VIDEO CONTROL CHARS ARE
+0172                   * EXECUTED DIRECTLY, ALL OTHER CHARS ARE
+0173                   * TRANSMITTED TO THE CHAR GEGISTER
+0174                   * >> DO NOT TO USE SUBROUTINES OF THE VIDEO
+0175                   *    CONTROLLER WITHOUT DISABLING THE
+0176                   *    KEYBOARD INTERRUPT!
+0177                   *
+0178  E036- AD 51 14   KEYIRQ  LDA PORTA2      LOAD KEY CODE
+0179  E039- 30 07              BMI VIDIRQ      EXECUTE VIDEO FUNCTION
+0180  E03B- 8D 85 17           STA CHAR        OR SAVE CHAR
+0181  E03E- 68         IRQ9    PLA
+0182  E03F- AA                 TAX             GET BACK SAVED X
+0183  E040- 68                 PLA             FROM MAIN IRQ HANDLER
+0184  E041- 40                 RTI
+0185                   *
+0186  E042- 4E 80 17   VIDIRQ  LSR VFLAG
+0187  E045- 08                 PHP
+0188  E046- 2E 80 17           ROL VFLAG
+0189  E049- 28                 PLP
+0190  E04A- B0 EF              BCS KEYIRQ+5
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 06
+
+0191  E04C- C9 A0              CMP =$A0        IF FUNCTION KEY
+0192  E04E- 90 09              BCC *+11
+0193  E050- C9 A8              CMP =$A8
+0194  E052- B0 05              BCS *+7
+0195  E054- 29 07              AND =7          MASK KEY NO
+0196  E056- 6C 8E 17           JMP (VFUNC)     AND JUMP VIA VECTOR
+0197                   *
+0198  E059- 8D 84 17           STA VIDKEY      SAVE A
+0199  E05C- A2 02              LDX =2
+0200  E05E- 8E 5E 14           STX IER2
+0201  E061- 58                 CLI             AND ALLOW OTHER IRQ
+0202  E062- A2 03              LDX =$03        SAVE VIDPNT,VIDPN2
+0203  E064- B5 E9              LDA VIDPNT,X    DURING INTERRUPT
+0204  E066- 48                 PHA             HANDLING
+0205  E067- CA                 DEX
+0206  E068- 10 FA              BPL *-4
+0207  E06A- 98                 TYA             SAVE Y
+0208  E06B- 48                 PHA
+0209  E06C- 20 83 E0           JSR EXVIDK      EXECUTE VIDEO KEY
+0210  E06F- 68                 PLA
+0211  E070- A8                 TAY             RESTORE Y
+0212  E071- A2 FC              LDX =$FC
+0213  E073- 68                 PLA
+0214  E074- 95 ED              STA VIDPNT+4,X  RESTORE VIDPNT,VIDPN2
+0215  E076- E8                 INX
+0216  E077- D0 FA              BNE *-4
+0217  E079- 78                 SEI
+0218  E07A- A2 82              LDX =$82        ALLOW KEYBOARD IRQ
+0219  E07C- 8E 5E 14           STX IER2
+0220  E07F- 68                 PLA
+0221  E080- AA                 TAX             RESTORE X
+0222  E081- 68                 PLA
+0223  E082- 40                 RTI
+0224                   *
+0225                   * EXECUTE VIDEO FUNCTION KEY
+0226                   *
+0227  E083- A2 16      EXVIDK  LDX =22 NO OF VIDEO FUNCTIONS
+0228  E085- AD 84 17           LDA VIDKEY
+0229  E088- DD 9D E0           CMP VIDKTB,X    SEARCH CODE IN TABLE
+0230  E08B- F0 04              BEQ EXCHR
+0231  E08D- CA                 DEX
+0232  E08E- 10 F8              BPL *-6
+0233  E090- 60         PAD     RTS             IGNORE, IF NOT FOUND
+0234                   *
+0235  E091- 8A         EXCHR   TXA
+0236  E092- 0A                 ASL A
+0237  E093- AA                 TAX
+0238  E094- BD D7 E0           LDA VIDVTB+1,X  LOAD VECTOR
+0239  E097- 48                 PHA             AND PUSH TO STACK
+0240  E098- BD D6 E0           LDA VIDVTB,X
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 07
+
+0241  E09B- 48                 PHA
+0242  E09C- 60                 RTS             EXECUTE FUNCTION
+0243                   *
+0244                   * VIDEO KEY CODE TABLE
+0245                   **********************
+0246                   *
+0247  E09D- E9 E8 E7   VIDKTB  BYT $E9,$E8,$E7,$E6,$E5,$E4
+0247  E0A0- E6 E5 E4 
+0248  E0A3- E3 E2 E1           BYT $E3,$E2,$E1,$C4,$C3,$9E
+0248  E0A6- C4 C3 9E 
+0249  E0A9- 91 8B 89           BYT $91,$8B,$89,$88,$87,$86
+0249  E0AC- 88 87 86 
+0250  E0AF- 85 84 83           BYT $85,$84,$83,$82,$81
+0250  E0B2- 82 81 
+0251                   *
+0252                   * CONTROL KEY CODE TABLE
+0253                   ************************
+0254                   *
+0255  E0B4- 18 16 03   CNTKTB  BYT $18,$16,$03,$1A,$01,$15
+0255  E0B7- 1A 01 15 
+0256  E0BA- 19 17 11           BYT $19,$17,$11,$04,$06,$0C
+0256  E0BD- 04 06 0C 
+0257  E0C0- 1B FF 02           BYT $1B,$FF,$02,$FF,$FF,$08
+0257  E0C3- FF FF 08 
+0258  E0C6- 10 FF FF           BYT $10,$FF,$FF,$05,$FF
+0258  E0C9- 05 FF 
+0259                   *
+0260  E0CB- 12 14 13           BYT $12,$14,$13,$0F,$0E
+0260  E0CE- 0F 0E 
+0261  E0D0- 0B 0D 0A           BYT $0B,$0D,$0A,$09,$07,$00
+0261  E0D3- 09 07 00 
+0262                   *
+0263                   * VIDEO AND CONTROL VECTOR TABLE
+0264                   ********************************
+0265                   *
+0266  E0D6- 40 E1 19   VIDVTB  WRD CDOWN-1,CRIGHT-1,CLEFT-1
+0266  E0D9- E1 25 E1 
+0267  E0DC- 4F E1 7B           WRD CUP-1,CHOME-1,INSCHR-1
+0267  E0DF- E1 C7 E1 
+0268  E0E2- AF E1 DC           WRD DELCHR-1,CLRLIN-1,CLRDSP-1
+0268  E0E5- E1 ED E1 
+0269  E0E8- 1A E4 03           WRD INSLIN-1,DELLIN-1,TALGRA-1
+0269  E0EB- E4 61 E2 
+0270  E0EE- 15 E2 C2           WRD ESCAPE-1,SETTAB-1
+0270  E0F1- E3 
+0271  E0F2- 69 E1 39           WRD RDOWN-1,CRMARG-1
+0271  E0F5- E1 
+0272  E0F6- 31 E1 5B           WRD CLMARG-1,RUP-1,RVHOME-1
+0272  E0F9- E1 8B E1 
+0273  E0FC- 27 E2 1E          WRD RWRITE-1,QWRITE-1,TBLWHI-1
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 08
+
+0273  E0FF- E2 0C E2 
+0274  E102- 30 E2              WRD CLRGRA-1
+0275                   *
+0276  E104- 65 E3 6E           WRD PRTON-1,PRTOFF-1,DSPCCH-1
+0276  E107- E3 89 E3 
+0277  E10A- CC E3 53           WRD CLRTAB-1,INVVID-1
+0277  E10D- E3 
+0278  E10E- 5C E3 FB           WRD NORVID-1,EXCR-1,EXLF-1
+0278  E111- E2 08 E3 
+0279  E114- D7 E3 92           WRD TAB-1,BELL-1,PAD-1
+0279  E117- E3 8F E0 
+0280                   *
+0281                   * VIDEO KEY SUBROUTINES
+0282                   ***********************
+0283                   *
+0284  E11A- A6 EE      CRIGHT  LDX CURPOS      -- CURSOR RIGHT --
+0285  E11C- EC 8A 17           CPX NUMCHR
+0286  E11F- B0 02              BCS *+4
+0287  E121- E6 EE              INC CURPOS
+0288  E123- 4C 4A E1           JMP LOCSET
+0289                   *
+0290  E126- AE 83 17   CLEFT   LDX LMARG       -- CURSOR LEFT --
+0291  E129- E4 EE              CPX CURPOS
+0292  E12B- B0 02              BCS *+4
+0293  E12D- C6 EE              DEC CURPOS
+0294  E12F- 4C 4A E1           JMP LOCSET
+0295                   *
+0296  E132- AE 83 17   CLMARG  LDX LMARG       -- CURSOR LEFT MARGIN --
+0297  E135- 86 EE              STX CURPOS
+0298  E137- 4C E2 E2           JMP SETCUR
+0299                   *
+0300  E13A- A2 00      CRMARG  LDX =0          -- CURSOR LEFT TO 0 --
+0301  E13C- 86 EE              STX CURPOS
+0302  E13E- 4C E2 E2           JMP SETCUR
+0303                   *
+0304  E141- A6 ED      CDOWN   LDX CURLIN      -- CURSOR DOWN --
+0305  E143- EC 89 17           CPX NUMLIN
+0306  E146- B0 02              BCS *+4
+0307  E148- E6 ED              INC CURLIN
+0308  E14A- 20 A7 E2   LOCSET  JSR LOCRM       LOCATE ROLL MEMORY
+0309  E14D- 4C E2 E2           JMP SETCUR      AND SET CURSOR
+0310                   *
+0311  E150- AE 8B 17   CUP     LDX UMARG       -- CURSOR UP --
+0312  E153- E4 ED              CPX CURLIN
+0313  E155- B0 02              BCS *+4
+0314  E157- C6 ED              DEC CURLIN
+0315  E159- 4C 4A E1           JMP LOCSET
+0316                   *
+0317  E15C- AE 8B 17   RUP     LDX UMARG       -- ROLL UP --
+0318  E15F- EC 82 17           CPX OFFSET
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 09
+
+0319  E162- B0 03              BCS *+5
+0320  E164- CE 82 17           DEC OFFSET
+0321  E167- 4C C1 E2           JMP LOCRM3
+0322                   *
+0323  E16A- AD 89 17   RDOWN   LDA NUMLIN      -- ROLL DOWN --
+0324  E16D- 38                 SEC
+0325  E16E- ED 82 17           SBC OFFSET
+0326  E171- ED 98 17           SBC DSPLIN
+0327  E174- 90 03              BCC *+5
+0328  E176- EE 82 17           INC OFFSET
+0329  E179- 4C C1 E2           JMP LOCRM3
+0330                   *
+0331  E17C- AE 8B 17   CHOME   LDX UMARG       -- CURSOR HOME --
+0332  E17F- 86 ED              STX CURLIN
+0333  E181- 8E 82 17           STX OFFSET
+0334  E184- AE 83 17   CHOME1  LDX LMARG
+0335  E187- 86 EE              STX CURPOS
+0336  E189- 4C 4A E1           JMP LOCSET
+0337                   *
+0338  E18C- AE 89 17   RVHOME  LDX NUMLIN      -- CURSOR REV HOME --
+0339  E18F- 86 ED              STX CURLIN
+0340  E191- 20 76 E2           JSR ROLLOC
+0341  E194- A0 00              LDY =0
+0342  E196- 20 EB E2           JSR ENDLIN      LINE EMPTY?
+0343  E199- D0 06              BNE RVHOM1      BRANCH, IF LAST LINE
+0344  E19B- CA                 DEX
+0345  E19C- 10 F1              BPL RVHOME+3
+0346  E19E- E8                 INX
+0347  E19F- F0 03              BEQ *+5         TAKEN, IF SCREEN EMPTY
+0348                   *
+0349  E1A1- 20 41 E1   RVHOM1  JSR CDOWN
+0350  E1A4- AE 8B 17           LDX UMARG
+0351  E1A7- E4 ED              CPX CURLIN
+0352  E1A9- 90 02              BCC *+4
+0353  E1AB- 86 ED              STX CURLIN
+0354  E1AD- 4C 32 E1           JMP CLMARG
+0355                   *
+0356  E1B0- 20 74 E2   DELCHR  JSR ROLLOC-2    -- DELETE CHAR --
+0357  E1B3- A4 EE              LDY CURPOS
+0358  E1B5- D0 07              BNE *+9         TEST BEFORE DOING
+0359  E1B7- C8                 INY
+0360  E1B8- B1 E9              LDA (VIDPNT),Y
+0361  E1BA- 88                 DEY
+0362  E1BB- 91 E9              STA (VIDPNT),Y
+0363  E1BD- C8                 INY
+0364  E1BE- CC 8A 17           CPY NUMCHR
+0365  E1C1- 90 F4              BCC *-10
+0366  E1C3- A9 20      DELCH2  LDA =' '
+0367  E1C5- 91 E9              STA (VIDPNT),Y
+0368  E1C7- 60                 RTS
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 10
+
+0369                   *
+0370  E1C8- 20 74 E2   INSCHR  JSR ROLLOC-2    -- INSERT CHAR --
+0371  E1CB- AC 8A 17           LDY NUMCHR
+0372  E1CE- 88                 DEY
+0373  E1CF- B1 E9              LDA (VIDPNT),Y
+0374  E1D1- C8                 INY
+0375  E1D2- 91 E9              STA (VIDPNT),Y
+0376  E1D4- 88                 DEY
+0377  E1D5- C4 EE              CPY CURPOS
+0378  E1D7- 10 F5              BPL *-9
+0379  E1D9- C8                 INY
+0380  E1DA- 4C C3 E1           JMP DELCH2
+0381                   *
+0382  E1DD- 20 74 E2   CLRLIN  JSR ROLLOC-2    -- CLEAR LINE --
+0383  E1E0- AC 8A 17           LDY NUMCHR
+0384  E1E3- A9 20              LDA =' '
+0385  E1E5- 91 E9              STA (VIDPNT),Y
+0386  E1E7- 88                 DEY
+0387  E1E8- C4 EE              CPY CURPOS
+0388  E1EA- 10 F9              BPL *-5
+0389  E1EC- C8                 INY
+0390  E1ED- 60                 RTS
+0391                   *
+0392  E1EE- 20 DD E1   CLRDSP  JSR CLRLIN      -- CLEAR DISPLAY --
+0393  E1F1- A6 ED              LDX CURLIN
+0394  E1F3- A5 EE              LDA CURPOS      SAVE CURPOS
+0395  E1F5- 48                 PHA
+0396  E1F6- A9 00              LDA =0
+0397  E1F8- 85 EE              STA CURPOS
+0398  E1FA- EC 89 17           CPX NUMLIN
+0399  E1FD- F0 0A              BEQ *+12
+0400  E1FF- E8                INX
+0401  E200- 20 76 E2           JSR ROLLOC
+0402  E203- 20 E0 E1           JSR CLRLIN+3
+0403  E206- 4C FA E1           JMP *-12
+0404  E209- 68                 PLA             RESTORE CURPOS
+0405  E20A- 85 EE              STA CURPOS
+0406  E20C- 60                 RTS
+0407                   *
+0408  E20D- AD 02 17   TBLWHI  LDA PORTA1      -- TOGGLE BLACK/WHITE --
+0409  E210- 49 01              EOR =1
+0410  E212- 8D 02 17           STA PORTA1
+0411  E215- 60                 RTS
+0412                   *
+0413  E216- AD 81 17   ESCAPE  LDA SFLAG       -- ESCAPE --
+0414  E219- 09 80              ORA =$80        SET ESCAPE FLAG
+0415  E21B- 8D 81 17           STA SFLAG
+0416  E21E- 60                 RTS
+0417                   *
+0418  E21F- AD 80 17   QWRITE  LDA VFLAG       -- QUIET WRITING --
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 11
+
+0419  E222- 09 02              ORA =$02
+0420  E224- 8D 80 17           STA VFLAG
+0421  E227- 60                 RTS
+0422                   *
+0423  E228- AD 80 17   RWRITE  LDA VFLAG       -- RESUME WRITING --
+0424  E22B- 29 FD              AND =$FD
+0425  E22D- 8D 80 17           STA VFLAG
+0426  E230- 60                 RTS
+0427                   *
+0428  E231- AD 80 17   CLRGRA  LDA VFLAG       -- CLEAR GRAPHICS
+0429  E234- 29 20              AND =$20        INITIALIZED?
+0430  E236- F0 F8              BEQ CLRGRA-1    RTS, IF NOT
+0431  E238- A2 E8              LDX =$E8        SET END MARK
+0432  E23A- A0 13              LDY =$13        ## REQUIRES FIX ##
+0433  E23C- 86 EB              STX VIPNT2
+0434  E23E- 84 EC              STY VIPNT2+1
+0435  E240- A9 00              LDA =0
+0436  E242- AA                 TAX             START TO FILL
+0437  E243- A0 07              LDY =$07        CONTINUE WITH FILL
+0438                   *
+0439                   * FILL: FILL MEMORY FROM X,Y WITH A TO VIPNT2
+0440                   *********************************************
+0441                   *
+0442  E245- 86 E9      FILL    STX VIDPNT
+0443  E247- 84 EA              STY VIDPNT+1
+0444  E249- A6 EB              LDX VIPNT2
+0445  E24B- A0 00              LDY =0
+0446  E24D- 91 E9      FILL1   STA (VIDPNT),Y
+0447  E24F- E6 E9              INC VIDPNT
+0448  E251- D0 02              BNE *+4
+0449  E253- E6 EA              INC VIDPNT+1
+0450  E255- E4 E9              CPX VIDPNT
+0451  E257- D0 F4              BNE FILL1
+0452  E259- A4 EA              LDY VIDPNT+1
+0453  E25B- C4 EC              CPY VIPNT2+1
+0454  E25D- 90 EC              BCC FILL1-2
+0455  E25F- 91 E9              STA (VIDPNT),Y
+0456  E261- 60                 RTS
+0457                   *
+0458  E262- 2C 80 17   TALGRA  BIT VFLAG       -- TOGGLE ALPHA/GRAPH
+0459  E265- 50 03              BVC *+5
+0460  E267- 4C A9 E5           JMP ICRTAL
+0461  E26A- AD 80 17           LDA VFLAG
+0462  E26D- 29 20              AND =$20
+0463  E26F- F0 F0              BEQ TALGRA-1    RTS, IF NOT
+0464  E271- 4C BF E5           JMP ICRTGR      INITIALIZED
+0465                   *
+0466                   * SUBROUTINE ROLLOC: COMPUTE ROLL MEMORY PNT
+0467                   ********************************************
+0468                   * ALL REGISTERS SAVED, ROLLOC-2 SETS X=CURLIN
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 12
+
+0469                   *
+0470  E274- A6 ED              LDX CURLIN
+0471  E276- 48         ROLLOC  PHA
+0472  E277- 78                 SEI             DISABLE IRQ FOR MULTIPLY
+0473  E278- 8E E0 14           STX MULTX
+0474  E27B- AD 8A 17           LDA NUMCHR
+0475  E27E- 18                 CLC
+0476  E27F- 69 01              ADC =1
+0477  E281- 8D E1 14           STA MULTY
+0478  E284- 18                 CLC
+0479  E285- AD E2 14           LDA MULTR
+0480  E288- 85 E9              STA VIDPNT
+0481  E28A- AD E3 14           LDA MULTR+1
+0482  E28D- 58                 CLI             ENABLE IRQ
+0483  E28E- 69 04              ADC =>CRTMEM
+0484  E290- 85 EA              STA VIDPNT+1
+0485  E292- 68                 PLA
+0486  E293- 60                 RTS
+0487                   *
+0488                   * CURLOC: COMPUTE CURSOR LOCATION
+0489                   *********************************
+0490                   * A SAVED, Y RETURNED=0
+0491                   *
+0492  E294- 20 74 E2   CURLOC  JSR ROLLOC-2
+0493  E297- 48                 PHA
+0494  E298- 18                 CLC
+0495  E299- A5 E9              LDA VIDPNT
+0496  E29B- 65 EE              ADC CURPOS
+0497  E29D- 85 E9              STA VIDPNT
+0498  E29F- 90 02              BCC *+4
+0499  E2A1- E6 EA              INC VIDPNT+1
+0500  E2A3- 68                 PLA
+0501  E2A4- A0 00              LDY =0
+0502  E2A6- 60                 RTS
+0503                   *
+0504                   * LOCRM: LOCATE ROLL MEMORY
+0505                   ***************************
+0506                   * A SAVED
+0507                   *
+0508  E2A7- 48         LOCRM   PHA
+0509  E2A8- A5 ED              LDA CURLIN
+0510  E2AA- 38                 SEC
+0511  E2AB- ED 82 17           SBC OFFSET
+0512  E2AE- 90 0A              BCC LOCRM2
+0513  E2B0- E9 10              SBC =$10
+0514  E2B2- 90 0C              BCC LOCRM3-1
+0515  E2B4- EE 82 17           INC OFFSET
+0516  E2B7- 4C A8 E2           JMP LOCRM+1
+0517  E2BA- CE 82 17   LOCRM2  DEC OFFSET
+0518  E2BD- 4C A8 E2           JMP LOCRM+1
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 13
+
+0519                   *
+0520  E2C0- 68                 PLA
+0521  E2C1- 2C 80 17   LOCRM3  BIT VFLAG
+0522  E2C4- 70 E0              BVS LOCRM-1     RTS, IF GRAPHICS
+0523  E2C6- 48                 PHA
+0524  E2C7- AE 82 17           LDX OFFSET
+0525  E2CA- 20 76 E2           JSR ROLLOC
+0526  E2CD- A2 0D              LDX =$D
+0527  E2CF- A5 E9      LOCRM4  LDA VIDPNT
+0528  E2D1- 8E 20 14           STX CRTADR
+0529  E2D4- 8D 21 14           STA CRTDAT
+0530  E2D7- CA                 DEX
+0531  E2D8- A5 EA              LDA VIDPNT+1
+0532  E2DA- 8E 20 14           STX CRTADR
+0533  E2DD- 8D 21 14           STA CRTDAT
+0534  E2E0- 68                 PLA
+0535  E2E1- 60                 RTS
+0536                   *
+0537                   * SETCUR: SET CURSOR
+0538                   ********************
+0539                   *
+0540  E2E2- 20 94 E2   SETCUR  JSR CURLOC
+0541  E2E5- A2 0F              LDX =$0F        VIDEO CONTROLLER
+0542  E2E7- 48                 PHA
+0543  E2E8- 4C CF E2           JMP LOCRM4
+0544                   *
+0545                   * ENDLIN
+0546                   ********
+0547                   *
+0548  E2EB- B1 E9      ENDLIN  LDA (VIDPNT),Y
+0549  E2ED- 29 7F              AND =$7F
+0550  E2EF- C9 20              CMP =$20
+0551  E2F1- D0 08              BNE *+10        NOT EMPTY
+0552  E2F3- CC 8A 17           CPY NUMCHR
+0553  E2F6- F0 03              BEQ *+5         EMPTY
+0554  E2F8- C8                 INY
+0555  E2F9- D0 F0              BNE ENDLIN
+0556  E2FB- 60                 RTS
+0557                   *
+0558                   *
+0559  E2FC- A9 04      EXCR    LDA =4          -- CARRIAGE RETURN --
+0560  E2FE- 2C 80 17          BIT VFLAG       AUTO LF ON?
+0561  E301- F0 03              BEQ *+5
+0562  E303- 20 10 E3           JSR EXLF+7      EXECUTE A LF
+0563  E306- 4C 32 E1           JMP CLMARG      EXECUTE A CR
+0564                   *
+0565  E309- A9 04      EXLF    LDA =4          -- LINE FEED --
+0566  E30B- 2C 80 17           BIT VFLAG       AUTO LF ON?
+0567  E30E- D0 EB              BNE EXCR-1      RTS, IF ON
+0568  E310- A5 ED              LDA CURLIN
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 14
+
+0569  E312- CD 89 17           CMP NUMLIN
+0570  E315- B0 03              BCS *+5
+0571  E317- 4C 41 E1           JMP CDOWN       EXECUTE LF
+0572  E31A- 20 86 17           JSR FULL        SAVE LINE AND MOVE UP
+0573                   *
+0574                   * MOVEUP: FAST MOVEUP FOR LINE FEED
+0575                   ***********************************
+0576                   *
+0577  E31D- AE 89 17   MOVEUP  LDX NUMLIN      X=LINE COUNTER
+0578  E320- A9 04              LDA =>CRTMEM
+0579  E322- 85 EC              STA VIPNT2+1
+0580  E324- 85 EA              STA VIDPNT+1
+0581  E326- A9 00              LDA =0
+0582  E328- 85 EB              STA VIPNT2
+0583  E32A- 85 E9              STA VIDPNT
+0584  E32C- A5 EB      MOVEU1  LDA VIPNT2
+0585  E32E- 38                 SEC
+0586  E32F- 6D 8A 17           ADC NUMCHR      ADD NUMCHR+1
+0587  E332- 85 EB              STA VIPNT2
+0588  E334- 90 02              BCC *+4
+0589  E336- E6 EC              INC VIPNT2+1
+0590  E338- AC 8A 17           LDY NUMCHR
+0591  E33B- B1 EB      MOVEU2  LDA (VIPNT2),Y
+0592  E33D- 91 E9              STA (VIDPNT),Y
+0593  E33F- 88                 DEY
+0594  E340- 10 F9              BPL MOVEU2
+0595  E342- A5 EC              LDA VIPNT2+1
+0596  E344- 85 EA              STA VIDPNT+1
+0597  E346- A5 EB              LDA VIPNT2
+0598  E348- 85 E9              STA VIDPNT
+0599  E34A- CA                 DEX
+0600  E34B- D0 DF              BNE MOVEU1
+0601  E34D- AE 89 17           LDX NUMLIN      CLEAR LAST LINE
+0602  E350- CA                 DEX
+0603  E351- 4C F3 E1           JMP CLRDSP+5
+0604                   *
+0605                   *
+0606  E354- AD 80 17   INVVID  LDA VFLAG       -- INVERSE VIDEO --
+0607  E357- 09 80              ORA =$80
+0608  E359- 8D 80 17           STA VFLAG
+0609  E35C- 60                 RTS
+0610                   *
+0611  E35D- AD 80 17   NORVID  LDA VFLAG       -- NORMAL VIDEO
+0612  E360- 29 7F              AND =$7F
+0613  E362- 8D 80 17           STA VFLAG
+0614  E365- 60                 RTS
+0615                   *
+0616  E366- AD 80 17   PRTON   LDA VFLAG       -- AUTOPRINT ON --
+0617  E369- 09 08              ORA =$08
+0618  E36B- 8D 80 17           STA VFLAG
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 15
+
+0619  E36E- 60                 RTS
+0620                   *
+0621  E36F- AD 80 17   PRTOFF  LDA VFLAG       -- AUTOPRINT OFF --
+0622  E372- 29 F7              AND =$F7
+0623  E374- 8D 80 17           STA VFLAG
+0624  E377- 60                 RTS
+0625                   *
+0626  E378- AD 80 17   CAPSON  LDA VFLAG       -- CAPITAL LETTERS --
+0627  E37B- 09 01              ORA =$01
+0628  E37D- 8D 80 17           STA VFLAG
+0629  E380- 60                 RTS
+0630                   *
+0631  E381- AD 80 17   CAPSOF  LDA VFLAG       -- CAPITALS OFF --
+0632  E384- 29 FE              AND =$FE
+0633  E386- 8D 80 17           STA VFLAG
+0634  E389- 60                 RTS
+0635                   *
+0636  E38A- AD 80 17   DSPCCH  LDA VFLAG       -- DISPLAY CONTROL CHR
+0637  E38D- 49 10              EOR =$10        TOGGLE
+0638  E38F- 8D 80 17           STA VFLAG
+0639  E392- 60                 RTS
+0640                   *
+0641  E393- A9 20      BELL    LDA =32         FREQUENCY IN A
+0642  E395- A2 08              LDX =8          LENGHT IN X
+0643                   *
+0644                   * OUTPUT A TONE
+0645                   ***************
+0646                   * FREQUENCY IN A, LENGHT IN X
+0647                   * TIMER 1 OF KIM IS USED FOR TIMING
+0648                   * SHIFT REGISTER AND TIMER 2 OF 6522-2
+0649                   *
+0650  E397- 20 B0 E3   TONE    JSR CONTON      START TONE OUT
+0651  E39A- A0 14              LDY =20
+0652  E39C- 8E 47 17           STX TIMER1
+0653  E39F- AD 47 17           LDA TIMER1
+0654  E3A2- 10 FB              BPL *-3
+0655  E3A4- 88                 DEY
+0656  E3A5- D0 F5              BNE *-9
+0657                   *
+0658  E3A7- AD 5B 14   ENDTON  LDA ACR2        CAN BE CALLED
+0659  E3AA- 29 E3              AND =$E3
+0660  E3AC- 8D 5B 14           STA ACR2
+0661  E3AF- 60                 RTS
+0662                   *
+0663  E3B0- 8D 58 14   CONTON  STA TLL22       SET TIMER 2 LATCH
+0664  E3B3- AD 5B 14           LDA ACR2        OF 6552-2
+0665  E3B6- 29 F3              AND =$F3        ACR3=0, ACR2=0
+0666  E3B8- 09 10              ORA =$10        ACR4=1
+0667  E3BA- 8D 5B 14           STA ACR2
+0668  E3BD- A9 2D              LDA =$2D        PREPARE SHIFT REGISTER
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 16
+
+0669  E3BF- 8D 5A 14           STA SR2         OF TIMER 2
+0670  E3C2- 60                 RTS
+0671                   *
+0672                   *
+0673  E3C3- 20 EB E3   SETTAB  JSR COMTAB      -- TABULATE --
+0674  E3C6- 19 90 17           ORA TABTB,Y
+0675  E3C9- 99 90 17           STA TABTB,Y
+0676  E3CC- 60                 RTS
+0677                   *
+0678                   *
+0679  E3CD- A9 00      CLRTAB  LDA =0          -- CLEAR TABS --
+0680  E3CF- A2 07              LDX =7
+0681  E3D1- 9D 90 17           STA TABTB,X
+0682  E3D4- CA                 DEX
+0683  E3D5- 10 FA              BPL *-4
+0684  E3D7- 60                 RTS
+0685                   *
+0686                   *
+0687  E3D8- 20 FB E4   TAB     JSR PRTCH9+5    -- TABULATE
+0688  E3DB- A5 EE              LDA CURPOS
+0689  E3DD- CD 8A 17           CMP NUMCHR
+0690  E3E0- F0 F5              BEQ TAB-1       RTS, IF END OF LINE
+0691  E3E2- 20 EB E3           JSR COMTAB
+0692  E3E5- 39 90 17           AND TABTB,Y
+0693  E3E8- F0 EE              BEQ TAB
+0694  E3EA- 60                 RTS
+0695                   *
+0696                   *
+0697  E3EB- A5 EE      COMTAB  LDA CURPOS
+0698  E3ED- 29 07              AND =7
+0699  E3EF- AA                 TAX
+0700  E3F0- A5 EE              LDA CURPOS
+0701  E3F2- 4A                 LSR A
+0702  E3F3- 4A                 LSR A
+0703  E3F4- 4A                 LSR A
+0704  E3F5- 29 07              AND =7
+0705  E3F7- A8                 TAY
+0706  E3F8- BD FC E3           LDA MASKTB,X
+0707  E3FB- 60                 RTS
+0708                   *
+0709  E3FC- 80 40 20  MASKTB  BYT 128,64,32,16,8,4,2,1
+0709  E3FF- 10 08 04 
+0709  E402- 02 01 
+0710                   *
+0711                   *
+0712  E404- A6 ED      DELLIN  LDX CURLIN      -- DELETE LINE --
+0713  E406- 20 46 E4           JSR MVUP
+0714  E409- E8                 INX
+0715  E40A- EC 89 17           CPX NUMLIN
+0716  E40D- 90 F7              BCC DELLIN+2
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 17
+
+0717  E40F- 20 84 E1           JSR CHOME1
+0718  E412- AE 89 17           LDX NUMLIN
+0719  E415- 20 76 E2           JSR ROLLOC
+0720  E418- 4C E0 E1           JMP CLRLIN+3
+0721                   *
+0722                   *
+0723  E41B- 20 3A E1   INSLIN  JSR CRMARG
+0724  E41E- AE 89 17           LDX NUMLIN      -- INSERT LINE --
+0725  E421- 20 76 E2           JSR ROLLOC
+0726  E424- A0 00              LDY =0
+0727  E426- 20 EB E2           JSR ENDLIN
+0728  E429- F0 09              BEQ INSL0
+0729  E42B- 20 86 17           JSR FULL
+0730  E42E- 20 1D E3           JSR MOVEUP
+0731  E431- 20 50 E1           JSR CUP
+0732  E434- AE 89 17   INSL0   LDX NUMLIN
+0733  E437- CA                 DEX
+0734  E438- 20 65 E4   INSL1   JSR MVDOWN
+0735  E43B- CA                 DEX
+0736  E43C- E4 ED              CPX CURLIN
+0737  E43E- 10 F8              BPL INSL1
+0738  E440- 20 84 E1           JSR CHOME1
+0739  E443- 4C DD E1           JMP CLRLIN
+0740                   *
+0741  E446- 20 76 E2   MVUP    JSR ROLLOC
+0742  E449- 8A                 TXA
+0743  E44A- 48                 PHA
+0744  E44B- AE 8A 17           LDX NUMCHR
+0745  E44E- E8                 INX
+0746  E44F- AC 8A 17           LDY NUMCHR
+0747  E452- C8                 INY
+0748  E453- B1 E9              LDA (VIDPNT),Y
+0749  E455- A0 00              LDY =0
+0750  E457- 91 E9              STA (VIDPNT),Y
+0751  E459- E6 E9              INC VIDPNT
+0752  E45B- D0 02              BNE *+4
+0753  E45D- E6 EA              INC VIDPNT+1
+0754  E45F- CA                 DEX
+0755  E460- D0 ED              BNE MVUP+9
+0756  E462- 68                 PLA
+0757  E463- AA                 TAX
+0758  E464- 60                 RTS
+0759                   *
+0760  E465- 20 76 E2   MVDOWN  JSR ROLLOC
+0761  E468- 8A                 TXA
+0762  E469- 48                 PHA
+0763  E46A- AE 8A 17           LDX NUMCHR
+0764  E46D- E8                 INX
+0765  E46E- A0 00              LDY =0
+0766  E470- B1 E9              LDA (VIDPNT),Y
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 18
+
+0767  E472- AC 8A 17           LDY NUMCHR
+0768  E475- C8                 INY
+0769  E476- 91 E9              STA (VIDPNT),Y
+0770  E478- E6 E9              INC VIDPNT
+0771  E47A- D0 02              BNE *+4
+0772  E47C- E6 EA              INC VIDPNT+1
+0773  E47E- CA                 DEX
+0774  E47F- D0 ED              BNE MVDOWN+9
+0775  E481- 68                 PLA
+0776  E482- AA                 TAX
+0777  E483- 60                 RTS
+0778                   *
+0779                   * PRTCHR: PRINT CHAR ON CRT
+0780                   ***************************
+0781                   * CHAR IS ALLSO PRINTED ON AUTOPR, IF AUTOPRINT
+0782                   * FLAG IS SET, REGISTERS SAVED
+0783                   *
+0784  E484- 08         PRTCHR  PHP             SAVE STATUS
+0785  E485- 78                 SEI
+0786  E486- 8D 84 17           STA VIDKEY      SAVE CHAR
+0787  E489- 48                 PHA             ALLSO ON STACK
+0788  E48A- 8A                 TXA             SAVE REGISTERS
+0789  E48B- 48                 PHA
+0790  E48C- 98                 TYA
+0791  E48D- 48                 PHA
+0792  E48E- AD 84 17           LDA VIDKEY      GET BACK CHAR
+0793  E491- 48                 PHA
+0794  E492- 58                 CLI
+0795  E493- A9 08              LDA =$08        TEST PRINT FLAG
+0796  E495- 2C 80 17           BIT VFLAG
+0797  E498- F0 05              BEQ *+7
+0798  E49A- 68                 PLA
+0799  E49B- 48                 PHA
+0800  E49C- 20 B8 E4           JSR JAUTOP
+0801  E49F- 68                 PLA
+0802  E4A0- A2 02              LDX =2          DISABLE KEYBOARD IRQ
+0803  E4A2- 8E 5E 14           STX IER2
+0804  E4A5- 8D 84 17           STA VIDKEY
+0805  E4A8- 20 BE E4           JSR PRTCH1
+0806  E4AB- 68                 PLA
+0807  E4AC- A8                 TAY
+0808  E4AD- 68                 PLA
+0809  E4AE- AA                 TAX
+0810  E4AF- A9 82              LDA =$82        ENABLE KEYBOARD IRQ
+0811  E4B1- 78                 SEI
+0812  E4B2- 8D 5E 14           STA IER2
+0813  E4B5- 68                 PLA
+0814  E4B6- 28                 PLP
+0815  E4B7- 60                 RTS
+0816                   *
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 19
+
+0817  E4B8- 6C 8C 17   JAUTOP  JMP (VAUTOP)
+0818                   *
+0819  E4BB- 4C 91 E0   PRTCH2  JMP EXCHR       EXECUTE CONTROL FUNC
+0820                   *
+0821  E4BE- AD 84 17   PRTCH1  LDA VIDKEY
+0822  E4C1- C9 13              CMP =$13        DISPLAY OFF
+0823  E4C3- F0 07              BEQ *+9
+0824  E4C5- A9 10              LDA =$10
+0825  E4C7- 2C 80 17           BIT VFLAG
+0826  E4CA- D0 0D              BNE PRTCH0
+0827  E4CC- AD 84 17           LDA VIDKEY
+0828  E4CF- A2 21              LDX =33         NO OF CONTROL FUNCTIONS
+0829  E4D1- DD B4 E0           CMP CNTKTB,X
+0830  E4D4- F0 E5              BEQ PRTCH2
+0831  E4D6- CA                 DEX
+0832  E4D7- 10 F8              BPL *-6
+0833                   *
+0834  E4D9- AD 84 17   PRTCH0  LDA VIDKEY
+0835  E4DC- C9 5F              CMP =$5F        IF NOT FOUND, RUBOUT?
+0836  E4DE- F0 04              BEQ *+6
+0837  E4E0- C9 7F              CMP =$7F
+0838  E4E2- D0 0B              BNE PRTCH4
+0839  E4E4- 20 26 E1           JSR CLEFT
+0840  E4E7- 20 94 E2           JSR CURLOC
+0841  E4EA- A9 20              LDA =' '
+0842  E4EC- 91 E9              STA (VIDPNT),Y
+0843  E4EE- 60                 RTS
+0844                   *
+0845  E4EF- 2C 80 17   PRTCH4  BIT VFLAG
+0846  E4F2- 10 02              BPL *+4
+0847  E4F4- 09 80              ORA =$80
+0848  E4F6- 20 94 E2   PRTCH9  JSR CURLOC
+0849  E4F9- 91 E9              STA (VIDPNT),Y
+0850  E4FB- A5 EE              LDA CURPOS
+0851  E4FD- CD 8A 17          CMP NUMCHR
+0852  E500- D0 06              BNE *+8
+0853  E502- 20 FC E2           JSR EXCR        AUTO CRLF IF END OF LINE
+0854  E505- 4C 09 E3           JMP EXLF
+0855  E508- 4C 1A E1           JMP CRIGHT
+0856                   *
+0857                   * GETKEY: GET A KEY FROM KEYBOARD
+0858                   *********************************
+0859                   * NO RPINT ON CRT, REGISTERS SAVED
+0860                   *
+0861  E50B- 58         GETKEY  CLI
+0862  E50C- AD 81 17           LDA SFLAG       TEST ESCAPE
+0863  E50F- 30 0D              BMI GETK1
+0864  E511- AD 85 17           LDA CHAR
+0865  E514- F0 F6              BEQ GETKEY+1    WAIT FOR CHAR
+0866  E516- 48                 PHA
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 20
+
+0867  E517- A9 00              LDA =0
+0868  E519- 8D 85 17           STA CHAR
+0869  E51C- 68                 PLA
+0870  E51D- 60                 RTS
+0871                   *
+0872  E51E- 29 7F      GETK1   AND =$7F
+0873  E520- 8D 81 17           STA SFLAG
+0874  E523- A9 00              LDA =0          RETURN AFTER ESC
+0875  E525- 60                 RTS
+0876                   *
+0877                   * GETCHR: GET A CHAR FROM KEYBOARD
+0878                   **********************************
+0879                   * WITH PRINT ON DISPLAY, REGISTERS SAVED
+0880                   *
+0881  E526- 20 0B E5   GETCHR  JSR GETKEY
+0882  E529- 4C 84 E4           JMP PRTCHR
+0883                   *
+0884                   *
+0885                   * GETLIN: GET A LINE FROM KEYBOARD
+0886                   **********************************
+0887                   * VIDEO DISPLAY AS BUFFER IS UNSED
+0888                   * ON EXIT VIDPNT,Y IS COMPUTED AND C=1
+0889                   * IF ESCAPE WAS PRESSED
+0890                   *
+0891  E52C- A6 EE      GETLIN  LDX CURPOS
+0892  E52E- 8E 83 17           STX LMARG       SET LEFT MARGIN
+0893  E531- 2C 81 17   GETL1   BIT SFLAG
+0894  E534- 30 6D              BMI GETL9
+0895  E536- A2 82              LDX =$82        ENABLE KEYBOARD IRQ
+0896  E538- 8E 5E 14           STX IER2
+0897  E53B- 20 0B E5           JSR GETKEY
+0898  E53E- F0 5D              BEQ GETL8
+0899  E540- A2 02              LDX =2  DISABLE KEYBOARD IRQ
+0900  E542- 8E 5E 14           STX IER2
+0901  E545- 8D 84 17           STA VIDKEY
+0902  E548- 48                 PHA
+0903  E549- 20 BE E4           JSR PRTCH1
+0904  E54C- 68                 PLA
+0905  E54D- C9 0D              CMP =$D         IF NOT CARRIAGE RETURN
+0906  E54F- D0 E0              BNE GETL1
+0907  E551- AD 80 17           LDA VFLAG       DO NOT STOP, IF DISPLAY
+0908  E554- 29 10              AND =$10        FLAG ON
+0909  E556- D0 D9              BNE GETL1
+0910                   *
+0911  E558- A6 ED              LDX CURLIN
+0912  E55A- AD 80 17           LDA VFLAG       IF AUTO LF
+0913  E55D- 29 04              AND =$04
+0914  E55F- F0 01              BEQ *+3
+0915  E561- CA                 DEX             DECREMENT LINE NO
+0916  E562- 20 76 E2           JSR ROLLOC
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 21
+
+0917  E565- A9 08              LDA =$08
+0918  E567- 2C 80 17           BIT VFLAG       IF AUTOPRINT SET
+0919  E56A- F0 1C              BEQ GETL3
+0920                   *
+0921  E56C- AC 83 17           LDY LMARG
+0922  E56F- 98         GETL2   TYA
+0923  E570- AA                 TAX             SAVE POINTER
+0924  E571- 20 EB E2           JSR ENDLIN
+0925  E574- F0 12              BEQ GETL3
+0926  E576- 8A                 TXA
+0927  E577- 48                 PHA
+0928  E578- A8                 TAY
+0929  E579- B1 E9              LDA (VIDPNT),Y
+0930  E57B- 20 B8 E4           JSR JAUTOP
+0931  E57E- 68                 PLA
+0932  E57F- A8                 TAY
+0933  E580- C8                 INY
+0934  E581- CC 8A 17           CPY NUMCHR
+0935  E584- 90 E9              BCC GETL2
+0936  E586- F0 E7              BEQ GETL2
+0937                   *
+0938  E588- AD 81 17   GETL3   LDA SFLAG       TEST ESCAPE FLAG
+0939  E58B- 18                 CLC
+0940  E58C- 10 06              BPL *+8
+0941  E58E- 29 7F              AND =$7F        CLEAR IF SET
+0942  E590- 8D 81 17           STA SFLAG
+0943  E593- 38                 SEC
+0944                   *
+0945  E594- AC 83 17   GETL4   LDY LMARG
+0946  E597- A9 00              LDA =0
+0947  E599- 8D 83 17           STA LMARG
+0948  E59C- 60                 RTS             RETURN WITH C=1 IF ESC
+0949                   *
+0950  E59D- 20 40 E4   GETL8   JSR INSL1+8     CLEAR LINE
+0951  E5A0- 38                 SEC
+0952  E5A1- B0 F1              BCS GETL4
+0953                   *
+0954  E5A3- 20 40 E4   GETL9   JSR INSL1+8     CLEAR LINE
+0955  E5A6- 4C 88 E5           JMP GETL3
+0956                   *
+0957                   *
+0958                   * INITIALIZE CRT CONTROLLER
+0959                   *
+0960  E5A9- AD 80 17   ICRTAL  LDA VFLAG
+0961  E5AC- 29 BF              AND =$BF
+0962  E5AE- 8D 80 17           STA VFLAG
+0963  E5B1- 20 C1 E2           JSR LOCRM3
+0964  E5B4- 20 E2 E2           JSR SETCUR
+0965  E5B7- A9 EF              LDA =<CRTTBA
+0966  E5B9- A2 E5              LDX =>CRTTBA
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 22
+
+0967  E5BB- A0 0C              LDY =12
+0968  E5BD- D0 0E              BNE ICRT
+0969                   *
+0970  E5BF- AD 80 17   ICRTGR  LDA VFLAG       INITIALIZE GRAPHICS
+0971  E5C2- 09 40              ORA =$40
+0972  E5C4- 8D 80 17           STA VFLAG
+0973  E5C7- A9 FC              LDA =<CRTTBG
+0974  E5C9- A2 E5              LDX =>CRTTBG
+0975  E5CB- A0 0E              LDY =14
+0976                   *
+0977  E5CD- 85 EB      ICRT    STA VIPNT2
+0978  E5CF- 86 EC              STX VIPNT2+1
+0979  E5D1- A9 3F              LDA =$3F
+0980  E5D3- 8D 03 17           STA DIRA1
+0981  E5D6- B1 EB              LDA (VIPNT2),Y
+0982  E5D8- 8D 02 17           STA PORTA1
+0983  E5DB- 88                 DEY
+0984  E5DC- 8C 20 14   ICRT1   STY CRTADR
+0985  E5DF- B1 EB              LDA (VIPNT2),Y
+0986  E5E1- 8D 21 14           STA CRTDAT
+0987  E5E4- C0 06              CPY =6          IF VERT. DISPLAYED
+0988  E5E6- D0 03              BNE *+5
+0989  E5E8- 8D 98 17           STA DSPLIN      SAVE IN DSPLIN
+0990  E5EB- 88                 DEY
+0991  E5EC- 10 EE              BPL ICRT1
+0992  E5EE- 60                 RTS
+0993                   *
+0994                   * ALPHA INITIALIZATION 16 LINES / 48 CHARS
+0995                   *
+0996  E5EF- 46 30 38   CRTTBA  BYT $46,$30,$38,$06,$14,$01
+0996  E5F2- 06 14 01 
+0997  E5F5- 10 12 00           BYT $10,$12,$00,$0E,$6D,$0D
+0997  E5F8- 0E 6D 0D 
+0998  E5FB- 1C                 BYT $1C
+0999                   *
+1000  E5FC- 27 1C 20  CRTTBG  BYT $27,$1C,$20,$03,$7F,$1F
+1000  E5FF- 03 7F 1F 
+1001  E602- 76 7F 00           BYT $76,$7F,$00,$01,$00,$00
+1001  E605- 01 00 00 
+1002  E608- 07 00              BYT $07,$00
+1003  E60A- 22                 BYT $22
+1004                   *
+1005                   * IGRAPH: INITIALIZE FOR GRAPHICS DISPLAY
+1006                   *****************************************
+1007                   *
+1008  E60B- A6 ED      IGRAPH  LDX CURLIN      MOVE OFF LINES
+1009  E60D- E0 10              CPX =$10
+1010  E60F- 90 07              BCC INIT1       IF MORE THAN 16
+1011  E611- 20 20 E3           JSR MOVEUP+3
+1012  E614- C6 ED              DEC CURLIN
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 23
+
+1013  E616- D0 F3              BNE IGRAPH
+1014                   *
+1015  E618- A2 0F      INIT1   LDX =$F         16 LINES ALPHA
+1016  E61A- 8E 89 17           STX NUMLIN
+1017  E61D- A2 00              LDX =0
+1018  E61F- 8E 82 17           STX OFFSET
+1019  E622- AD 80 17           LDA VFLAG
+1020  E625- 09 20              ORA =$20
+1021  E627- 8D 80 17           STA VFLAG
+1022  E62A- 20 C1 E2           JSR LOCRM3
+1023  E62D- 4C BF E5           JMP ICRTGR
+1024                   *
+1025                   * INITCR: INITIALIZE CT-CONTROL-PROGRAM
+1026                   ***************************************
+1027                   *
+1028  E630- A2 05      INITCR  LDX =5
+1029  E632- A9 00              LDA =0
+1030  E634- 9D 80 17           STA VFLAG,X
+1031  E637- CA                 DEX
+1032  E638- 10 FA              BPL *-4
+1033                   *
+1034  E63A- A9 80              LDA =$80        DEFAULT TABS
+1035  E63C- 20 CF E3           JSR CLRTAB+2
+1036                   *
+1037  E63F- A2 09              LDX =9
+1038  E641- BD 61 E6           LDA CRTTBI,X
+1039  E644- 9D 86 17           STA FULL,X
+1040  E647- CA                 DEX
+1041  E648- 10 F7              BPL *-7
+1042                   *
+1043  E64A- 20 7C E1           JSR CHOME
+1044  E64D- 20 EE E1           JSR CLRDSP
+1045  E650- 20 A9 E5           JSR ICRTAL
+1046                   *
+1047  E653- AD 5B 14   INITKB  LDA ACR2
+1048  E656- 09 01              ORA =1          ENABLE LATCH
+1049  E658- 8D 5B 14           STA ACR2
+1050  E65B- A9 82              LDA =$82        ENABLE IRQ
+1051  E65D- 8D 5E 14           STA IER2
+1052  E660- 60                 RTS
+1053                   *
+1054                   * 40 LINES IN MEMORY / 48 CHARS
+1055                   *
+1056  E661- 60 00 00   CRTTBI  BYT $60,$00,$00 DEFAULT FULL ROUTINE
+1057  E664- 29 2F 00           BYT $29,$2F,0   NUMLIN,NUMCHR,UMARG
+1058  E667- 36 E8              WRD PRTRSA      DEFAULT AUTOPRINT
+1059  E669- 3E E0              WRD IRQ9        DUMMY FUNCTION KEY
+1060                   *
+1061                   *
+1062                   PRTTY   EQU $2800       TTY ROUTINE
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 24
+
+1063                   *
+1064                   * PRTREG: PRINT CPU REGISTER CONTENT (SAVED)
+1065                   ********************************************
+1066                   *
+1067  E66B- 20 99 E6   PRTREG  JSR PRTINF
+1068  E66E- 0D 8A              BYT $D,$8A
+1069  E670- A2 FA              LDX =$FA
+1070  E672- BD 99 E5   PRTR1   LDA PRTR4-$FA,X
+1071  E675- 20 84 E4           JSR PRTCHR
+1072  E678- 20 99 E6           JSR PRTINF
+1073  E67B- BD                 BYT 128+'='
+1074  E67C- B5 F6              LDA SAVPC+7,X
+1075  E67E- 20 C8 E6           JSR PRTBYT
+1076  E681- E0 FA              CPX =$FA
+1077  E683- D0 05              BNE PRTR2
+1078  E685- A5 EF              LDA SAVPC
+1079  E687- 20 C8 E6           JSR PRTBYT
+1080  E68A- 20 99 E6   PRTR2   JSR PRTINF
+1081  E68D- 20 A0              BYT $20,$A0
+1082  E68F- E8                 INX
+1083  E690- D0 E0              BNE PRTR1
+1084  E692- 60                 RTS
+1085                   *
+1086  E693- 50 46 53   PRTR4   BYT 'PFSAYX'
+1086  E696- 41 59 58 
+1087                   *
+1088                   *
+1089                   * PRTINF: PRINT A STRING OF ASCII
+1090                   *********************************
+1091                   * STRING FOLLOWS SUBROUTINE CALL, LAST
+1092                   * CHAR HAS BIT7=1, REGS X AND Y SAVED, A NOT
+1093                   *
+1094  E699- 68         PRTINF  PLA             GET PROGRAM COUNTER
+1095  E69A- 85 E7              STA FETCH
+1096  E69C- 68                 PLA
+1097  E69D- 85 E8              STA FETCH+1
+1098  E69F- 98                 TYA
+1099  E6A0- 48                 PHA             SAVE Y
+1100  E6A1- A0 00              LDY =0
+1101  E6A3- 20 BD E6   PRTIF1  JSR IFETCH
+1102  E6A6- B1 E7              LDA (FETCH),Y
+1103  E6A8- 30 06              BMI PRTIF2
+1104  E6AA- 20 84 E4           JSR PRTCHR      PRINT ONE CHAR
+1105  E6AD- 4C A3 E6           JMP PRTIF1
+1106  E6B0- 29 7F      PRTIF2  AND =$7F
+1107  E6B2- 20 84 E4           JSR PRTCHR      PRINT LAST CHAR
+1108  E6B5- 68                 PLA
+1109  E6B6- A8                 TAY
+1110  E6B7- 20 BD E6           JSR IFETCH
+1111  E6BA- 6C E7 00           JMP (FETCH)
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 25
+
+1112                   *
+1113  E6BD- E6 E7      IFETCH  INC FETCH
+1114  E6BF- D0 02              BNE *+4
+1115  E6C1- E6 E8              INC FETCH+1
+1116  E6C3- 60                 RTS
+1117                   *
+1118                   * PRTAX: PRINT 2 BYTES
+1119                   **********************
+1120                   *
+1121  E6C4- 20 C8 E6   PRTAX   JSR PRTBYT
+1122  E6C7- 8A                 TXA             CONTINUE WITH PRTBYT
+1123                   *
+1124                   * PRTBYT: PRINT A AS TWO HEX CHARS
+1125                   **********************************
+1126                   * ALL REGISTERS SAVED
+1127                   *
+1128  E6C8- 48         PRTBYT  PHA
+1129  E6C9- 4A                 LSR A
+1130  E6CA- 4A                 LSR A
+1131  E6CB- 4A                 LSR A
+1132  E6CC- 4A                 LSR A
+1133  E6CD- 20 D7 E6           JSR PRTHEX
+1134  E6D0- 68                 PLA
+1135  E6D1- 48                 PHA
+1136  E6D2- 20 D7 E6           JSR PRTHEX
+1137  E6D5- 68                 PLA
+1138  E6D6- 60                 RTS
+1139                   *
+1140  E6D7- 29 0F      PRTHEX  AND =$0F
+1141  E6D9- C9 0A              CMP =$0A
+1142  E6DB- 18                 CLC
+1143  E6DC- 30 02              BMI *+4
+1144  E6DE- 69 07              ADC =7
+1145  E6E0- 69 30              ADC =$30
+1146  E6E2- 4C 84 E4           JMP PRTCHR
+1147                   *
+1148                   *
+1149                           PAG
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 26
+
+1150                   *
+1151                   * TABLE OF OPCODES AND ADDRESSING MODES
+1152                   ***************************************
+1153                   * USED FOR ASSEMBLER AND DISASSEMBLER
+1154                   *
+1155  E6E5-          ORG $E722
+1156                   *
+1157  E722- 40 02 45   DISMOD  BYT $40,$02,$45,$03,$D0,$08
+1157  E725- 03 D0 08 
+1158  E728- 40 09 30           BYT $40,$09,$30,$22,$45,$33
+1158  E72B- 22 45 33 
+1159  E72E- D0 08 40           BYT $D0,$08,$40,$09,$40,$02
+1159  E731- 09 40 02 
+1160  E734- 45 33 D0           BYT $45,$33,$D0,$08,$40,$09
+1160  E737- 08 40 09 
+1161  E73A- 40 02 45           BYT $40,$02,$45,$B3,$D0,$08
+1161  E73D- B3 D0 08 
+1162  E740- 40 09 00           BYT $40,$09,$00,$22,$44,$33
+1162  E743- 22 44 33 
+1163  E746- D0 8C 44           BYT $D0,$8C,$44,$00,$11,$22
+1163  E749- 00 11 22 
+1164  E74C- 44 33 D0           BYT $44,$33,$D0,$8C,$44,$9A
+1164  E74F- 8C 44 9A 
+1165  E752- 10 22 44           BYT $10,$22,$44,$33,$D0,$08
+1165  E755- 33 D0 08 
+1166  E758- 40 09 10           BYT $40,$09,$10,$22,$44,$33
+1166  E75B- 22 44 33 
+1167  E75E- D0 08 40           BYT $D0,$08,$40,$09,$62,$13
+1167  E761- 09 62 13 
+1168  E764- 78 A9              BYT $78,$A9
+1169                   *
+1170  E766- 00 21 01   MODE2   BYT $00,$21,$01,$02,$00,$80
+1170  E769- 02 00 80 
+1171  E76C- 59 4D 11           BYT $59,$4D,$11,$12,$06,$4A
+1171  E76F- 12 06 4A 
+1172  E772- 05 1D              BYT $05,$1D
+1173                   *
+1174  E774- 2C 29 2C   CHAR1   BYT $2C,$29,$2C,$3D,$28,$41
+1174  E777- 3D 28 41 
+1175                   *
+1176  E77A- 59 00 58   CHAR2   BYT $59,$00,$58,$00,$00,$00
+1176  E77D- 00 00 00 
+1177                   *
+1178  E780- 1C 8A 1C   MNEML   BYT $1C,$8A,$1C,$23,$5D,$8B
+1178  E783- 23 5D 8B 
+1179  E786- 1B A1 9D           BYT $1B,$A1,$9D,$8A,$1D,$23
+1179  E789- 8A 1D 23 
+1180  E78C- 9D 8B 1D           BYT $9D,$8B,$1D,$A1,$00,$29
+1180  E78F- A1 00 29 
+1181  E792- 19 AE 69           BYT $19,$AE,$69,$A8,$19,$23
+
+----------------------------------------------------------------------
+
+R65 CRT-CONTROLLER                 11/03/18   R65 ASSEMBLER  PAGE 27
+
+1181  E795- A8 19 23 
+1182  E798- 24 53 1B           BYT $24,$53,$1B,$23,$24,$53
+1182  E79B- 23 24 53 
+1183  E79E- 19 A1 00           BYT $19,$A1,$00,$1A,$5B,$5B
+1183  E7A1- 1A 5B 5B 
+1184  E7A4- A5 69 24           BYT $A5,$69,$24,$24,$AE,$AE
+1184  E7A7- 24 AE AE 
+1185  E7AA- A8 AD 29           BYT $A8,$AD,$29,$00,$7C,$00
+1185  E7AD- 00 7C 00 
+1186  E7B0- 15 9C 6D           BYT $15,$9C,$6D,$9C,$A5,$69
+1186  E7B3- 9C A5 69 
+1187  E7B6- 29 53 84           BYT $29,$53,$84,$13,$34,$11
+1187  E7B9- 13 34 11 
+1188  E7BC- A5 69 23           BYT $A5,$69,$23,$A0
+1188  E7BF- A0 
+1189                   *
+1190  E7C0- D8 62 5A   MNEMR   BYT $D8,$62,$5A,$48,$26,$62
+1190  E7C3- 48 26 62 
+1191  E7C6- 94 88 54           BYT $94,$88,$54,$44,$C8,$54
+1191  E7C9- 44 C8 54 
+1192  E7CC- 68 44 E8           BYT $68,$44,$E8,$94,$01,$B4
+1192  E7CF- 94 01 B4 
+1193  E7D2- 08 84 74           BYT $08,$84,$74,$B4,$28,$6E
+1193  E7D5- B4 28 6E 
+1194  E7D8- 74 F4 CC           BYT $74,$F4,$CC,$4A,$72,$F2
+1194  E7DB- 4A 72 F2 
+1195  E7DE- A4 8A 01           BYT $A4,$8A,$01,$AA,$A2,$A2
+1195  E7E1- AA A2 A2 
+1196  E7E4- 74 74 74           BYT $74,$74,$74,$72,$44,$68
+1196  E7E7- 72 44 68 
+1197  E7EA- B2 32 B2           BYT $B2,$32,$B2,$01,$22,$01
+1197  E7ED- 01 22 01 
+1198  E7F0- 1A 1A 26           BYT $1A,$1A,$26,$26,$72,$72
+1198  E7F3- 26 72 72 
+1199  E7F6- 88 C8 C4           BYT $88,$C8,$C4,$CA,$26,$48
+1199  E7F9- CA 26 48 
+1200  E7FC- 44 44 A2          BYT $44,$44,$A2,$C8
+1200  E7FF- C8 
+1201                   *
+1202  E800-                    END
+LABELS=009B
+ERRORS=00
+RECORDS=4B

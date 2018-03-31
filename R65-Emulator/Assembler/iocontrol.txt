@@ -1,0 +1,1270 @@
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 01
+
+0001                   *                             15/8/82 RB
+0002                   *   ************************************
+0003                   *   * IO CONTROLLER FOR R65/JOB SYSTEM *
+0004                   *   ************************************
+0005                   *
+0006                   * EPROM VERSION 1 15/08/79 RB
+0007                   * REVISION 2.3    10/05/82
+0008                   * CC 1978 - 1982 RRICHARZ RBAUMANN
+0009                   *
+0010                           TIT R65/JOB I/O CONTROL
+0011                   *
+0012                   * THE I/O CONTROLER DRIVES THE FOLLOWING
+0013                   * INTERFACES OF THE R65/JOB SYSTEM:
+0014                   * - AUDIO TAPE RECORDING AND WRITING
+0015                   * - SYSTEM TIME OF DAY CLOCK UPDATE
+0016                   *
+0017                   PSTART  EQU $E800       START OF PROGRAM
+0018                   *
+0019                   * PAGE ZERO AREA:
+0020                   *****************
+0021                   *
+0022                   * TAPE LOAD AND STORE TEMPORARIES
+0023                   *
+0024  0000-                    ORG $DA
+0025                   *
+0026  00DA-            FILFLG  BSS 1   FILE ENTRY FLAGS
+0027                   *               BIT 7 1=PROTECTED
+0028                   *               BIT 6 1=NO PRINTING
+0029                   *               BIT 5 1=WRITE, 0=READ
+0030                   *
+0031  00DB-            FILERR  BSS 1   FILE HANDLING ERROR
+0032                   *               01 DISK OR TAPE READ ERROR
+0033                   *               02 CHECKSUM ERROR
+0034                   *               03 ESCAPE EXIT DURING R/W
+0035                   *               04 RECORD NO ERROR ON TAPE
+0036                   *               05 FILE TYPE ERROR
+0037                   *
+0038  00DC-            FILDRV  BSS 1   TAPE OR DISK DRIVE
+0039                   *
+0040                   * TEMPORARY AREA FOR TAPE AND DISK R/W
+0041                   *
+0042  00DD-            TRECID  BSS 2   RECORD ID OF FIRST RECORD
+0043  00DF-            TRECNO  BSS 1   RECORD NUMBER
+0044  00E0-            TRECST  BSS 2   START ADDRESS POINTER
+0045  00E2-            TRECSI  BSS 1   RECORD SIZE
+0046  00E3-            TCOUNT  BSS 1   TEMPORARY COUNTER
+0047  00E4-            TTRIB   BSS 1
+0048  00E5-            TGANG   BSS 1
+0049  00E6-            TCNT1   BSS 1
+0050                   *
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 02
+
+0051                   * PAGE ZERO DATA AREA
+0052                   *********************
+0053                   *
+0054                           ORG $E7
+0055  00E7-            FETCH   BSS 2   REGISTER FOR DATA ROUT.
+0056  00E9-            VIDPNT  BSS 2   VIDEO POINTER
+0057  00EB-            VIPNT2  BSS 2   SECOND VIDEO POINTER
+0058  00ED-            CURLIN  BSS 1   CURSOR LINE
+0059  00EE-            CURPOS  BSS 1   CURSOR POSITION
+0060  00EF-            SAVPC   BSS 2   PROCESSOR PC SAVE
+0061  00F1-            SAVST   BSS 1   PROCESSOR STATUS SAVE
+0062  00F2-            SAVSP   BSS 1   PROCESSOR STACK PN SAVE
+0063  00F3-            SAVACC  BSS 1   PROCESSOR A SAVE
+0064  00F4-            SAVYRG  BSS 1   PROCESSOR Y SAVE
+0065  00F5-            SAVXRG  BSS 1   PROCESSOR X SAVE
+0066  00F6-            CHKHI   BSS 1
+0067  00F7-            CHKSUM  BSS 1
+0068  00F8-            INL     BSS 2   MONITOR INPUT POINTER
+0069  00FA-            POINT   BSS 2   OPEN CELL POINTER
+0070  00FC-            TEMP    BSS 1
+0071  00FD-            TEMPX   BSS 1
+0072  00FE-            KCHAR   BSS 1
+0073  00FF-            MODE    BSS 1
+0074                   *
+0075                   * PAGE 3 2/3 DATA AREA
+0076                   **********************
+0077                   *
+0078  0100-                    ORG $200
+0079  0200-            RSBUFF  BSS 256
+0080                   *
+0081                   * FILE LABEL AREA
+0082                   *
+0083  0300-            FILTYP  BSS 1   TYPE OF ACTIVE FILE
+0084  0301-            FILNAM  BSS 16  FILE NAME
+0085  0311-            FILCYC  BSS 1   CYCLUS NUMBER
+0086  0312-            FILSTP  BSS 1   FILE SUBTYPE
+0087  0313-            FILLOC  BSS 2   LOCATION OR SECTOR
+0088  0315-            FILSIZ  BSS 2   FILE SIZE
+0089  0317-            FILDAT  BSS 3   FILE GENERATION DATE
+0090  031A-            FILSA   BSS 2   START ADDRESS
+0091  031C-            FILEA   BSS 2   END ADDRESS
+0092  031E-            FILLNK  BSS 2   FILE LINK
+0093                   *
+0094  0320-            FILNM1  BSS 16
+0095  0330-            FILCY1  BSS 1
+0096  0331-            FILSA1  BSS 2
+0097  0333-            SAVRST  BSS 2
+0098                   *
+0099                           PAG
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 03
+
+0100                   *
+0101                   * PAGE 17 DATA AREA
+0102                   *******************
+0103                   *
+0104  0335-                    ORG $1780
+0105  1780-            VFLAG   BSS 1
+0106  1781-            SFLAG   BSS 1
+0107                   *
+0108  1782-                    BSS 23  CRT-CONTROLLER DATA AREA
+0109                   *
+0110  1799-            IRQACC  BSS 1   IRQ ACCU SAVE
+0111                   *
+0112  179A-            NMI     BSS 2   NMI VECTOR
+0113  179C-            PRIOTB  BSS 16  PRIORITY IRQ VECTORS
+0114  17AC-            BREAK   BSS 2   BREAK VECTOR
+0115  17AE-            SAVVEC  BSS 2   VECTOR SAVE FOR IBM
+0116  17B0-            IBMCT   BSS 1   IBM TIMER COUNTER
+0117  17B1-            IBCASE  BSS 1   IBM UPPER/LOWER CASE
+0118                   *
+0119  17B2-            IBMFLG  BSS 1   FROM ORIGINAL VERSION
+0120  17B3-            RSFIFO1 BSS 1   FIFO INPUT POINTER
+0121  17B4-            RSFIFO2 BSS 1   FIFO OUTPUT POINTER
+0122  17B5-            TIME    BSS 4   1/20SEC,SEC,MIN,HOUR
+0123  17B9-            DATE    BSS 3   DAY,MONTH,YEAR
+0124                   *
+0125  17BC-                    ORG $17E7
+0126  17E7-            CHKL    BSS 2   TAPE CHECKSUM
+0127  17E9-            SAVX    BSS 3   TAPE SAVE X
+0128                   *
+0129                   * VECTORS TO CTR-CONTROLLER
+0130                   ***************************
+0131                   *
+0132                   GETKEY  EQU $E000       GET KEY FROM KEYBOARD
+0133                   PRTCHR  EQU $E009       PRINT A CHAR TO CRT
+0134                   PRTINF  EQU $E027       PRINT A STRING
+0135                   PRTHEX  EQU $E02A       PRINT HEX CHAR
+0136                   PRTBYT  EQU $E02D       PRINT BYTE IN A
+0137                   PRTAX   EQU $E030       PRINT TWO BYTES
+0138                   KEYIRQ  EQU $E036       KEYBOARD IRQ
+0139                   IRQ9    EQU $E03E       DUMMY IRQ HANDLER
+0140                   *
+0141                   * VECTORS TO KIM-1
+0142                   ******************
+0143                   *
+0144                   CHKT    EQU $194C       *** COMPUTE CHECKSUM
+0145                   RDCHTK  EQU $1A24       *** GET CHAR FROM TAPE
+0146                   TRDBIT  EQU $1A41       *** READ BYTE FROM TAPE
+0147                   KINIT1  EQU $1E8C       *** INITIALIZE TAPE IO
+0148                   KINIT2  EQU $1E93       *** INITIALIZE TAPE IO
+0149                   OUTCH   EQU $1EA0       *** PRINT CHAR ON TTY
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 04
+
+0150                   *
+0151                   * VECTORS TO DISK CONTROLLER
+0152                   ****************************
+0153                   *
+0154                   DWRFIL  EQU $F000       WRITE DISK FILE
+0155                   DRDFIL  EQU $F003       READ DISK FILE
+0156                   *
+0157                   * VECTORS TO MONITOR
+0158                   ********************
+0159                   ILLIRQ  EQU $F803       ILLEGAL INTERRUPT
+0160                   ADAPT   EQU $F818
+0161                   *
+0162                   * INTERFACE CONTROL REGISTERS
+0163                   * ***************************
+0164                   *
+0165                   PORTB1  EQU $1440       6552-1
+0166                   DIRB1   EQU $1442       DIRECTION OF PORTB1
+0167                   *
+0168                   TLC11   EQU $1444       6522-1 TIMER 1
+0169                   THC11   EQU $1445
+0170                   TLL11   EQU $1446
+0171                   THL11   EQU $1447
+0172                   *
+0173                   TLL21   EQU $1448       6552-1 TIMER 2
+0174                   THC21   EQU $1449
+0175                   *
+0176                   SR1     EQU $144A
+0177                   ACR1    EQU $144B       CONTROL REGISTER
+0178                   IFR1    EQU $144D       IRQ FLAG REGISTER
+0179                   IER1    EQU $144E       IRQ ENABLE REGISTER
+0180                   *
+0181                   PORTB2  EQU $1450       6522-2
+0182                   DIRB2   EQU $1451
+0183                   PORTA2  EQU $1451       KEYBOARD REGISTER
+0184                   *
+0185                   TLC12   EQU $1454       6522-2 TIMER 1
+0186                   THC12   EQU $1455       USED FOR TIME CLOCK
+0187                   TLL12   EQU $1456
+0188                   THL12   EQU $1457
+0189                   *
+0190                   ACR2    EQU $145B       CONTROL REGISTER
+0191                   IFR2    EQU $145D
+0192                   IER2    EQU $145E
+0193                   CPRTA2  EQU $145F
+0194                   *
+0195                   PORTB3  EQU $1460       DAC
+0196                   PORTA3  EQU $1461       ADC
+0197                   DIRA3   EQU $1463
+0198                   IFR3    EQU $146D
+0199                   *
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 05
+
+0200                   TAPAON  EQU $14E4       START TAPE A
+0201                   TAPAOF  EQU $14E5       STOP TAPE A
+0202                   TAPBON  EQU $14E6       START TAPE B
+0203                   TAPBOF  EQU $14E7       STOP TAPE B
+0204                   *
+0205                   USPBD   EQU $1702
+0206                   USPBDD  EQU $1703
+0207                   *               BIT 0: TAPE READ/WRITE
+0208                   *               BIT 1: IBM PRINTING
+0209                   *               BIT 2: DISK READ & WRITE
+0210                   *
+0211                   KMPBD   EQU $1742
+0212                   KMC1T   EQU $1744       KIM TIMER
+0213                   TMSEC   EQU $1747
+0214                   *
+0215                   RSADAT  EQU $14C8       RS232
+0216                   RSASTA  EQU $14C9
+0217                   RSACOM  EQU $14CA
+0218                   RSACNT  EQU $14CB
+0219                   *
+0220                           PAG
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 06
+
+0221                   *
+0222                   * START OF PROGRAM
+0223                   *
+0224  17EC-                    ORG PSTART
+0225                   *
+0226                   * VECTORS FOR SUBROUTINE CALLS
+0227                   ******************************
+0228                   *
+0229  E800- 4C 7E E8           JMP PRTTTY      PRINT CHAR TO TTTY
+0230  E803- 4C 98 E8           JMP RSTIOC      RESET I/O/CONTROL
+0231  E806- 4C 5A ED           JMP ESCTST      ESCAPE TEST DURING I=1
+0232  E809- 4C BE ED           JMP TDIR        PRINT TAPE DIRECTORY
+0233  E80C- 4C 51 EB           JMP TWRFIL      WRITE TAPE FILE LABEL
+0234  E80F- 4C D0 ED           JMP TPWAIT      READY MESSAGE FOR TAPE
+0235  E812- 4C 38 EA           JMP TRDREC      LOAD A RECORD FROM TAPE
+0236  E815- 4C F9 EB           JMP RDFILE      LOAD A FILE FROM DRIVE
+0237  E818- 4C 80 E9           JMP TWRREC      WRITE A RECORD TO TAPE
+0238  E81B- 4C 14 EB           JMP WRFILE      WRITE A FILE TO DRIVE
+0239  E81E- 4C B7 EB           JMP SETFID      SET DATE TO FILE LABEL
+0240  E821- 4C C3 EB           JMP TAPEON      START TAPE
+0241  E824- 4C CE EB           JMP TAPEOF      STOP TAPE
+0242  E827- 4C D1 EB           JMP TDELAY      DELAY 1 SEC
+0243  E82A- 4C E1 EB           JMP SETID       SET SET TAPE ID
+0244  E82D- 4C DE EC           JMP PRFLAB      PRINT FILE LABEL
+0245  E830- 4C 03 EC           JMP TRDLBR      READ LABEL RECORD
+0246  E833- 4C 39 E8           JMP IRQ         IRQ POLLING ROUTINE
+0247  E836- 4C 5E E9           JMP PRTRSA      PRINT TO NEEDLE PRINTER
+0248                   *
+0249                   * IRQ PRIORIY HANDLER
+0250                   *********************
+0251                   *
+0252  E839- 8D 99 17   IRQ     STA IRQACC      SAVE A
+0253  E83C- D8                 CLD
+0254  E83D- 68                 PLA
+0255  E83E- 48                 PHA
+0256  E83F- 29 10              AND =$10
+0257  E841- F0 06              BEQ *+8         SKIP,IF NOT BREAK
+0258  E843- AD 99 17           LDA IRQACC
+0259  E846- 6C AC 17           JMP (BREAK)
+0260                   *
+0261  E849- AD 99 17           LDA IRQACC
+0262  E84C- 48                 PHA             SAVE A ON STACK
+0263  E84D- 8A                 TXA
+0264  E84E- 48                 PHA             SAVE X ON STACK
+0265  E84F- 2C 4D 14           BIT IFR1
+0266  E852- 10 04              BPL *+6
+0267  E854- A2 02              LDX =2          SECOND LEVEL
+0268  E856- D0 1D              BNE VECTOR
+0269  E858- 2C 5D 14           BIT IFR2
+0270  E85B- 10 04              BPL *+6
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 07
+
+0271  E85D- A2 00              LDX =0          FIRST LEVEL
+0272  E85F- F0 14              BEQ VECTOR
+0273  E861- 2C 6D 14           BIT IFR3
+0274  E864- 10 04              BPL *+6
+0275  E866- A2 04              LDX =4          THIRD LEVEL
+0276  E868- D0 0B              BNE VECTOR
+0277  E86A- 2C C9 14           BIT RSASTA      WRITE IRQ?
+0278  E86D- 10 04              BPL *+6
+0279  E86F- A2 06              LDX =6
+0280  E871- D0 02              BNE VECTOR
+0281  E873- A2 0E              LDX =$E         LAST LEVEL ILLEGAL
+0282                   *
+0283  E875- BD 9D 17   VECTOR  LDA PRIOTB+1,X  GET VECTOR
+0284  E878- 48                 PHA
+0285  E879- BD 9C 17           LDA PRIOTB,X
+0286  E87C- 48                 PHA
+0287  E87D- 60                 RTS             GO SERVE IRQ, A AND
+0288                   *                       X ARE ON STACK
+0289                   *
+0290                   *
+0291                   * PRINT CHAR ON TTY
+0292                   *******************
+0293                   *
+0294  E87E- D8         PRTTTY  CLD
+0295  E87F- 20 18 F8           JSR ADAPT
+0296  E882- C9 0D              CMP =$0D
+0297  E884- F0 04              BEQ *+6
+0298  E886- 20 A0 1E           JSR OUTCH       OUTCH (KIM)
+0299  E889- 60                 RTS
+0300                   *
+0301  E88A- 20 A0 1E           JSR OUTCH
+0302  E88D- A2 05              LDX =5
+0303  E88F- A9 00      LOOP    LDA =0
+0304  E891- 20 A0 1E           JSR OUTCH
+0305  E894- CA                 DEX
+0306  E895- D0 F8              BNE LOOP
+0307  E897- 60                 RTS
+0308                   *
+0309                   *
+0310                   * RESET I/O CONTROLLER SUBROUTINE
+0311                   *********************************
+0312                   *
+0313  E898- A2 0F      RSTIOC  LDX =15         SET UP PRIORITY
+0314  E89A- BD CF E8           LDA IRQTB,X     TABLE
+0315  E89D- 9D 9C 17           STA PRIOTB,X
+0316  E8A0- CA                 DEX
+0317  E8A1- 10 F7              BPL *-7
+0318                   *
+0319  E8A3- AD 5B 14           LDA ACR2        SET TIME CLOCK
+0320  E8A6- 29 7F              AND =$7F        DISABLE BP7 OUT
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 08
+
+0321  E8A8- 09 40              ORA =$40        SET TO FREE RUNNING
+0322  E8AA- 8D 5B 14           STA ACR2
+0323  E8AD- A9 50              LDA =$50        SET TO 1/20 SEC
+0324  E8AF- 8D 56 14           STA TLL12       (50000 MICROSEC)
+0325  E8B2- A9 3C              LDA =$3C        =$C350
+0326  E8B4- 8D 55 14           STA THC12       AND START CLOCK
+0327  E8B7- A9 C0              LDA =$C0        ALLOW IRQ FROM T1
+0328  E8B9- 8D 5E 14           STA IER2        OF 6522-2
+0329  E8BC- A9 00              LDA =0
+0330  E8BE- 8D B3 17           STA RSFIFO1     CLEAR FIFO POINTERS
+0331  E8C1- 8D B4 17           STA RSFIFO2
+0332  E8C4- A9 02              LDA =$02        INIT RS232 A
+0333  E8C6- 8D CA 14           STA RSACOM
+0334  E8C9- A9 1C              LDA =$1C        4800 BAUD
+0335  E8CB- 8D CB 14           STA RSACNT
+0336  E8CE- 60                 RTS
+0337                   *
+0338  E8CF- DE E8 23   IRQTB   WRD TIMIRQ-1,EXIRQ-1,EXIRQ-1
+0338  E8D2- E9 23 E9 
+0339  E8D5- 2C E9 23           WRD RSIRQ-1,EXIRQ-1,EXIRQ-1
+0339  E8D8- E9 23 E9 
+0340  E8DB- 23 E9 23           WRD EXIRQ-1,EXIRQ-1
+0340  E8DE- E9 
+0341                   *
+0342                   *
+0343                   * IRQ HANDLER FOR 6522-2
+0344                   ************************
+0345                   *
+0346  E8DF- A9 02      TIMIRQ  LDA =$02
+0347  E8E1- 2D 5E 14           AND IER2
+0348  E8E4- 2C 5D 14           BIT IFR2        IS IRQ FROM KEYBOARD
+0349  E8E7- F0 03              BEQ *+5
+0350  E8E9- 4C 36 E0           JMP KEYIRQ      YES, GO TO SERVE IT
+0351                   *
+0352  E8EC- A9 00              LDA =0
+0353  E8EE- 2D 5E 14           AND IER2
+0354  E8F1- 2C 5D 14           BIT IFR2        IS IRQ FROM TIMER1?
+0355  E8F4- D0 03              BNE *+5
+0356  E8F6- 4C 03 F8           JMP ILLIRQ      ILLEGAL IRQ FROM 6522-2
+0357                   *
+0358  E8F9- A9 40              LDA =$40
+0359  E8FB- 8D 5E 14           STA IER2
+0360  E8FE- 58                 CLI             AND ALLOW OTHER IRQ
+0361  E8FF- AD 54 14           LDA TLC12       CLEAR IRQ FLAG
+0362                   *
+0363  E902- A2 00              LDX =0          UPDATE NOW CLOCK
+0364  E904- F8                 SED
+0365  E905- BD B5 17   TIMIR1  LDA TIME,X      GET A BYTE
+0366  E908- 18                 CLC
+0367  E909- 69 01              ADC =1          INCREMENT DECIMAL
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 09
+
+0368  E90B- 9D B5 17           STA TIME,X
+0369  E90E- DD 28 E9           CMP MAXVAL,X
+0370  E911- 90 0A              BCC TIMIR2      SKIP, IF NO OVERFLOW
+0371  E913- A9 00              LDA =0
+0372  E915- 9D B5 17           STA TIME,X
+0373  E918- E8                 INX
+0374  E919- E0 05              CPX =5          UPDATE UP TO DAYS
+0375  E91B- D0 E8              BNE TIMIR1
+0376                   *
+0377  E91D- 78         TIMIR2  SEI
+0378  E91E- A9 C0              LDA =$C0        ENABLE THIS IRQ AGAIN
+0379  E920- 8D 5E 14           STA IER2
+0380  E923- D8                 CLD
+0381  E924- 68         EXIRQ   PLA             EXIT IRQ ROUTINE
+0382  E925- AA                 TAX
+0383  E926- 68                 PLA
+0384  E927- 40                 RTI
+0385                   *
+0386  E928- 20 60 60   MAXVAL  BYT $20,$60,$60,$24,$31
+0386  E92B- 24 31 
+0387                   *
+0388                   *
+0389                   * RSIRQ: NEEDLE PRINTER IRQ HANDLER
+0390                   ***********************************
+0391                   *
+0392  E92D- 50 19      RSIRQ   BVC RSIRQ1      STOP TX IRQ IF DSR NOT
+0393  E92F- A9 07              LDA =$07                        READY
+0394  E931- CD CA 14           CMP RSACOM      TX IRQ SET?
+0395  E934- F0 03              BEQ *+5         YES, SKIP
+0396  E936- 8D CA 14           STA RSACOM      NO, SET IT
+0397  E939- AD C9 14           LDA RSASTA      GET STATUS
+0398  E93C- 29 10              AND =$10        TX EMPTY?
+0399  E93E- F0 E4              BEQ EXIRQ       NO, EXIT
+0400                   *
+0401  E940- AD B3 17           LDA RSFIFO1     FIFO EMPTY?
+0402  E943- CD B4 17           CMP RSFIFO2
+0403  E946- D0 07              BNE RSIRQ2
+0404                   *
+0405  E948- A9 0B      RSIRQ1  LDA =$B         FIFO EMPTY OR DSR NOT
+0406  E94A- 8D CA 14           STA RSACOM                      READY
+0407  E94D- D0 D5              BNE EXIRQ       ALLWAYS TAKEN
+0408                   *
+0409  E94F- EE B4 17   RSIRQ2  INC RSFIFO2
+0410  E952- AE B4 17           LDX RSFIFO2
+0411  E955- BD 00 02           LDA RSBUFF,X    GET A CHAR
+0412  E958- 8D C8 14           STA RSADAT      SEND IT
+0413  E95B- 4C 24 E9           JMP EXIRQ
+0414                   *
+0415                   *
+0416                   * PRTRSA: PRINT TO RS232 A (FIFO)
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 10
+
+0417                   *********************************
+0418                   *
+0419  E95E- AA         PRTRSA  TAX             SAVE CHAR
+0420  E95F- 58                 CLI
+0421                   *
+0422  E960- AD B4 17   PRTRSA1 LDA RSFIFO2     IS FIFO FULL?
+0423  E963- 18                 CLC
+0424  E964- ED B3 17           SBC RSFIFO1
+0425  E967- F0 F7              BEQ PRTRSA1     YES, WAIT
+0426                   *
+0427  E969- 78                 SEI
+0428  E96A- EE B3 17           INC RSFIFO1     NO, CONTINUE
+0429  E96D- AC B3 17           LDY RSFIFO1
+0430  E970- 8A                 TXA
+0431  E971- 99 00 02           STA RSBUFF,Y
+0432  E974- A9 07              LDA =7
+0433  E976- CD CA 14           CMP RSACOM      IS TX IRQ SET
+0434  E979- F0 03              BEQ RSEND       YES, SKIP
+0435                   *
+0436  E97B- 8D CA 14           STA RSACOM      NO, SET IT
+0437                   *
+0438  E97E- 58         RSEND   CLI
+0439  E97F- 60                 RTS
+0440                   *
+0441                   *
+0442                   * TWRREC: WRITE RECORD TO TAPE
+0443                   ******************************
+0444                   *
+0445                   * RECORD FORMAT:(64*SYNCH),$2A,ID(2),RECNO
+0446                   *   RESIZE,1-256 BYTE BINARY DATA,$2F,CHECKS
+0447                   *
+0448                   * THIS SUBROUTINE ASSUMES, THAT THE DRIVE IS ON
+0449                   * ESCAPE GIVES EXIT FRO TWRREC WITH A=3
+0450                   *
+0451                   * ENTRY PARAMETERS: TRECID,TRECNO,TRECST
+0452                   *       RECORD SIZE IN A (1-256 BYTES)
+0453                   * EXIT CONDITIONS: STATUS IN A
+0454                   *
+0455  E980- E6 DF      TWRREC  INC TRECNO      COUNT THIS RECORD
+0456  E982- 85 E2              STA TRECSI      SAVE RECORD SIZE
+0457  E984- 20 19 EA           JSR TWRSYN      INITIALIZE, WRITE SYNCH
+0458  E987- D0 42              BNE CLLED1      ERROR EXIT
+0459  E989- A9 2A              LDA =$2A
+0460  E98B- 20 CF E9           JSR TWRBT       WRITE START MARK
+0461  E98E- A5 DD              LDA TRECID
+0462  E990- 20 CC E9           JSR TWRBTC      WRITE ID, START CHECKS
+0463  E993- A5 DE              LDA TRECID+1
+0464  E995- 20 CC E9           JSR TWRBTC
+0465  E998- A5 DF              LDA TRECNO
+0466  E99A- 20 CC E9           JSR TWRBTC      WRITE RECORD NO
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 11
+
+0467  E99D- A5 E2              LDA TRECSI
+0468  E99F- 20 CC E9           JSR TWRBTC      WRITE RECORD SIZE
+0469                   *
+0470  E9A2- A0 00      TWRRE1  LDY =0
+0471  E9A4- B1 E0              LDA (TRECST),Y
+0472  E9A6- 20 CC E9           JSR TWRBTC      WRITE DATA BYTE
+0473  E9A9- E6 E0              INC TRECST
+0474  E9AB- D0 02              BNE *+4
+0475  E9AD- E6 E1              INC TRECST+1
+0476                   *
+0477  E9AF- C6 E2              DEC TRECSI      COUNT THIS BYTE
+0478  E9B1- D0 EF              BNE TWRRE1
+0479                   *
+0480  E9B3- A9 2F              LDA =$2F                END OF DATA MARK
+0481  E9B5- 20 CC E9           JSR TWRBTC
+0482  E9B8- AD E7 17           LDA CHKL
+0483  E9BB- 20 CF E9           JSR TWRBT       WRITE CHECKSUM
+0484  E9BE- AD E8 17           LDA CHKL+1
+0485  E9C1- 20 CF E9           JSR TWRBT
+0486  E9C4- A9 16              LDA =$16        END OF RECORD MARK
+0487  E9C6- 20 CF E9           JSR TWRBT
+0488  E9C9- A9 00              LDA =0          A=0: NORMAL EXIT
+0489                   *
+0490  E9CB- 60         CLLED1  RTS
+0491                   *
+0492                   * WRITE BYTE TO TAPE
+0493                   ********************
+0494                   *
+0495  E9CC- 20 4C 19   TWRBTC  JSR CHKT        UPDATE CKECKSUM
+0496                   *
+0497  E9CF- A0 07      TWRBT   LDY =7
+0498  E9D1- 84 E3              STY TCOUNT
+0499  E9D3- A0 02      TWRBT1  LDY =2
+0500  E9D5- 84 E4              STY TTRIB
+0501  E9D7- BE 15 EA   TWRBT2  LDX TWRBT6,Y
+0502  E9DA- 48                 PHA
+0503  E9DB- 2C 47 17   TWRBT3  BIT TMSEC
+0504  E9DE- 10 FB              BPL TWRBT3
+0505  E9E0- B9 16 EA           LDA TWRBT6+1,Y
+0506  E9E3- 8D 44 17           STA KMC1T
+0507  E9E6- A5 E5              LDA TGANG
+0508  E9E8- 49 80              EOR =$80
+0509  E9EA- 8D 42 17           STA KMPBD
+0510  E9ED- 85 E5              STA TGANG
+0511  E9EF- CA                 DEX
+0512  E9F0- D0 E9              BNE TWRBT3
+0513  E9F2- 68                 PLA
+0514  E9F3- C6 E4              DEC TTRIB
+0515  E9F5- F0 05              BEQ TWRBT4
+0516  E9F7- 30 07              BMI TWRBT5
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 12
+
+0517  E9F9- 4A                 LSR A
+0518  E9FA- 90 DB              BCC TWRBT2
+0519  E9FC- A0 00      TWRBT4  LDY =0
+0520  E9FE- F0 D7              BEQ TWRBT2
+0521  EA00- C6 E3      TWRBT5  DEC TCOUNT
+0522  EA02- 10 CF              BPL TWRBT1
+0523  EA04- 20 5A ED           JSR ESCTST      ESCAPE?
+0524  EA07- B0 01              BCS *+3
+0525  EA09- 60                 RTS
+0526                   *
+0527  EA0A- A9 03      TEXIT   LDA =3          ESCAPE DURING R/W
+0528  EA0C- AA                 TAX
+0529  EA0D- 68                 PLA
+0530  EA0E- 68                 PLA
+0531  EA0F- 8A                 TXA
+0532  EA10- C6 DF      TEXIT1  DEC TRECNO      DO NOT COUNT RECORD
+0533  EA12- C9 00              CMP =0          SET Z
+0534  EA14- 60                 RTS
+0535                   *
+0536  EA15- 02 C3 03   TWRBT6  BYT $2,$c3,3,$7E
+0536  EA18- 7E 
+0537                   *
+0538                   * INITIALIZE WRITE AND WRITE SYNC
+0539                   *********************************
+0540                   *
+0541  EA19- A9 00      TWRSYN  LDA =0  CLEAR CHECKSUM
+0542  EA1B- 8D E7 17           STA CHKL
+0543  EA1E- 8D E8 17           STA CHKL+1
+0544  EA21- A9 27              LDA =$27
+0545  EA23- 85 E5              STA TGANG
+0546  EA25- A2 BF              LDX =$BF
+0547  EA27- 20 93 1E           JSR KINIT2      INITIALIZE KIM TAPE IO
+0548  EA2A- A2 40              LDX =64 AND SET I
+0549  EA2C- 86 E6              STX TCNT1
+0550  EA2E- A9 16      TWRHIC  LDA =$16        SYNCH COUNTER
+0551  EA30- 20 CF E9           JSR TWRBT
+0552  EA33- C6 E6              DEC TCNT1
+0553  EA35- D0 F7              BNE TWRHIC
+0554  EA37- 60                 RTS             NORMAL EXIT, C=1
+0555                   *
+0556                   * TRDREC: READ RECORD FROM TAPE
+0557                   *******************************
+0558                   *
+0559                   * THIS ROUTINE ASSUMES, THAT THE DRIVE IS
+0560                   * ON, IIS SET TO 1
+0561                   * IF FILFLG, BIT 6=0 AND ERROR, SEVERALTRIES
+0562                   * ARE DONE, UNTIL NO ERROR OR ESCAPE
+0563                   *
+0564                   * ENTRY PARAMETERS: TRECID, TRECNO,TRECST,FILFLG
+0565                   * EXIT PARAMETERS: STATUS IN A
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 13
+
+0566                   *
+0567  EA38- E6 DF      TRDREC  INC TRECNO      COUNT RECORD
+0568                   *
+0569  EA3A- A5 E0              LDA TRECST      SAVE RECORDSTART
+0570  EA3C- A6 E1              LDX TRECST+1
+0571  EA3E- 8D 33 03           STA SAVRST
+0572  EA41- 8E 34 03           STX SAVRST+1
+0573  EA44- 20 D5 EA           JSR TRDSYN      INITIALIZE AND SYNCH
+0574  EA47- 20 BD EA           JSR TRDBTC      GET ID LOW
+0575  EA4A- C5 DD              CMP TRECID
+0576  EA4C- D0 EC              BNE TRDREC+2
+0577  EA4E- 20 BD EA           JSR TRDBTC      GET ID HIGH
+0578  EA51- C5 DE              CMP TRECID+1
+0579  EA53- D0 E5              BNE TRDREC+2
+0580  EA55- 20 BD EA           JSR TRDBTC      GET RECORD NO
+0581  EA58- C5 DF              CMP TRECNO
+0582  EA5A- F0 12              BEQ TRDRE0
+0583                   *
+0584  EA5C- 90 DC              BCC TRDREC+2    TRY AGAIN, IF SMALLER
+0585  EA5E- A9 04              LDA =4          RECORD NUMBER ERROR
+0586  EA60- 24 DA              BIT FILFLG
+0587  EA62- 70 AC              BVS TEXIT1      EXIT WITH ERRROR 4
+0588                   *
+0589  EA64- 20 73 ED           JSR TREWD       OR REWIND ONE RECORD
+0590  EA67- 90 D1              BCC TRDREC+2    AND SEARCH AGAIN, OR
+0591  EA69- A9 03      TEXIT3  LDA =3          IF ESCAPE WAS PRESSED
+0592  EA6B- 4C 10 EA           JMP TEXIT1      EXIT WITH ERROR3
+0593                   *
+0594  EA6E- 20 BD EA   TRDRE0  JSR TRDBTC      GET RECORD SIZE
+0595  EA71- 85 E2              STA TRECSI
+0596                   *
+0597  EA73- 20 BD EA   TRDRE1  JSR TRDBTC      GET ONE DATA BYTE
+0598  EA76- A0 00              LDY =0
+0599  EA78- 91 E0              STA (TRECST),Y
+0600  EA7A- E6 E0              INC TRECST
+0601  EA7C- D0 02              BNE *+4
+0602  EA7E- E6 E1              INC TRECST+1
+0603                   *
+0604  EA80- C6 E2              DEC TRECSI      COUNT DATA BYTE
+0605  EA82- D0 EF              BNE TRDRE1
+0606                   *
+0607  EA84- 20 BD EA           JSR TRDBTC      READ END OF DATA MARK
+0608  EA87- C9 2F              CMP =$2F
+0609  EA89- D0 13              BNE TRDRE8
+0610  EA8B- 20 CE EA           JSR TRDBT       GET CHECKSUM LOW
+0611  EA8E- CD E7 17           CMP CHKL
+0612  EA91- D0 0F              BNE TRDRE9
+0613  EA93- 20 CE EA           JSR TRDBT       GET CHECKSUM HIGH
+0614  EA96- CD E8 17           CMP CHKL+1
+0615  EA99- D0 07              BNE TRDRE9
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 14
+
+0616  EA9B- A9 00              LDA =0          A=0, NORMAL EXIT
+0617  EA9D- 60                 RTS             Z=1
+0618                   *
+0619  EA9E- A9 01      TRDRE8  LDA =1          READ ERROR
+0620  EAA0- D0 02              BNE TRDRE9+2    SLLWAYS TAKEN
+0621                   *
+0622  EAA2- A9 02      TRDRE9  LDA =2          CHECKSUM ERROR
+0623  EAA4- 24 DA              BIT FILFLG      MESSAGE ALLOWED?
+0624  EAA6- 70 C3              BVS TEXIT3+2    IF NOT, ERROR EXIT
+0625                   *
+0626  EAA8- AE 33 03           LDX SAVRST      SAME START ADDRESS
+0627  EAAB- AC 34 03           LDY SAVRST+1    AGAIN FOR NEXT TRY
+0628  EAAE- 86 E0              STX TRECST
+0629  EAB0- 84 E1              STY TRECST+1
+0630  EAB2- 20 73 ED           JSR TREWD       REWIND ONE RECORD
+0631  EAB5- B0 03              BCS *+5
+0632  EAB7- 4C 3A EA           JMP TRDREC+2    TRY AGAIN
+0633  EABA- 4C 69 EA           JMP TEXIT3      OR ESCAPE EXIT
+0634                   *
+0635                   *
+0636                   * READ BYTE FROM TAPE
+0637                   *********************
+0638                   *
+0639  EABD- 20 CE EA   TRDBTC  JSR TRDBT
+0640  EAC0- 48                 PHA
+0641  EAC1- 20 5A ED           JSR ESCTST      ESCAPE?
+0642  EAC4- 90 04              BCC TRDBT2
+0643                   *
+0644  EAC6- 68         TEXIT2  PLA             ESCAPE
+0645  EAC7- 4C 0A EA           JMP TEXIT       ALWAYS TAKEN
+0646                   *
+0647  EACA- 68         TRDBT2  PLA
+0648  EACB- 4C 4C 19           JMP CHKT        UPDATE CHECKSUM
+0649                   *
+0650  EACE- 20 24 1A   TRDBT   JSR RDCHTK
+0651  EAD1- AD EA 17           LDA SAVX+1
+0652  EAD4- 60                 RTS
+0653                   *
+0654                   * SYNCHRONIZE AND INITIALIZE
+0655                   *
+0656  EAD5- A9 00      TRDSYN  LDA =0          CLEAR CHECKSUM
+0657  EAD7- 8D E7 17           STA CHKL
+0658  EADA- 8D E8 17           STA CHKL+1
+0659  EADD- 20 8C 1E           JSR KINIT1      INITIALIZE KIM TAPE IO
+0660  EAE0- A2 FF      TRDSY1  LDX =$FF
+0661  EAE2- 8E E9 17           STX SAVX
+0662  EAE5- 20 5A ED   TRDSY2  JSR ESCTST      ESCAPE?
+0663  EAE8- B0 DD              BCS TEXIT2+1
+0664  EAEA- 20 41 1A           JSR TRDBIT
+0665  EAED- 4E E9 17           LSR SAVX
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 15
+
+0666  EAF0- 0D E9 17           ORA SAVX
+0667  EAF3- 8D E9 17           STA SAVX
+0668  EAF6- C9 16              CMP =$16        SYNCH?
+0669  EAF8- D0 EB              BNE TRDSY2
+0670                   *
+0671  EAFA- A2 08      TRDSY3  LDX =8          READ 8 SYNCH CHARS
+0672  EAFC- 20 CE EA           JSR TRDBT
+0673  EAFF- C9 16              CMP =$16
+0674  EB01- D0 DD              BNE TRDSY1
+0675  EB03- CA                 DEX
+0676  EB04- D0 F6              BNE TRDSY3+2
+0677                   *
+0678  EB06- 20 CE EA   TRDSY4  JSR TRDBT
+0679  EB09- C9 2A              CMP =$2A
+0680  EB0B- F0 06              BEQ TRDSY5
+0681  EB0D- C9 16              CMP =$16
+0682  EB0F- D0 CF              BNE TRDSY1
+0683  EB11- F0 F3              BEQ TRDSY4
+0684                   *
+0685  EB13- 60         TRDSY5  RTS
+0686                   *
+0687                   * WRFILE: WRITE BLOCK FILE
+0688                   **************************
+0689                   *
+0690                   * ENTRY CONDITIONS: FILNAM,FILCYC,FILSA
+0691                   *   FILEA,FILDRV,FILSTP,FILLOC (TAPE ONLY)
+0692                   *   FILFLG
+0693                   *
+0694                   * EXIT CONDITION: FILERR AND A
+0695                   *
+0696  EB14- AD 1A 03   WRFILE  LDA FILSA       USE SAME BLOCK TO
+0697  EB17- 8D 31 03           STA FILSA1      STORE AS DEFINED
+0698  EB1A- AD 1B 03           LDA FILSA+1     IN DIRECTORY
+0699  EB1D- 8D 32 03           STA FILSA1+1
+0700                   *
+0701  EB20- 20 B7 EB           JSR SETFID      SET DATE TO FILE DATE
+0702  EB23- A5 DA              LDA FILFLG
+0703  EB25- 29 80              AND =$80        MASK PROTECTED FLAG
+0704  EB27- 09 42              ORA ='B'        B = BLOCK FILE
+0705  EB29- 8D 00 03           STA FILTYP
+0706  EB2C- D8                 CLD
+0707  EB2D- 38                 SEC
+0708  EB2E- AD 1C 03           LDA FILEA       COMPUTE FILSIZ
+0709  EB31- ED 1A 03           SBC FILSA
+0710  EB34- 8D 15 03           STA FILSIZ
+0711  EB37- AD 1D 03           LDA FILEA+1
+0712  EB3A- ED 1B 03           SBC FILSA+1
+0713  EB3D- 8D 16 03           STA FILSIZ+1
+0714  EB40- EE 15 03           INC FILSIZ
+0715  EB43- D0 03              BNE *+5
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 16
+
+0716  EB45- EE 16 03           INC FILSIZ+1
+0717                   *
+0718                   *
+0719  EB48- A9 02              LDA =2  MASK FOR DRIVE TYPE
+0720  EB4A- 24 DC              BIT FILDRV
+0721  EB4C- D0 03              BNE *+5
+0722  EB4E- 4C 00 F0           JMP DWRFIL      WRITE DISK FILE
+0723                   *
+0724                   * TWRFIL: WRITE FILE TO TAPE
+0725                   ****************************
+0726                   * IF FILSIZ(2)=0, ONLY THE LABEL RECORD IS
+0727                   * WRITTEN, FILSA1 AND FILSIZ ARE USED AS THE
+0728                   * DATA POINTERS, TRECST IS INCREMENTED
+0729                   *
+0730  EB51- 20 AD ED   TWRFIL  JSR SETFLB
+0731  EB54- 24 DA              BIT FILFLG
+0732  EB56- 70 0E              BVS TWRFI0      SKIP, IFNOT OUTPUT
+0733                   *
+0734  EB58- 20 27 E0           JSR PRTINF
+0735  EB5B- 0D 0A 0E           BYT $D,$A,$E,'STORING',$8B
+0735  EB5E- 53 54 4F 
+0735  EB61- 52 49 4E 
+0735  EB64- 47 8B 
+0736                   *
+0737  EB66- 78         TWRFI0  SEI
+0738  EB67- 20 C3 EB           JSR TAPEON
+0739  EB6A- 20 D1 EB           JSR TDELAY
+0740                   *
+0741  EB6D- A9 20              LDA =32
+0742  EB6F- 20 80 E9           JSR TWRREC      WRITE LABEL RECORD
+0743  EB72- D0 2D              BNE TWRFI2      SKIP, IF ERROR
+0744  EB74- 20 D1 EB           JSR TDELAY
+0745                   *
+0746  EB77- 20 E1 EB           JSR SETID
+0747  EB7A- AD 31 03           LDA FILSA1      USE FILSA1 AS START
+0748  EB7D- 85 E0              STA TRECST      OF DATA IN MEMORY
+0749  EB7F- AD 32 03           LDA FILSA1+1
+0750  EB82- 85 E1              STA TRECST+1
+0751                   *
+0752  EB84- CE 16 03   TWRFI1  DEC FILSIZ+1    LOOP FOR FULL RECORDS
+0753  EB87- 30 09              BMI TWRFI3
+0754  EB89- A9 00              LDA =0
+0755  EB8B- 20 80 E9           JSR TWRREC
+0756  EB8E- F0 F4              BEQ TWRFI1
+0757  EB90- D0 0F              BNE TWRFI2      ERROR EXIT
+0758                   *
+0759  EB92- AD 15 03   TWRFI3  LDA FILSIZ
+0760  EB95- F0 05              BEQ TWRFI4
+0761  EB97- 20 80 E9           JSR TWRREC
+0762  EB9A- D0 05              BNE TWRFI2
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 17
+
+0763                   *
+0764  EB9C- 20 D1 EB   TWRFI4  JSR TDELAY      ONE SECOND TAPE AT END
+0765  EB9F- A9 00              LDA =0          NORMAL EXIT
+0766  EBA1- 85 DB      TWRFI2  STA FILERR
+0767  EBA3- 24 DA              BIT FILFLG
+0768  EBA5- 70 05              BVS TWRFI5
+0769  EBA7- 20 27 E0           JSR PRTINF
+0770  EBAA- 0D 9A              BYT $D,$9A      CLEAR LINE
+0771                   *
+0772  EBAC- 20 CE EB   TWRFI5  JSR TAPEOF
+0773  EBAF- 20 27 E0           JSR PRTINF
+0774  EBB2- 87                 BYT $87         BELL
+0775  EBB3- 58                 CLI
+0776  EBB4- A5 DB              LDA FILERR
+0777  EBB6- 60                 RTS
+0778                   *
+0779                   * SET DATE TO FILE DATE
+0780                   ***********************
+0781                   *
+0782  EBB7- A2 02      SETFID  LDX =2
+0783  EBB9- BD B9 17           LDA DATE,X
+0784  EBBC- 9D 17 03           STA FILDAT,X
+0785  EBBF- CA                 DEX
+0786  EBC0- 10 F7              BPL SETFID+2
+0787  EBC2- 60                 RTS
+0788                   *
+0789                   * TAPE ON
+0790                   *********
+0791                   *
+0792  EBC3- 18         TAPEON  CLC     CARRY IS ON OR OFF
+0793  EBC4- A5 DC              LDA FILDRV
+0794  EBC6- 2A                 ROL A
+0795  EBC7- 29 03              AND =3
+0796  EBC9- AA                 TAX
+0797  EBCA- BD E4 14           LDA TAPAON,X
+0798  EBCD- 60                 RTS
+0799                   *
+0800                   * TAPE OFF
+0801                   **********
+0802                   *
+0803  EBCE- 38         TAPEOF  SEC
+0804  EBCF- B0 F3              BCS TAPEON+1    ALLWAYS TAKEN
+0805                   *
+0806                   * TDELAY: DELAY 1 SECOND
+0807                   ************************
+0808                   * CAN BE USED BY ANY NON IRQ ROUTINE
+0809                   *
+0810  EBD1- A0 03      TDELAY  LDY =3
+0811  EBD3- A9 FF              LDA =255
+0812  EBD5- 8E 47 17           STX TMSEC
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 18
+
+0813  EBD8- AE 47 17           LDX TMSEC
+0814  EBDB- 10 FB              BPL *-3
+0815  EBDD- 88                 DEY
+0816  EBDE- 10 F3              BPL *-11
+0817  EBE0- 60                 RTS
+0818                   *
+0819                   * COMPUTE ID
+0820                   ************
+0821                   *
+0822  EBE1- A9 00      SETID   LDA =0
+0823  EBE3- 85 DD              STA TRECID
+0824  EBE5- 85 DE              STA TRECID+1
+0825  EBE7- A2 10              LDX =16
+0826  EBE9- BD 01 03   SETID1  LDA FILNAM,X
+0827  EBEC- 18                 CLC
+0828  EBED- 65 DD              ADC TRECID
+0829  EBEF- 85 DD              STA TRECID
+0830  EBF1- 90 02              BCC SETID2
+0831  EBF3- E6 DE              INC TRECID+1
+0832  EBF5- CA         SETID2  DEX
+0833  EBF6- 10 F1              BPL SETID1
+0834  EBF8- 60                 RTS
+0835                   *
+0836                   *
+0837                   * RDFILE: READ FILE FROM TAPE OR DISK
+0838                   *************************************
+0839                   *
+0840                   * ENTRY CONDITIONS: FILFLG,FILNM1,FILCY1,
+0841                   *    FILSA1,FILDRV
+0842                   * EXIT CONDITIONS: FILERR AND A
+0843                   *
+0844  EBF9- D8         RDFILE  CLD
+0845  EBFA- A9 02              LDA =2
+0846  EBFC- 24 DC              BIT FILDRV
+0847  EBFE- D0 5F              BNE TRDFIL      TAPE FILE READ
+0848  EC00- 4C 03 F0           JMP DRDFIL      DISK FILE READ
+0849                   *
+0850                   * TDRLBR: READ LABEL RECORD
+0851                   ***************************
+0852                   *
+0853  EC03- 20 AD ED   TRDLBR  JSR SETFLB      READ LABEL RCORD
+0854                   *
+0855  EC06- 24 DA              BIT FILFLG
+0856  EC08- 70 10              BVS RDFIL1
+0857  EC0A- 20 27 E0           JSR PRTINF
+0858  EC0D- 0D 0A 0E           BYT $D,$A,$E,'SEARCHING',$8B
+0858  EC10- 53 45 41 
+0858  EC13- 52 43 48 
+0858  EC16- 49 4E 47 
+0858  EC19- 8B 
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 19
+
+0859                   *
+0860  EC1A- 78         RDFIL1  SEI
+0861  EC1B- 20 C3 EB           JSR TAPEON
+0862  EC1E- 20 38 EA           JSR TRDREC      GET LABEL RECORD
+0863  EC21- D0 35              BNE RDFIL9      SKIP, IF ERROR
+0864                   *
+0865  EC23- 20 CE EB           JSR TAPEOF
+0866  EC26- AD 20 03           LDA FILNM1
+0867  EC29- F0 2C              BEQ RDFIL5      FILNM1=0, READ NEXT FILE
+0868                   *
+0869  EC2B- A2 0F              LDX =15         COMPARE NOW NAME
+0870  EC2D- BD 20 03   RDFIL2  LDA FILNM1,X
+0871  EC30- DD 01 03           CMP FILNAM,X
+0872  EC33- D0 0D              BNE RDFIL4      NOT MATCHING
+0873  EC35- CA                 DEX
+0874  EC36- 10 F5              BPL RDFIL2
+0875                   *
+0876  EC38- AD 30 03           LDA FILCY1
+0877  EC3B- F0 1A              BEQ RDFIL5      FILCY1=0, READ EVERY CY
+0878  EC3D- CD 11 03           CMP FILCYC
+0879  EC40- F0 15              BEQ RDFIL5      SKIP, IF NOT MATCHING
+0880                   *
+0881  EC42- 24 DA      RDFIL4  BIT FILFLG
+0882  EC44- 70 BD              BVS TRDLBR      CONTINUE SEARCHING
+0883  EC46- 20 27 E0           JSR PRTINF
+0884  EC49- 0D 17 46           BYT $D,$17,'FOUND:'+128
+0884  EC4C- 4F 55 4E 
+0884  EC4F- 44 BA 
+0885  EC51- 20 DE EC           JSR PRFLAB      PRINT FILE LABEL
+0886  EC54- 4C 03 EC           JMP TRDLBR      AND CONTINUE SEARCHING
+0887                   *
+0888  EC57- 60         RDFIL5  RTS
+0889                   *
+0890  EC58- 85 DB      RDFIL9  STA FILERR      GET BACK ONE SUBR LEVEL
+0891  EC5A- 68                 PLA
+0892  EC5B- 68                 PLA
+0893  EC5C- 4C AC EB           JMP TWRFI5      ERROR EXIT
+0894                   *
+0895                   *
+0896  EC5F- 20 03 EC   TRDFIL  JSR TRDLBR      READ LABEL RECORD
+0897  EC62- AD 00 03           LDA FILTYP      MUST BE BLOCK FILE
+0898  EC65- 29 7F              AND =$7F
+0899  EC67- C9 42              CMP ='B'
+0900  EC69- F0 07              BEQ *+9
+0901  EC6B- A9 05              LDA =5          FILE TYPE ERROR
+0902  EC6D- 85 DB      RDFIL8  STA FILERR
+0903  EC6F- 4C AC EB           JMP TWRFI5
+0904                   *
+0905  EC72- AD 31 03           LDA FILSA1      IF FILSA1(2)#0
+0906  EC75- 0D 32 03           ORA FILSA1+1
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 20
+
+0907  EC78- F0 24              BEQ RDFIL6
+0908  EC7A- AD 31 03           LDA FILSA1      SET NEW FILSA
+0909  EC7D- 8D 1A 03           STA FILSA
+0910  EC80- 18                 CLC
+0911  EC81- 6D 15 03           ADC FILSIZ
+0912  EC84- 8D 1C 03           STA FILEA
+0913  EC87- AD 32 03           LDA FILSA1+1
+0914  EC8A- 8D 1B 03           STA FILSA+1
+0915  EC8D- 6D 16 03           ADC FILSIZ+1
+0916  EC90- 8D 1D 03           STA FILEA+1
+0917  EC93- AD 1C 03           LDA FILEA
+0918  EC96- D0 03              BNE *+5
+0919  EC98- CE 1D 03           DEC FILEA+1
+0920  EC9B- CE 1C 03           DEC FILEA
+0921                   *
+0922  EC9E- 24 DA      RDFIL6  BIT FILFLG
+0923  ECA0- 70 16              BVS RDFIL3
+0924  ECA2- 20 27 E0           JSR PRTINF
+0925  ECA5- 0D 97              BYT $D,$97
+0926  ECA7- 20 DE EC           JSR PRFLAB
+0927  ECAA- 20 27 E0           JSR PRTINF
+0928  ECAD- 0D 0A 0E           BYT $D,$A,$E,'LOADING',$8B
+0928  ECB0- 4C 4F 41 
+0928  ECB3- 44 49 4E 
+0928  ECB6- 47 8B 
+0929                   *
+0930  ECB8- 20 E1 EB   RDFIL3  JSR SETID
+0931  ECBB- 20 C3 EB           JSR TAPEON
+0932  ECBE- AD 1A 03           LDA FILSA
+0933  ECC1- AE 1B 03           LDX FILSA+1
+0934  ECC4- 85 E0              STA TRECST
+0935  ECC6- 86 E1              STX TRECST+1
+0936                   *
+0937  ECC8- 20 38 EA   RDFIL7  JSR TRDREC      GET ONE RECPRD
+0938  ECCB- D0 A0              BNE RDFIL8      EXIT ERROR
+0939  ECCD- AD 1C 03           LDA FILEA
+0940  ECD0- C5 E0              CMP TRECST
+0941  ECD2- AD 1D 03           LDA FILEA+1
+0942  ECD5- E5 E1              SBC TRECST+1
+0943  ECD7- B0 EF              BCS RDFIL7
+0944  ECD9- A9 00              LDA =0
+0945  ECDB- 4C A1 EB           JMP TWRFI2      GOOD COMPLETION
+0946                   *
+0947                   * PRINT FILE LABEL
+0948                   ******************
+0949                   *
+0950  ECDE- 20 27 E0   PRFLAB  JSR PRTINF
+0951  ECE1- 0D 8A              BYT $D,$8A
+0952  ECE3- A2 00              LDX =0          PRINT NAME
+0953  ECE5- BD 01 03           LDA FILNAM,X
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 21
+
+0954  ECE8- 20 09 E0           JSR PRTCHR
+0955  ECEB- E8                 INX
+0956  ECEC- E0 10              CPX =16
+0957  ECEE- D0 F5              BNE *-9
+0958                   *
+0959  ECF0- 20 27 E0           JSR PRTINF
+0960  ECF3- AE                 BYT 128+'.'
+0961  ECF4- AD 11 03           LDA FILCYC
+0962  ECF7- 20 2D E0           JSR PRTBYT      PRINT CYCLUS NUMBER
+0963                   *
+0964  ECFA- A9 20              LDA =' '
+0965  ECFC- 20 09 E0           JSR PRTCHR
+0966  ECFF- AE 00 03           LDX FILTYP
+0967  ED02- 10 02              BPL *+4
+0968  ED04- A9 50              LDA ='P'        P=PROTECTED
+0969  ED06- 20 09 E0           JSR PRTCHR
+0970  ED09- 8A                 TXA
+0971  ED0A- 29 7F              AND =$7F
+0972  ED0C- 20 09 E0           JSR PRTCHR      FILE TYPE
+0973  ED0F- AD 12 03           LDA FILSTP
+0974  ED12- 20 09 E0           JSR PRTCHR      FILE SUBTYPE
+0975                   *
+0976  ED15- 20 27 E0           JSR PRTINF
+0977  ED18- A0                 BYT $A0
+0978  ED19- AD 1B 03           LDA FILSA+1
+0979  ED1C- AE 1A 03           LDX FILSA
+0980  ED1F- 20 30 E0           JSR PRTAX       START ADDRESS
+0981  ED22- 20 27 E0           JSR PRTINF
+0982  ED25- AD                 BYT 128+'-'
+0983  ED26- AD 1D 03           LDA FILEA+1
+0984  ED29- AE 1C 03           LDX FILEA
+0985  ED2C- 20 30 E0           JSR PRTAX       END ADDRESS
+0986                   *
+0987  ED2F- 20 27 E0           JSR PRTINF
+0988  ED32- A0                 BYT $A0
+0989  ED33- AD 14 03           LDA FILLOC+1
+0990  ED36- AE 13 03           LDX FILLOC
+0991  ED39- 20 30 E0           JSR PRTAX       LOCATION
+0992                   *
+0993  ED3C- 20 27 E0           JSR PRTINF
+0994  ED3F- A0                 BYT $A0
+0995  ED40- AD 17 03           LDA FILDAT
+0996  ED43- 20 2D E0           JSR PRTBYT
+0997  ED46- 20 27 E0           JSR PRTINF
+0998  ED49- AF                 BYT 128+'/'
+0999  ED4A- AD 18 03           LDA FILDAT+1
+1000  ED4D- 20 2D E0           JSR PRTBYT
+1001  ED50- 20 27 E0           JSR PRTINF
+1002  ED53- AF                 BYT 128+'/'
+1003  ED54- AD 19 03           LDA FILDAT+2
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 22
+
+1004  ED57- 20 2D E0           JSR PRTBYT      CONTINUE WITH ESC TEST
+1005                   *
+1006                   *
+1007                   * ESCTST: ESCAPE TEST DURING I=1
+1008                   ********************************
+1009                   *
+1010  ED5A- AD 81 17   ESCTST  LDA SFLAG
+1011  ED5D- 30 0D              BMI ESCTS1
+1012  ED5F- AD 51 14           LDA PORTA2
+1013  ED62- C9 91              CMP =$91
+1014  ED64- F0 0B              BEQ ESCTS2
+1015  ED66- C9 1B              CMP =$1B
+1016  ED68- F0 07              BEQ ESCTS2
+1017  ED6A- 18                 CLC
+1018  ED6B- 60                 RTS
+1019                   *
+1020  ED6C- 29 7F      ESCTS1  AND =$7F
+1021  ED6E- 8D 81 17           STA SFLAG       CLEAR ESCAPE FLAG
+1022  ED71- 38         ESCTS2  SEC
+1023  ED72- 60                 RTS
+1024                   *
+1025                   *
+1026                   * TREWD: REWIND TAPE ONE RECORD
+1027                   *******************************
+1028                   *
+1029  ED73- 20 CE EB   TREWD   JSR TAPEOF
+1030  ED76- 58                 CLI
+1031  ED77- 20 27 E0           JSR PRTINF
+1032  ED7A- 20 0E 52           BYT ' ',$E,'REWIND TAPE',$A0
+1032  ED7D- 45 57 49 
+1032  ED80- 4E 44 20 
+1032  ED83- 54 41 50 
+1032  ED86- 45 A0 
+1033  ED88- A5 DC              LDA FILDRV
+1034  ED8A- 20 2A E0           JSR PRTHEX
+1035  ED8D- 20 27 E0           JSR PRTINF
+1036  ED90- 07 8B              BYT $7,$8B
+1037  ED92- 20 00 E0           JSR GETKEY
+1038  ED95- 38                 SEC
+1039  ED96- F0 05              BEQ *+7         IF ESCAPE
+1040  ED98- C9 0D              CMP =$D
+1041  ED9A- D0 F6              BNE *-8         OR CR
+1042  ED9C- 18                 CLC
+1043  ED9D- 08                 PHP             SAVE c
+1044  ED9E- A2 0D              LDX =13
+1045  EDA0- A9 5F              LDA =$5F        RUBOUT MESSAGE
+1046  EDA2- 20 09 E0           JSR PRTCHR
+1047  EDA5- CA                 DEX
+1048  EDA6- 10 F8              BPL *-6
+1049  EDA8- 20 C3 EB           JSR TAPEON
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 23
+
+1050  EDAB- 28                 PLP             RESTORE C (1=ESC)
+1051  EDAC- 60                 RTS
+1052                   *
+1053                   * SET FOR LABEL RECORD
+1054                   *
+1055  EDAD- A9 00      SETFLB  LDA =0
+1056  EDAF- 85 DF              STA TRECNO
+1057  EDB1- 85 DD              STA TRECID
+1058  EDB3- 85 DE              STA TRECID+1
+1059  EDB5- A9 00              LDA =<FILTYP
+1060  EDB7- 85 E0              STA TRECST
+1061  EDB9- A9 03              LDA =>FILTYP
+1062  EDBB- 85 E1              STA TRECST+1
+1063  EDBD- 60                 RTS
+1064                   *
+1065                   *
+1066                   * TDIR: TAPE DIRECTORY
+1067                   **********************
+1068                   * ENTRY CONDITIONS: FILDRV
+1069                   * EXIT FROM THIS ROUTINE BY PRESSING ESCAPE
+1070                   *
+1071  EDBE- A9 40      TDIR    LDA =$40        NO OUTPUT BY SUBROUTINE
+1072  EDC0- 85 DA              STA FILFLG
+1073  EDC2- A9 00              LDA =0          TAKE EVERY LABEL RECORD
+1074  EDC4- 8D 20 03           STA FILNM1
+1075  EDC7- 20 03 EC           JSR TRDLBR      GET A LABEL RECORD
+1076  EDCA- 20 DE EC           JSR PRFLAB      AND PRINT INFORMATION
+1077  EDCD- 4C BE ED           JMP TDIR        LOOP
+1078                   *
+1079                   *
+1080                   * TPWAIT: WAIT ON TAPE DRIVE READY
+1081                   **********************************
+1082                   * MESSAGE IS PRINTED, IF ALLOWED, RETURN MUST
+1083                   * BE ANSWERED, C=1 IF ESCAPE WAS PRESSED, ELSE
+1084                   * C=0
+1085                   * FILDRV AND FILFLG (BIT 5,6) ARE USED
+1086                   *
+1087  EDD0- A5 DA      TPWAIT  LDA FILFLG      PRINTING ALLOWED?
+1088  EDD2- 0A                 ASL A
+1089  EDD3- 30 44              BMI TPWAI3-1    RTS IF NOT
+1090                   *
+1091  EDD5- 0A                 ASL A
+1092  EDD6- 30 11              BMI TPWAI1      SKI, IF WRITE
+1093                   *
+1094  EDD8- 20 27 E0           JSR PRTINF
+1095  EDDB- 0D 0A 52           BYT $D,$A,'READ FROM'+128
+1095  EDDE- 45 41 44 
+1095  EDE1- 20 46 52 
+1095  EDE4- 4F CD 
+1096  EDE6- 4C F6 ED           JMP TPWAI2
+
+----------------------------------------------------------------------
+
+R65/JOB I/O CONTROL                16/08/82   R65 ASSEMBLER  PAGE 24
+
+1097                   *
+1098  EDE9- 20 27 E0   TPWAI1  JSR PRTINF
+1099  EDEC- 0D 0A 57           BYT $D,$A,'WRITE TO'+128
+1099  EDEF- 52 49 54 
+1099  EDF2- 45 20 54 
+1099  EDF5- CF 
+1100                   *
+1101  EDF6- 20 27 E0   TPWAI2  JSR PRTINF
+1102  EDF9- 20 54 41           BYT ' TAPE '+128
+1102  EDFC- 50 45 A0 
+1103  EDFF- A5 DC              LDA FILDRV
+1104  EE01- 20 2A E0           JSR PRTHEX
+1105  EE04- 20 27 E0           JSR PRTINF
+1106  EE07- 20 52 45           BYT ' READY? '+128
+1106  EE0A- 41 44 59 
+1106  EE0D- 3F A0 
+1107  EE0F- 20 00 E0           JSR GETKEY
+1108  EE12- 38                 SEC
+1109  EE13- F0 05              BEQ TPWAI3      SKIP, IF ESCAPE
+1110                   *
+1111  EE15- C9 0D              CMP =$D
+1112  EE17- D0 F6              BNE *-8         CONTINUE WAITING
+1113  EE19- 18                 CLC
+1114                   *
+1115  EE1A- 60         TPWAI3  RTS
+1116                   *
+1117                   *
+1118  EE1B-                    END
+LABELS=00CE
+ERRORS=00
+RECORDS=48

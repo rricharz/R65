@@ -1,0 +1,1446 @@
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 01
+
+0001                   *                                15/8/79 RB
+0002                   *
+0003                   ***********************************
+0004                   * MONITOR FOR JOB COMPUTER SYSTEM *
+0005                   ***********************************
+0006                   * EPROM VERSION         15/08/79 RB
+0007                   * CC RRICHARZ RBAUMANN 1977-1982
+0008                   *
+0009                   * MODIFIED 2018 TO START DIRECTLY IN EXDOS
+0010                   *
+0011                   PSTART  EQU $F800       START OF PROGRAM
+0012                   *
+0013                           TIT R65/JOB MONITOR
+0014                   *
+0015                   * THE MONITOR IS LINKED TO THE FOLLOWING
+0016                   * CONTROLER-PROGRAMS:
+0017                   * R65/JOB CRT CONTROLER    E000-E7FF
+0018                   * R65/JOB I/O CONTROLER    E800-EFFF
+0019                   * R65/JON DISK CONTROLER   F800-FFFF
+0020                   *
+0021                   * ERROR CODES
+0022                   *************
+0023                   * 01 READ ERROR
+0024                   * 02 CHECKSUM ERROR
+0025                   * 03 ESCAPE EXIT DURING READ/WRITE
+0026                   * 04 RECORD NUMBER ERROR
+0027                   * 05 FILE TYPE ERROR
+0028                   * 06 FILE NOT FOUND
+0029                   * 07 DISK NOT READY
+0030                   * 08 DIRECTORY FULL, FILE NOT STORED
+0031                   * 09 ILLEGAL IRQ
+0032                   * 10 EXPRESSION MISSING
+0033                   * 11 MEMORY CELL NOT GOOD
+0034                   * 12 BREAK TABLE FULL, NOT INSERTED
+0035                   * 13 ILLEGAL MEMORY CELL FOR BREAK
+0036                   * 14 DOUBLE BRAK POINT SETTING
+0037                   * 15 END OF LINE EXPECTED
+0038                   * 16 SYNTAX WRONG IN REGISTER NAME OR =
+0039                   * 17 BREAKPOINT NOT FOUND IN TABLE
+0040                   * 18 SYNTAX FRONG IN STORE
+0041                   * 19 FILE SUBTYPE WRONG OR MISSING
+0042                   * 20 WRONG FILE TYPE NOT RUN
+0043                   * 21 UNKNOWN MONITOR COMMAND
+0044                   * 22 ILLEGAL OPCODE FOR STEP/TRACE
+0045                   * 23 TOO MANY OPEN FILES, NOT OPENED
+0046                   * 24 DIRECTION ERROR IN SEQUENTIAL R/W
+0047                   * 25 WRONG FILE NUMBER, FILE NOT OPEN
+0048                   * 26 DISK FULL, FILE NOT STORED
+0049                   *
+0050                   * PAGE ZERO TEMPORARY AREA
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 02
+
+0051                   ***************************
+0052                   *
+0053                   * USED FOR DISASSEMBLER AND TRACER
+0054                   *
+0055  0000-                    ORG $DD
+0056  00DD-            DFORM   BSS 1   FORMAT
+0057  00DE-            LENGHT  BSS 1   OPERAND LENGHT
+0058  00DF-            LMNEM   BSS 1   MNEMONIC
+0059  00E0-            RMNEM   BSS 1
+0060  00E1-            DISPC   BSS 2   PC
+0061  00E3-            DISCNT  BSS 1   COUNTER
+0062                   *
+0063                   * USED FOR LOAD/STORE
+0064  00E4-                    ORG $DA
+0065  00DA-            FILFLG  BSS 1
+0066  00DB-            FILERR  BSS 1
+0067  00DC-            FILDRV  BSS 1   TAPE OR DISK DRIVE
+0068                   *
+0069                   * PAGE ZERO PERMANENT DATA AREA
+0070                   *******************************
+0071                   *
+0072  00DD-                    ORG $E7
+0073  00E7-            FETCH   BSS 2   REGISTER FOR DATA ROUT.
+0074  00E9-            VIDPNT  BSS 2   VIDEO POINTER
+0075  00EB-            VIPNT2  BSS 2   SECOND VIDEO POINTER
+0076  00ED-            CURLIN  BSS 1   CURSOR LINE
+0077  00EE-            CURPOS  BSS 1   CURSOR POSITION
+0078  00EF-            SAVPC   BSS 2   PROCESSOR PC SAVE
+0079  00F1-            SAVST   BSS 1   PROCESSOR STATUS SAVE
+0080  00F2-            SAVSP   BSS 1   PROCESSOR STACK PN SAVE
+0081  00F3-            SAVACC  BSS 1   PROCESSOR A SAVE
+0082  00F4-            SAVYRG  BSS 1   PROCESSOR Y SAVE
+0083  00F5-            SAVXRG  BSS 1   PROCESSOR X SAVE
+0084  00F6-            CHKHI   BSS 1
+0085  00F7-            CHKSUM  BSS 1
+0086  00F8-            INL     BSS 2   MONITOR INPUT POINTER
+0087  00FA-            POINT   BSS 2   OPEN CELL POINTER
+0088  00FC-            TEMP    BSS 1
+0089  00FD-            TEMPX   BSS 1
+0090  00FE-            KCHAR   BSS 1
+0091  00FF-            MODE    BSS 1
+0092                   *
+0093                   * PAGE 2/3 DATA AREA:
+0094                   *********************
+0095                   *
+0096  0100-                    ORG $200
+0097  0200-                    BSS 256 RESERVED FOR IO CONTR.
+0098                   *
+0099  0300-            FILTYP  BSS 1
+0100  0301-            FILNAM  BSS 16
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 03
+
+0101  0311-            FILCYC  BSS 1
+0102  0312-            FILSTP  BSS 1
+0103  0313-            FILLOC  BSS 2
+0104  0315-            FILSIZ  BSS 2
+0105  0317-            FILDAT  BSS 3
+0106  031A-            FILSA   BSS 2
+0107  031C-            FILEA   BSS 2
+0108  031E-            FILLNK  BSS 2
+0109                   *
+0110  0320-            FILNM1  BSS 16
+0111  0330-            FILCY1  BSS 1
+0112  0331-            FILSA1  BSS 2
+0113                   *
+0114                   * PAGE 17 DATA AREA:
+0115                   ********************
+0116                   *
+0117  0333-                    ORG $1780
+0118  1780-            VFLAG   BSS 1   VIDEO FLAG REGISTER
+0119  1781-            SFLAG   BSS 1   SYSTEM FLAG REGISTER
+0120                   *
+0121  1782-                    BSS 23  RESERVED FOR CRT CONTR.
+0122  1799-                    BSS 28  RESERVED FOR IO CONTR.
+0123                   NUMCHR  EQU $178A       CHARS PER LINE
+0124                   NMI     EQU $179A       NMI VECTOR
+0125                   BREAK   EQU $17AC       BREAK VECTOR
+0126                   CNTL    EQU $17F2       TTY DELAY
+0127                   CNTH    EQU $17F3       TTY DELAY
+0128                   *
+0129  17B5-            TIME    BSS 4   1/20 SEC,SEC,MIN,HOUR
+0130  17B9-            DATE    BSS 3   DAY/MONTH/YEAR
+0131                   *
+0132  17BC-            TRACFL  BSS 1   TRACE FLAG/COUNTER
+0133  17BD-            BREAKT  BSS 24  BREAK TABLE (8)
+0134                   *
+0135  17D5-            VMON    BSS 2   VECTOR FOR MONITOR
+0136                   *
+0137                   *
+0138                   * VECTORS TO OTHER EPROMS:
+0139                   **************************
+0140                   *
+0141                   GETKEY  EQU $E000       GET KEY FROM KB
+0142                   GETLIN  EQU $E006       GET LINE
+0143                   PRTCHR  EQU $E009       PRINT CHAR TO SCREEN
+0144                   INITCR  EQU $E01B       INIT CRT CONTR.
+0145                   ENDLIN  EQU $E024       TEST END OF LINE
+0146                   PRTREG  EQU $E033       PRINT CPU REGISTER
+0147                   RSTIOC  EQU $E803       RESET I/O CONTR.
+0148                   PRTINF  EQU $E027       PRINT STRING
+0149                   PRTBYT  EQU $E02D       PRINT HEX BYTE
+0150                   PRTAX   EQU $E030       PRINT 2 BYTES
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 04
+
+0151                   ESCTST  EQU $E806       ESCAPE TEST, DURING I=1
+0152                   RDFILE  EQU $E815       READ BLOCK FILE
+0153                   WRFILE  EQU $E81B       WRITE BLOCK FILE
+0154                   TDIR    EQU $E809       PRINT TAPE DIRECTORY
+0155                   RSTFLD  EQU $F006       RESET DISK CONTR.
+0156                   DDIR    EQU $F009       PRINT DISK DIRECTORY
+0157                   DELETE  EQU $F00C       DELETE FILE ON DISK
+0158                   DECCPS  EQU $1CA0       GO TO KIM MONITOR
+0159                   GOEXEC  EQU $1DC8       GO TO USER PROGRAM
+0160                   INITS   EQU $1E88       INITIALIZE KIM
+0161                   INCPT   EQU $1F63       INCREMENT POINT
+0162                   PACK    EQU $1FAC       PACK INPUT (HEX)
+0163                   OPEN    EQU $1FCC       INL TO POINT (2 BT)
+0164                   IRQ     EQU $E833       IRQ PRIORITY HANDLER
+0165                   EXDOS   EQU $C800       EXDOS
+0166                   *
+0167                   * OPCODE TABLE FOR DISASSEMBLER
+0168                   *
+0169                   DISMOD  EQU $E722
+0170                   MODE2   EQU $E766
+0171                   CHAR1   EQU $E774
+0172                   CHAR2   EQU $E77A
+0173                   MNEML   EQU $E780
+0174                   MNEMR   EQU $E7C0
+0175                   *
+0176                           PAG
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 05
+
+0177                   *
+0178                   * START OF PROGRAM
+0179                   *
+0180  17D7-                    ORG PSTART
+0181                   *
+0182                   * VECTORS TO SUBROUTINES
+0183                   ************************
+0184                   *
+0185  F800- 4C 1B F8           JMP RESET       RESET AND GOTO MONITOR
+0186  F803- 4C 30 F9           JMP ILLIRQ      ILLEGAL INTERRUPT
+0187  F806- 4C E7 F8           JMP HEXPDF      GET HEX EXPRESSION
+0188  F809- 4C F3 F8           JMP HEXPZE
+0189  F80C- 4C 4D F9           JMP TEST        TEST INPUT
+0190  F80F- 4C F0 FB           JMP PRTDAT      PRINT DATE
+0191  F812- 4C 09 FC           JMP PRTTIM      PRINT TIME
+0192  F815- 4C CC FD           JMP GETNAM      GET FILENAME FOR INPUT
+0193  F818- 4C A1 F9           JMP ADAPT       ADAPT CHARS FOR OUTPUT
+0194                   *
+0195                   * SYSTEM RESET ROUTINE
+0196                   **********************
+0197                   * CALLED BY RESET AND ON STARTUP
+0198                   *
+0199  F81B- A2 FF      RESET   LDX =$FF        RESET STACK POINTER
+0200  F81D- 9A                 TXS
+0201  F81E- 86 F2              STX SAVSP
+0202  F820- 20 88 1E           JSR INITS
+0203  F823- A2 00              LDX =0          CLEAR CPU FLAG
+0204  F825- 86 F1              STX SAVST
+0205  F827- D8                 CLD
+0206                   *
+0207  F828- A9 98              LDA =<STOP      SET NMI AND BREAK
+0208  F82A- 8D 9A 17           STA NMI
+0209  F82D- 8D AC 17           STA BREAK
+0210  F830- A9 F8              LDA =>STOP
+0211  F832- 8D 9B 17           STA NMI+1
+0212  F835- 8D AD 17           STA BREAK+1
+0213                   *
+0214  F838- A9 80              LDA =$80        SET DEFAULT BAUD RATE
+0215  F83A- 8D F2 17           STA CNTL        (110 BAUD)
+0216  F83D- A9 02              LDA =2
+0217  F83F- 8D F3 17           STA CNTH
+0218                   *
+0219  F842- A9 89              LDA =<GETCOM
+0220  F844- 8D D5 17           STA VMON
+0221  F847- A9 F8              LDA =>GETCOM
+0222  F849- 8D D6 17           STA VMON+1
+0223                   *
+0224  F84C- 8A                 TXA             A=0
+0225  F84D- A2 18              LDX =24         CLEAR BREAK TABLE
+0226  F84F- 9D BC 17           STA TRACFL,X    AND TRACE FLAG
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 06
+
+0227  F852- CA                 DEX
+0228  F853- 10 FA              BPL *-4
+0229                   *
+0230  F855- 20 1B E0           JSR INITCR      INIT CRT-CONTROL
+0231  F858- 20 03 E8           JSR RSTIOC      INIT IO-CONTROL
+0232  F85B- 20 06 F0           JSR RSTFLD      INIT DISK-CONTROL
+0233                   *
+0234  F85E- 58                 CLI             ALLOW NOW INTERRUPTS
+0235                   *
+0236  F85F- 20 27 E0           JSR PRTINF
+0237  F862- 52 36 35           BYT 'R65 MONITOR '
+0237  F865- 20 4D 4F 
+0237  F868- 4E 49 54 
+0237  F86B- 4F 52 20 
+0238  F86E- 31 39 37           BYT '1978-1982 VERSION 3.01',$D,$8A
+0238  F871- 38 2D 31 
+0238  F874- 39 38 32 
+0238  F877- 20 56 45 
+0238  F87A- 52 53 49 
+0238  F87D- 4F 4E 20 
+0238  F880- 33 2E 30 
+0238  F883- 31 0D 8A 
+0239  F886- 4C 00 C8           JMP EXDOS
+0240                   *
+0241                   *
+0242                   * GETCOM: GET MONITOR COMMAND, MAIN LOOP
+0243                   ****************************************
+0244                   *
+0245  F889- 20 27 E0   GETCOM  JSR PRTINF
+0246  F88C- 0D 0A AA           BYT $D,$A,$AA
+0247  F88F- 20 06 E0           JSR GETLIN      GET A LINE
+0248  F892- 20 06 FA           JSR INTCOM
+0249  F895- 4C 89 F8           JMP GETCOM
+0250                   *
+0251                   * STOP: NMI AND BREAK ROUTINE
+0252                   *****************************
+0253                   *
+0254  F898- 85 F3      STOP    STA SAVACC
+0255  F89A- 68                 PLA
+0256  F89B- 85 F1              STA SAVST
+0257  F89D- 68                 PLA
+0258  F89E- 85 EF              STA SAVPC
+0259  F8A0- 68                 PLA
+0260  F8A1- 85 F0              STA SAVPC+1
+0261  F8A3- 84 F4              STY SAVYRG
+0262  F8A5- 86 F5              STX SAVXRG
+0263  F8A7- D8                 CLD
+0264  F8A8- 58                 CLI
+0265  F8A9- BA                 TSX
+0266  F8AA- 86 F2              STX SAVSP
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 07
+
+0267  F8AC- A5 F1              LDA SAVST       TEST FOR BREAK
+0268  F8AE- 29 10              AND =$10
+0269  F8B0- D0 0C              BNE EXBRK
+0270  F8B2- 20 33 E0           JSR PRTREG
+0271  F8B5- 20 27 E0           JSR PRTINF
+0272  F8B8- 4E 4D C9           BYT 'NM',128+'I'
+0273  F8BB- 6C D5 17           JMP (VMON)
+0274                   *
+0275  F8BE- 38         EXBRK   SEC
+0276  F8BF- A5 EF              LDA SAVPC
+0277  F8C1- E9 02              SBC =2
+0278  F8C3- 85 EF              STA SAVPC
+0279  F8C5- 85 F8              STA INL
+0280  F8C7- B0 02              BCS *+4
+0281  F8C9- C6 F0              DEC SAVPC+1
+0282  F8CB- A5 F0              LDA SAVPC+1
+0283  F8CD- 85 F9              STA INL+1
+0284  F8CF- 20 33 E0           JSR PRTREG
+0285  F8D2- 20 27 E0           JSR PRTINF
+0286  F8D5- 42 52 CB           BYT 'BR',128+'K'
+0287  F8D8- 20 02 FB           JSR CLRB1       CLEAR THIS BREAKPOINT
+0288  F8DB- AD BC 17           LDA TRACFL
+0289  F8DE- F0 DB              BEQ EXBRK-3     JUMP TO (VMON)
+0290  F8E0- 4C A3 FC           JMP TRACEM      CONTINUE TRACING
+0291                   *
+0292                   *
+0293                   * HEXP: GET HEX EXPRESSION
+0294                   **************************
+0295                   *
+0296                   * HEXPPC: DEFAULT PC
+0297                   * HEXPDF: DEFAULT IN A,X
+0298                   * HEXPZE: DEFAULT =0
+0299                   * HEXPER: ERROR, IF NOT HEX DIGIT
+0300                   *
+0301  F8E3- A5 EF      HEXPPC  LDA SAVPC
+0302  F8E5- A6 F0              LDX SAVPC+1
+0303                   *
+0304  F8E7- 85 F8      HEXPDF  STA INL
+0305  F8E9- 86 F9              STX INL+1
+0306  F8EB- 20 24 E0           JSR ENDLIN
+0307  F8EE- 20 19 F9           JSR PACKTS
+0308  F8F1- D0 14              BNE HEXP3
+0309                   *
+0310  F8F3- A9 00      HEXPZE  LDA =0
+0311  F8F5- 85 F8              STA INL
+0312  F8F7- 85 F9              STA INL+1
+0313  F8F9- 20 24 E0           JSR ENDLIN
+0314  F8FC- 20 19 F9   HEXP1   JSR PACKTS
+0315  F8FF- D0 06             BNE HEXP3
+0316  F901- C8         HEXP2   INY
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 08
+
+0317  F902- CC 8A 17           CPY NUMCHR
+0318  F905- D0 F5              BNE HEXP1
+0319  F907- A5 F8      HEXP3   LDA INL
+0320  F909- A6 F9              LDX INL+1
+0321  F90B- 60                 RTS
+0322                   *
+0323  F90C- 20 24 E0   HEXPER  JSR ENDLIN
+0324  F90F- 20 19 F9           JSR PACKTS
+0325  F912- F0 DF              BEQ HEXPZE
+0326  F914- A9 10              LDA =$10        ERROR 10
+0327  F916- 4C 32 F9           JMP ERROR
+0328                   *
+0329  F919- B1 E9      PACKTS  LDA (VIDPNT),Y
+0330  F91B- 20 A1 F9           JSR ADAPT
+0331  F91E- 84 FC              STY TEMP
+0332  F920- C9 3A              CMP =$3A
+0333  F922- 30 04              BMI PACKT1
+0334  F924- C9 41              CMP =$41
+0335  F926- 30 03              BMI PACKT1+3
+0336  F928- 20 AC 1F   PACKT1  JSR PACK
+0337  F92B- A4 FC              LDY TEMP
+0338  F92D- C9 00              CMP =0
+0339  F92F- 60                 RTS
+0340                   *
+0341                   * ERROR ROUTINE:
+0342                   ****************
+0343                   *
+0344  F930- A9 09      ILLIRQ  LDA =$09        ERROR 9
+0345                   *
+0346  F932- A8         ERROR   TAY
+0347  F933- A2 FF              LDX =$FF
+0348  F935- 9A                 TXS
+0349  F936- 20 27 E0           JSR PRTINF
+0350  F939- 0D 0A 07           BYT $0D,$0A,$7,'*** ERROR',$A0
+0350  F93C- 2A 2A 2A 
+0350  F93F- 20 45 52 
+0350  F942- 52 4F 52 
+0350  F945- A0 
+0351  F946- 98                 TYA
+0352  F947- 20 2D E0           JSR PRTBYT
+0353  F94A- 6C D5 17           JMP (VMON)
+0354                   *
+0355                   * TEST: COMPARE INPUT BUFFER WITH ARG
+0356                   *************************************
+0357                   * ARG FOLLOWS SUBROUTINE CALL, LAST CHAR
+0358                   * HAS BIT 7 SET, RETURN C=0 IF EQUAL, ELSE C=1.
+0359                   * INPUT BUFFER IS ADDRESSED BY (VIDPNT),Y.
+0360                   * Y IS SAVED IF NOT EQUAL, ELSE Y IS INCREASED
+0361                   * TO FIRST BYTE AFTER MATCHING
+0362                   * STRING IN INPUT BUFFER
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 09
+
+0363                   *
+0364  F94D- 20 24 E0   TEST    JSR ENDLIN
+0365  F950- 68                 PLA             GET DATA POINTER
+0366  F951- 85 E7              STA FETCH
+0367  F953- 68                 PLA
+0368  F954- 85 E8              STA FETCH+1
+0369  F956- 98                 TYA             SAVE Y
+0370  F957- 48                 PHA
+0371  F958- 8A                 TXA             SAVE X
+0372  F959- 48                 PHA
+0373  F95A- A2 00              LDX =0
+0374  F95C- 20 AE F9   TEST1   JSR INCFET
+0375  F95F- A1 E7              LDA (FETCH,X)
+0376  F961- 30 26              BMI TEST4       LAST CHAR FOUND
+0377  F963- B1 E9              LDA (VIDPNT),Y
+0378  F965- 20 A1 F9           JSR ADAPT
+0379  F968- C1 E7              CMP (FETCH,X)
+0380  F96A- D0 08              BNE TEST2       DIFFERENCE FOUND
+0381  F96C- CC 8A 17           CPY NUMCHR
+0382  F96F- F0 03              BEQ TEST2
+0383  F971- C8                 INY
+0384  F972- D0 E8              BNE TEST1       ALLWAYS TAKEN
+0385                   *
+0386  F974- A1 E7      TEST2   LDA (FETCH,X)
+0387  F976- 30 06              BMI TEST3
+0388  F978- 20 AE F9           JSR INCFET
+0389  F97B- 4C 74 F9           JMP TEST2
+0390                   *
+0391  F97E- 68         TEST3   PLA
+0392  F97F- AA                 TAX
+0393  F980- 38                 SEC
+0394  F981- 68                 PLA
+0395  F982- A8                 TAY
+0396  F983- 20 AE F9           JSR INCFET
+0397  F986- 6C E7 00           JMP (FETCH)
+0398                   *
+0399  F989- B1 E9      TEST4   LDA (VIDPNT),Y
+0400  F98B- 20 A1 F9           JSR ADAPT
+0401  F98E- 09 80              ORA =$80
+0402  F990- C1 E7              CMP (FETCH,X)
+0403  F992- D0 E0              BNE TEST2
+0404  F994- CC 8A 17           CPY NUMCHR      END OF LINE?
+0405  F997- F0 01              BEQ *+3
+0406  F999- C8                 INY
+0407  F99A- 68                 PLA
+0408  F99B- AA                 TAX
+0409  F99C- 68                 PLA
+0410  F99D- 18                 CLC
+0411  F99E- 4C 83 F9           JMP TEST4-6
+0412                   *
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 10
+
+0413  F9A1- 29 7F      ADAPT   AND =$7F        IGNORE INVERSE VIDEO
+0414  F9A3- C9 61              CMP =$61        AND CAPITALIZE
+0415  F9A5- 90 06              BCC ADAPT1
+0416  F9A7- C9 7B              CMP =$7B
+0417  F9A9- B0 02              BCS ADAPT1
+0418  F9AB- 29 DF              AND =$DF
+0419  F9AD- 60         ADAPT1  RTS
+0420                   *
+0421  F9AE- E6 E7      INCFET  INC FETCH
+0422  F9B0- D0 02              BNE *+4
+0423  F9B2- E6 E8              INC FETCH+1
+0424  F9B4- 60                 RTS
+0425                   *
+0426                   * ENDER: ERROR, IF NOT EOL
+0427                   **************************
+0428                   *
+0429  F9B5- 20 24 E0   ENDLER  JSR ENDLIN
+0430  F9B8- F0 FA              BEQ ENDLER-1    RTS, IF EOL
+0431  F9BA- A9 15              LDA =$15        ERROR 15
+0432  F9BC- 4C 32 F9           JMP ERROR
+0433                   *
+0434                   * GETDAT: GET DATE
+0435                   ******************
+0436                   *
+0437  F9BF- 20 06 E0   GETDAT  JSR GETLIN
+0438  F9C2- 20 24 E0           JSR ENDLIN
+0439  F9C5- F0 ED              BEQ ENDLER-1    RTS IF EOL
+0440  F9C7- 20 F3 F8           JSR HEXPZE      GET DAY
+0441  F9CA- 8D B9 17           STA DATE
+0442  F9CD- 20 DC F9           JSR GETDA1      GET MONTH
+0443  F9D0- 8D BA 17           STA DATE+1
+0444  F9D3- 20 DC F9           JSR GETDA1      GET YEAR
+0445  F9D6- 8D BB 17           STA DATE+2
+0446  F9D9- 4C B5 F9           JMP ENDLER
+0447                   *
+0448  F9DC- 20 4D F9   GETDA1  JSR TEST
+0449  F9DF- AF                 BYT 128+'/'
+0450  F9E0- 4C F3 F8           JMP HEXPZE
+0451                   *
+0452                   * GETTIM: GET TIME
+0453                   ******************
+0454                   *
+0455  F9E3- 20 06 E0   GETTIM  JSR GETLIN
+0456  F9E6- 20 24 E0           JSR ENDLIN
+0457  F9E9- F0 C9              BEQ ENDLER-1    RTS IF EOL
+0458  F9EB- 20 F3 F8           JSR HEXPZE      GET HOURS
+0459  F9EE- 8D B8 17           STA TIME+3
+0460  F9F1- 20 4D F9           JSR TEST
+0461  F9F4- BA                 BYT 128+':'
+0462  F9F5- 20 F3 F8           JSR HEXPZE      GET MINUTES
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 11
+
+0463  F9F8- 8D B7 17           STA TIME+2
+0464  F9FB- A9 00              LDA =0
+0465  F9FD- 8D B5 17          STA TIME
+0466  FA00- 8D B6 17           STA TIME+1
+0467  FA03- 4C B5 F9           JMP ENDLER
+0468                   *
+0469                   * INTCOM: INTERPRET MONITOR COMMANDS
+0470                   ************************************
+0471                   * CAN BE CALLED FROM OTHER PROGRAMS, TRACE
+0472                   * COMMANDS AND BREAKPOINTS RETURN TO MONITOR
+0473                   * MAIN LOOP, INTERPRETATION STARTS AT
+0474                   * (VIDPNT),Y
+0475                   *
+0476  FA06- 90 01      INTCOM  BCC *+3
+0477  FA08- 60                 RTS             RETURN, IF ESCAPE
+0478                   *
+0479  FA09- 20 24 E0           JSR ENDLIN
+0480  FA0C- F0 FA              BEQ *-4         RTS, IF EOL
+0481  FA0E- 20 4D F9           JSR TEST
+0482  FA11- 47 CF              BYT 'G',128+'O' *** GO ***
+0483  FA13- B0 12              BCS INTC1
+0484  FA15- 20 E3 F8   GO      JSR HEXPPC
+0485  FA18- 20 CC 1F           JSR OPEN
+0486  FA1B- 20 4D F9           JSR TEST
+0487  FA1E- AC                 BYT 128+','
+0488  FA1F- B0 03              BCS *+5
+0489  FA21- 20 97 FB           JSR REG1        SET REGISTERS
+0490                   *
+0491  FA24- 4C C8 1D           JMP GOEXEC
+0492                   *
+0493                   *
+0494  FA27- 20 4D F9   INTC1   JSR TEST
+0495  FA2A- AF                 BYT 128+'/'     *** /(OPEN MEMORY)***
+0496  FA2B- B0 72              BCS INTC2
+0497  FA2D- 20 F3 F8   OPM0    JSR HEXPZE
+0498  FA30- 20 B5 F9           JSR ENDLER      ERROR, IF NOT EOL
+0499  FA33- 20 CC 1F           JSR OPEN
+0500                   *
+0501  FA36- 20 27 E0   OPM1    JSR PRTINF
+0502  FA39- 0D 0A A8           BYT $D,$A,$A8
+0503  FA3C- A5 FB              LDA POINT+1
+0504  FA3E- A6 FA              LDX POINT
+0505  FA40- 20 30 E0           JSR PRTAX
+0506  FA43- 20 27 E0           JSR PRTINF
+0507  FA46- 29 20 A0           BYT $29,$20,$A0
+0508  FA49- A0 00              LDY =0
+0509  FA4B- B1 FA              LDA (POINT),Y
+0510  FA4D- 20 2D E0           JSR PRTBYT
+0511  FA50- 20 27 E0           JSR PRTINF
+0512  FA53- 20 A0              BYT $20,$A0
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 12
+
+0513  FA55- 20 06 E0           JSR GETLIN
+0514  FA58- 90 01              BCC *+3
+0515  FA5A- 60                 RTS             RETURN, IF ESCAPE
+0516                   *
+0517  FA5B- 20 24 E0           JSR ENDLIN
+0518  FA5E- D0 06              BNE OPM2
+0519                   *
+0520  FA60- 20 63 1F   OPM1A   JSR INCPT       RETURN, NEXT CELL
+0521  FA63- 4C 36 FA           JMP OPM1
+0522                   *
+0523  FA66- 20 A1 F9   OPM2    JSR ADAPT
+0524  FA69- C9 4C              CMP ='L'        LAST CELL
+0525  FA6B- D0 0B              BNE OPM3
+0526  FA6D- A5 FA              LDA POINT
+0527  FA6F- D0 02              BNE *+4
+0528  FA71- C6 FB              DEC POINT+1
+0529  FA73- C6 FA              DEC POINT
+0530  FA75- 4C 36 FA           JMP OPM1
+0531                   *
+0532  FA78- C9 27      OPM3    CMP ='''        ASCII?
+0533  FA7A- D0 10              BNE OPM4
+0534  FA7C- C8                 INY
+0535  FA7D- B1 E9              LDA (VIDPNT),Y
+0536  FA7F- A0 00      OPM3A   LDY =0
+0537  FA81- 91 FA              STA (POINT),Y
+0538  FA83- D1 FA              CMP (POINT),Y
+0539  FA85- F0 D9              BEQ OPM1A
+0540  FA87- A9 11              LDA =$11        ERROR 11
+0541  FA89- 4C 32 F9           JMP ERROR
+0542                   *
+0543  FA8C- C9 2F      OPM4    CMP ='/'        NEW CELL
+0544  FA8E- D0 04              BNE OPM5
+0545  FA90- C8                 INY
+0546  FA91- 4C 2D FA           JMP OPM0
+0547                   *
+0548  FA94- 20 0C F9   OPM5    JSR HEXPER
+0549  FA97- 20 B5 F9           JSR ENDLER
+0550  FA9A- A5 F8              LDA INL
+0551  FA9C- 4C 7F FA           JMP OPM3A
+0552                   *
+0553                   *
+0554  FA9F- 20 4D F9   INTC2   JSR TEST
+0555  FAA2- 47 53 C2           BYT 'GS',128+'B'  *** GSB ***
+0556  FAA5- B0 06              BCS INTC3
+0557  FAA7- BA                 TSX
+0558  FAA8- 86 F2              STX SAVSP       SET STACK POINTER
+0559  FAAA- 4C 15 FA           JMP GO
+0560                   *
+0561                   *
+0562  FAAD- 20 4D F9   INTC3   JSR TEST
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 13
+
+0563  FAB0- 53 45 54           BYT 'SET',128+'B'   *** SETBR ***
+0563  FAB3- C2 
+0564  FAB4- B0 3D              BCS INTC4
+0565  FAB6- 20 0C F9           JSR HEXPER
+0566  FAB9- 20 B5 F9           JSR ENDLER
+0567  FABC- A2 07      SETB1   LDX =7
+0568  FABE- BD BD 17           LDA BREAKT,X    CHECK IN TABLE
+0569  FAC1- F0 08              BEQ SETB3
+0570  FAC3- CA                 DEX
+0571  FAC4- 10 F8              BPL SETB1+2
+0572  FAC6- A9 12              LDA =$12        ERROR 12
+0573  FAC8- 20 32 F9           JSR ERROR
+0574                   *
+0575  FACB- A5 F8      SETB3   LDA INL
+0576  FACD- 9D C5 17           STA BREAKT+8,X
+0577  FAD0- A5 F9              LDA INL+1
+0578  FAD2- 9D CD 17           STA BREAKT+16,X
+0579  FAD5- A0 00              LDY =0
+0580  FAD7- B1 F8              LDA (INL),Y
+0581  FAD9- F0 13              BEQ SETB4
+0582  FADB- 9D BD 17           STA BREAKT,X
+0583  FADE- 98                 TYA
+0584  FADF- 91 F8              STA (INL),Y
+0585  FAE1- D1 F8              CMP (INL),Y
+0586  FAE3- D0 01              BNE *+3
+0587  FAE5- 60                 RTS
+0588  FAE6- 9D BD 17           STA BREAKT,X
+0589  FAE9- A9 13              LDA =$13        ERROR 13
+0590  FAEB- 4C 32 F9           JMP ERROR
+0591                   *
+0592  FAEE- A9 14      SETB4   LDA =$14
+0593  FAF0- 4C 32 F9           JMP ERROR       ERROR 14
+0594                   *
+0595                   *
+0596  FAF3- 20 4D F9   INTC4   JSR TEST
+0597  FAF6- 43 4C 52           BYT 'CLR',128+'B'   *** CLRB ***
+0597  FAF9- C2 
+0598  FAFA- B0 2C              BCS INTC5
+0599  FAFC- 20 0C F9           JSR HEXPER
+0600  FAFF- 20 B5 F9          JSR ENDLER
+0601  FB02- A2 07      CLRB1   LDX =7
+0602  FB04- BD C5 17           LDA BREAKT+8,X
+0603  FB07- C5 F8              CMP INL
+0604  FB09- D0 07              BNE CLRB3
+0605  FB0B- BD CD 17           LDA BREAKT+16,X
+0606  FB0E- C5 F9              CMP INL+1
+0607  FB10- F0 08              BEQ CLRB4
+0608  FB12- CA         CLRB3   DEX
+0609  FB13- 10 EF              BPL CLRB1+2
+0610  FB15- A9 17              LDA =$17        ERROR 17
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 14
+
+0611  FB17- 4C 32 F9           JMP ERROR
+0612  FB1A- BD BD 17   CLRB4   LDA BREAKT,X
+0613  FB1D- F0 F3              BEQ CLRB3
+0614  FB1F- A0 00              LDY =0
+0615  FB21- 91 F8              STA (INL),Y
+0616  FB23- 98                 TYA
+0617  FB24- 9D BD 17           STA BREAKT,X
+0618  FB27- 60                 RTS
+0619                   *
+0620                   *
+0621  FB28- 20 4D F9   INTC5   JSR TEST
+0622  FB2B- 52 45 53           BYT 'RESET',128+'B'   *** RESETB ***
+0622  FB2E- 45 54 C2 
+0623  FB31- B0 1B              BCS INTC6
+0624  FB33- 20 B5 F9           JSR ENDLER
+0625                   *
+0626  FB36- A2 07      RESB1   LDX =7
+0627  FB38- BD BD 17           LDA BREAKT,X
+0628  FB3B- F0 0D              BEQ RESB3
+0629  FB3D- BD C5 17           LDA BREAKT+8,X
+0630  FB40- 85 F8              STA INL
+0631  FB42- BD CD 17           LDA BREAKT+16,X
+0632  FB45- 85 F9              STA INL+1
+0633  FB47- 20 1A FB           JSR CLRB4
+0634  FB4A- CA         RESB3   DEX
+0635  FB4B- 10 EB              BPL RESB1+2
+0636  FB4D- 60                 RTS
+0637                   *
+0638  FB4E- 20 4D F9   INTC6   JSR TEST
+0639  FB51- 50 52 54           BYT 'PRT',128+'B'   *** PRTB ***
+0639  FB54- C2 
+0640  FB55- B0 1E              BCS INTC7
+0641  FB57- 20 B5 F9           JSR ENDLER
+0642  FB5A- A2 07              LDX =7
+0643  FB5C- BD BD 17   PRTB2   LDA BREAKT,X
+0644  FB5F- F0 10              BEQ PRTB3
+0645  FB61- 20 27 E0           JSR PRTINF
+0646  FB64- 89                 BYT $89         TAB
+0647  FB65- BD CD 17           LDA BREAKT+16,X
+0648  FB68- 20 2D E0           JSR PRTBYT
+0649  FB6B- BD C5 17           LDA BREAKT+8,X
+0650  FB6E- 20 2D E0           JSR PRTBYT
+0651  FB71- CA         PRTB3   DEX
+0652  FB72- 10 E8              BPL PRTB2
+0653  FB74- 60                 RTS
+0654                   *
+0655                   *
+0656  FB75- 20 4D F9   INTC7   JSR TEST
+0657  FB78- 52 45 C7           BYT 'RE',128+'G'  *** REG ***
+0658  FB7B- B0 5C              BCS INTC8
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 15
+
+0659  FB7D- 20 24 E0           JSR ENDLIN
+0660  FB80- D0 15              BNE REG1
+0661  FB82- 20 33 E0           JSR PRTREG
+0662  FB85- 20 27 E0           JSR PRTINF
+0663  FB88- 0D 0A 52           BYT $D,$A,'R',128+'*'
+0663  FB8B- AA 
+0664  FB8C- 20 06 E0           JSR GETLIN
+0665  FB8F- A0 02              LDY =2
+0666  FB91- 20 24 E0           JSR ENDLIN
+0667  FB94- D0 01              BNE REG1
+0668  FB96- 60                 RTS
+0669                   *
+0670  FB97- 20 24 E0   REG1    JSR ENDLIN
+0671  FB9A- B1 E9              LDA (VIDPNT),Y
+0672  FB9C- 20 A1 F9           JSR ADAPT
+0673  FB9F- A2 06              LDX =6
+0674  FBA1- DD D2 FB   REG2    CMP REG6-1,X
+0675  FBA4- F0 08              BEQ REG4
+0676  FBA6- CA                 DEX
+0677  FBA7- D0 F8              BNE REG2
+0678  FBA9- A9 16      REG3    LDA =$16        ERROR 16
+0679  FBAB- 4C 32 F9           JMP ERROR
+0680                   *
+0681  FBAE- C8         REG4    INY
+0682  FBAF- 20 4D F9           JSR TEST
+0683  FBB2- BD                 BYT 128+'='
+0684  FBB3- B0 F4              BCS REG3
+0685  FBB5- 8A                 TXA
+0686  FBB6- 48                 PHA
+0687  FBB7- 20 F3 F8           JSR HEXPZE
+0688  FBBA- 68                 PLA
+0689  FBBB- AA                 TAX
+0690  FBBC- A5 F8              LDA INL
+0691  FBBE- 95 EF              STA SAVPC,X
+0692  FBC0- E0 01              CPX =1
+0693  FBC2- D0 06              BNE REG5
+0694  FBC4- 85 EF              STA SAVPC
+0695  FBC6- A5 F9              LDA INL+1
+0696  FBC8- 85 F0              STA SAVPC+1
+0697  FBCA- 20 4D F9   REG5    JSR TEST
+0698  FBCD- AC                 BYT 128+','
+0699  FBCE- 90 C7              BCC REG1
+0700  FBD0- 4C B5 F9           JMP ENDLER
+0701                   *
+0702  FBD3- 50 46 53   REG6    BYT 'PFSAYX'
+0702  FBD6- 41 59 58 
+0703                   *
+0704                   *
+0705  FBD9- 20 4D F9   INTC8   JSR TEST
+0706  FBDC- 44 41 54           BYT 'DAT',128+'E'   *** DATE ***
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 16
+
+0706  FBDF- C5 
+0707  FBE0- B0 39              BCS INTC9
+0708  FBE2- 20 B5 F9           JSR ENDLER
+0709  FBE5- 20 27 E0           JSR PRTINF
+0710  FBE8- 0D 8A              BYT $D,$8A
+0711  FBEA- 20 F0 FB           JSR PRTDAT
+0712  FBED- 4C BF F9           JMP GETDAT
+0713                   *
+0714  FBF0- A2 00      PRTDAT  LDX =0
+0715  FBF2- BD B9 17           LDA DATE,X
+0716  FBF5- 20 2D E0           JSR PRTBYT
+0717  FBF8- E8                 INX
+0718  FBF9- E0 03              CPX =3
+0719  FBFB- F0 07              BEQ PRTDA1
+0720  FBFD- 20 27 E0          JSR PRTINF
+0721  FC00- AF                 BYT 128+'/'
+0722  FC01- 4C F2 FB           JMP PRTDAT+2
+0723                   *
+0724  FC04- 20 27 E0   PRTDA1  JSR PRTINF
+0725  FC07- A0                 BYT $A0
+0726  FC08- 60                 RTS
+0727                   *
+0728  FC09- A2 03      PRTTIM  LDX =3
+0729  FC0B- BD B5 17           LDA TIME,X
+0730  FC0E- 20 2D E0           JSR PRTBYT
+0731  FC11- CA                 DEX
+0732  FC12- F0 F0              BEQ PRTDA1
+0733  FC14- 20 27 E0           JSR PRTINF
+0734  FC17- BA                 BYT 128+':'
+0735  FC18- 4C 0B FC           JMP PRTTIM+2
+0736                   *
+0737  FC1B- 20 4D F9   INTC9   JSR TEST
+0738  FC1E- 54 49 4D           BYT 'TIM',128+'E'   *** TIME ***
+0738  FC21- C5 
+0739  FC22- B0 0E              BCS INTC10
+0740  FC24- 20 B5 F9           JSR ENDLER
+0741  FC27- 20 27 E0           JSR PRTINF
+0742  FC2A- 0D 8A              BYT $0D,$8A
+0743  FC2C- 20 09 FC           JSR PRTTIM
+0744  FC2F- 4C E3 F9           JMP GETTIM
+0745                   *
+0746                   *
+0747  FC32- 20 4D F9   INTC10  JSR TEST
+0748  FC35- 44 49 D3           BYT 'DI',128+'S'   *** DIS ***
+0749  FC38- B0 27              BCS INTC11
+0750  FC3A- A5 E1              LDA DISPC
+0751  FC3C- A6 E2              LDX DISPC+1
+0752  FC3E- 20 E7 F8           JSR HEXPDF
+0753  FC41- 85 E1              STA DISPC
+0754  FC43- 86 E2              STX DISPC+1
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 17
+
+0755  FC45- 20 4D F9           JSR TEST
+0756  FC48- AC                 BYT 128+','
+0757  FC49- A9 0B              LDA =11
+0758  FC4B- 20 E7 F8           JSR HEXPDF
+0759  FC4E- 20 9D FE           JSR DSMBL+2
+0760  FC51- 20 00 E0   DIS1    JSR GETKEY
+0761  FC54- F0 0A              BEQ DIS2
+0762  FC56- C9 0D              CMP =$D
+0763  FC58- D0 06              BNE DIS2
+0764  FC5A- 20 9B FE           JSR DSMBL
+0765  FC5D- 4C 51 FC           JMP DIS1
+0766                   *
+0767  FC60- 60         DIS2    RTS             RETURN AFTER ESCAPE
+0768                   *
+0769                   *
+0770  FC61- 20 4D F9   INTC11  JSR TEST
+0771  FC64- 53 54 45           BYT 'STE',128+'P'   *** STEP ***
+0771  FC67- D0 
+0772  FC68- B0 16              BCS INTC12
+0773  FC6A- 20 E3 F8           JSR HEXPPC
+0774  FC6D- 20 B5 F9           JSR ENDLER
+0775  FC70- A5 F8              LDA INL
+0776  FC72- 85 EF              STA SAVPC
+0777  FC74- A5 F9              LDA INL+1
+0778  FC76- 85 F0              STA SAVPC+1
+0779  FC78- A9 80              LDA =$80
+0780  FC7A- 8D BC 17           STA TRACFL      STEPPING
+0781  FC7D- 4C 08 FE           JMP STEP
+0782                   *
+0783                   *
+0784  FC80- 20 4D F9   INTC12  JSR TEST
+0785  FC83- 54 52 41           BYT 'TRAC',128+'E'   *** TRACE ***
+0785  FC86- 43 C5 
+0786  FC88- B0 34              BCS INTC13
+0787  FC8A- 20 E3 F8           JSR HEXPPC
+0788  FC8D- 85 EF              STA SAVPC
+0789  FC8F- 86 F0              STX SAVPC+1
+0790  FC91- 20 4D F9           JSR TEST
+0791  FC94- AC                 BYT 128+','
+0792  FC95- A9 06              LDA =6
+0793  FC97- 20 E7 F8           JSR HEXPDF
+0794  FC9A- 29 7F              AND =$7F        MAX 127 STEPS
+0795  FC9C- D0 02              BNE *+4
+0796  FC9E- A9 01              LDA =1
+0797  FCA0- 8D BC 17           STA TRACFL
+0798  FCA3- 10 13      TRACEM  BPL TRACE3
+0799  FCA5- 20 00 E0   TRACE2  JSR GETKEY
+0800  FCA8- D0 08              BNE TRACE4
+0801  FCAA- A9 00              LDA =0
+0802  FCAC- 8D BC 17           STA TRACFL
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 18
+
+0803  FCAF- 6C D5 17           JMP (VMON)
+0804                   *
+0805  FCB2- C9 0D      TRACE4  CMP =$D
+0806  FCB4- D0 F4              BNE TRACE2+5
+0807  FCB6- F0 03              BEQ TRACE3+3    STEP
+0808                   *
+0809  FCB8- CE BC 17   TRACE3  DEC TRACFL
+0810  FCBB- 4C 08 FE           JMP STEP
+0811                   *
+0812                   *
+0813  FCBE- 20 4D F9   INTC13  JSR TEST
+0814  FCC1- 4C 4F 41           BYT 'LOA',128+'D'   *** LOAD ***
+0814  FCC4- C4 
+0815  FCC5- B0 32              BCS INTC14
+0816                   *
+0817  FCC7- 20 CC FD   BFLOAD  JSR GETNAM      GET FILE NAME
+0818  FCCA- 20 F2 FC           JSR HARGUM      GET DRIVE, DEFAULT=0
+0819  FCCD- 85 DC              STA FILDRV
+0820  FCCF- 20 F2 FC           JSR HARGUM      GET START ADDRESS
+0821  FCD2- 8D 31 03           STA FILSA1
+0822  FCD5- 8E 32 03           STX FILSA1+1
+0823  FCD8- 20 B5 F9           JSR ENDLER
+0824  FCDB- A9 00              LDA =0
+0825  FCDD- 85 DA              STA FILFLG
+0826  FCDF- 20 15 E8           JSR RDFILE
+0827  FCE2- D0 0B              BNE LOADER
+0828  FCE4- AD 1A 03           LDA FILSA
+0829  FCE7- 85 EF              STA SAVPC
+0830  FCE9- AD 1B 03           LDA FILSA+1
+0831  FCEC- 85 F0              STA SAVPC+1
+0832  FCEE- 60                 RTS
+0833                   *
+0834  FCEF- 4C 32 F9   LOADER  JMP ERROR
+0835                   *
+0836                   * HARGUM: GET ARGUMENT (, OR HEXPZE)
+0837                   ************************************
+0838                   *
+0839  FCF2- 20 4D F9   HARGUM  JSR TEST
+0840  FCF5- AC                 BYT 128+','
+0841  FCF6- 4C F3 F8           JMP HEXPZE
+0842                   *
+0843                   *
+0844  FCF9- 20 4D F9   INTC14  JSR TEST
+0845  FCFC- 52 55 CE           BYT 'RU',128+'N'   *** RUN ***
+0846  FCFF- B0 1A             BCS INTC15
+0847  FD01- 20 C7 FC           JSR BFLOAD
+0848  FD04- AD 12 03           LDA FILSTP
+0849  FD07- C9 4D              CMP ='M'        MUST BE ML PROGRAM
+0850  FD09- F0 05              BEQ RUN1
+0851  FD0B- A9 20              LDA =$20        ERROR 20
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 19
+
+0852  FD0D- 4C 32 F9           JMP ERROR
+0853                   *
+0854  FD10- A5 EF      RUN1    LDA SAVPC       GET START ADDRESS
+0855  FD12- A6 F0              LDX SAVPC+1
+0856  FD14- 85 F8              STA INL
+0857  FD16- 86 F9              STX INL+1
+0858  FD18- 4C 18 FA           JMP GO+3
+0859                   *
+0860                   *
+0861  FD1B- 20 4D F9   INTC15  JSR TEST
+0862  FD1E- 44 49 D2           BYT 'DI',128+'R'   *** DIR ***
+0863  FD21- B0 0F              BCS INTC16
+0864                   *
+0865  FD23- 20 F3 F8           JSR HEXPZE      GET DRIVE NUMBER
+0866  FD26- 85 DC              STA FILDRV
+0867  FD28- 29 02              AND =2
+0868  FD2A- D0 03              BNE *+5
+0869  FD2C- 4C 09 F0           JMP DDIR        DISK DIRECTORY
+0870  FD2F- 4C 09 E8           JMP TDIR        TAPE DIRECTORY
+0871                   *
+0872                   *
+0873  FD32- 20 4D F9   INTC16  JSR TEST
+0874  FD35- 44 45 4C           BYT 'DELET',128+'E'   *** DELETE ***
+0874  FD38- 45 54 C5 
+0875  FD3B- B0 11              BCS INTC17
+0876                   *
+0877  FD3D- 20 CC FD           JSR GETNAM      GET FILE NAME
+0878  FD40- 20 F2 FC           JSR HARGUM      GET DISK DRIVE
+0879  FD43- 85 DC              STA FILDRV
+0880  FD45- 20 0C F0           JSR DELETE
+0881  FD48- F0 03              BEQ *+5
+0882  FD4A- 4C 32 F9           JMP ERROR
+0883  FD4D- 60                 RTS
+0884                   *
+0885                   *
+0886  FD4E- 20 4D F9   INTC17  JSR TEST
+0887  FD51- 53 54 4F           BYT 'STOR',128+'E'   *** STORE ***
+0887  FD54- 52 C5 
+0888  FD56- 90 05              BCC *+7
+0889  FD58- A9 21              LDA =$21        ERROR 21
+0890  FD5A- 4C 32 F9           JMP ERROR
+0891  FD5D- 20 CC FD           JSR GETNAM
+0892  FD60- A2 10              LDX =16
+0893  FD62- BD 20 03           LDA FILNM1,X    TRANSFER
+0894  FD65- 9D 01 03           STA FILNAM,X
+0895  FD68- CA                 DEX
+0896  FD69- 10 F7              BPL *-7
+0897  FD6B- 20 F2 FC           JSR HARGUM      GET DRIVE
+0898  FD6E- 85 DC              STA FILDRV
+0899  FD70- 20 4D F9           JSR TEST
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 20
+
+0900  FD73- AC                 BYT 128+','
+0901  FD74- B0 4D              BCS STORE1      SYNTAX ERROR?
+0902  FD76- 20 0C F9           JSR HEXPER
+0903  FD79- 8D 1A 03           STA FILSA
+0904  FD7C- 8E 1B 03           STX FILSA+1
+0905  FD7F- 20 4D F9           JSR TEST
+0906  FD82- AD                 BYT 128+'-'
+0907  FD83- B0 3E              BCS STORE1
+0908  FD85- 20 0C F9           JSR HEXPER
+0909  FD88- 8D 1C 03           STA FILEA
+0910  FD8B- 8E 1D 03           STX FILEA+1
+0911  FD8E- 20 4D F9           JSR TEST
+0912  FD91- AC                 BYT 128+','     SYNTAX ERROR?
+0913  FD92- B0 2F              BCS STORE1
+0914  FD94- 20 4D F9           JSR TEST
+0915  FD97- D0                 BYT 128+'P'     PROTECTED FLAG?
+0916  FD98- A9 00              LDA =0
+0917  FD9A- B0 02              BCS *+4
+0918  FD9C- A9 80              LDA =$80
+0919  FD9E- 85 DA              STA FILFLG      PROTECTED FLAG
+0920  FDA0- B1 E9              LDA (VIDPNT),Y
+0921  FDA2- C8                 INY
+0922  FDA3- 20 A1 F9           JSR ADAPT
+0923  FDA6- C9 41              CMP =$41
+0924  FDA8- 90 1E              BCC STORE2      MUST BE LETTER
+0925  FDAA- C9 5C              CMP =$5C
+0926  FDAC- B0 1A              BCS STORE2
+0927  FDAE- 8D 12 03           STA FILSTP
+0928  FDB1- 20 F2 FC           JSR HARGUM
+0929  FDB4- 8D 13 03           STA FILLOC
+0930  FDB7- 8E 14 03           STX FILLOC+1
+0931  FDBA- 20 B5 F9           JSR ENDLER
+0932  FDBD- 20 1B E8           JSR WRFILE
+0933  FDC0- D0 03              BNE STORE1+2
+0934  FDC2- 60                 RTS
+0935                   *
+0936  FDC3- A9 18      STORE1  LDA =$18        ERROR 18
+0937  FDC5- 4C 32 F9           JMP ERROR
+0938                   *
+0939  FDC8- A9 19      STORE2  LDA =$19        ERROR 19
+0940  FDCA- D0 F9              BNE STORE1+2
+0941                   *
+0942                   *
+0943                   * GETNAM: GET FILE NAME
+0944                   ***********************
+0945                   *
+0946  FDCC- 20 24 E0   GETNAM  JSR ENDLIN
+0947  FDCF- A9 20              LDA =$20
+0948  FDD1- A2 10              LDX =16
+0949  FDD3- 9D 1F 03           STA FILNM1-1,X
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 21
+
+0950  FDD6- CA                 DEX
+0951  FDD7- D0 FA              BNE *-4
+0952  FDD9- 8E 30 03           STX FILCY1      IS 0
+0953  FDDC- B1 E9      GETNM0  LDA (VIDPNT),Y
+0954  FDDE- 29 7F              AND =$7F
+0955  FDE0- C9 2C              CMP =','
+0956  FDE2- F0 1C              BEQ GETNM2      END OF NAME
+0957  FDE4- C9 2E              CMP ='.'
+0958  FDE6- F0 10              BEQ GETNM1
+0959  FDE8- E0 10              CPX =16
+0960  FDEA- B0 03              BCS *+5
+0961  FDEC- 9D 20 03           STA FILNM1,X
+0962  FDEF- C8                 INY
+0963  FDF0- CC 8A 17           CPY NUMCHR
+0964  FDF3- B0 12              BCS GETNM3
+0965  FDF5- E8                 INX
+0966  FDF6- D0 E4              BNE GETNM0      ALLWAYS TAKEN
+0967                   *
+0968  FDF8- C8         GETNM1  INY
+0969  FDF9- 20 F3 F8           JSR HEXPZE
+0970  FDFC- 8D 30 03           STA FILCY1
+0971  FDFF- 60                RTS
+0972                   *
+0973  FE00- E0 00      GETNM2  CPX =0
+0974  FE02- D0 03              BNE GETNM3
+0975  FE04- 8E 20 03           STX FILNM1      READ NEXT FILE ON TAPE
+0976  FE07- 60         GETNM3  RTS
+0977                   *
+0978                   *
+0979                   * TRACE AND STEP ROUTINE
+0980                   ************************
+0981                   * ESCAPE TEST IS MADE AFTER EVERY STEP,EVERY
+0982                   * LINE IS DISASSEMBLED AND A BREAKPOINT SET
+0983                   * AT THE FOLLOWING INSTRUCTION CODE. RTS,RTI
+0984                   * AND BRK GIVE AN ERROR STOP. SUBROUTINES
+0985                   * ARE EXECUTED IN REAL TIME
+0986                   *
+0987  FE08- A5 EF      STEP    LDA SAVPC
+0988  FE0A- 85 E1              STA DISPC
+0989  FE0C- A5 F0              LDA SAVPC+1
+0990  FE0E- 85 E2              STA DISPC+1
+0991  FE10- 20 AE FE           JSR INTDS       DISASSEMBLE ONE CODE
+0992  FE13- A5 EF              LDA SAVPC
+0993  FE15- 85 F8              STA INL
+0994  FE17- A5 F0              LDA SAVPC+1
+0995  FE19- 85 F9              STA INL+1
+0996  FE1B- 20 CC 1F           JSR OPEN
+0997  FE1E- A0 00              LDY =0
+0998  FE20- B1 E1      COMPST  LDA (DISPC),Y   GET OPCODE
+0999  FE22- C9 4C              CMP =$4C        IF JMP
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 22
+
+1000  FE24- 18                 CLC
+1001  FE25- F0 05              BEQ COMPS1
+1002  FE27- C9 6C              CMP =$6C        OR JMP (IND)
+1003  FE29- 38                 SEC
+1004  FE2A- D0 19              BNE COMPS3
+1005                   *
+1006  FE2C- C8         COMPS1  INY             COMPUTE TARGET
+1007  FE2D- B1 E1              LDA (DISPC),Y
+1008  FE2F- 85 F8              STA INL
+1009  FE31- C8                 INY
+1010  FE32- B1 E1              LDA (DISPC),Y
+1011  FE34- 85 F9              STA INL+1
+1012  FE36- 90 0A              BCC COMPS2      SKIP, IF DIRECT
+1013                   *
+1014  FE38- B1 F8              LDA (INL),Y
+1015  FE3A- AA                 TAX
+1016  FE3B- 88                 DEY
+1017  FE3C- B1 F8              LDA (INL),Y
+1018  FE3E- 85 F8              STA INL
+1019  FE40- 86 F9              STX INL+1
+1020                   *
+1021  FE42- 4C 80 FE   COMPS2  JMP COMPS4
+1022                   *
+1023  FE45- A8         COMPS3  TAY             SAVE CODE
+1024  FE46- 29 0F              AND =$F
+1025  FE48- D0 2B              BNE CODE
+1026  FE4A- 98                 TYA
+1027  FE4B- 29 10              AND =$10
+1028  FE4D- F0 16              BEQ TSTBRK
+1029  FE4F- 98                 TYA
+1030  FE50- 4A                 LSR A
+1031  FE51- 4A                 LSR A
+1032  FE52- 4A                 LSR A
+1033  FE53- 4A                 LSR A
+1034  FE54- 4A                 LSR A
+1035  FE55- 4A                 LSR A
+1036  FE56- AA                 TAX
+1037  FE57- BD 97 FE           LDA MASK,X
+1038  FE5A- 24 F1              BIT SAVST
+1039  FE5C- B0 05              BCS BITSET
+1040  FE5E- D0 15      NOTSET  BNE CODE
+1041  FE60- 4C 86 FE           JMP DOBRA
+1042  FE63- D0 FB      BITSET  BNE *-3
+1043                   *
+1044  FE65- 98         TSTBRK  TYA
+1045  FE66- F0 08              BEQ ENDST       BRK
+1046  FE68- C9 60              CMP =$60
+1047  FE6A- F0 04              BEQ ENDST       RST
+1048  FE6C- C9 40              CMP =$40
+1049  FE6E- D0 05              BNE CODE        RTI
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 23
+
+1050                   *
+1051  FE70- A9 22      ENDST   LDA =$22        ERROR 22
+1052  FE72- 4C 32 F9           JMP ERROR
+1053                   *
+1054  FE75- A5 DF      CODE    LDA LMNEM
+1055  FE77- D0 F7              BNE ENDST       SKIP, IF ILLEGAL CODE
+1056  FE79- 20 8E FF           JSR PCADJ
+1057  FE7C- 85 F8      COMS4A  STA INL
+1058  FE7E- 84 F9              STY INL+1
+1059  FE80- 20 BC FA   COMPS4  JSR SETB1       SET BREAKPOINT
+1060  FE83- 4C C8 1D           JMP GOEXEC      DO THE INSTRUCTION
+1061                   *
+1062  FE86- 38         DOBRA   SEC             COMPUTE BRANCH
+1063  FE87- A0 01              LDY =1
+1064  FE89- B1 E1              LDA (DISPC),Y
+1065  FE8B- 20 DB FF           JSR PCADJ3
+1066  FE8E- AA                 TAX
+1067  FE8F- E8                 INX
+1068  FE90- D0 01              BNE *+3
+1069  FE92- C8                 INY
+1070  FE93- 8A                 TXA
+1071  FE94- 4C 7C FE           JMP COMS4A
+1072                   *
+1073  FE97- 80 40 01   MASK    BYT $80,$40,$01,$02
+1073  FE9A- 02 
+1074                   *
+1075                   *
+1076                   * DISASSEMBLER ROUTINES:
+1077                   ************************
+1078                   * DISASSEMBLE ONE OR SEVERAL LINES FROM MEMORY.
+1079                   * INVALID OPCODES ARE ASSUMED TO BE ONE BYTE
+1080                   *
+1081  FE9B- A9 0C      DSMBL   LDA =12         12 INSTRUCTIONS
+1082  FE9D- 85 E3              STA DISCNT
+1083  FE9F- 20 AE FE   DSMBL2  JSR INTDS
+1084  FEA2- 20 8E FF           JSR PCADJ
+1085  FEA5- 85 E1              STA DISPC
+1086  FEA7- 84 E2              STY DISPC+1
+1087  FEA9- C6 E3              DEC DISCNT
+1088  FEAB- D0 F2              BNE DSMBL2
+1089  FEAD- 60                 RTS
+1090                   *
+1091  FEAE- 20 06 E8   INTDS   JSR ESCTST      ESCAPE?
+1092  FEB1- 90 03              BCC *+5
+1093  FEB3- 4C AA FC           JMP TRACE2+5
+1094                   *
+1095  FEB6- 20 73 FF           JSR PRPC        PRINT PC
+1096  FEB9- A1 E1              LDA (DISPC,X)   GET OPCODE, X IS 0
+1097  FEBB- A8                 TAY
+1098  FEBC- 4A                 LSR A           ODD,EVEN TEST
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 24
+
+1099  FEBD- 90 0B              BCC IEVEN
+1100  FEBF- 4A                 LSR A
+1101  FEC0- B0 17              BCS ERR         XXXXXX11 INVALID
+1102  FEC2- C9 22              CMP =$22
+1103  FEC4- F0 13              BEQ ERR         10001001 INVALID
+1104  FEC6- 29 07              AND =7
+1105  FEC8- 09 80              ORA =$80        ADD INDEXING OFFSET
+1106                   *
+1107  FECA- 4A         IEVEN   LSR A
+1108  FECB- AA                 TAX
+1109  FECC- BD 22 E7           LDA DISMOD,X    INDEXING INTO ADDRESS
+1110  FECF- B0 04              BCS RTMODE      MODE TABLE
+1111  FED1- 4A                 LSR A
+1112  FED2- 4A                 LSR A
+1113  FED3- 4A                 LSR A
+1114  FED4- 4A                 LSR A
+1115                   *
+1116  FED5- 29 0F      RTMODE  AND =$F         MASK FOR 4 BIT INDEX
+1117  FED7- D0 04              BNE GETFMT
+1118                   *
+1119  FED9- A0 80      ERR     LDY =$80        SUBSTITUTE 80 FOR INVAL
+1120  FEDB- A9 00              LDA =0          VALID CODE
+1121  FEDD- AA         GETFMT  TAX
+1122  FEDE- BD 66 E7           LDA MODE2,X
+1123  FEE1- 85 DD              STA DFORM
+1124  FEE3- 29 03              AND =3
+1125  FEE5- 85 DE              STA LENGHT
+1126  FEE7- 98                 TYA
+1127  FEE8- 29 8F              AND =$8F
+1128  FEEA- AA                 TAX
+1129  FEEB- 98                 TYA
+1130  FEEC- A0 03              LDY =3
+1131  FEEE- E0 8A              CPX =$8A
+1132  FEF0- F0 0B              BEQ MNNDX3
+1133  FEF2- 4A         MNNDX1  LSR A
+1134  FEF3- 90 08              BCC MNNDX3
+1135  FEF5- 4A                 LSR A
+1136  FEF6- 4A         MNNDX2  LSR A
+1137  FEF7- 09 20              ORA =$20
+1138  FEF9- 88                 DEY
+1139  FEFA- D0 FA              BNE MNNDX2
+1140  FEFC- C8                 INY
+1141  FEFD- 88         MNNDX3  DEY
+1142  FEFE- D0 F2             BNE MNNDX1
+1143  FF00- 48                 PHA
+1144                   *
+1145  FF01- B1 E1      PROP    LDA (DISPC),Y
+1146  FF03- 20 2D E0           JSR PRTBYT
+1147  FF06- A2 01              LDX =1
+1148  FF08- 20 85 FF   PROPBL  JSR PRBL2
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 25
+
+1149  FF0B- C4 DE              CPY LENGHT
+1150  FF0D- C8                 INY
+1151  FF0E- 90 F1              BCC PROP
+1152  FF10- A2 03              LDX =3
+1153  FF12- C0 04              CPY =4
+1154  FF14- 90 F2              BCC PROPBL
+1155  FF16- 68                 PLA
+1156  FF17- A8                 TAY
+1157  FF18- B9 80 E7           LDA MNEML,Y
+1158  FF1B- 85 DF              STA LMNEM
+1159  FF1D- B9 C0 E7           LDA MNEMR,Y
+1160  FF20- 85 E0              STA RMNEM
+1161  FF22- A9 00      PRMN1   LDA =0
+1162  FF24- A0 05              LDY =5
+1163  FF26- 06 E0      PRMN2   ASL RMNEM
+1164  FF28- 26 DF              ROL LMNEM
+1165  FF2A- 2A                 ROL A
+1166  FF2B- 88                 DEY
+1167  FF2C- D0 F8              BNE PRMN2
+1168  FF2E- 69 3F              ADC =$3F
+1169  FF30- 20 09 E0           JSR PRTCHR
+1170  FF33- CA                 DEX
+1171  FF34- D0 EC              BNE PRMN1
+1172  FF36- 20 83 FF           JSR PRBLNK
+1173  FF39- A2 06              LDX =6
+1174  FF3B- E0 03      PRADR1  CPX =3
+1175  FF3D- D0 12              BNE PRADR3
+1176  FF3F- A4 DE              LDY LENGHT
+1177  FF41- F0 0E              BEQ PRADR3
+1178  FF43- A5 DD      PRADR2  LDA DFORM
+1179  FF45- C9 E8              CMP =$E8
+1180  FF47- B1 E1              LDA (DISPC),Y
+1181  FF49- B0 1C              BCS RELADR
+1182  FF4B- 20 2D E0           JSR PRTBYT
+1183  FF4E- 88                 DEY
+1184  FF4F- D0 F2              BNE PRADR2
+1185  FF51- 06 DD      PRADR3  ASL DFORM
+1186  FF53- 90 0E              BCC PRADR4
+1187  FF55- BD 73 E7           LDA CHAR1-1,X
+1188  FF58- 20 09 E0           JSR PRTCHR
+1189  FF5B- BD 79 E7           LDA CHAR2-1,X
+1190  FF5E- F0 03              BEQ PRADR4
+1191  FF60- 20 09 E0           JSR PRTCHR
+1192  FF63- CA         PRADR4  DEX
+1193  FF64- D0 D5              BNE PRADR1
+1194  FF66- 60                 RTS
+1195                   *
+1196  FF67- 20 DB FF   RELADR  JSR PCADJ3
+1197  FF6A- AA                 TAX
+1198  FF6B- E8                 INX
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 26
+
+1199  FF6C- D0 01              BNE PRNTYX
+1200  FF6E- C8                 INY
+1201  FF6F- 98         PRNTYX  TYA
+1202  FF70- 4C 30 E0           JMP PRTAX
+1203                   *
+1204  FF73- 20 27 E0   PRPC    JSR PRTINF
+1205  FF76- 0D 8A              BYT $0D,$8A
+1206  FF78- A5 E2              LDA DISPC+1
+1207  FF7A- A6 E1              LDX DISPC
+1208  FF7C- 20 30 E0           JSR PRTAX
+1209  FF7F- 20 27 E0           JSR PRTINF
+1210  FF82- AD                 BYT $AD
+1211  FF83- A2 03      PRBLNK  LDX =3
+1212  FF85- A9 20      PRBL2   LDA =$20
+1213  FF87- 20 09 E0   PRBL3   JSR PRTCHR
+1214  FF8A- CA                 DEX
+1215  FF8B- D0 F8              BNE PRBL2
+1216  FF8D- 60                 RTS
+1217                   *
+1218  FF8E- A0 00      PCADJ   LDY =0
+1219  FF90- B1 E1              LDA (DISPC),Y
+1220  FF92- C9 20              CMP =$20
+1221  FF94- D0 42              BNE PCADJ0
+1222  FF96- A2 02              LDX =2
+1223  FF98- A0 01      PCADJ6  LDY =1
+1224  FF9A- B1 E1              LDA (DISPC),Y
+1225  FF9C- DD E7 FF           CMP SUBTBL,X
+1226  FF9F- D0 08              BNE PCADJ7
+1227  FFA1- C8                 INY
+1228  FFA2- B1 E1              LDA (DISPC),Y
+1229  FFA4- DD E8 FF           CMP SUBTBL+1,X
+1230  FFA7- F0 08              BEQ PCADJ8
+1231  FFA9- CA         PCADJ7  DEX
+1232  FFAA- CA                 DEX
+1233  FFAB- 10 EB              BPL PCADJ6
+1234  FFAD- 4C D8 FF           JMP PCADJ0
+1235  FFB0- C8                 INY
+1236  FFB1- 20 27 E0   PCADJ8  JSR PRTINF
+1237  FFB4- 0D 0A 09           BYT $D,$A,9,9,'    BYT ',$A0
+1237  FFB7- 09 20 20 
+1237  FFBA- 20 20 42 
+1237  FFBD- 59 54 20 
+1237  FFC0- A0 
+1238  FFC1- A2 06              LDX =6
+1239  FFC3- CA         CALCL1  DEX
+1240  FFC4- F0 EB              BEQ PCADJ8
+1241  FFC6- C8                 INY
+1242  FFC7- B1 E1              LDA (DISPC),Y
+1243  FFC9- 48                 PHA
+1244  FFCA- 20 2D E0           JSR PRTBYT
+
+----------------------------------------------------------------------
+
+R65/JOB MONITOR                    09/03/18   R65 ASSEMBLER  PAGE 27
+
+1245  FFCD- 20 27 E0           JSR PRTINF
+1246  FFD0- AC                 BYT $AC
+1247  FFD1- 68                 PLA
+1248  FFD2- 10 EF              BPL CALCL1
+1249  FFD4- 98                 TYA
+1250  FFD5- 4C DA FF           JMP PCADJ2
+1251  FFD8- A5 DE      PCADJ0  LDA LENGHT
+1252  FFDA- 38         PCADJ2  SEC
+1253  FFDB- A4 E2      PCADJ3  LDY DISPC+1
+1254  FFDD- AA                 TAX
+1255  FFDE- 10 01              BPL PCADJ4
+1256  FFE0- 88                 DEY
+1257  FFE1- 65 E1      PCADJ4  ADC DISPC
+1258  FFE3- 90 01              BCC RTS1
+1259  FFE5- C8                 INY
+1260  FFE6- 60         RTS1    RTS
+1261                   *
+1262  FFE7- 27 E0 0C   SUBTBL  WRD PRTINF,PSTART+12
+1262  FFEA- F8 
+1263                   *
+1264                   *
+1265                   * SYSTEM VECTORS FOR CPU RESET, NMI AND IRQ
+1266                   *******************************************
+1267                   *
+1268  FFEB-          ORG $FFF7
+1269                   *
+1270  FFF7- 6C 9A 17   EXSNMI  JMP (NMI)
+1271                   *
+1272  FFFA- F7 FF      SYSNMI  WRD EXSNMI
+1273  FFFC- 1B F8      SYSRST  WRD RESET
+1274  FFFE- 33 E8     SYSIRQ  WRD IRQ
+1275                   *
+1276                           END
+LABELS=00E4
+ERRORS=00
+RECORDS=47

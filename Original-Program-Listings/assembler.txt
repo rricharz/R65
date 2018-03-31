@@ -1,0 +1,2913 @@
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 01
+
+0001                   * 18/11/81
+0002                   **********************************
+0003                   * R65 COMPUTER SYSTEM: ASSEMBLER *
+0004                   **********************************
+0005                   *
+0006                   * VERSION 8.0   WITH UNLIMITED NO OF LABELS
+0007                   *               ADDITIONAL PSEUDO OP'Ss
+0008                   *               NO RPINTING IN FIRST PASS
+0009                   *               SOURCE MAY BE IN SEVERAL FILES
+0010                   *               ONLY 'END' TERMINATES A PASS
+0011                   * ASSEMBLER FOR R65 COMPUTER SYSTEM
+0012                   * CC RRICHARZ, RBAUMANN 1978-1981
+0013                   *       - 32 k MEMORY
+0014                   *       - VIDEO INTERFACE WITH 4k VIDEO MEMORY
+0015                   *       - HARDCOPY OUTPUT
+0016                   *       - TAPE AND OR DISK DRIVE(S)
+0017                   *
+0018                   * INPUT FROM 2 DEVICES
+0019                   *       - COMMAND INPUT FROM KEYBOARD
+0020                   *       - SOURCE CODE INPUT FROM TAPE OR DISK
+0021                   *
+0022                   * OUTPUT TO 3 DEVICES
+0023                   *       - MESSAGES AND LISTING TO VIDEO DISPLAY
+0024                   *       - ERROR TABLE, CROSS REFERENCE MAP AND
+0025                   *         LISTINGS TO HARD COPY
+0026                   *       - OBJECT FILE(S) TO TAPE OR DISK
+0027                   *
+0028                   * COMMANDS (A* IS PRINTED IN COMMAND MODE)
+0029                   *       F       FIRST PASS
+0030                   *       S       SECOND PASS
+0031                   *       C       CONTINUE SAME PASS
+0032                   *       R       REFERENCE MAP
+0033                   *
+0034                   *
+0035                   * SOURCE LINE FORMAT [] MEANS OPTIONAL
+0036                   * [LABEL] OPCODE [OPERAND] [COMMENT]
+0037                   * OR *[COMMENT]
+0038                   *
+0039                   * PSEUDO OPCODES (ASSEMBLER DIRECTIVES)
+0040                   *
+0041                   *       - EQU "EXPRESSION"      ASSIGN LABEL
+0042                   *       - ORG "EXPRESSION"      ASSIGN PC
+0043                   *       - BSS "EXPRESSION"      RESERVE BYTES
+0044                   *       - BYT "EXPR","EXPR",..  ASSIGN BYTES
+0045                   *               "EXPR" CAN BE 'STRING'
+0046                   *       - WRD "EXPR","EXPR",..  ASSIGN WORDS
+0047                   *       - PAG                   NEW PAGE
+0048                   *       - TIT "MAX 32 CHARS"    ASSIGN TITLE
+0049                   *       - END                   END OF SOURCE
+0050                   *       - NPR                   NO PRINTING
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 02
+
+0051                   *       - PRT                   PRINTING
+0052                   *
+0053                   * ERROR CODES: (FULL ERROR ANALYSIS IN FIRST
+0054                   * PASS INCLUDING FORWARD BRANCHES AND
+0055                   * UNRESOLVED REFERENCES)
+0056                   * FOR ERROR CODES <30 SEE SYSTEM ERRORS
+0057                   *
+0058                   * ERROR 31  CLOSING ) EXPECTED IN EXPRESSION
+0059                   * ERROR 32  SYNTAX ERROR IN LABEL
+0060                   * ERROR 33  HEX CHAR EXPECTED AFTER $
+0061                   * ERROR 34  LABEL TABLE OVERFLOW
+0062                   * ERROR 35  LOGICAL CHAR EXPECTED AFTER #
+0063                   * ERROR 36  EXPRESSION NOT RESOLVED (PASS 2)
+0064                   * ERROR 37  SYNTAX ERROR IN OPCODE
+0065                   * ERROR 38  MNEMONIC OR ADDRESSING ILLEGAL
+0066                   * ERROR 39  ILLEGAL ADDRESSING MODE
+0067                   * ERROR 40  SYNTAX ERROR IN OPERAND
+0068                   * ERROR 41  ABSOLUTE ADDRESS ILLEGAL
+0069                   * ERROR 42  MORE THAN 1 UNRESOLVED LABEL IN
+0070                   *               FORWARD BRANCH
+0071                   * ERROR 43  BRANCH EXCEEDS BOUNDS
+0072                   * ERROR 44  FORWARD BRANCH TO THIS LABEL
+0073                   *               EXCEEDS BOUNDS
+0074                   * ERROR 45  DOUBLE LABELDEFINITION
+0075                   * ERROR 46  MISSMATCH IN SECOND PASS
+0076                   * ERROR 47  LABEL MISSING IN EQU
+0077                   * ERROR 48  OPERAND OF BYT TOO LONG
+0078                   * ERROR 49  EXPRESSION MUST BE RESOLVED
+0079                   * ERROR 50  LINE TOO LONG
+0080                   * ERROR 51  CHAR FOLLOWS LOGICAL END OF OPERAND
+0081                   * ERROR 52  TOO MANY UNRESOLVED BRANCHES
+0082                   *               NOT INSERTED INTO TEST TABLE
+0083                   *
+0084                           TIT R65 ASSEMBLER V8.0
+0085                   *
+0086                           ORG 0
+0087                   *
+0088                   * PAGE ZERO ASSEMBLER VARIABLES
+0089                   *******************************
+0090                   *
+0091                   * TEMPORARY BUFFERS
+0092                   *
+0093  0000-            INBUFF  BSS 48  LINE BUFFER
+0094  0030-            LABEL   BSS 7   LABEL SHIFT REGISTER
+0095  0037-            TEMP1   BSS 1   TEMPORARY REGISTER
+0096  0038-            NUMBYT  BSS 1   NUMBER OF BYTES
+0097  0039-            RESOLV  BSS 3   UNRESOLVED COUNTER
+0098  003C-            OBJECT  BSS 32  OBJECT CODE LINE BUFFER
+0099  005C-            VALUE   BSS 2   VALUE OF EXPRESSION
+0100  005E-            OPCODE  BSS 2   OPCODE SAVE REGISTER
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 03
+
+0101  0060-            ADMODE  BSS 1   ADDRESSING MODE
+0102  0061-            INDEX1  BSS 1   MNEMONIC TABLE INDEX
+0103  0062-            INDEX2  BSS 1   CODE OFFSET INDEX
+0104  0063-            DEFLB   BSS 1   LABEL DEFINITION FLAG
+0105  0064-            INBFPN  BSS 1   END OF INPUT POINTER
+0106  0065-            BRANTB  BSS 48  FORWARD BRANCH TABLE
+0107  0095-            BASE    BSS 2   REFERENCE TABLE POINTER
+0108  0097-            LABPNT  BSS 2   LABEL POINTER
+0109  0099-            LABPN1  BSS 2   SECOND LABEL POINTER
+0110  009B-            INPFIL  BSS 1   INPUT FILE NUMBER
+0111  009C-            SAVPNT  BSS 2   SAVED FILE PAR POINTER
+0112                   *
+0113                   * PRESET TO 0 IN BOTH PASSES
+0114                   *
+0115  009E-            PCOLD   BSS 2   OLD PROGRAM COUNTER
+0116  00A0-            PCNEW   BSS 2   NEW PROGRAMM COUNTER
+0117  00A2-            LINCNT  BSS 2   LINE COUNTER
+0118  00A4-            PAGECN  BSS 1   PAGE COUNTER
+0119  00A5-            OUTREC  BSS 1   OUTPUT RECORD COUNTER
+0120  00A6-            BRANTC  BSS 1   TABLE POINTER
+0121  00A7-            FILCNT  BSS 1   INPUT FILE COUNTER
+0122  00A8-            NUMERR  BSS 1   NUMBER OF ERRORS
+0123                   *
+0124                   * PRESET IN BOTH PASSES
+0125                   *
+0126  00A9-            PASSFL  BSS 1   PASS FLAG
+0127  00AA-            PRTFLG  BSS 1   PRINT FLAG
+0128  00AB-            PAGELN  BSS 1   PAGE LINE COUNTER
+0129  00AC-            OBPNT   BSS 2   OBJECT BUFFER POINTER
+0130  00AE-            OBADDR  BSS 2   OBJECT BASE ADDRESS
+0131                   *
+0132                   * PRESET ONLY IN FIRST BASS
+0133                   *
+0134  00B0-            LABCNT  BSS 2   LABEL COUNTER
+0135  00B2-            TITLE   BSS 32  TITLE OF PROGRAM
+0136                   *
+0137                   *
+0138                   *
+0139                   * MONITOR LABELS:
+0140                   *****************
+0141                   *
+0142                   FILFLG  EQU $DA         FILE ENTRY FLAG
+0143                   FILDRV  EQU $DC         FILE DRIVE
+0144                   CURPOS  EQU $EE         CURSOR HOR. POSITION
+0145                   INL     EQU $F8         INPUT BUFFER MONITOR
+0146                   *
+0147                   FILNAM  EQU $0301       FILE NAME
+0148                   FILSTP  EQU $0312       FILE SUBTYPE
+0149                   FILLOC  EQU $0313       FILE LOCATION/SECTOR
+0150                   FILSIZ  EQU $0315       FILE SIZE
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 04
+
+0151                   FILSA   EQU $031A       START ADDRESS
+0152                   FILEA   EQU $031C       END ADDRESS
+0153                   FILNM1  EQU $0320       SECOND FILE NAME
+0154                   FILSA1  EQU $0331       SECOND START ADDRESS
+0155                   FIRCTB  EQU $0351       ROCORD COUNTER
+0156                   *
+0157                   VFLAG   EQU $1780       VIDEO FLAG REGISTER
+0158                   SFLAG   EQU $1781       SYSTEM FLAG REGISTER
+0159                   NUMLIN  EQU $1789       VIDEO LINES
+0160                   MNEMR   EQU $E7C0       MNEMONIC TABLE
+0161                   MNEML   EQU $E780
+0162                   DISMOD  EQU $E722       ADDRESSING MODE TABLE 1
+0163                   MODE2   EQU $E766       ADDRESSING MODE TABLE
+0164                   CLOSAL  EQU $F015
+0165                   *
+0166                           PAG
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 05
+
+0167                   *
+0168                   * START OF PROGRAM ENTRY VECTORS
+0169                   ********************************
+0170                   *
+0171  00D2-                    ORG $2000
+0172                   *
+0173  2000- 4C C7 29           JMP COLDST      COLD START ENTRY
+0174  2003- 4C 10 2A           JMP WARMST      WARM START ENTRY
+0175                   *
+0176                   *
+0177                   * MONITOR CONSTANTS:
+0178                   ********************
+0179                   *
+0180  2006- 00 50      OBSTR   WRD $5000       START OF OBJECT BUFFER
+0181  2008- FE 8F      OBEND   WRD $8FFE       END OF OBJECT BUFFER -1
+0182                   *
+0183  200A- 00 DF      SAVNAM  WRD $DF00       INPUT FILE NAME BUFFER
+0184                   *
+0185  200C- 00 30      LABSTR  WRD $3000       START OF LABEL TABLE
+0186  200E- F0 4F      LABEND  WRD $4FF0       END OF LABEL TABLE
+0187                   *
+0188  2010- 32         TABLE   BYT 50          PRINTED LINES/PAGE
+0189  2011- 45                 BYT 69          TOTAL LINES/PAGE
+0190  2012- 0C                 BYT $0C         FORM FEED CODE
+0191  2013- 00                 BYT 0           NO OF ADD. PAD CHARS
+0192  2014- 41                 BYT 65          POSITION OF PAPER MARK
+0193  2015- CE                 BYT $CE         START POSITION ON PAPER
+0194                   *
+0195                   * SUBROUTINE VECTORS
+0196                   ********************
+0197                   *
+0198                   GETKEY  EQU $E000
+0199                   GETCHR  EQU $E003
+0200                   GETLIN  EQU $E006
+0201                   PRTCHR  EQU $E009
+0202                   VAUTOP  EQU $E00C
+0203                   PRTINF  EQU $E027
+0204                   PRTBYT  EQU $E02D
+0205                   PRTAX   EQU $E030
+0206  2016- 4C 20 EB   WRFILA  JMP WRFILE+12   SPECIAL ENTRY!
+0207                   WRFILE  EQU $EB14
+0208                   OPEN    EQU $F00F
+0209                   CLOSE   EQU $F012
+0210                   READCH  EQU $F018
+0211                   PRTDAT  EQU $F80F
+0212                   GETNAM  EQU $F815
+0213  2019- 4C F2 FC   HARGUM  JMP $FCF2
+0214                   PACKTS  EQU $F919
+0215                   *
+0216                   *
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 06
+
+0217                   *
+0218                   * SUBROUTINE SRLAB: SEARCH LABEL
+0219                   ********************************
+0220                   * SEARCH IN LABTB, RETURN C0 IF NOT
+0221                   * FOUND, ELSE LBAPNT=ADDRESS OF LABEL
+0222                   * USED: TEMP1,A; SAVED: X,Y; OUPUT: A,Z
+0223                   *
+0224  201C- 84 37      SRLAB   STY TEMP1
+0225  201E- AD 0C 20           LDA LABSTR      SET TO START OF TABLE
+0226  2021- AC 0D 20           LDY LABSTR+1
+0227                   *
+0228  2024- 85 97      SRLAB1  STA LABPNT
+0229  2026- 84 98              STY LABPNT+1
+0230  2028- C5 B0              CMP LABCNT      COMPARE TABLE END
+0231  202A- 98                 TYA
+0232  202B- E5 B1              SBC LABCNT+1
+0233  202D- B0 1C              BCS SRLAB4      SKIP, IF END OF TABLE
+0234  202F- A0 04              LDY =4
+0235  2031- B9 30 00   SRLAB2  LDA LABEL,Y     COMPARE NOW
+0236  2034- D1 97              CMP (LABPNT),Y
+0237  2036- D0 07              BNE SRLAB3
+0238  2038- 88                 DEY
+0239  2039- 10 F6              BPL SRLAB2      LOOP UNTIL DONE
+0240  203B- 38                 SEC             LABEL FOUND
+0241  203C- A4 37              LDY TEMP1
+0242  203E- 60                 RTS
+0243                   *
+0244  203F- A5 97      SRLAB3  LDA LABPNT      DIFFERENCE FOUND
+0245  2041- A4 98              LDY LABPNT+1
+0246  2043- 18                 CLC
+0247  2044- 69 08              ADC =8          NEXT ONE
+0248  2046- 90 DC              BCC SRLAB1
+0249  2048- C8                 INY
+0250  2049- B0 D9              BCS SRLAB1      ALLWAYS TAKEN
+0251                   *
+0252  204B- 18         SRLAB4  CLC             NOT FOUND
+0253  204C- A4 37              LDY TEMP1
+0254  204E- 60                 RTS
+0255                   *
+0256                   *
+0257                   * SUBROUTINE STLABN: STORE LABEL NAME
+0258                   *************************************
+0259                   * STORE IN LABTAB, ERROR IF TABLE OVERFLOW
+0260                   * NO DUPLICATE LABEL TEST, LABTB7 SET TO 0
+0261                   * USED: A,Y; SAVED: X; INPUT: LABCNT;
+0262                   * OUTPUT: LABCNT, CALLED: ERROR 34
+0263                   *
+0264  204F- A5 B0      STLABN  LDA LABCNT      COMPUTE LABPNT
+0265  2051- A4 B1              LDY LABCNT+1
+0266  2053- 18                 CLC
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 07
+
+0267  2054- 69 08              ADC =8
+0268  2056- 90 01              BCC *+3
+0269  2058- C8                 INY
+0270  2059- 48                 PHA
+0271  205A- CD 0E 20           CMP LABEND      TEST TABLE OVERFLOW
+0272  205D- 98                 TYA
+0273  205E- ED 0F 20           SBC LABEND+1
+0274  2061- 68                 PLA
+0275  2062- 90 09              BCC STLAB1      SKIP, IF NOT FULL
+0276                   *
+0277  2064- A9 34              LDA =$34        ERROR 34: TOO MANY
+0278  2066- 20 31 29           JSR ERROR       ERRORS
+0279  2069- A5 B0              LDA LABCNT
+0280  206B- A4 B1              LDY LABCNT+1
+0281                   *
+0282  206D- 85 B0      STLAB1  STA LABCNT
+0283  206F- 84 B1              STY LABCNT+1
+0284  2071- 38                 SEC
+0285  2072- E9 08              SBC =8
+0286  2074- B0 01              BCS *+3
+0287  2076- 88                 DEY
+0288  2077- 85 97              STA LABPNT
+0289  2079- 84 98              STY LABPNT+1
+0290                   *
+0291  207B- A0 04              LDY =4
+0292  207D- B9 30 00   STLAB2  LDA LABEL,Y
+0293  2080- 91 97              STA (LABPNT),Y
+0294  2082- 88                 DEY
+0295  2083- 10 F8              BPL STLAB2
+0296                   *
+0297  2085- A9 00              LDA =0          CLEAR BYTE 7
+0298  2087- A0 07              LDY =7
+0299  2089- 91 97              STA (LABPNT),Y
+0300  208B- 60                 RTS
+0301                   *
+0302                   *  SUBROUTINE RDLAB: READ LABEL FROM BUFFER
+0303                   *******************************************
+0304                   * READ 1-7 CHARS, SHIFT INTO 5 BYTES, STORE
+0305                   * IN LABEL, TERMINATORS ARE NOT LETTERS OR
+0306                   * NUMBERS. USED: A,X,Y,TEMP1; CALLED: ERROR;
+0307                   * INPUT:X; OUTPUT: LABEL,X
+0308                   *
+0309  208C- A0 08      RDLAB   LDY =8          CHAR COUNTER
+0310  208E- A9 06              LDA =6
+0311  2090- 85 37              STA TEMP1       TEMP1 = BIT COUNTER
+0312  2092- B5 00              LDA INBUFF,X    GET ONE CHAR
+0313  2094- C9 30              CMP =$30        IF NOT LEGAL CODE
+0314  2096- 90 04              BCC *+6         USE SAME NEXT LOOP
+0315  2098- C9 5B              CMP =$5B        IF LEGAL
+0316  209A- 90 03              BCC *+5         USE THIS CHAR
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 08
+
+0317  209C- CA                 DEX             USE SAME CHAR AGAIN
+0318  209D- A9 00              LDA =0          USE 0 FILLER
+0319  209F- 88                 DEY             COUNT CHAR
+0320  20A0- F0 21              BEQ RDLAB2      LAST CHAR
+0321  20A2- 0A                 ASL A
+0322  20A3- 0A                 ASL A
+0323  20A4- C0 06              CPY =6          IF X<6
+0324  20A6- 90 08              BCC RDLAB1      USE 6 BITS
+0325  20A8- C6 37              DEC TEMP1
+0326  20AA- 0A                 ASL A           TAKE ONLY 5 BITS
+0327  20AB- 90 03              BCC RDLAB1      LEGAL 5 BIT CODE
+0328  20AD- A9 00              LDA =0          ELSE USE FILLER
+0329  20AF- CA                 DEX
+0330  20B0- 0A         RDLAB1  ASL A           SHIFT INTO LABEL
+0331  20B1- 26 34              ROL LABEL+4
+0332  20B3- 26 33              ROL LABEL+3
+0333  20B5- 26 32              ROL LABEL+2
+0334  20B7- 26 31              ROL LABEL+1
+0335  20B9- 26 30              ROL LABEL
+0336  20BB- C6 37              DEC TEMP1
+0337  20BD- D0 F1              BNE RDLAB1      LOOP FOR BITS
+0338  20BF- E8                 INX
+0339  20C0- 4C 8E 20           JMP RDLAB+2
+0340  20C3- C9 00      RDLAB2  CMP =0
+0341  20C5- D0 06              BNE *+8         MORE THAN 6 CHARACTERS
+0342  20C7- A5 30              LDA LABEL
+0343  20C9- F0 02              BEQ *+4         FIRST CHAR NOT LETTER
+0344  20CB- E8                 INX
+0345  20CC- 60                 RTS
+0346  20CD- A9 32              LDA =$32
+0347  20CF- 4C 31 29           JMP ERROR       RETURN AFTER ERROR
+0348                   *
+0349                   *
+0350                   * SUBROUTINE RDBL: READ BLANKS
+0351                   ******************************
+0352                   * USED: A; SAVED:Y; INPUT:X; OUTPUT:X
+0353                   *
+0354  20D2- B5 00      RDBL    LDA INBUFF,X
+0355  20D4- E8                 INX
+0356  20D5- C9 20              CMP =$20
+0357  20D7- F0 F9              BEQ RDBL
+0358  20D9- CA                 DEX
+0359  20DA- 60                 RTS
+0360                   *
+0361                   *
+0362                   * SUBROUTINE EXPRESSION
+0363                   ***********************
+0364                   * READ EXPRESSION FROM INBUFF,X.  COMPUTE
+0365                   * VALUE AND RESOLV-FLAG (GIVES NUMBER OF
+0366                   * UNRESOLVED REFERENCES USED
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 09
+
+0367                   * SYNTAX:
+0368                   * EXPRESSION: FUNCTION [+-FUNCTION]
+0369                   * FUNCTION:   <ARGUMENT OR >ARGUMENT OR
+0370                   *               ARGUMENT
+0371                   * ARGUMENT:   'CHAR['] OR $HEX OR #BINARY OR
+0372                   *               DECIMAL OR * OR LABEL
+0373                   * USED: A,X,Y; INPUT:X; OUTPUT: X,VALUE
+0374                   *               RESOLVE,RESOLV+1;
+0375                   *               CALLED: FUNC,ERROR
+0376                   *
+0377  20DB- A9 00      EXPRES  LDA =0          SET COUNTER FOR
+0378  20DD- 85 39              STA RESOLV      UNRESOLVED LABELS
+0379  20DF- 20 17 21           JSR FUNC
+0380  20E2- 48         EXP1    PHA             PUSH RESULT ON STACK
+0381  20E3- A5 5C              LDA VALUE
+0382  20E5- 48                 PHA
+0383  20E6- B5 00              LDA INBUFF,X    GET NEXT CHAR
+0384  20E8- C9 2B              CMP =$2B        IF +
+0385  20EA- D0 12              BNE MINUS
+0386  20EC- E8                 INX
+0387  20ED- 20 17 21           JSR FUNC        GET NEXT FUNCTION
+0388  20F0- 68                 PLA             AND ADD TO SAVED VALUE
+0389  20F1- 18                 CLC
+0390  20F2- 65 5C              ADC VALUE
+0391  20F4- 85 5C              STA VALUE
+0392  20F6- 68                 PLA
+0393  20F7- 65 5D              ADC VALUE+1
+0394  20F9- 85 5D              STA VALUE+1
+0395  20FB- 4C E2 20           JMP EXP1
+0396  20FE- C9 2D      MINUS   CMP =$2D        IF -
+0397  2100- D0 12              BNE EXP2
+0398  2102- E8                 INX
+0399  2103- 20 17 21           JSR FUNC        GET NEXT FUNCTION
+0400  2106- 68                 PLA             AND SUBTRACT FROM SAVED
+0401  2107- 38                 SEC
+0402  2108- E5 5C              SBC VALUE
+0403  210A- 85 5C              STA VALUE
+0404  210C- 68                 PLA
+0405  210D- E5 5D              SBC VALUE+1
+0406  210F- 85 5D              STA VALUE+1
+0407  2111- 4C E2 20           JMP EXP1
+0408  2114- 68         EXP2    PLA             GET SAVED VALUE BACK
+0409  2115- 68                 PLA
+0410  2116- 60                 RTS
+0411                   *
+0412                   *
+0413                   * SUBROUTINE FUNCTION
+0414                   *********************
+0415                   * CALLED: ARG
+0416                   *
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 10
+
+0417  2117- B5 00      FUNC    LDA INBUFF,X
+0418  2119- C9 3C              CMP =$3C        IF < (LOW BYTE)
+0419  211B- D0 09              BNE *+11
+0420  211D- E8                 INX
+0421  211E- 20 33 21           JSR ARG         GET ARGUMENT
+0422  2121- A9 00      FUNC1   LDA =0          AND SET HIGH BYTE TO 0
+0423  2123- 85 5D              STA VALUE+1
+0424  2125- 60                 RTS
+0425                   *
+0426  2126- C9 3E              CMP =$3E        IF > (HIGH BYTE)
+0427  2128- D0 09              BNE ARG
+0428  212A- E8                 INX
+0429  212B- 20 33 21           JSR ARG         GET ARGUMENT
+0430  212E- 85 5C              STA VALUE       STORE HIGH BYTE IN
+0431  2130- 4C 21 21           JMP FUNC1       LOW BYTE AND CLEAR HIGH
+0432                   *
+0433                   *
+0434                   * SUBROUTINE ARGUMENT
+0435                   *********************
+0436                   * CALLED: ERROR,PACKTS,TSTBIN,DIGTST,RDLAB,
+0437                   * SRLAB,STLABN,SETREF
+0438                   *
+0439  2133- B5 00      ARG     LDA INBUFF,X
+0440  2135- C9 28              CMP =$28        IF (
+0441  2137- D0 13              BNE ARG05
+0442  2139- E8                 INX
+0443  213A- 20 DF 20           JSR EXPRES+4    GET EXPRESSION
+0444  213D- B5 00              LDA INBUFF,X    MUST BE )
+0445  213F- C9 29              CMP =$29
+0446  2141- F0 05              BEQ *+7
+0447  2143- A9 31              LDA =$31
+0448  2145- 20 31 29           JSR ERROR
+0449  2148- E8                 INX
+0450  2149- A5 5D              LDA VALUE+1
+0451  214B- 60                 RTS
+0452                   *
+0453  214C- C9 27      ARG05   CMP =$27        IF '
+0454  214E- D0 12              BNE ARG10
+0455  2150- E8                 INX
+0456  2151- B5 00              LDA INBUFF,X    GET CHAR
+0457  2153- 85 5C              STA VALUE
+0458  2155- E8                 INX
+0459  2156- B5 00              LDA INBUFF,X    IGNORE SECOND '
+0460  2158- C9 27              CMP =$27
+0461  215A- D0 01              BNE *+3
+0462  215C- E8                 INX
+0463  215D- A9 00              LDA =0
+0464  215F- 85 5D              STA VALUE+1
+0465  2161- 60                 RTS
+0466                   *
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 11
+
+0467  2162- C9 24      ARG10   CMP =$24        IF $ (HEX)
+0468  2164- D0 24              BNE ARG20
+0469  2166- E8                 INX
+0470  2167- A9 00              LDA =0
+0471  2169- 85 F8              STA INL
+0472  216B- 85 F9              STA INL+1
+0473  216D- B5 00              LDA INBUFF,X
+0474  216F- 20 1B F9           JSR PACKTS+2
+0475  2172- F0 05              BEQ *+7
+0476  2174- A9 33              LDA =$33
+0477  2176- 20 31 29           JSR ERROR
+0478  2179- E8                 INX
+0479  217A- B5 00              LDA INBUFF,X
+0480  217C- 20 1B F9           JSR PACKTS+2
+0481  217F- F0 F8              BEQ *-6
+0482  2181- A5 F8              LDA INL
+0483  2183- 85 5C              STA VALUE
+0484  2185- A5 F9              LDA INL+1
+0485  2187- 85 5D              STA VALUE+1
+0486  2189- 60                 RTS
+0487                   *
+0488  218A- C9 23      ARG20   CMP =$23        IF # (BINARY)
+0489  218C- D0 1A              BNE ARG30
+0490  218E- E8                 INX             READ BINARY NUMBER
+0491  218F- A9 00              LDA =0
+0492  2191- 85 5C              STA VALUE
+0493  2193- 85 5D              STA VALUE+1
+0494  2195- 20 2A 22           JSR TSTBIN
+0495  2198- F0 05              BEQ *+7
+0496  219A- A9 35              LDA =$35
+0497  219C- 20 31 29           JSR ERROR
+0498  219F- E8                 INX
+0499  21A0- 20 2A 22           JSR TSTBIN
+0500  21A3- F0 FA              BEQ *-4
+0501  21A5- A5 5D              LDA VALUE+1
+0502  21A7- 60                 RTS
+0503                   *
+0504  21A8- 20 3D 22   ARG30   JSR DIGTST      IF DECIMAL NUMBER
+0505  21AB- B0 12              BCS ARG40
+0506  21AD- A9 00              LDA =0          READ DECIMAL NUMBER
+0507  21AF- 85 5C              STA VALUE
+0508  21B1- 85 5D              STA VALUE+1
+0509  21B3- 20 3D 22           JSR DIGTST
+0510  21B6- E8                 INX
+0511  21B7- 20 3D 22           JSR DIGTST
+0512  21BA- 90 FA              BCC *-4
+0513  21BC- A5 5D              LDA VALUE+1
+0514  21BE- 60                 RTS
+0515                   *
+0516  21BF- C9 2A      ARG40   CMP =$2A        IF *
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 12
+
+0517  21C1- D0 0A              BNE ARG50
+0518  21C3- E8                 INX             GET PROGRAM COUNTER
+0519  21C4- A5 9E              LDA PCOLD
+0520  21C6- 85 5C              STA VALUE
+0521  21C8- A5 9F              LDA PCOLD+1
+0522  21CA- 85 5D              STA VALUE+1
+0523  21CC- 60                 RTS
+0524                   *
+0525  21CD- 20 8C 20   ARG50   JSR RDLAB       MUST BE LABEL
+0526  21D0- 20 1C 20           JSR SRLAB
+0527  21D3- 90 3A              BCC ARG52       BRANCH IF UNKNOWN
+0528  21D5- 20 C4 2D           JSR SETREF      INSERT INTO REF TABLE
+0529  21D8- 20 79 22           JSR DEFIN       IF DEFINED
+0530  21DB- F0 18              BEQ ARG51
+0531  21DD- A5 A9              LDA PASSFL
+0532  21DF- F0 08              BEQ *+10
+0533  21E1- A0 07              LDY =7
+0534  21E3- B1 97              LDA (LABPNT),Y  GET RFLAG
+0535  21E5- 30 02              BMI *+4
+0536  21E7- E6 39              INC RESOLV
+0537  21E9- A0 05              LDY =5
+0538  21EB- B1 97              LDA (LABPNT),Y  GET VALUE
+0539  21ED- 85 5C              STA VALUE
+0540  21EF- C8                 INY
+0541  21F0- B1 97              LDA (LABPNT),Y
+0542  21F2- 85 5D              STA VALUE+1
+0543  21F4- 60                 RTS
+0544  21F5- E6 39      ARG51   INC RESOLV      COUNT UNRESOLVED REF
+0545  21F7- A5 97              LDA LABPNT
+0546  21F9- 85 3A              STA RESOLV+1
+0547  21FB- A5 98              LDA LABPNT+1
+0548  21FD- 85 3B              STA RESOLV+2    SAVE LABEL NUMBER
+0549  21FF- A5 A9              LDA PASSFL
+0550  2201- F0 05              BEQ *+7
+0551  2203- A9 36              LDA =$36
+0552  2205- 20 31 29           JSR ERROR
+0553  2208- A9 00              LDA =0
+0554  220A- 85 5C              STA VALUE       RETURN VALUE = 0
+0555  220C- 85 5D              STA VALUE+1
+0556  220E- 60                 RTS
+0557  220F- 20 4F 20   ARG52   JSR STLABN      STORE LABEL NAME
+0558  2212- A5 A9              LDA PASSFL
+0559  2214- F0 05              BEQ *+7
+0560  2216- A9 36              LDA =$36
+0561  2218- 20 31 29           JSR ERROR
+0562  221B- A9 FF              LDA =$FF        SET TO UNRESOLVED
+0563  221D- A0 05              LDY =5
+0564  221F- 91 97              STA (LABPNT),Y
+0565  2221- C8                 INY
+0566  2222- 91 97              STA (LABPNT),Y
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 13
+
+0567  2224- 20 C4 2D           JSR SETREF
+0568  2227- 4C F5 21           JMP ARG51
+0569                   *
+0570                   *
+0571                   * SUBROUTINE TSTBIN: GET AND TEST BINARY NUMBER
+0572                   ***********************************************
+0573                   *
+0574  222A- B5 00      TSTBIN  LDA INBUFF,X
+0575  222C- C9 30              CMP =$30
+0576  222E- 18                 CLC
+0577  222F- F0 05              BEQ *+7
+0578  2231- C9 31              CMP =$31
+0579  2233- D0 07              BNE *+9
+0580  2235- 38                 SEC
+0581  2236- 26 5C              ROL VALUE
+0582  2238- 26 5D              ROL VALUE+1
+0583  223A- A9 00              LDA =0          SET ZERO FLAG
+0584  223C- 60                 RTS
+0585                   *
+0586                   *
+0587                   * SUBROUTINE DIGTST: TEST AND GET DECIMAL
+0588                   *****************************************
+0589                   *
+0590  223D- B5 00      DIGTST  LDA INBUFF,X
+0591  223F- C9 30              CMP =$30
+0592  2241- 90 04              BCC *+6
+0593  2243- C9 3A              CMP =$3A
+0594  2245- 90 02              BCC *+4
+0595  2247- 38                 SEC             C=1 >> NOT DECIMAL
+0596  2248- 60                 RTS
+0597                   *
+0598  2249- 06 5C              ASL VALUE       MULTIPLY VALUE BY 10
+0599  224B- 26 5D              ROL VALUE+1
+0600  224D- A5 5C              LDA VALUE       SAVE 2*VALUE
+0601  224F- 85 F8              STA INL
+0602  2251- A5 5D              LDA VALUE+1
+0603  2253- 85 F9              STA INL+1
+0604  2255- 06 5C              ASL VALUE
+0605  2257- 26 5D              ROL VALUE+1
+0606  2259- 06 5C              ASL VALUE
+0607  225B- 26 5D              ROL VALUE+1     8*VALUE
+0608  225D- A5 5C              LDA VALUE
+0609  225F- 18                 CLC
+0610  2260- 65 F8              ADC INL
+0611  2262- 85 5C              STA VALUE
+0612  2264- A5 5D              LDA VALUE+1
+0613  2266- 65 F9              ADC INL+1
+0614  2268- 85 5D              STA VALUE+1     10*VALUE
+0615  226A- B5 00              LDA INBUFF,X
+0616  226C- 29 0F              AND =$0F        CONVERT TO BCD
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 14
+
+0617  226E- 18                 CLC
+0618  226F- 65 5C              ADC VALUE       ADD TO 10*VALUE
+0619  2271- 85 5C              STA VALUE
+0620  2273- 90 02              BCC *+4
+0621  2275- E6 5D              INC VALUE+1
+0622  2277- 18                 CLC             C=0 >> DECIMAL
+0623  2278- 60                 RTS
+0624                   *
+0625                   *
+0626                   * SUBROUTINE DEFIN
+0627                   ******************
+0628                   * RETURN Z=1 IF LABEL UNDEFINED
+0629                   * INPUT: LABEL IN LABPNT
+0630                   *
+0631  2279- A0 05      DEFIN   LDY =5
+0632  227B- B1 97              LDA (LABPNT),Y
+0633  227D- C8                 INY
+0634  227E- 31 97              AND (LABPNT),Y
+0635  2280- C9 FF              CMP =$FF
+0636  2282- 60                 RTS
+0637                   *
+0638                   *
+0639                   * SUBROUTINE RDOPC: READ OPCODE FROM INBUFF
+0640                   *******************************************
+0641                   * PACK IN OPCODE WITH SAME FORMAT AS DISASSEM-
+0642                   * BLER (5BIT/CHAR, OFFSET=$3F, LEFT SHIFTED 1)
+0643                   * USED: A,X,Y,TEMP1; INPUT: X; OUTPUT; X,
+0644                   * OPCODE; CALLED: ERROR
+0645                   *
+0646  2283- A9 03      RDOPC   LDA =3
+0647  2285- 85 37              STA TEMP1       CHAR COUNTER
+0648  2287- B5 00      RDOPC1  LDA INBUFF,X    GET A CHAR
+0649  2289- C9 41              CMP =$41        TEST FOR LETTER
+0650  228B- 90 04              BCC ERR7
+0651  228D- C9 5B              CMP =$5B
+0652  228F- 90 0B              BCC *+13
+0653  2291- A0 00      ERR7    LDY =0
+0654  2293- 84 5E              STY OPCODE
+0655  2295- 84 5F              STY OPCODE+1
+0656  2297- A9 37              LDA =$37
+0657  2299- 4C 31 29           JMP ERROR
+0658                   *
+0659  229C- E8                 INX
+0660  229D- 38                 SEC
+0661  229E- E9 3F              SBC =$3F        SUBTRACT OFFSET
+0662  22A0- 0A                 ASL A
+0663  22A1- 0A                 ASL A
+0664  22A2- 0A                 ASL A
+0665  22A3- A0 05              LDY =5          BIT COUNTER
+0666  22A5- 0A         RDOPC2  ASL A
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 15
+
+0667  22A6- 26 5F              ROL OPCODE+1
+0668  22A8- 26 5E              ROL OPCODE
+0669  22AA- 88                 DEY
+0670  22AB- D0 F8              BNE RDOPC2
+0671  22AD- C6 37              DEC TEMP1       NEXT CHAR
+0672  22AF- D0 D6              BNE RDOPC1
+0673  22B1- 06 5F              ASL OPCODE+1
+0674  22B3- 26 5E              ROL OPCODE
+0675  22B5- B5 00              LDA INBUFF,X    TEST NEXT CHAR
+0676  22B7- E8                 INX
+0677  22B8- C9 20              CMP =$20        MUST BE BLANK
+0678  22BA- F0 03              BEQ *+5
+0679  22BC- 20 97 22           JSR ERR7+6
+0680  22BF- 60                 RTS
+0681                   *
+0682                   *
+0683                   * SUBROUTINE SROPC: SEARCH OPCODE IN TABLE
+0684                   ******************************************
+0685                   * USE OPCODE AND ADDRESSING MODE FOR TEST
+0686                   *
+0687  22C0- A2 41      SROPC   LDX =$41        POINTER TO MNEMONIC TB
+0688  22C2- CA                 DEX
+0689  22C3- D0 0C              BNE *+14
+0690  22C5- A9 38              LDA =$38
+0691  22C7- 20 31 29           JSR ERROR
+0692  22CA- A9 00              LDA =0
+0693  22CC- 85 3C              STA OBJECT
+0694  22CE- 4C FA 23           JMP ERR10+5     ASSUME ABS AND OPCODE=0
+0695                   *                       IF NOT FOUND
+0696  22D1- A5 5F              LDA OPCODE+1
+0697  22D3- DD BF E7           CMP MNEMR-1,X
+0698  22D6- D0 EA              BNE SROPC+2
+0699  22D8- A5 5E              LDA OPCODE
+0700  22DA- DD 7F E7           CMP MNEML-1,X
+0701  22DD- D0 E3              BNE SROPC+2
+0702  22DF- CA                 DEX
+0703  22E0- 86 61              STX INDEX1
+0704  22E2- 8A                 TXA
+0705  22E3- 0A                 ASL A
+0706  22E4- 0A                 ASL A
+0707  22E5- 0A                 ASL A
+0708  22E6- 85 62              STA INDEX2
+0709  22E8- B0 0B              BCS SROP30
+0710  22EA- 20 47 23   SROP20  JSR TSTADM      ITS XXXXX000 INST
+0711  22ED- F0 05              BEQ *+7
+0712  22EF- A9 39      ERR9    LDA =$39
+0713  22F1- 20 31 29           JSR ERROR
+0714  22F4- 60                 RTS
+0715  22F5- 06 62      SROP30  ASL INDEX2
+0716  22F7- B0 22              BCS SROP50
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 16
+
+0717  22F9- 10 06              BPL SROP40
+0718  22FB- A5 62              LDA INDEX2      ITS 1XXX1010 INST
+0719  22FD- 09 8A              ORA =$8A        COMPUTE OPCODE
+0720  22FF- D0 E9              BNE SROP20
+0721                   *
+0722  2301- 06 62      SROP40  ASL INDEX2      ITS XXXYY100 INST
+0723  2303- A0 03              LDY =3
+0724  2305- 98                 TYA
+0725  2306- 38                 SEC
+0726  2307- 2A                 ROL A
+0727  2308- 0A                 ASL A
+0728  2309- 0A                 ASL A
+0729  230A- 05 62              ORA INDEX2
+0730  230C- 20 47 23           JSR TSTADM
+0731  230F- D0 01              BNE *+3
+0732  2311- 60                 RTS             RETURN, IF FOUND
+0733  2312- 88                 DEY             TRY AGAIN
+0734  2313- 10 F0              BPL SROP40+4
+0735  2315- A6 61              LDX INDEX1      IF NOT FOUND, SEARCH
+0736  2317- E8                 INX             CODE AGAIN (DOUBLE
+0737  2318- 4C C2 22           JMP SROPC+2     CODES IN TABLE!)
+0738                   *
+0739  231B- 06 62      SROP50  ASL INDEX2
+0740  231D- B0 14              BCS SROP60      IF XXXYYY10 INST
+0741  231F- A0 07              LDY =7
+0742  2321- 98                 TYA
+0743  2322- 38                 SEC
+0744  2323- 2A                 ROL A
+0745  2324- 0A                 ASL A
+0746  2325- 05 62              ORA INDEX2
+0747  2327- 20 47 23           JSR TSTADM      TEST ADDRESSING
+0748  232A- D0 01              BNE *+3
+0749  232C- 60                 RTS             RETURN, IF FOUND
+0750  232D- 88                 DEY             TRY NEXT Y
+0751  232E- 10 F1              BPL SROP50+6
+0752  2330- 4C EF 22           JMP ERR9
+0753                   *
+0754  2333- A0 07      SROP60  LDY =7
+0755  2335- 98                 TYA
+0756  2336- 0A                 ASL A
+0757  2337- 38                 SEC
+0758  2338- 2A                 ROL A
+0759  2339- 05 62              ORA INDEX2
+0760  233B- 20 47 23           JSR TSTADM
+0761  233E- D0 01              BNE *+3
+0762  2340- 60                 RTS             RETURN, IF FOUND
+0763  2341- 88                 DEY
+0764  2342- 10 F1              BPL SROP60+2
+0765  2344- 4C EF 22           JMP ERR9
+0766                   *
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 17
+
+0767                   *
+0768                   * SUBROUTINE TSTADM: TEST ADDRESSING MODE
+0769                   *****************************************
+0770                   * ADDRESSING MODE CAN BE CHANGED IF NEEDED
+0771                   *
+0772  2347- 85 3C      TSTADM  STA OBJECT      SAVE OPCODE
+0773  2349- 4A                 LSR A           COMPUTE ADDRESSING MODE
+0774  234A- 90 05              BCC *+7         FOR THIS CODE
+0775  234C- 4A                 LSR A
+0776  234D- 29 07              AND =7
+0777  234F- 09 80              ORA =$80
+0778  2351- 4A                 LSR A
+0779  2352- AA                 TAX
+0780  2353- BD 22 E7           LDA DISMOD,X    LOAD MODE FROM TABLE
+0781  2356- B0 04              BCS *+6
+0782  2358- 4A                 LSR A
+0783  2359- 4A                 LSR A
+0784  235A- 4A                 LSR A
+0785  235B- 4A                 LSR A
+0786  235C- 29 0F              AND =$0F        COMPUTE MODE IN A
+0787  235E- AA                 TAX             AND SAVE IN X
+0788  235F- C9 0D              CMP =$0D                IF RELATIVE
+0789  2361- D0 0D              BNE TSTAD1
+0790  2363- A5 60              LDA ADMODE      CONVERT IT
+0791  2365- C9 02              CMP =2          CAN BE ZERO PAGE
+0792  2367- F0 04              BEQ *+6
+0793  2369- C9 03              CMP =3          CAN BE ABSOLUTE
+0794  236B- D0 03              BNE *+5
+0795  236D- 86 60              STX ADMODE
+0796  236F- 60                 RTS
+0797                   *
+0798  2370- A5 60      TSTAD1  LDA ADMODE
+0799  2372- C9 02              CMP =2          ZERO PAGE
+0800  2374- D0 11              BNE TSTAD3
+0801  2376- A5 3C              LDA OBJECT
+0802  2378- C9 4C              CMP =$4C        IF JMP
+0803  237A- F0 04              BEQ *+6
+0804  237C- C9 20              CMP =$20        OR JSR
+0805  237E- D0 04              BNE TSTAD2
+0806  2380- A9 03              LDA =3          SET TO ABSOLUTE
+0807  2382- 85 60              STA ADMODE
+0808  2384- E4 60      TSTAD2  CPX ADMODE      TEST NOW
+0809  2386- 60                 RTS
+0810                   *
+0811  2387- C9 0C      TSTAD3  CMP =$0C        ZERO PAGE,Y
+0812  2389- D0 F9              BNE TSTAD2
+0813  238B- A5 3C              LDA OBJECT
+0814  238D- 29 0F              AND =$0F
+0815  238F- C9 09              CMP =$09
+0816  2391- F0 F1              BEQ TSTAD2
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 18
+
+0817  2393- A9 0A              LDA =$A         CONVERT TO ABS,Y
+0818  2395- 4C 82 23           JMP TSTAD2-2    IF CODE =X9
+0819                   *
+0820                   *
+0821                   * SUBROUTINE OPER: INTERPRET OPERAND
+0822                   ************************************
+0823                   * USED: A,X,Y,TEMP1; INPUT:X; OUTPUT:RESOLV
+0824                   * VALUE,D(ADDRESSING MODE); CALLED: EXPRES,
+0825                   * ERROR,ZPAGE
+0826                   *
+0827  2398- B5 00      OPER    LDA INBUFF,X
+0828  239A- C9 3D              CMP =$3D        IF =
+0829  239C- D0 07              BNE *+9
+0830  239E- E8                 INX             IMMEDIATE (1)
+0831  239F- 20 DB 20           JSR EXPRES
+0832  23A2- A9 01              LDA =1
+0833  23A4- 60                 RTS
+0834                   *
+0835  23A5- C9 20              CMP =$20        IF BLANK
+0836  23A7- D0 04              BNE *+6
+0837  23A9- E8                 INX
+0838  23AA- A9 04              LDA =4          IMPLIED (4)
+0839  23AC- 60                 RTS
+0840                   *
+0841  23AD- C9 41              CMP =$41        IF A
+0842  23AF- D0 0D              BNE OPER15
+0843  23B1- E8                 INX
+0844  23B2- B5 00              LDA INBUFF,X    AND BLANK
+0845  23B4- C9 20              CMP =$20
+0846  23B6- D0 03              BNE *+5
+0847  23B8- A9 05              LDA =5          ACCUMULATOR (5)
+0848  23BA- 60                 RTS
+0849                   *
+0850                   *
+0851  23BB- CA                 DEX
+0852  23BC- B5 00              LDA INBUFF,X
+0853                   *
+0854  23BE- C9 28      OPER15  CMP =$28        IF (
+0855  23C0- D0 57              BNE OPER20
+0856  23C2- E8                 INX
+0857  23C3- 20 DB 20           JSR EXPRES      GET EXPRESSION
+0858  23C6- B5 00              LDA INBUFF,X
+0859  23C8- C9 2C              CMP =$2C        IF NOW ,
+0860  23CA- D0 1A              BNE OPER16
+0861  23CC- E8                 INX
+0862  23CD- B5 00              LDA INBUFF,X
+0863  23CF- C9 58              CMP =$58        MUST BE X
+0864  23D1- D0 22              BNE ERR10
+0865  23D3- E8                 INX
+0866  23D4- B5 00              LDA INBUFF,X
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 19
+
+0867  23D6- C9 29              CMP =$29        AND )
+0868  23D8- D0 1B              BNE ERR10
+0869  23DA- 20 53 24           JSR ZPAGE       MUST BE ZERO PAGE
+0870  23DD- F0 03              BEQ *+5
+0871  23DF- 20 FD 23           JSR ERR11
+0872  23E2- E8                 INX
+0873  23E3- A9 06              LDA =6          (X.PAGE,X) (6)
+0874  23E5- 60                 RTS
+0875                   *
+0876  23E6- C9 29      OPER16  CMP =$29        MUST BE )
+0877  23E8- D0 0B              BNE ERR10
+0878  23EA- E8                 INX
+0879  23EB- B5 00              LDA INBUFF,X
+0880  23ED- C9 20              CMP =$20        IF NOW BLANK
+0881  23EF- D0 11              BNE OPER17
+0882  23F1- E8                 INX
+0883  23F2- A9 0B              LDA =$0B        (ABSOLUTE) (11)
+0884  23F4- 60                 RTS
+0885                   *
+0886  23F5- A9 40      ERR10   LDA =$40        SYNTAX ERROR IN OPER
+0887  23F7- 20 31 29           JSR ERROR
+0888  23FA- A9 03              LDA =3          ASSUME ABSOLUTE
+0889  23FC- 60                 RTS
+0890                   *
+0891  23FD- A9 41      ERR11   LDA =$41        MUST BE ZERO PAGE IND
+0892  23FF- 4C 31 29           JMP ERROR
+0893                   *
+0894  2402- C9 2C      OPER17  CMP =$2C        MUST BE ,
+0895  2404- D0 EF              BNE ERR10
+0896  2406- E8                 INX
+0897  2407- B5 00              LDA INBUFF,X
+0898  2409- C9 59              CMP =$59        MUST BE Y
+0899  240B- D0 E8              BNE ERR10
+0900  240D- E8                 INX
+0901  240E- 20 53 24           JSR ZPAGE
+0902  2411- F0 03              BEQ *+5         MSU BE ZERO PAGE
+0903  2413- 20 FD 23           JSR ERR11
+0904  2416- A9 07              LDA =7          (ZERO PAGE),Y (7)
+0905  2418- 60                 RTS
+0906                   *
+0907  2419- 20 DB 20   OPER20  JSR EXPRES      MUST BE EXPRESSION
+0908  241C- B5 00              LDA INBUFF,X
+0909  241E- C9 20              CMP =$20        IF NOW BLANK
+0910  2420- D0 0B              BNE OPER25
+0911  2422- 20 53 24           JSR ZPAGE
+0912  2425- D0 03              BNE *+5
+0913  2427- A9 02              LDA =2          ZERO PAGE (2)
+0914  2429- 60                 RTS
+0915                   *
+0916  242A- A9 03              LDA =3          ABSOLUTE
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 20
+
+0917  242C- 60                 RTS
+0918                   *
+0919  242D- C9 2C      OPER25  CMP =$2C        MUST BE ,
+0920  242F- D0 C4              BNE ERR10
+0921  2431- E8                 INX
+0922  2432- B5 00              LDA INBUFF,X
+0923  2434- E8                 INX
+0924  2435- C9 58              CMP =$58        IF NOW X
+0925  2437- D0 0B              BNE OPER30
+0926  2439- 20 53 24           JSR ZPAGE
+0927  243C- D0 03              BNE *+5
+0928  243E- A9 08              LDA =8          ZERO PAGE,X (8)
+0929  2440- 60                 RTS
+0930                   *
+0931  2441- A9 09              LDA =9          ZERO PAGE,Y (12)
+0932  2443- 60                 RTS
+0933                   *
+0934  2444- C9 59      OPER30  CMP =$59        MUST BE Y
+0935  2446- D0 AD              BNE ERR10
+0936  2448- 20 53 24           JSR ZPAGE
+0937  244B- D0 03              BNE *+5
+0938  244D- A9 0C              LDA =$0C        ZERO PAGE,Y (12)
+0939  244F- 60                 RTS
+0940                   *
+0941  2450- A9 0A              LDA =$0A        ABSOLUTE,Y (10
+0942  2452- 60                 RTS
+0943                   *
+0944                   *
+0945                   * SUBROUTINE ZPAGE
+0946                   ******************
+0947                   * TEST FOR ZERO PAGE ADDRESSING
+0948                   * RETURN Z=1 IF ZERO PAGE
+0949                   *
+0950  2453- A5 39      ZPAGE   LDA RESOLV
+0951  2455- D0 02              BNE *+4         ASSUME ABS IF UNDEFINED
+0952  2457- A5 5D              LDA VALUE+1
+0953  2459- 60                 RTS
+0954                   *
+0955                   *
+0956                   * SUBROUTINE DEFLAB: DEFINE LABEL
+0957                   *********************************
+0958                   * USED: A,Y; SAVED:X; INPUT: LABEL, VALUE,
+0959                   * LABPNT; CALLED SRLAB,STLAB,ERROR,DEFIN
+0960                   *
+0961  245A- 20 1C 20   DEFLAB  JSR SRLAB       IF LABEL IN TAB;E
+0962  245D- B0 06              BCS *+8           DO NOT STORE
+0963  245F- 20 4F 20           JSR STLABN      ELSE STORE
+0964  2462- 4C 91 24           JMP DEFL1
+0965                   *
+0966  2465- A5 A9              LDA PASSFL
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 21
+
+0967  2467- D0 03              BNE *+5
+0968  2469- 20 25 2D           JSR RESFBR      RESOLVE BRANCHES
+0969  246C- 20 79 22           JSR DEFIN
+0970  246F- F0 20              BEQ DEFL1       IF DEFINED
+0971  2471- A5 A9              LDA PASSFL        TEST PASS FLAG
+0972  2473- D0 05              BNE *+7
+0973  2475- A9 45              LDA =$45
+0974  2477- 4C 31 29           JMP ERROR
+0975                   *
+0976  247A- A0 05              LDY =5
+0977  247C- B1 97              LDA (LABPNT),Y  COMPARE IN PASS 2
+0978  247E- C5 5C              CMP VALUE
+0979  2480- D0 07              BNE *+9
+0980  2482- C8                 INY
+0981  2483- B1 97              LDA (LABPNT),Y
+0982  2485- C5 5D              CMP VALUE+1
+0983  2487- F0 05              BEQ *+7
+0984  2489- A9 46              LDA =$46
+0985  248B- 20 31 29           JSR ERROR
+0986  248E- 4C 9C 24           JMP DEFL2
+0987                   *
+0988  2491- A5 5C      DEFL1   LDA VALUE       STORE ADDRESS
+0989  2493- A0 05              LDY =5
+0990  2495- 91 97              STA (LABPNT),Y
+0991  2497- A5 5D              LDA VALUE+1
+0992  2499- C8                 INY
+0993  249A- 91 97              STA (LABPNT),Y
+0994                   *
+0995  249C- A5 A9      DEFL2   LDA PASSFL
+0996  249E- F0 08              BEQ *+10
+0997  24A0- A0 07              LDY =7
+0998  24A2- B1 97              LDA (LABPNT),Y
+0999  24A4- 09 80              ORA =$80        SET RFLAG
+1000  24A6- 91 97              STA (LABPNT),Y
+1001  24A8- 60                 RTS
+1002                   *
+1003                   *
+1004                   * SUBROUTINE INTLIN:INTERPRET ONE LINE
+1005                   **************************************
+1006                   *OUTPUT: OBJECT,NUMBYT
+1007                   *
+1008  24A9- A2 00      INTLIN  LDX =0          CLEAR BUFFER POINTER
+1009  24AB- 86 38              STX NUMBYT      CLEAR NUMBER OF BYTES
+1010  24AD- 86 63              STX DEFLB       CLEAR LABEL DEF FLAG
+1011  24AF- B5 00              LDA INBUFF,X    GET FIRST CHAR
+1012  24B1- C9 2A              CMP =$2A        IF *
+1013  24B3- D0 01              BNE *+3
+1014  24B5- 60                 RTS             RETURN (COMMENT LINE)
+1015                   *
+1016  24B6- C9 20              CMP =$20        NOT A BLANK
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 22
+
+1017  24B8- F0 0F              BEQ INTL2
+1018  24BA- 20 8C 20           JSR RDLAB       READ LABEL, NO STORING
+1019  24BD- A9 FF              LDA =$FF        AT THIS MOMENT, BUT SET
+1020  24BF- 85 63              STA DEFLB       LABEL DEFINITION FLAG
+1021  24C1- A5 9E              LDA PCOLD       GET ADDRESS FOR LABEL
+1022  24C3- 85 5C              STA VALUE
+1023  24C5- A5 9F              LDA PCOLD+1
+1024  24C7- 85 5D              STA VALUE+1
+1025                   *
+1026  24C9- 20 D2 20   INTL2   JSR RDBL        READ BLANKS
+1027  24CC- 20 83 22           JSR RDOPC       READ NOW OPCODE
+1028                   *
+1029  24CF- A0 09              LDY =9          SEARCH IN PSEUDO TABLE
+1030  24D1- A5 5E              LDA OPCODE
+1031  24D3- D9 50 26           CMP PSEUDO,Y
+1032  24D6- F0 05              BEQ *+7
+1033  24D8- 88                 DEY
+1034  24D9- 10 F8              BPL *-6
+1035  24DB- 30 07              BMI *+9         BRANCH IF NOT FOUND
+1036  24DD- A5 5F              LDA OPCODE+1
+1037  24DF- D9 5A 26           CMP PSEUDO+10,Y
+1038  24E2- D0 F4              BNE *-10
+1039                   *
+1040  24E4- 98                 TYA
+1041  24E5- 48                 PHA
+1042  24E6- D0 20              BNE INTL10      FOUND. IF EQU (0)
+1043  24E8- A5 63              LDA DEFLB         TEST DEF FLAG
+1044  24EA- D0 05              BNE *+7
+1045  24EC- A9 47              LDA =$47        LABEL MISSING IN EQU
+1046  24EE- 4C 31 29           JMP ERROR
+1047                   *
+1048  24F1- A0 04              LDY =4          SAVE LABEL
+1049  24F3- B9 30 00   INTL5   LDA LABEL,Y
+1050  24F6- 48                 PHA
+1051  24F7- 88                 DEY
+1052  24F8- 10 F9              BPL INTL5
+1053                   *
+1054  24FA- 20 64 26           JSR EXPDEF      GET VALUE FOR EQU
+1055                   *
+1056  24FD- A0 00              LDY =0
+1057  24FF- 68         INTL6   PLA             GET BACK LABEL
+1058  2500- 99 30 00           STA LABEL,Y
+1059  2503- C8                 INY
+1060  2504- C0 05              CPY =5
+1061  2506- D0 F7              BNE INTL6
+1062                   *
+1063  2508- A5 63      INTL10  LDA DEFLB       IF LABEL DEFNITION
+1064  250A- F0 03              BEQ *+5
+1065  250C- 20 5A 24           JSR DEFLAB      DEFINE IT NOW
+1066                   *
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 23
+
+1067  250F- 68                 PLA             GET AGAIN PSEUDO NUMBER
+1068  2510- D0 01              BNE *+3
+1069  2512- 60                 RTS             RETURN NOW FROM EQU
+1070                   *
+1071  2513- C9 01              CMP =1          IF ORG (1)
+1072  2515- D0 0E              BNE INTL12
+1073  2517- 20 64 26           JSR EXPDEF        GET NEW PC
+1074  251A- A5 5C              LDA VALUE
+1075  251C- 85 A0              STA PCNEW
+1076  251E- A5 5D              LDA VALUE+1
+1077  2520- 85 A1              STA PCNEW+1
+1078  2522- 4C 65 28           JMP CLOSRC      CLOSE EXISTING OBJ. REC
+1079                   *
+1080  2525- C9 02      INTL12  CMP =2          IF BSS (2)
+1081  2527- D0 13              BNE INTL13
+1082  2529- 20 64 26           JSR EXPDEF        GET VALUE
+1083  252C- 18                 CLC             ADD TO PCOLD
+1084  252D- A5 9E              LDA PCOLD
+1085  252F- 65 5C              ADC VALUE
+1086  2531- 85 A0              STA PCNEW
+1087  2533- A5 9F              LDA PCOLD+1
+1088  2535- 65 5D              ADC VALUE+1
+1089  2537- 85 A1              STA PCNEW+1
+1090  2539- 4C 65 28           JMP CLOSRC      CLOSE EXISTING OBJ. REC
+1091                   *
+1092  253C- C9 03      INTL13  CMP =3          IF BYT (3)
+1093  253E- D0 49              BNE INTL14
+1094  2540- B5 00      BYT     LDA INBUFF,X    GET ONE BYTE
+1095  2542- C9 27              CMP =$27        IF '
+1096  2544- D0 29              BNE BYT3
+1097  2546- E8                 INX             GET ASCII STRING
+1098  2547- B5 00              LDA INBUFF,X
+1099  2549- A4 38      BYT1    LDY NUMBYT
+1100  254B- C0 20              CPY =$20
+1101  254D- B0 35              BCS ERR18
+1102  254F- 99 3C 00           STA OBJECT,Y    STORE
+1103  2552- E6 38              INC NUMBYT
+1104  2554- E8                 INX
+1105  2555- E0 2E              CPX =$2E        TEST END OF INBUFF
+1106  2557- B0 2B              BCS ERR18
+1107  2559- B5 00              LDA INBUFF,X    TEST NEXT CHAR
+1108  255B- C9 27              CMP =$27
+1109  255D- D0 EA              BNE BYT1        CONTINUE STRING READ
+1110  255F- E8                 INX
+1111  2560- C6 38              DEC NUMBYT
+1112  2562- B9 3C 00           LDA OBJECT,Y
+1113  2565- 85 5C              STA VALUE
+1114  2567- A9 00              LDA =0
+1115  2569- 20 E2 20           JSR EXP1
+1116  256C- 4C 72 25           JMP BYT2
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 24
+
+1117                   *
+1118  256F- 20 DB 20   BYT3    JSR EXPRES
+1119  2572- A5 5C      BYT2    LDA VALUE
+1120  2574- A4 38              LDY NUMBYT
+1121  2576- 99 3C 00           STA OBJECT,Y
+1122  2579- E6 38              INC NUMBYT
+1123  257B- B5 00              LDA INBUFF,X
+1124  257D- E8                 INX
+1125  257E- C9 2C              CMP =$2C
+1126  2580- F0 BE              BEQ BYT
+1127  2582- CA                 DEX
+1128  2583- 60                 RTS
+1129                   *
+1130  2584- A9 48      ERR18   LDA =$48
+1131  2586- 4C 31 29           JMP ERROR       RETURN AFTER ERROR
+1132                   *
+1133  2589- C9 04      INTL14  CMP =$04                IF WRD (4)
+1134  258B- D0 1C              BNE INTL15
+1135  258D- 20 DB 20   WRD     JSR EXPRES      GET WORD
+1136  2590- A4 38              LDY NUMBYT
+1137  2592- A5 5C              LDA VALUE
+1138  2594- 99 3C 00           STA OBJECT,Y
+1139  2597- C8                 INY
+1140  2598- A5 5D              LDA VALUE+1
+1141  259A- 99 3C 00           STA OBJECT,Y
+1142  259D- C8                 INY
+1143  259E- 84 38              STY NUMBYT
+1144  25A0- B5 00              LDA INBUFF,X
+1145  25A2- E8                 INX
+1146  25A3- C9 2C              CMP =$2C        IF ,
+1147  25A5- F0 E6              BEQ WRD         CONTINUE
+1148  25A7- CA                 DEX
+1149  25A8- 60                 RTS
+1150                   *
+1151  25A9- C9 05      INTL15  CMP =5          IF PAG (5)
+1152  25AB- D0 07              BNE INTL16
+1153  25AD- A5 AB      PAGE    LDA PAGELN      . SET BIT 7 (PAGE FLAG)
+1154  25AF- 09 80              ORA =$80
+1155  25B1- 85 AB              STA PAGELN
+1156  25B3- 60                 RTS
+1157                   *
+1158  25B4- C9 06      INTL16  CMP =6          IF TIT (6)
+1159  25B6- D0 0C              BNE INTL17
+1160  25B8- A0 1F              LDY =$1F          LOAD 32 CHARS
+1161  25BA- B5 00              LDA INBUFF,X
+1162  25BC- 99 B2 00           STA TITLE,Y
+1163  25BF- E8                 INX
+1164  25C0- 88                 DEY
+1165  25C1- 10 F7              BPL *-7
+1166  25C3- 60                 RTS
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 25
+
+1167                   *
+1168  25C4- C9 07      INTL17  CMP =7          IF END (7)
+1169  25C6- D0 03              BNE *+5
+1170  25C8- 4C C1 2B           JMP END         GO TO END
+1171                   *
+1172  25CB- C9 08      INTL18  CMP =$08        IF NPR (8)
+1173  25CD- D0 05              BNE INTL19
+1174  25CF- A9 00              LDA =0
+1175  25D1- 85 AA              STA PRTFLG      INHIBIT PRINTING
+1176  25D3- 60                 RTS
+1177                   *
+1178  25D4- C9 09      INTL19  CMP =$09        IF PRT (9)
+1179  25D6- D0 09              BNE INTL20
+1180  25D8- A5 A9              LDA PASSFL      DO NOTHIN IN FIRST PASS
+1181  25DA- F0 04              BEQ *+6
+1182  25DC- A9 80              LDA =$80        SET PRINTING FLAG
+1183  25DE- 85 AA              STA PRTFLG
+1184  25E0- 60                 RTS
+1185                   *
+1186  25E1- 20 98 23   INTL20  JSR OPER        MUST BE OPCODE
+1187  25E4- 85 60              STA ADMODE      SAVE ADDRESSING MODE
+1188  25E6- B5 00              LDA INBUFF,X
+1189  25E8- C9 20              CMP =$20
+1190  25EA- F0 05              BEQ *+7
+1191  25EC- A9 51              LDA =$51
+1192  25EE- 20 31 29           JSR ERROR
+1193  25F1- A5 5C              LDA VALUE
+1194  25F3- 85 3D              STA OBJECT+1
+1195  25F5- A5 5D              LDA VALUE+1
+1196  25F7- 85 3E              STA OBJECT+2
+1197  25F9- 20 C0 22           JSR SROPC       SEARCH OPCODE
+1198  25FC- A4 60              LDY ADMODE
+1199  25FE- B9 66 E7           LDA MODE2,Y     COMPUTE NUMBYT
+1200  2601- 29 03              AND =$03
+1201  2603- AA                 TAX
+1202  2604- E8                 INX
+1203  2605- 86 38              STX NUMBYT
+1204  2607- C0 0D              CPY =$0D        IF RELATIVE ADDRESSING
+1205  2609- F0 01              BEQ *+3         GO TO COMPUTE OFFSET
+1206  260B- 60                 RTS
+1207                   *
+1208  260C- A5 A9              LDA PASSFL
+1209  260E- D0 2C              BNE BRAN2
+1210  2610- A5 39              LDA RESOLV      IF OPERAND RESOLVED
+1211  2612- F0 28              BEQ BRAN2
+1212  2614- C9 02              CMP =2
+1213  2616- 90 05              BCC *+7
+1214  2618- A9 42              LDA =$42
+1215  261A- 20 31 29           JSR ERROR       MORE THAN 1 UNRES LABEL
+1216  261D- 20 FF 2C           JSR FORBR       INSERT FORWARD BRANCH
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 26
+
+1217  2620- A9 00              LDA =0
+1218  2622- 85 3D              STA OBJECT+1
+1219  2624- 60                 RTS
+1220                   *
+1221                   * SUBROUTINE TO COMPUTE RELATIVE ADDRESS
+1222                   ****************************************
+1223                   *
+1224  2625- A5 3D      BRAN1   LDA OBJECT+1
+1225  2627- 38                 SEC
+1226  2628- E9 02              SBC =2
+1227  262A- 48                 PHA
+1228  262B- A5 3E              LDA OBJECT+2
+1229  262D- E9 00              SBC =0
+1230  262F- A8                 TAY
+1231  2630- 68                 PLA
+1232  2631- 38                 SEC
+1233  2632- E5 9E              SBC PCOLD
+1234  2634- 85 3D              STA OBJECT+1
+1235  2636- 08                 PHP
+1236  2637- 98                 TYA
+1237  2638- E5 9F              SBC PCOLD+1
+1238  263A- 28                 PLP
+1239  263B- 60                 RTS
+1240                   *
+1241                   *
+1242  263C- 20 25 26   BRAN2   JSR BRAN1
+1243  263F- 30 0A              BMI BRAN3
+1244  2641- C9 00              CMP =0
+1245  2643- F0 05              BEQ *+7
+1246  2645- A9 43              LDA =$43
+1247  2647- 20 31 29           JSR ERROR
+1248  264A- 60                 RTS
+1249  264B- C9 FF      BRAN3   CMP =$FF
+1250  264D- D0 F6              BNE *-8
+1251  264F- 60                 RTS
+1252                   *
+1253                   *
+1254                   * PSEUDO OPCODE TABLE
+1255                   *
+1256  2650- 34 84 1D   PSEUDO  BYT $34,$84,$1D,$1E,$C4,$88,$AA,$33
+1256  2653- 1E C4 88 
+1256  2656- AA 33 
+1257  2658- 7C 8C              BYT $7C,$8C
+1258  265A- AC D0 28           BYT $AC,$D0,$28,$AA,$CA,$90,$AA,$CA
+1258  265D- AA CA 90 
+1258  2660- AA CA 
+1259  2662- 66 EA              BYT $66,$EA
+1260                   *
+1261                   *
+1262                   * EXPDEF: GET A RESOLVED EXPRESSION
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 27
+
+1263                   ***********************************
+1264                   *
+1265  2664- 20 DB 20   EXPDEF  JSR EXPRES
+1266  2667- A5 39              LDA RESOLV
+1267  2669- F0 05              BEQ *+7
+1268  266B- A9 49              LDA =$49
+1269  266D- 20 31 29           JSR ERROR
+1270  2670- 60                 RTS
+1271                   *
+1272                   *
+1273                   * JSR PRINTLIN: PRINT A LINE
+1274                   ****************************
+1275                   * INPUT: OBJECT,NUMBYT,PCOLD,PCNEW,PAGELN
+1276                   * PAGECN,LINCNT
+1277                   *
+1278  2671- A9 00      PRTLIN  LDA =0
+1279  2673- 85 37              STA TEMP1       POINTER IN OBJ
+1280  2675- F8                 SED
+1281  2676- 18                 CLC             INCREMENT LINE COUNTER
+1282  2677- A9 01              LDA =1
+1283  2679- 65 A2              ADC LINCNT      DECIMAL INCREMENT
+1284  267B- 85 A2              STA LINCNT
+1285  267D- A5 A3              LDA LINCNT+1
+1286  267F- 69 00              ADC =0
+1287  2681- 85 A3              STA LINCNT+1
+1288  2683- D8                 CLD
+1289  2684- 24 AA      PRTL10  BIT PRTFLG
+1290  2686- 10 28              BPL PRTL21-2
+1291  2688- A5 A3              LDA LINCNT+1
+1292  268A- A6 A2              LDX LINCNT
+1293  268C- 20 30 E0           JSR PRTAX       PRINT LINE NUMBER
+1294  268F- 20 27 E0           JSR PRTINF
+1295  2692- 20 A0              BYT $20,$A0     PRINT 2 BLANKS
+1296  2694- A5 A0              LDA PCNEW
+1297  2696- C5 9E              CMP PCOLD
+1298  2698- D0 06              BNE *+8
+1299  269A- A5 A1              LDA PCNEW+1
+1300  269C- C5 9F              CMP PCOLD+1
+1301  269E- F0 0B              BEQ PRTL20
+1302  26A0- A5 9F              LDA PCOLD+1
+1303  26A2- A6 9E              LDX PCOLD
+1304  26A4- 20 30 E0           JSR PRTAX       PRINT PROGRAM COUNTER
+1305  26A7- 20 27 E0           JSR PRTINF
+1306  26AA- AD                 BYT $AD         PRINT -
+1307  26AB- A2 0B      PRTL20  LDX =$0B
+1308  26AD- 20 05 27           JSR TAB
+1309  26B0- A2 03              LDX =3          PRINT MAX 3 OBJ BYTES
+1310  26B2- A4 37      PRTL21  LDY TEMP1
+1311  26B4- B9 3C 00           LDA OBJECT,Y
+1312  26B7- C4 38              CPY NUMBYT
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 28
+
+1313  26B9- F0 1A              BEQ PRTL25
+1314  26BB- E6 37              INC TEMP1
+1315  26BD- 24 AA              BIT PRTFLG
+1316  26BF- 10 03              BPL *+5
+1317  26C1- 20 2D E0           JSR PRTBYT
+1318  26C4- E6 9E              INC PCOLD
+1319  26C6- D0 02              BNE *+4
+1320  26C8- E6 9F              INC PCOLD+1
+1321  26CA- 24 AA              BIT PRTFLG
+1322  26CC- 10 04              BPL *+6
+1323  26CE- 20 27 E0           JSR PRTINF      PRINT BLANK
+1324  26D1- A0                 BYT $A0
+1325  26D2- CA                 DEX
+1326  26D3- D0 DD              BNE PRTL21
+1327  26D5- A4 37      PRTL25  LDY TEMP1
+1328  26D7- C0 04              CPY =4
+1329  26D9- B0 19              BCS PRTL30
+1330  26DB- 24 AA              BIT PRTFLG
+1331  26DD- 10 05              BPL *+7
+1332  26DF- A2 16              LDX =$16
+1333  26E1- 20 05 27           JSR TAB         TABULATE TO POS $16
+1334  26E4- A2 00              LDX =0
+1335  26E6- 24 AA      PRTL26  BIT PRTFLG
+1336  26E8- 10 05              BPL *+7
+1337  26EA- B5 00              LDA INBUFF,X
+1338  26EC- 20 09 E0           JSR PRTCHR      PRINT TEXT
+1339  26EF- E8                 INX
+1340  26F0- E4 64              CPX INBFPN
+1341  26F2- 90 F2              BCC PRTL26
+1342  26F4- A5 38      PRTL30  LDA NUMBYT
+1343  26F6- C5 37              CMP TEMP1
+1344  26F8- F0 0A              BEQ *+12        RETURN
+1345  26FA- 24 AA              BIT PRTFLG
+1346  26FC- 10 03              BPL *+5
+1347  26FE- 20 0F 27           JSR NEWLIN
+1348  2701- 4C 84 26           JMP PRTL10
+1349  2704- 60                 RTS
+1350                   *
+1351                   *
+1352                   * SUBROUTINE TAB: TABULATOR (TO X)
+1353                   **********************************
+1354                   *
+1355  2705- A9 20      TAB     LDA =$20
+1356  2707- 20 09 E0           JSR PRTCHR
+1357  270A- E4 EE              CPX CURPOS
+1358  270C- B0 F9              BCS TAB+2
+1359  270E- 60                 RTS
+1360                   *
+1361                   *
+1362                   * SUBROUTINE NEWLIN: START NEW LINE
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 29
+
+1363                   ***********************************
+1364                   *
+1365  270F- 20 6E 27   NEWLIN  JSR CRLF
+1366  2712- E6 AB              INC PAGELN
+1367  2714- A5 AB              LDA PAGELN
+1368  2716- 30 06              BMI NEWL06
+1369  2718- CD 10 20           CMP TABLE       PRINTED LINES
+1370  271B- B0 01              BCS NEWL06
+1371  271D- 60                 RTS             RETURN IF NOT NEW PAGE
+1372  271E- E6 AB      NEWL06  INC PAGELN
+1373  2720- AD 80 17           LDA VFLAG       TEST AUTOPRINT FLAG
+1374  2723- 29 08              AND =8
+1375  2725- F0 06              BEQ *+8
+1376  2727- AD 12 20           LDA TABLE+2     $D FOR IBM, $A FOR TTY
+1377  272A- 20 0C E0           JSR VAUTOP      EXECUTE LFON HARD COPY
+1378                   *
+1379  272D- 20 6E 27   NEWL10  JSR CRLF
+1380  2730- A9 00              LDA =0
+1381  2732- 85 AB              STA PAGELN
+1382  2734- F8                 SED
+1383  2735- 38                 SEC
+1384  2736- 65 A4              ADC PAGECN      INCREMENT PAGE NUMBER
+1385  2738- 85 A4              STA PAGECN
+1386  273A- D8                 CLD
+1387  273B- A2 1F              LDX =$1F
+1388  273D- B5 B2              LDA TITLE,X     PRINT TITLE
+1389  273F- 20 09 E0           JSR PRTCHR
+1390  2742- CA                 DEX
+1391  2743- 10 F8              BPL *-6
+1392  2745- A2 22              LDX =34
+1393  2747- 20 05 27           JSR TAB
+1394  274A- 20 0F F8           JSR PRTDAT
+1395  274D- 20 27 E0           JSR PRTINF
+1396  2750- 20 20 52           BYT '  R65 ASSEMBLER  PAGE',$A0
+1396  2753- 36 35 20 
+1396  2756- 41 53 53 
+1396  2759- 45 4D 42 
+1396  275C- 4C 45 52 
+1396  275F- 20 20 50 
+1396  2762- 41 47 45 
+1396  2765- A0 
+1397  2766- A5 A4              LDA PAGECN
+1398  2768- 20 2D E0           JSR PRTBYT
+1399  276B- 20 6E 27           JSR CRLF
+1400  276E- 20 27 E0   CRLF    JSR PRTINF
+1401  2771- 0D 8A              BYT $0D,$8A
+1402  2773- A2 01              LDX =1          LEADING SPACES
+1403  2775- 8A                 TXA             (WAS 16)
+1404  2776- 48                 PHA
+1405  2777- A9 14              LDA =$14        (WAS $20)
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 30
+
+1406  2779- 20 0C E0           JSR VAUTOP
+1407  277C- 68                 PLA
+1408  277D- AA                 TAX
+1409  277E- CA                 DEX
+1410  277F- D0 F4              BNE *-10
+1411  2781- 60         CRLF1   RTS
+1412                   *
+1413                   *
+1414                   *
+1415                   * SUBROUTINE GET: GET A LINE FROM FILE
+1416                   **************************************
+1417                   *
+1418  2782- A2 2F      GET     LDX =$2F        CLEAR INBUFF
+1419  2784- A9 20              LDA =$20
+1420  2786- 95 00              STA INBUFF,X
+1421  2788- CA                 DEX
+1422  2789- 10 FB              BPL GET+4
+1423                   *
+1424  278B- A2 00              LDX =0          POINTER IN INBUFF
+1425  278D- 86 64      GET10   STX INBFPN
+1426  278F- A6 9B              LDX INPFIL
+1427  2791- A9 00              LDA =0
+1428  2793- 85 DA              STA FILFLG
+1429  2795- 20 18 F0           JSR READCH      GET ONE CHARACTER
+1430  2798- F0 03              BEQ *+5
+1431  279A- 4C 0E 28           JMP GETERR
+1432  279D- C9 1F              CMP =$1F        EOF
+1433  279F- F0 0D              BEQ GET20
+1434  27A1- C9 0D              CMP =$0D
+1435  27A3- D0 01              BNE *+3
+1436  27A5- 60                 RTS
+1437  27A6- A6 64              LDX INBFPN
+1438  27A8- 20 15 28           JSR STINB
+1439  27AB- 4C 8D 27           JMP GET10
+1440                   *
+1441  27AE- A6 9B      GET20   LDX INPFIL
+1442  27B0- 20 12 F0           JSR CLOSE
+1443  27B3- E6 A7              INC FILCNT
+1444  27B5- A5 A9      GET25   LDA PASSFL
+1445  27B7- F0 06              BEQ GET27
+1446  27B9- 20 A3 29           JSR BACKNM      GET SAVED FILE NAME
+1447  27BC- 4C E5 27           JMP GET28
+1448                   *
+1449  27BF- 20 27 E0   GET27   JSR PRTINF
+1450  27C2- 43 4F 4E           BYT 'CONTINUATION FILENAME.CY,DRIVE?'
+1450  27C5- 54 49 4E 
+1450  27C8- 55 41 54 
+1450  27CB- 49 4F 4E 
+1450  27CE- 20 46 49 
+1450  27D1- 4C 45 4E 
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 31
+
+1450  27D4- 41 4D 45 
+1450  27D7- 2E 43 59 
+1450  27DA- 2C 44 52 
+1450  27DD- 49 56 45 
+1450  27E0- 3F 
+1451  27E1- A0                 BYT $A0
+1452  27E2- 20 76 29           JSR INNAME
+1453  27E5- 20 27 E0   GET28   JSR PRTINF
+1454  27E8- 14 0D 0A           BYT $14,$0D,$0A,'PRESS ANY KEY'+128
+1454  27EB- 50 52 45 
+1454  27EE- 53 53 20 
+1454  27F1- 41 4E 59 
+1454  27F4- 20 4B 45 
+1454  27F7- D9 
+1455  27F8- A5 AA              LDA PRTFLG
+1456  27FA- 10 04              BPL *+6
+1457  27FC- 20 27 E0           JSR PRTINF
+1458  27FF- 94                 BYT $94
+1459  2800- A9 00              LDA =0
+1460  2802- 85 DA              STA FILFLG
+1461  2804- 20 0F F0           JSR OPEN
+1462  2807- D0 06              BNE GETERR+1
+1463                   *
+1464  2809- 84 9B      GET30   STY INPFIL
+1465  280B- 4C 82 27           JMP GET
+1466                   *
+1467  280E- 98         GETERR  TYA             INPUT ERROR
+1468  280F- 20 31 29           JSR ERROR       THIS ERROR IS FATAL
+1469  2812- 4C 10 2A           JMP WARMST
+1470                   *
+1471  2815- E0 30      STINB   CPX =$30                IF NOT OVERFLOW
+1472  2817- F0 04              BEQ *+6
+1473  2819- 95 00              STA INBUFF,X
+1474  281B- E8                 INX
+1475  281C- 60                 RTS
+1476  281D- A9 50              LDA =$50
+1477  281F- 4C 31 29           JMP ERROR       RETURN AFTER ERROR
+1478                   *
+1479                   *
+1480                   * SUBROUTINE PUT: PUT OBJECT CODE INTO
+1481                   **************************************
+1482                   * OUTPUT BUFFER, RETURN IF FIRST PASS.
+1483                   * IS ONLY CALLED, IF NUMBYT>0
+1484                   *
+1485  2822- A5 A9      PUT     LDA PASSFL
+1486  2824- D0 01              BNE *+3
+1487  2826- 60                 RTS
+1488                   *
+1489  2827- 20 24 29           JSR OBEMPT      IF BUFFER EMPTY
+1490  282A- D0 08              BNE PUT10
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 32
+
+1491  282C- A5 9E              LDA PCOLD       STORE PCOLD
+1492  282E- 85 AE              STA OBADDR      AT BASE ADDRESS
+1493  2830- A5 9F              LDA PCOLD+1
+1494  2832- 85 AF              STA OBADDR+1
+1495                   *
+1496  2834- AD 08 20   PUT10   LDA OBEND       IF BUFFER FULL
+1497  2837- 38                 SEC
+1498  2838- E5 AC              SBC OBPNT
+1499  283A- 85 37              STA TEMP1
+1500  283C- AD 09 20           LDA OBEND+1
+1501  283F- E5 AD              SBC OBPNT+1
+1502  2841- 48                 PHA
+1503  2842- A5 37              LDA TEMP1
+1504  2844- C5 38              CMP NUMBYT
+1505  2846- 68                 PLA
+1506  2847- E9 00              SBC =0
+1507  2849- B0 06              BCS *+8
+1508  284B- 20 65 28           JSR CLOSRC      CLOSE RECORD
+1509  284E- 4C 22 28           JMP PUT         AND OPEN NEW ONE
+1510                   *
+1511  2851- A0 00              LDY =0          STORE OBJECT CODE
+1512  2853- A2 00              LDX =0
+1513  2855- B5 3C      PUT20   LDA OBJECT,X
+1514  2857- 91 AC              STA (OBPNT),Y
+1515  2859- E6 AC              INC OBPNT
+1516  285B- D0 02              BNE *+4
+1517  285D- E6 AD              INC OBPNT+1
+1518  285F- E8                 INX
+1519  2860- E4 38              CPX NUMBYT
+1520  2862- D0 F1              BNE PUT20
+1521  2864- 60                 RTS
+1522                   *
+1523                   *
+1524  2865- A5 A9      CLOSRC  LDA PASSFL
+1525  2867- D0 01              BNE *+3
+1526  2869- 60                 RTS
+1527  286A- 20 24 29           JSR OBEMPT      IF BUFFER EMPTY
+1528  286D- D0 01              BNE *+3
+1529  286F- 60                 RTS             DO NOTHING
+1530                   *
+1531  2870- 8A                 TXA
+1532  2871- 48                 PHA
+1533  2872- 20 27 E0           JSR PRTINF
+1534  2875- 14 0D 0A           BYT $14,$0D,$0A,$0E
+1534  2878- 0E 
+1535  2879- 53 54 4F           BYT 'STORE OBJECT FILE:',$0B
+1535  287C- 52 45 20 
+1535  287F- 4F 42 4A 
+1535  2882- 45 43 54 
+1535  2885- 20 46 49 
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 33
+
+1535  2888- 4C 45 3A 
+1535  288B- 0B 
+1536  288C- 0D 0A 46           BYT $0D,$0A,'FILENAME.CY,DRIVE,LOC?'
+1536  288F- 49 4C 45 
+1536  2892- 4E 41 4D 
+1536  2895- 45 2E 43 
+1536  2898- 59 2C 44 
+1536  289B- 52 49 56 
+1536  289E- 45 2C 4C 
+1536  28A1- 4F 43 3F 
+1537  28A4- A0                 BYT $A0
+1538  28A5- 20 06 E0           JSR GETLIN
+1539  28A8- 20 15 F8           JSR GETNAM
+1540  28AB- 20 19 20           JSR HARGUM
+1541  28AE- 85 DC              STA FILDRV
+1542  28B0- 20 19 20           JSR HARGUM
+1543  28B3- 8D 13 03           STA FILLOC
+1544  28B6- 8E 14 03           STX FILLOC+1
+1545  28B9- A2 10              LDX =16
+1546  28BB- BD 20 03           LDA FILNM1,X
+1547  28BE- 9D 01 03           STA FILNAM,X
+1548  28C1- CA                 DEX
+1549  28C2- 10 F7              BPL *-7
+1550  28C4- A5 AC              LDA OBPNT       SET FILE SIZE
+1551  28C6- 38                 SEC
+1552  28C7- ED 06 20           SBC OBSTR
+1553  28CA- 8D 15 03           STA FILSIZ
+1554  28CD- A5 AD              LDA OBPNT+1
+1555  28CF- ED 07 20           SBC OBSTR+1
+1556  28D2- 8D 16 03           STA FILSIZ+1
+1557  28D5- AD 06 20           LDA OBSTR       SET START IN RAM
+1558  28D8- 8D 31 03           STA FILSA1
+1559  28DB- AD 07 20           LDA OBSTR+1
+1560  28DE- 8D 32 03           STA FILSA1+1
+1561  28E1- A9 00              LDA =0
+1562  28E3- 85 DA              STA FILFLG
+1563  28E5- A9 4D              LDA ='M         OBJECT FILE FROM
+1564  28E7- 8D 12 03           STA FILSTP      ASSEMBLER
+1565  28EA- A5 AE              LDA OBADDR
+1566  28EC- 8D 1A 03           STA FILSA
+1567  28EF- 18                 CLC
+1568  28F0- 6D 15 03           ADC FILSIZ
+1569  28F3- 8D 1C 03           STA FILEA
+1570  28F6- A5 AF              LDA OBADDR+1
+1571  28F8- 8D 1B 03           STA FILSA+1
+1572  28FB- 6D 16 03           ADC FILSIZ+1
+1573  28FE- 8D 1D 03           STA FILEA+1
+1574  2901- AD 1C 03           LDA FILEA
+1575  2904- D0 03              BNE *+5
+1576  2906- CE 1D 03           DEC FILEA+1
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 34
+
+1577  2909- CE 1C 03           DEC FILEA
+1578  290C- 20 16 20           JSR WRFILA
+1579  290F- D0 0D              BNE PUTERR
+1580  2911- AD 06 20           LDA OBSTR
+1581  2914- 85 AC              STA OBPNT
+1582  2916- AD 07 20           LDA OBSTR+1
+1583  2919- 85 AD              STA OBPNT+1
+1584  291B- 68                 PLA
+1585  291C- AA                 TAX
+1586  291D- 60                 RTS
+1587                   *
+1588  291E- 68         PUTERR  PLA             WRITE ERROR
+1589  291F- AA                 TAX
+1590  2920- 98                 TYA
+1591  2921- 4C 31 29           JMP ERROR
+1592                   *
+1593                   *
+1594  2924- A5 AC      OBEMPT  LDA OBPNT
+1595  2926- CD 06 20           CMP OBSTR
+1596  2929- D0 05              BNE *+7
+1597  292B- A5 AD              LDA OBPNT+1
+1598  292D- CD 07 20           CMP OBSTR+1
+1599  2930- 60                 RTS
+1600                   *
+1601                   *
+1602                   * SUBROUTINE ERROR: PRINT ERROR MESSAGE
+1603                   ***************************************
+1604                   * SET PRINT FLAG; SAVED: X,Y
+1605                   *
+1606  2931- 48         ERROR   PHA
+1607  2932- 20 27 E0           JSR PRTINF
+1608  2935- 12                 BYT $12
+1609  2936- 2A 2A 2A           BYT '*** ERROR',$A0
+1609  2939- 20 45 52 
+1609  293C- 52 4F 52 
+1609  293F- A0 
+1610  2940- 68                 PLA
+1611  2941- 20 2D E0           JSR PRTBYT
+1612  2944- E6 A8              INC NUMERR
+1613  2946- 8A                 TXA
+1614  2947- 48                 PHA
+1615  2948- A5 A9              LDA PASSFL
+1616  294A- D0 14              BNE ENDERR
+1617  294C- 20 27 E0           JSR PRTINF
+1618  294F- 20 20 49           BYT '  IN LINE '+128
+1618  2952- 4E 20 4C 
+1618  2955- 49 4E 45 
+1618  2958- A0 
+1619  2959- A5 A3              LDA LINCNT+1
+1620  295B- A6 A2              LDX LINCNT
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 35
+
+1621  295D- 20 30 E0           JSR PRTAX
+1622  2960- 20 6E 27   ENDERR  JSR CRLF
+1623  2963- 68                 PLA
+1624  2964- AA                 TAX
+1625  2965- 60                 RTS
+1626                   *
+1627                   *
+1628                   * CONFIGURATE PRINTER FOR 96 CHARS
+1629                   *
+1630  2966- A2 02      PRCON   LDX =2
+1631  2968- BD D9 2A           LDA PRTAB,X
+1632  296B- 86 37              STX TEMP1
+1633  296D- 20 0C E0           JSR VAUTOP
+1634  2970- A6 37              LDX TEMP1
+1635  2972- CA                 DEX
+1636  2973- 10 F3              BPL PRCON+2
+1637  2975- 60                 RTS
+1638                   *
+1639                   *
+1640                   * GET FILE NAME
+1641                   *
+1642  2976- 20 06 E0   INNAME  JSR GETLIN
+1643  2979- 20 15 F8           JSR GETNAM
+1644  297C- 20 19 20           JSR HARGUM
+1645  297F- 48                 PHA
+1646  2980- A4 A7              LDY FILCNT
+1647  2982- AD 0A 20           LDA SAVNAM
+1648  2985- 18         INNA5   CLC
+1649  2986- 88                 DEY
+1650  2987- 30 05              BMI INNA10
+1651  2989- 69 14              ADC =20
+1652  298B- 4C 85 29           JMP INNA5
+1653  298E- 85 9C      INNA10  STA SAVPNT
+1654  2990- AD 0B 20           LDA SAVNAM+1
+1655  2993- 85 9D              STA SAVPNT+1
+1656  2995- A0 12              LDY =18
+1657  2997- B9 1F 03   INNA20  LDA FILNM1-1,Y
+1658  299A- 91 9C              STA (SAVPNT),Y
+1659  299C- 88                 DEY
+1660  299D- D0 F8              BNE INNA20
+1661  299F- 68                 PLA
+1662  29A0- 91 9C              STA (SAVPNT),Y
+1663  29A2- 60                 RTS
+1664                   *
+1665                   *
+1666                   * GET FILE NAME BACK FROM BUFFER
+1667                   *
+1668  29A3- A4 A7      BACKNM  LDY FILCNT
+1669  29A5- AD 0A 20           LDA SAVNAM
+1670  29A8- 18         BACK10  CLC
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 36
+
+1671  29A9- 88                 DEY
+1672  29AA- 30 05              BMI BACK20      CALCULATE POINTER
+1673  29AC- 69 14              ADC =20
+1674  29AE- 4C A8 29           JMP BACK10
+1675  29B1- 85 9C      BACK20  STA SAVPNT
+1676  29B3- AD 0B 20           LDA SAVNAM+1
+1677  29B6- 85 9D              STA SAVPNT+1
+1678  29B8- A0 12              LDY =18
+1679  29BA- B1 9C      BACK30  LDA (SAVPNT),Y
+1680  29BC- 99 1F 03           STA FILNM1-1,Y
+1681  29BF- 88                 DEY
+1682  29C0- D0 F8              BNE BACK30
+1683  29C2- B1 9C              LDA (SAVPNT),Y
+1684  29C4- 85 DC              STA FILDRV
+1685  29C6- 60                 RTS
+1686                   *
+1687                   *
+1688                   * INITIALIZATION
+1689                   ****************
+1690                   *
+1691  29C7- A9 20      COLDST  LDA =$20
+1692  29C9- A2 1F              LDX =$1F
+1693  29CB- 95 B2              STA TITLE,X     CLEAR TITLE
+1694  29CD- CA                 DEX
+1695  29CE- 10 FB              BPL *-3
+1696                   *
+1697  29D0- 20 27 E0           JSR PRTINF
+1698  29D3- 0D 0A 09           BYT $D,$A,9,9,'R65 ASSEMBLER',$D,$A
+1698  29D6- 09 52 36 
+1698  29D9- 35 20 41 
+1698  29DC- 53 53 45 
+1698  29DF- 4D 42 4C 
+1698  29E2- 45 52 0D 
+1698  29E5- 0A 
+1699  29E6- 0A 53 4F           BYT $A,'SOURCE FILE: ',$D
+1699  29E9- 55 52 43 
+1699  29EC- 45 20 46 
+1699  29EF- 49 4C 45 
+1699  29F2- 3A 20 0D 
+1700  29F5- 0A 46 49           BYT $A,'FILENAME.CY,DRIVE?',$A0
+1700  29F8- 4C 45 4E 
+1700  29FB- 41 4D 45 
+1700  29FE- 2E 43 59 
+1700  2A01- 2C 44 52 
+1700  2A04- 49 56 45 
+1700  2A07- 3F A0 
+1701  2A09- A9 00              LDA =0
+1702  2A0B- 85 A7              STA FILCNT
+1703  2A0D- 20 76 29           JSR INNAME
+1704                   *
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 37
+
+1705  2A10- 20 27 E0   WARMST  JSR PRTINF
+1706  2A13- 0D 0A 41           BYT $D,$A,'A*'+128
+1706  2A16- AA 
+1707  2A17- 20 66 29           JSR PRCON
+1708  2A1A- 20 03 E0           JSR GETCHR
+1709                   *
+1710  2A1D- C9 46              CMP =$46        F=FIRST PASS
+1711  2A1F- F0 03              BEQ *+5
+1712  2A21- 4C B2 2A           JMP WARM10
+1713  2A24- AD 0C 20           LDA LABSTR
+1714  2A27- AE 0D 20           LDX LABSTR+1
+1715  2A2A- 85 B0              STA LABCNT
+1716  2A2C- 86 B1              STX LABCNT+1
+1717  2A2E- A9 00              LDA =0
+1718  2A30- 85 A9              STA PASSFL
+1719  2A32- 85 AA              STA PRTFLG
+1720  2A34- AD 15 20   PASS    LDA TABLE+5     BOTH PASSES
+1721  2A37- 85 AB              STA PAGELN
+1722  2A39- A9 00              LDA =0
+1723  2A3B- 85 A7              STA FILCNT      START WITH FIRST FILE
+1724  2A3D- 20 A3 29           JSR BACKNM
+1725                   *
+1726  2A40- A9 00              LDA =0
+1727  2A42- 85 DA              STA FILFLG
+1728  2A44- 20 0F F0           JSR OPEN        OPEN SOURCE
+1729  2A47- F0 03              BEQ *+5
+1730  2A49- 4C 0F 28           JMP GETERR+1
+1731                   *
+1732  2A4C- 84 9B              STY INPFIL
+1733  2A4E- AD 06 20           LDA OBSTR       OBJECT START
+1734  2A51- 85 AC              STA OBPNT
+1735  2A53- AD 07 20           LDA OBSTR+1
+1736  2A56- 85 AD              STA OBPNT+1
+1737  2A58- A2 0A              LDX =(NUMERR-PCOLD)  SET ALL TO 0
+1738  2A5A- A9 00              LDA =0
+1739  2A5C- 95 9E              STA PCOLD,X
+1740  2A5E- CA                 DEX
+1741  2A5F- 10 FB              BPL *-3
+1742  2A61- A9 80              LDA =$80
+1743  2A63- 85 A5              STA OUTREC
+1744  2A65- 20 27 E0           JSR PRTINF      ** AUTOPRINT ON
+1745  2A68- 92                 BYT $92         **
+1746  2A69- 20 0F 27           JSR NEWLIN      ** DELETE THIS
+1747                   *
+1748  2A6C- 20 27 E0   LINE    JSR PRTINF      AUTOPRINT OFF
+1749  2A6F- 94                 BYT $94
+1750  2A70- AD 81 17           LDA SFLAG       ESCAPE TEST
+1751  2A73- 10 08              BPL LINE1
+1752  2A75- 29 7F              AND =$7F
+1753  2A77- 8D 81 17           STA SFLAG
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 38
+
+1754  2A7A- 4C 10 2A           JMP WARMST
+1755  2A7D- 20 82 27   LINE1   JSR GET
+1756  2A80- 20 A9 24           JSR INTLIN
+1757  2A83- 18                 CLC
+1758  2A84- A5 A0              LDA PCNEW
+1759  2A86- 65 38              ADC NUMBYT
+1760  2A88- 85 A0              STA PCNEW
+1761  2A8A- 90 02              BCC *+4
+1762  2A8C- E6 A1              INC PCNEW+1
+1763  2A8E- A5 38              LDA NUMBYT
+1764  2A90- F0 03              BEQ *+5
+1765  2A92- 20 22 28           JSR PUT
+1766  2A95- 24 AA              BIT PRTFLG
+1767  2A97- 10 04              BPL *+6
+1768  2A99- 20 27 E0           JSR PRTINF
+1769  2A9C- 92                 BYT $92         AUTOPRINT ON
+1770  2A9D- 20 71 26           JSR PRTLIN
+1771  2AA0- 24 AA              BIT PRTFLG
+1772  2AA2- 10 03              BPL *+5
+1773  2AA4- 20 0F 27           JSR NEWLIN
+1774  2AA7- A5 A0              LDA PCNEW
+1775  2AA9- 85 9E              STA PCOLD
+1776  2AAB- A5 A1              LDA PCNEW+1
+1777  2AAD- 85 9F              STA PCOLD+1
+1778  2AAF- 4C 6C 2A           JMP LINE        HANDLE LINES
+1779                   *
+1780  2AB2- C9 53      WARM10  CMP =$53        S=SECOND PASS
+1781  2AB4- D0 11              BNE WARM20
+1782  2AB6- A9 01              LDA =1
+1783  2AB8- 85 A9              STA PASSFL
+1784  2ABA- A9 80              LDA =$80
+1785  2ABC- 85 AA              STA PRTFLG      PRINTING ON
+1786  2ABE- 20 66 29           JSR PRCON
+1787  2AC1- 20 DC 2A           JSR CLRRFL      CLEAR R-FLAG
+1788  2AC4- 4C 34 2A           JMP PASS
+1789                   *
+1790  2AC7- C9 43      WARM20  CMP =$43        C=CONTINUE
+1791  2AC9- D0 03              BNE WARM30
+1792  2ACB- 4C 6C 2A           JMP LINE        HANDLE LINES
+1793                   *
+1794  2ACE- C9 52      WARM30  CMP =$52        R=REFERENCE TABLE
+1795  2AD0- F0 30              BEQ MAP
+1796  2AD2- 20 27 E0           JSR PRTINF
+1797  2AD5- 87                 BYT $87         BELL
+1798  2AD6- 4C 10 2A           JMP WARMST
+1799                   *
+1800                   *
+1801  2AD9- 14 75 1B   PRTAB   BYT 20,117,27
+1802                   *
+1803                   *
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 39
+
+1804                   * CLEAR R-FLAG
+1805                   *
+1806  2ADC- A0 07      CLRRFL  LDY =7
+1807  2ADE- AD 0C 20           LDA LABSTR
+1808  2AE1- AE 0D 20           LDX LABSTR+1
+1809  2AE4- 85 97      CLRRF1  STA LABPNT
+1810  2AE6- 86 98              STX LABPNT+1
+1811  2AE8- C5 B0              CMP LABCNT
+1812  2AEA- 8A                 TXA
+1813  2AEB- E5 B1              SBC LABCNT+1
+1814  2AED- 90 01              BCC *+3
+1815  2AEF- 60                 RTS
+1816                   *
+1817  2AF0- B1 97              LDA (LABPNT),Y
+1818  2AF2- 29 7F              AND =$7F
+1819  2AF4- 91 97              STA (LABPNT),Y
+1820  2AF6- A5 97              LDA LABPNT
+1821  2AF8- A6 98              LDX LABPNT+1
+1822  2AFA- 18                 CLC
+1823  2AFB- 69 08              ADC =8
+1824  2AFD- 90 E5              BCC CLRRF1
+1825  2AFF- E8                 INX
+1826  2B00- B0 E2              BCS CLRRF1      ALWAYS TAKEN
+1827                   *
+1828                   *
+1829                   * PRINT REFERENCE TABLE
+1830                   ***********************
+1831                   *
+1832  2B02- A5 A9      MAP     LDA PASSFL
+1833  2B04- F0 17              BEQ MAP1
+1834  2B06- A9 80              LDA =$80
+1835  2B08- 85 AA              STA PRTFLG
+1836  2B0A- 20 27 E0           JSR PRTINF
+1837  2B0D- 4D 41 50           BYT 'MAP DESTROYED'+128
+1837  2B10- 20 44 45 
+1837  2B13- 53 54 52 
+1837  2B16- 4F 59 45 
+1837  2B19- C4 
+1838  2B1A- 4C 10 2A           JMP WARMST
+1839  2B1D- 20 66 29   MAP1    JSR PRCON
+1840  2B20- AD 15 20           LDA TABLE+5
+1841  2B23- 85 AB              STA PAGELN
+1842  2B25- A9 00              LDA =0
+1843  2B27- 85 A4              STA PAGECN
+1844  2B29- 20 27 E0           JSR PRTINF
+1845  2B2C- 92                 BYT $92         AUTOPRINT ON
+1846  2B2D- 20 0F 27           JSR NEWLIN
+1847  2B30- 20 27 E0           JSR PRTINF
+1848  2B33- 43 52 4F           BYT 'CROSS REFERENCE MAP',$BA
+1848  2B36- 53 53 20 
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 40
+
+1848  2B39- 52 45 46 
+1848  2B3C- 45 52 45 
+1848  2B3F- 4E 43 45 
+1848  2B42- 20 4D 41 
+1848  2B45- 50 BA 
+1849  2B47- 20 0F 27           JSR NEWLIN
+1850  2B4A- 20 DC 2A           JSR CLRRFL      CLEAR R-FLAG
+1851                   *
+1852  2B4D- AD 0C 20   CROSS0  LDA LABSTR
+1853  2B50- AE 0D 20           LDX LABSTR+1
+1854  2B53- 85 97      CROSS1  STA LABPNT
+1855  2B55- 86 98              STX LABPNT+1
+1856  2B57- C5 B0              CMP LABCNT
+1857  2B59- 8A                 TXA
+1858  2B5A- E5 B1              SBC LABCNT+1
+1859  2B5C- 90 0A              BCC CROSS2
+1860  2B5E- 20 0F 27           JSR NEWLIN
+1861  2B61- 20 27 E0           JSR PRTINF
+1862  2B64- 94                 BYT $94
+1863  2B65- 4C 10 2A           JMP WARMST
+1864                   *
+1865  2B68- A0 07      CROSS2  LDY =7
+1866  2B6A- B1 97              LDA (LABPNT),Y
+1867  2B6C- 10 0C              BPL CROSS3      SKIP, IF FOUND
+1868  2B6E- A5 97              LDA LABPNT
+1869  2B70- A6 98              LDX LABPNT+1
+1870  2B72- 18                 CLC
+1871  2B73- 69 08              ADC =8
+1872  2B75- 90 DC              BCC CROSS1
+1873  2B77- E8                 INX
+1874  2B78- B0 D9              BCS CROSS1
+1875                   *
+1876  2B7A- A5 97      CROSS3  LDA LABPNT
+1877  2B7C- A6 98              LDX LABPNT+1
+1878  2B7E- 18         CROSS4  CLC
+1879  2B7F- 69 08              ADC =8
+1880  2B81- 85 99              STA LABPN1
+1881  2B83- 90 01              BCC *+3
+1882  2B85- E8                 INX
+1883  2B86- 86 9A              STX LABPN1+1
+1884  2B88- C5 B0              CMP LABCNT
+1885  2B8A- 8A                 TXA
+1886  2B8B- E5 B1              SBC LABCNT+1
+1887  2B8D- B0 24              BCS CROSS7      SKIP, IF FOUND
+1888                   *
+1889  2B8F- A0 07              LDY =7
+1890  2B91- B1 99              LDA (LABPN1),Y
+1891  2B93- 10 07              BPL CROSS6
+1892  2B95- A5 99      CROSS5  LDA LABPN1
+1893  2B97- A6 9A              LDX LABPN1+1
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 41
+
+1894  2B99- 4C 7E 2B           JMP CROSS4
+1895                   *
+1896  2B9C- 38         CROSS6  SEC
+1897  2B9D- A0 04              LDY =4
+1898  2B9F- B1 97              LDA (LABPNT),Y  COMPARE NOW
+1899  2BA1- F1 99              SBC (LABPN1),Y
+1900  2BA3- 88                 DEY
+1901  2BA4- 10 F9              BPL CROSS6+3
+1902  2BA6- 90 ED              BCC CROSS5
+1903  2BA8- A5 99              LDA LABPN1
+1904  2BAA- A6 9A              LDX LABPN1+1
+1905  2BAC- 85 97              STA LABPNT
+1906  2BAE- 86 98              STX LABPNT+1
+1907  2BB0- 4C 7E 2B           JMP CROSS4
+1908                   *
+1909  2BB3- A0 07      CROSS7  LDY =7
+1910  2BB5- B1 97              LDA (LABPNT),Y  SET R-FLAG
+1911  2BB7- 09 80              ORA =$80
+1912  2BB9- 91 97              STA (LABPNT),Y
+1913  2BBB- 20 6E 2C           JSR PRLABN
+1914  2BBE- 4C 4D 2B           JMP CROSS0
+1915                   *
+1916                   *
+1917                   * END OF SOURCE
+1918                   *
+1919  2BC1- A9 00      END     LDA =0
+1920  2BC3- 85 A0              STA PCNEW
+1921  2BC5- 85 A1              STA PCNEW+1
+1922  2BC7- 20 27 E0           JSR PRTINF      AUTOPRINT ON
+1923  2BCA- 92                 BYT $92
+1924  2BCB- 20 71 26           JSR PRTLIN
+1925  2BCE- 20 0F 27   END0    JSR NEWLIN
+1926  2BD1- 20 27 E0           JSR PRTINF
+1927  2BD4- 4C 41 42           BYT 'LABELS',$BD
+1927  2BD7- 45 4C 53 
+1927  2BDA- BD 
+1928  2BDB- A9 00              LDA =0
+1929  2BDD- 85 98              STA LABPNT+1
+1930  2BDF- A5 B0              LDA LABCNT
+1931  2BE1- 38                 SEC
+1932  2BE2- ED 0C 20           SBC LABSTR
+1933  2BE5- 85 97              STA LABPNT
+1934  2BE7- A5 B1              LDA LABCNT+1
+1935  2BE9- ED 0D 20           SBC LABSTR+1
+1936  2BEC- A0 04              LDY =4
+1937  2BEE- 06 97      END1    ASL LABPNT
+1938  2BF0- 2A                 ROL A
+1939  2BF1- 26 98              ROL LABPNT+1
+1940  2BF3- 88                 DEY
+1941  2BF4- 10 F8              BPL END1
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 42
+
+1942  2BF6- AA                 TAX
+1943  2BF7- A5 98              LDA LABPNT+1
+1944  2BF9- 20 30 E0           JSR PRTAX
+1945  2BFC- 20 0F 27           JSR NEWLIN
+1946  2BFF- 20 27 E0           JSR PRTINF
+1947  2C02- 45 52 52           BYT 'ERRORS',$BD
+1947  2C05- 4F 52 53 
+1947  2C08- BD 
+1948  2C09- A5 A8              LDA NUMERR
+1949  2C0B- 20 2D E0           JSR PRTBYT
+1950  2C0E- 20 0F 27           JSR NEWLIN
+1951  2C11- 20 27 E0           JSR PRTINF
+1952  2C14- 52 45 43           BYT 'RECORDS',$BD
+1952  2C17- 4F 52 44 
+1952  2C1A- 53 BD 
+1953  2C1C- A6 9B              LDX INPFIL
+1954  2C1E- BD 51 03           LDA FIRCTB,X
+1955  2C21- 20 2D E0           JSR PRTBYT
+1956  2C24- 20 0F 27           JSR NEWLIN
+1957  2C27- 20 65 28           JSR CLOSRC
+1958  2C2A- A6 9B              LDX INPFIL
+1959  2C2C- 20 12 F0           JSR CLOSE
+1960  2C2F- 20 27 E0           JSR PRTINF
+1961  2C32- 55 4E 52           BYT 'UNRESOLVED',$BA
+1961  2C35- 45 53 4F 
+1961  2C38- 4C 56 45 
+1961  2C3B- 44 BA 
+1962  2C3D- 20 DC 2A           JSR CLRRFL      CLEAR R-FLAG
+1963  2C40- AD 0C 20           LDA LABSTR
+1964  2C43- AE 0D 20           LDX LABSTR+1
+1965  2C46- 85 97      UNRES   STA LABPNT
+1966  2C48- 86 98              STX LABPNT+1
+1967  2C4A- C5 B0              CMP LABCNT
+1968  2C4C- 8A                 TXA
+1969  2C4D- E5 B1              SBC LABCNT+1
+1970  2C4F- 90 03              BCC *+5
+1971  2C51- 4C 4D 2B           JMP CROSS0
+1972  2C54- 20 79 22           JSR DEFIN
+1973  2C57- F0 08              BEQ END2
+1974  2C59- A0 07              LDY =7
+1975  2C5B- B1 97              LDA (LABPNT),Y
+1976  2C5D- 09 80              ORA =$80
+1977  2C5F- 91 97              STA (LABPNT),Y
+1978  2C61- A5 97      END2    LDA LABPNT
+1979  2C63- A6 98              LDX LABPNT+1
+1980  2C65- 18                 CLC
+1981  2C66- 69 08              ADC =8
+1982  2C68- 90 01              BCC *+3
+1983  2C6A- E8                 INX
+1984  2C6B- 4C 46 2C           JMP UNRES
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 43
+
+1985                   *
+1986                   *
+1987                   * SUBROUTINE PRLABN: PRINT NAME OF LABEL
+1988                   ****************************************
+1989                   *
+1990  2C6E- A0 00      PRLABN  LDY =0
+1991  2C70- B1 97              LDA (LABPNT),Y
+1992  2C72- 99 30 00           STA LABEL,Y
+1993  2C75- C8                 INY
+1994  2C76- C0 05              CPY =5
+1995  2C78- D0 F6              BNE PRLABN+2
+1996                   *
+1997  2C7A- 20 0F 27           JSR NEWLIN
+1998  2C7D- A0 07              LDY =7          CHAR COUNTER
+1999  2C7F- A2 06      PRLAB0  LDX =6
+2000  2C81- C0 06              CPY =6
+2001  2C83- 90 01              BCC *+3
+2002  2C85- CA                 DEX
+2003  2C86- A9 00              LDA =0
+2004  2C88- 26 34      PRLAB1  ROL LABEL+4
+2005  2C8A- 26 33              ROL LABEL+3
+2006  2C8C- 26 32              ROL LABEL+2
+2007  2C8E- 26 31              ROL LABEL+1
+2008  2C90- 26 30              ROL LABEL
+2009  2C92- 2A                 ROL A
+2010  2C93- CA                 DEX
+2011  2C94- D0 F2              BNE PRLAB1
+2012  2C96- C9 00              CMP =0
+2013  2C98- F0 09              BEQ PRLAB3
+2014  2C9A- C9 30              CMP =$30
+2015  2C9C- 10 02              BPL *+4
+2016  2C9E- 09 40              ORA =$40
+2017  2CA0- 20 09 E0           JSR PRTCHR
+2018  2CA3- 88         PRLAB3  DEY
+2019  2CA4- D0 D9              BNE PRLAB0
+2020  2CA6- A2 08              LDX =8
+2021  2CA8- 20 05 27           JSR TAB
+2022  2CAB- 20 79 22           JSR DEFIN
+2023  2CAE- D0 0A              BNE *+12
+2024  2CB0- 20 27 E0           JSR PRTINF
+2025  2CB3- 3F 3F 3F           BYT '???',$BF
+2025  2CB6- BF 
+2026  2CB7- 4C C7 2C           JMP *+16
+2027                   *
+2028  2CBA- A0 06              LDY =6
+2029  2CBC- B1 97              LDA (LABPNT),Y
+2030  2CBE- 20 2D E0           JSR PRTBYT
+2031  2CC1- 88                 DEY
+2032  2CC2- B1 97              LDA (LABPNT),Y
+2033  2CC4- 20 2D E0           JSR PRTBYT
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 44
+
+2034  2CC7- 20 8C 2D           JSR CBASE
+2035  2CCA- A0 07              LDY =7
+2036  2CCC- B1 97              LDA (LABPNT),Y
+2037  2CCE- 29 7F              AND =$7F
+2038  2CD0- 0A                 ASL A
+2039  2CD1- A8                 TAY             Y=2*NO OF REFERENCES
+2040                   *
+2041  2CD2- A9 0A      PRLAB4  LDA =10         REFERENCES PER LINE
+2042  2CD4- 85 37              STA TEMP1
+2043  2CD6- A2 10              LDX =16
+2044  2CD8- 20 05 27           JSR TAB
+2045  2CDB- C0 00      PRLAB5  CPY =0
+2046  2CDD- F0 1F              BEQ PRLAB6
+2047  2CDF- 88                 DEY
+2048  2CE0- B1 95              LDA (BASE),Y
+2049  2CE2- 20 2D E0           JSR PRTBYT
+2050  2CE5- 88                 DEY
+2051  2CE6- B1 95              LDA (BASE),Y
+2052  2CE8- 20 2D E0           JSR PRTBYT
+2053  2CEB- 20 27 E0           JSR PRTINF
+2054  2CEE- A0                 BYT $A0
+2055  2CEF- C6 37              DEC TEMP1
+2056  2CF1- 10 E8              BPL PRLAB5
+2057  2CF3- 98                 TYA
+2058  2CF4- F0 08              BEQ PRLAB6
+2059  2CF6- 48                 PHA
+2060  2CF7- 20 0F 27           JSR NEWLIN
+2061  2CFA- 68                 PLA
+2062  2CFB- A8                 TAY
+2063  2CFC- D0 D4              BNE PRLAB4
+2064  2CFE- 60         PRLAB6  RTS
+2065                   *
+2066                   *
+2067                   * SUBROUTINE FORBR: INSERT FORWARD BRANCH
+2068                   *****************************************
+2069                   * INPUT: OBJECT, BRANTC, ONLY IN FIRST PASS
+2070                   * RESOLV+1
+2071                   *
+2072  2CFF- A5 A6      FORBR   LDA BRANTC
+2073  2D01- C9 0C              CMP =12
+2074  2D03- 90 05              BCC *+7
+2075  2D05- A9 52              LDA =$52
+2076  2D07- 4C 31 29           JMP ERROR
+2077  2D0A- A8                 TAY
+2078  2D0B- A5 3A              LDA RESOLV+1
+2079  2D0D- 99 65 00           STA BRANTB,Y    STORE NO OF LABELS
+2080  2D10- A5 3B              LDA RESOLV+2
+2081  2D12- 99 71 00           STA BRANTB+12,Y
+2082  2D15- 20 25 26           JSR BRAN1
+2083  2D18- A4 A6              LDY BRANTC
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 45
+
+2084  2D1A- 99 89 00           STA BRANTB+36,Y STORE HIGH BYTE
+2085  2D1D- A5 3D              LDA OBJECT+1
+2086  2D1F- 99 7D 00           STA BRANTB+24,Y STORE LOW BYTE
+2087  2D22- E6 A6              INC BRANTC
+2088  2D24- 60                 RTS
+2089                   *
+2090                   *
+2091                   * SUBROUTINE RESFBR: RESOLVE FORWARD BRANCH
+2092                   *******************************************
+2093                   * INPUT: LABPNT; ONLY IN FIRST PASS
+2094                   * SAVED: X,Y
+2095                   *
+2096  2D25- 8A         RESFBR  TXA
+2097  2D26- 48                 PHA
+2098  2D27- A6 A6      RESF1   LDX BRANTC
+2099  2D29- F0 10              BEQ RESF0       TABLE EMPTY
+2100  2D2B- CA                 DEX
+2101  2D2C- A5 97      RESF8   LDA LABPNT
+2102  2D2E- D5 65              CMP BRANTB,X
+2103  2D30- D0 06              BNE RESF6
+2104  2D32- A5 98              LDA LABPNT+1
+2105  2D34- D5 71              CMP BRANTB+12,X
+2106  2D36- F0 06              BEQ RESF7
+2107  2D38- CA         RESF6   DEX
+2108  2D39- 10 F1              BPL RESF8
+2109  2D3B- 68         RESF0   PLA
+2110  2D3C- AA                 TAX
+2111  2D3D- 60                 RTS
+2112                   *
+2113  2D3E- 8A         RESF7   TXA
+2114  2D3F- 48                 PHA
+2115  2D40- 20 48 2D           JSR RESF2
+2116  2D43- 68                 PLA
+2117  2D44- AA                 TAX
+2118  2D45- 4C 27 2D           JMP RESF1
+2119                   *
+2120  2D48- B5 7D      RESF2   LDA BRANTB+24,X
+2121  2D4A- 18                 CLC
+2122  2D4B- 65 5C              ADC VALUE
+2123  2D4D- 08                 PHP
+2124  2D4E- B5 89              LDA BRANTB+36,X
+2125  2D50- 65 5D              ADC VALUE+1
+2126  2D52- 28                 PLP
+2127  2D53- 30 10              BMI RESF3
+2128  2D55- C9 00              CMP =0
+2129  2D57- F0 10              BEQ RESF4
+2130  2D59- 98         ERR14   TYA
+2131  2D5A- 48                 PHA
+2132  2D5B- A9 44              LDA =$44
+2133  2D5D- 20 31 29           JSR ERROR
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 46
+
+2134  2D60- 68                 PLA
+2135  2D61- A8                 TAY
+2136  2D62- 4C 69 2D           JMP RESF4
+2137                   *
+2138  2D65- C9 FF      RESF3   CMP =$FF
+2139  2D67- D0 F0              BNE ERR14
+2140                   *
+2141  2D69- E8         RESF4   INX
+2142  2D6A- E4 A6              CPX BRANTC
+2143  2D6C- B0 13              BCS RESF5
+2144  2D6E- B5 65              LDA BRANTB,X
+2145  2D70- 95 64              STA BRANTB-1,X
+2146  2D72- B5 71              LDA BRANTB+12,X
+2147  2D74- 95 70              STA BRANTB+11,X
+2148  2D76- B5 7D              LDA BRANTB+24,X
+2149  2D78- 95 7C              STA BRANTB+23,X
+2150  2D7A- B5 89              LDA BRANTB+36,X
+2151  2D7C- 95 88              STA BRANTB+35,X
+2152  2D7E- 4C 69 2D           JMP RESF4
+2153                   *
+2154  2D81- C6 A6      RESF5   DEC BRANTC
+2155  2D83- 60                 RTS
+2156                   *
+2157                   *
+2158                   * SUBROUTINE CBASE: COMPUTE BASE
+2159                   ********************************
+2160                   * INPUT: LABCNT
+2161                   *
+2162  2D84- A5 B0      CBASE2  LDA LABCNT
+2163  2D86- A6 B1              LDX LABCNT+1
+2164  2D88- 85 97              STA LABPNT
+2165  2D8A- 86 98              STX LABPNT+1
+2166                   *
+2167  2D8C- AD 06 20   CBASE   LDA OBSTR
+2168  2D8F- 85 95              STA BASE
+2169  2D91- AD 07 20           LDA OBSTR+1
+2170  2D94- 85 96              STA BASE+1
+2171  2D96- A5 97              LDA LABPNT
+2172  2D98- A6 98              LDX LABPNT+1
+2173  2D9A- 38         CBASE1  SEC
+2174  2D9B- E9 08              SBC =8
+2175  2D9D- 85 99              STA LABPN1
+2176  2D9F- B0 01              BCS *+3
+2177  2DA1- CA                 DEX
+2178  2DA2- 86 9A              STX LABPN1+1
+2179  2DA4- CD 0C 20           CMP LABSTR
+2180  2DA7- 8A                 TXA
+2181  2DA8- ED 0D 20           SBC LABSTR+1
+2182  2DAB- B0 01              BCS *+3
+2183  2DAD- 60                 RTS
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 47
+
+2184  2DAE- A0 07              LDY =7
+2185  2DB0- B1 99              LDA (LABPN1),Y
+2186  2DB2- 29 7F              AND =$7F
+2187  2DB4- 0A                 ASL A
+2188  2DB5- 65 95              ADC BASE
+2189  2DB7- 85 95              STA BASE
+2190  2DB9- 90 02              BCC *+4
+2191  2DBB- E6 96              INC BASE+1
+2192  2DBD- A5 99              LDA LABPN1
+2193  2DBF- A6 9A              LDX LABPN1+1
+2194  2DC1- 4C 9A 2D           JMP CBASE1
+2195                   *
+2196                   *
+2197                   * SUBROUTINE: SETREF: SET REFERENCE
+2198                   ***********************************
+2199                   * SAVED: X,Y; INPUT: LABPNT
+2200                   *
+2201  2DC4- 86 61      SETREF  STX INDEX1      SAVE X
+2202  2DC6- 84 62              STY INDEX2
+2203  2DC8- A5 A9              LDA PASSFL
+2204  2DCA- F0 01              BEQ *+3
+2205  2DCC- 60                 RTS
+2206                   *
+2207  2DCD- A0 07              LDY =7
+2208  2DCF- B1 97              LDA (LABPNT),Y
+2209  2DD1- 29 7F              AND =$7F
+2210  2DD3- C9 7F              CMP =$7F
+2211  2DD5- D0 03              BNE *+5
+2212  2DD7- A4 62              LDY INDEX2      NOT INSERTED IN FULL
+2213  2DD9- 60                 RTS
+2214                   *
+2215  2DDA- A5 97              LDA LABPNT
+2216  2DDC- 48                 PHA
+2217  2DDD- A5 98              LDA LABPNT+1
+2218  2DDF- 48                 PHA
+2219  2DE0- 20 84 2D           JSR CBASE2
+2220  2DE3- 68                 PLA
+2221  2DE4- 85 98              STA LABPNT+1
+2222  2DE6- 68                 PLA
+2223  2DE7- 85 97              STA LABPNT
+2224                   *
+2225  2DE9- A5 95              LDA BASE
+2226  2DEB- 85 AC              STA OBPNT
+2227  2DED- CD 08 20           CMP OBEND
+2228  2DF0- A5 96              LDA BASE+1
+2229  2DF2- 85 AD              STA OBPNT+1
+2230  2DF4- ED 09 20           SBC OBEND+1
+2231  2DF7- B0 3C              BCS SETR1
+2232                   *
+2233  2DF9- A6 37              LDX TEMP1
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 48
+
+2234  2DFB- A0 07              LDY =7
+2235  2DFD- B1 97              LDA (LABPNT),Y
+2236  2DFF- 18                 CLC
+2237  2E00- 69 01              ADC =1
+2238  2E02- 91 97              STA (LABPNT),Y
+2239  2E04- 20 8C 2D           JSR CBASE
+2240  2E07- A5 AC      SETR2   LDA OBPNT
+2241  2E09- C5 95              CMP BASE
+2242  2E0B- A5 AD              LDA OBPNT+1
+2243  2E0D- E5 96              SBC BASE+1
+2244  2E0F- 90 16              BCC SETR3
+2245  2E11- A0 00              LDY =0
+2246  2E13- B1 AC              LDA (OBPNT),Y
+2247  2E15- A0 02              LDY =2
+2248  2E17- 91 AC              STA (OBPNT),Y
+2249  2E19- 38                 SEC
+2250  2E1A- A5 AC              LDA OBPNT
+2251  2E1C- E9 01              SBC =1
+2252  2E1E- 85 AC              STA OBPNT
+2253  2E20- B0 02              BCS *+4
+2254  2E22- C6 AD              DEC OBPNT+1
+2255  2E24- 4C 07 2E           JMP SETR2
+2256                   *
+2257  2E27- 20 8C 2D   SETR3   JSR CBASE
+2258  2E2A- A0 00              LDY =0
+2259  2E2C- A5 9E              LDA PCOLD
+2260  2E2E- 91 95              STA (BASE),Y
+2261  2E30- C8                 INY
+2262  2E31- A5 9F              LDA PCOLD+1
+2263  2E33- 91 95              STA (BASE),Y
+2264  2E35- A4 62      SETR1   LDY INDEX2
+2265  2E37- A6 61              LDX INDEX1
+2266  2E39- 60                 RTS
+2267                   *
+2268                   *
+2269  2E3A-                    END
+LABELS=00FD
+ERRORS=00
+RECORDS=82
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 49
+
+CROSS REFERENCE MAP:
+
+ADMODE   0060    2363 236D 2370 2382 2384 25E4 25FC 
+ARG      2133    211E 2128 212B 
+ARG05    214C    2137 
+ARG10    2162    214E 
+ARG20    218A    2164 
+ARG30    21A8    218C 
+ARG40    21BF    21AB 
+ARG50    21CD    21C1 
+ARG51    21F5    21DB 2227 
+ARG52    220F    21D3 
+BACKNM   29A3    27B9 2A3D 
+BACK10   29A8    29AE 
+BACK20   29B1    29AA 
+BACK30   29BA    29C0 
+BASE     0095    2CE0 2CE6 2D8F 2D94 2DB5 2DB7 2DBB 2DE9 2DF0 2E09 2E0D 
+                 2E2E 2E33 
+BRANTB   0065    2D0D 2D12 2D1A 2D1F 2D2E 2D34 2D48 2D4E 2D6E 2D70 2D72 
+                 2D74 2D76 2D78 2D7A 2D7C 
+BRANTC   00A6    2CFF 2D18 2D22 2D27 2D6A 2D81 
+BRAN1    2625    263C 2D15 
+BRAN2    263C    260E 2612 
+BRAN3    264B    263F 
+BYT      2540    2580 
+BYT1     2549    255D 
+BYT2     2572    256C 
+BYT3     256F    2544 
+CBASE    2D8C    2CC7 2E04 2E27 
+CBASE1   2D9A    2DC1 
+CBASE2   2D84    2DE0 
+CLOSAL   F015    
+CLOSE    F012    27B0 2C2C 
+CLOSRC   2865    2522 2539 284B 2C27 
+CLRRFL   2ADC    2AC1 2B4A 2C3D 
+CLRRF1   2AE4    2AFD 2B00 
+COLDST   29C7    2000 
+CRLF     276E    270F 272D 276B 2960 
+CRLF1    2781    
+CROSS0   2B4D    2BBE 2C51 
+CROSS1   2B53    2B75 2B78 
+CROSS2   2B68    2B5C 
+CROSS3   2B7A    2B6C 
+CROSS4   2B7E    2B99 2BB0 
+CROSS5   2B95    2BA6 
+CROSS6   2B9C    2B93 2BA4 
+CROSS7   2BB3    2B8D 
+CURPOS   00EE    270A 
+DEFIN    2279    21D8 246C 2C54 2CAB 
+DEFLAB   245A    250C 
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 50
+
+DEFLB    0063    24AD 24BF 24E8 2508 
+DEFL1    2491    2462 246F 
+DEFL2    249C    248E 
+DIGTST   223D    21A8 21B3 21B7 
+DISMOD   E722    2353 
+END      2BC1    25C8 
+ENDERR   2960    294A 
+END0     2BCE    
+END1     2BEE    2BF4 
+END2     2C61    2C57 
+ERROR    2931    2066 20CF 2145 2176 219C 2205 2218 2299 22C7 22F1 23F7 
+                 23FF 2477 248B 24EE 2586 25EE 261A 2647 266D 280F 281F 
+                 2921 2D07 2D5D 
+ERR10    23F5    22CE 23D1 23D8 23E8 2404 240B 242F 2446 
+ERR11    23FD    23DF 2413 
+ERR14    2D59    2D67 
+ERR18    2584    254D 2557 
+ERR7     2291    228B 22BC 
+ERR9     22EF    2330 2344 
+EXPDEF   2664    24FA 2517 2529 
+EXPRES   20DB    213A 239F 23C3 2419 256F 258D 2664 
+EXP1     20E2    20FB 2111 2569 
+EXP2     2114    2100 
+FILCNT   00A7    27B3 2980 29A3 2A0B 2A3B 
+FILDRV   00DC    28AE 29C4 
+FILEA    031C    28F3 28FE 2901 2906 2909 
+FILFLG   00DA    2793 2802 28E3 2A42 
+FILLOC   0313    28B3 28B6 
+FILNAM   0301    28BE 
+FILNM1   0320    28BB 2997 29BC 
+FILSA    031A    28EC 28F8 
+FILSA1   0331    28D8 28DE 
+FILSIZ   0315    28CA 28D2 28F0 28FB 
+FILSTP   0312    28E7 
+FIRCTB   0351    2C1E 
+FORBR    2CFF    261D 
+FUNC     2117    20DF 20ED 2103 
+FUNC1    2121    2130 
+GET      2782    2789 280B 2A7D 
+GETCHR   E003    2A1A 
+GETERR   280E    279A 2807 2A49 
+GETKEY   E000    
+GETLIN   E006    28A5 2976 
+GETNAM   F815    28A8 2979 
+GET10    278D    27AB 
+GET20    27AE    279F 
+GET25    27B5    
+GET27    27BF    27B7 
+GET28    27E5    27BC 
+GET30    2809    
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 51
+
+HARGUM   2019    28AB 28B0 297C 
+INBFPN   0064    26F0 278D 27A6 
+INBUFF   0000    2092 20D2 20E6 2117 2133 213D 2151 2156 216D 217A 222A 
+                 223D 226A 2287 22B5 2398 23B2 23BC 23C6 23CD 23D4 23EB 
+                 2407 241C 2432 24AF 2540 2547 2559 257B 25A0 25BA 25E6 
+                 26EA 2786 2819 
+INDEX1   0061    22E0 2315 2DC4 2E37 
+INDEX2   0062    22E6 22F5 22FB 2301 230A 231B 2325 2339 2DC6 2DD7 2E35 
+INL      00F8    2169 216B 2181 2185 224F 2253 2260 2266 
+INNAME   2976    27E2 2A0D 
+INNA10   298E    2987 
+INNA20   2997    299D 
+INNA5    2985    298B 
+INPFIL   009B    278F 27AE 2809 2A4C 2C1C 2C2A 
+INTLIN   24A9    2A80 
+INTL10   2508    24E6 
+INTL12   2525    2515 
+INTL13   253C    2527 
+INTL14   2589    253E 
+INTL15   25A9    258B 
+INTL16   25B4    25AB 
+INTL17   25C4    25B6 
+INTL18   25CB    
+INTL19   25D4    25CD 
+INTL2    24C9    24B8 
+INTL20   25E1    25D6 
+INTL5    24F3    24F8 
+INTL6    24FF    2506 
+LABCNT   00B0    2028 202B 204F 2051 2069 206B 206D 206F 2A2A 2A2C 2AE8 
+                 2AEB 2B57 2B5A 2B88 2B8B 2BDF 2BE7 2C4A 2C4D 2D84 2D86 
+LABEL    0030    2031 207D 20B1 20B3 20B5 20B7 20B9 20C7 24F3 2500 2C72 
+                 2C88 2C8A 2C8C 2C8E 2C90 
+LABEND   200E    205A 205E 
+LABPNT   0097    2024 2026 2034 203F 2041 2077 2079 2080 2089 21E3 21EB 
+                 21F0 21F7 21FB 221F 2222 227B 227E 247C 2483 2495 249A 
+                 24A2 24A6 2AE4 2AE6 2AF0 2AF4 2AF6 2AF8 2B53 2B55 2B6A 
+                 2B6E 2B70 2B7A 2B7C 2B9F 2BAC 2BAE 2BB5 2BB9 2BDD 2BE5 
+                 2BEE 2BF1 2BF7 2C46 2C48 2C5B 2C5F 2C61 2C63 2C70 2CBC 
+                 2CC2 2CCC 2D2C 2D32 2D88 2D8A 2D96 2D98 2DCF 2DDA 2DDD 
+                 2DE4 2DE7 2DFD 2E02 
+LABPN1   0099    2B81 2B86 2B91 2B95 2B97 2BA1 2BA8 2BAA 2D9D 2DA2 2DB0 
+                 2DBD 2DBF 
+LABSTR   200C    201E 2021 2A24 2A27 2ADE 2AE1 2B4D 2B50 2BE2 2BE9 2C40 
+                 2C43 2DA4 2DA8 
+LINCNT   00A2    2679 267B 267D 2681 2688 268A 2959 295B 
+LINE     2A6C    2AAF 2ACB 
+LINE1    2A7D    2A73 
+MAP      2B02    2AD0 
+MAP1     2B1D    2B04 
+MINUS    20FE    20EA 
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 52
+
+MNEML    E780    22DA 
+MNEMR    E7C0    22D3 
+MODE2    E766    25FE 
+NEWLIN   270F    26FE 2A69 2AA4 2B2D 2B47 2B5E 2BCE 2BFC 2C0E 2C24 2C7A 
+                 2CF7 
+NEWL06   271E    2716 271B 
+NEWL10   272D    
+NUMBYT   0038    24AB 2549 2552 2560 2574 2579 2590 259E 2605 26B7 26F4 
+                 2844 2860 2A86 2A8E 
+NUMERR   00A8    2944 2A58 2C09 
+NUMLIN   1789    
+OBADDR   00AE    282E 2832 28EA 28F6 
+OBEMPT   2924    2827 286A 
+OBEND    2008    2834 283C 2DED 2DF4 
+OBJECT   003C    22CC 2347 2376 238B 254F 2562 2576 2594 259A 25F3 25F7 
+                 2622 2625 262B 2634 26B4 2855 2D1D 
+OBPNT    00AC    2838 283F 2857 2859 285D 28C4 28CD 2914 2919 2924 292B 
+                 2A51 2A56 2DEB 2DF2 2E07 2E0B 2E13 2E17 2E1A 2E1E 2E22 
+OBSTR    2006    28C7 28CF 28D5 28DB 2911 2916 2926 292D 2A4E 2A53 2D8C 
+                 2D91 
+OPCODE   005E    2293 2295 22A6 22A8 22B1 22B3 22D1 22D8 24D1 24DD 
+OPEN     F00F    2804 2A44 
+OPER     2398    25E1 
+OPER15   23BE    23AF 
+OPER16   23E6    23CA 
+OPER17   2402    23EF 
+OPER20   2419    23C0 
+OPER25   242D    2420 
+OPER30   2444    2437 
+OUTREC   00A5    2A63 
+PACKTS   F919    216F 217C 
+PAGE     25AD    
+PAGECN   00A4    2736 2738 2766 2B27 
+PAGELN   00AB    25AD 25B1 2712 2714 271E 2732 2A37 2B23 
+PASS     2A34    2AC4 
+PASSFL   00A9    21DD 21FF 2212 2465 2471 249C 25D8 260C 27B5 2822 2865 
+                 2948 2A30 2AB8 2B02 2DC8 
+PCNEW    00A0    251C 2520 2531 2537 2694 269A 2A84 2A88 2A8C 2AA7 2AAB 
+                 2BC3 2BC5 
+PCOLD    009E    21C4 21C8 24C1 24C5 252D 2533 2632 2638 2696 269C 26A0 
+                 26A2 26C4 26C8 282C 2830 2A58 2A5C 2AA9 2AAD 2E2C 2E31 
+PRCON    2966    2973 2A17 2ABE 2B1D 
+PRLABN   2C6E    2BBB 2C78 
+PRLAB0   2C7F    2CA4 
+PRLAB1   2C88    2C94 
+PRLAB3   2CA3    2C98 
+PRLAB4   2CD2    2CFC 
+PRLAB5   2CDB    2CF1 
+PRLAB6   2CFE    2CDD 2CF4 
+PRTAB    2AD9    2968 
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 53
+
+PRTAX    E030    268C 26A4 295D 2BF9 
+PRTBYT   E02D    26C1 2768 2941 2C0B 2C21 2CBE 2CC4 2CE2 2CE8 
+PRTCHR   E009    26EC 2707 273F 2CA0 
+PRTDAT   F80F    274A 
+PRTFLG   00AA    25D1 25DE 2684 26BD 26CA 26DB 26E6 26FA 27F8 2A32 2A95 
+                 2AA0 2ABC 2B08 
+PRTINF   E027    268F 26A7 26CE 274D 276E 27BF 27E5 27FC 2872 2932 294C 
+                 29D0 2A10 2A65 2A6C 2A99 2AD2 2B0A 2B29 2B30 2B61 2BC7 
+                 2BD1 2BFF 2C11 2C2F 2CB0 2CEB 
+PRTLIN   2671    2A9D 2BCB 
+PRTL10   2684    2701 
+PRTL20   26AB    269E 
+PRTL21   26B2    2686 26D3 
+PRTL25   26D5    26B9 
+PRTL26   26E6    26F2 
+PRTL30   26F4    26D9 
+PSEUDO   2650    24D3 24DF 
+PUT      2822    284E 2A92 
+PUTERR   291E    290F 
+PUT10    2834    282A 
+PUT20    2855    2862 
+RDBL     20D2    20D7 24C9 
+RDLAB    208C    20C0 21CD 24BA 
+RDLAB1   20B0    20A6 20AB 20BD 
+RDLAB2   20C3    20A0 
+RDOPC    2283    24CC 
+RDOPC1   2287    22AF 
+RDOPC2   22A5    22AB 
+READCH   F018    2795 
+RESFBR   2D25    2469 
+RESF0    2D3B    2D29 
+RESF1    2D27    2D45 
+RESF2    2D48    2D40 
+RESF3    2D65    2D53 
+RESF4    2D69    2D57 2D62 2D7E 
+RESF5    2D81    2D6C 
+RESF6    2D38    2D30 
+RESF7    2D3E    2D36 
+RESF8    2D2C    2D39 
+RESOLV   0039    20DD 21E7 21F5 21F9 21FD 2453 2610 2667 2D0B 2D10 
+SAVNAM   200A    2982 2990 29A5 29B3 
+SAVPNT   009C    298E 2993 299A 29A0 29B1 29B6 29BA 29C2 
+SETREF   2DC4    21D5 2224 
+SETR1    2E35    2DF7 
+SETR2    2E07    2E24 
+SETR3    2E27    2E0F 
+SFLAG    1781    2A70 2A77 
+SRLAB    201C    21D0 245A 
+SRLAB1   2024    2046 2049 
+SRLAB2   2031    2039 
+
+----------------------------------------------------------------------
+
+R65 ASSEMBLER V8.0                 18/11/81   R65 ASSEMBLER  PAGE 54
+
+SRLAB3   203F    2036 
+SRLAB4   204B    202D 
+SROPC    22C0    22D6 22DD 2318 25F9 
+SROP20   22EA    22FF 
+SROP30   22F5    22E8 
+SROP40   2301    22F9 2313 
+SROP50   231B    22F7 232E 
+SROP60   2333    231D 2342 
+STINB    2815    27A8 
+STLABN   204F    220F 245F 
+STLAB1   206D    2062 
+STLAB2   207D    2083 
+TAB      2705    26AD 26E1 270C 2747 2CA8 2CD8 
+TABLE    2010    2718 2727 2A34 2B20 
+TEMP1    0037    201C 203C 204C 2090 20A8 20BB 2285 22AD 2673 26B2 26BB 
+                 26D5 26F6 283A 2842 296B 2970 2CD4 2CEF 2DF9 
+TITLE    00B2    25BC 273D 29CB 
+TSTADM   2347    22EA 230C 2327 233B 
+TSTAD1   2370    2361 
+TSTAD2   2384    237E 2389 2391 2395 
+TSTAD3   2387    2374 
+TSTBIN   222A    2195 21A0 
+UNRES    2C46    2C6B 
+VALUE    005C    20E3 20F2 20F4 20F7 20F9 2108 210A 210D 210F 2123 212E 
+                 2149 2153 215F 2183 2187 2191 2193 21A5 21AF 21B1 21BC 
+                 21C6 21CA 21ED 21F2 220A 220C 2236 2238 2249 224B 224D 
+                 2251 2255 2257 2259 225B 225D 2262 2264 2268 226F 2271 
+                 2275 2457 247E 2485 2491 2497 24C3 24C7 251A 251E 252F 
+                 2535 2565 2572 2592 2598 25F1 25F5 2D4B 2D50 
+VAUTOP   E00C    272A 2779 296D 
+VFLAG    1780    2720 
+WARMST   2A10    2003 2812 2A7A 2AD6 2B1A 2B65 
+WARM10   2AB2    2A21 
+WARM20   2AC7    2AB4 
+WARM30   2ACE    2AC9 
+WRD      258D    25A5 
+WRFILA   2016    290C 
+WRFILE   EB14    2016 
+ZPAGE    2453    23DA 240E 2422 2439 2448 

@@ -1,0 +1,1700 @@
+----------------------------------------------------------------------
+
+R65 DISK IO - REFERENCE MAP        16/08/82   R65 ASSEMBLER  PAGE 01
+
+0001                   *
+0002                   *   ************************************
+0003                   *   * R65/JOB DISK AND FILE CONTROLLER *
+0004                   *   ************************************
+0005                   *
+0006                   * EPROM VERSION 1 REVISION 7 15/8/82 RB
+0007                   *       - FOR 2 TEAC FD50-E DRIVES
+0008                   * CC RRICHARZ RBAUMANN 1978 - 1982
+0009                   *
+0010                   PSTART  EQU $F000       START OF PROGRAM
+0011                   NRSEC   EQU 780         80 SEC-2 DIRECTORY
+0012                   *
+0013                           TIT R65 DISK IO - VARIABLES
+0014                   *
+0015                   * THE R65/JOB DISK CONTROLLER CONTROLS TWO
+0016                   * FLOPPY DRIVES. THE DISK FILE HANDLING IS DONE
+0017                   * WITH A DIRECTORY ON TRACK 0
+0018                   * SEQUENTIAL FILE HANDLING ON DISK AND ON AUDIO
+0019                   * TAPE IS ALLOWED. UP TO 8 FILES CAN BE OPEN
+0020                   * AT THE SAME TIME
+0021                   *
+0022                   * IMPROVEMENTS OF REVISION 5:
+0023                   *       - WRITE OVERFLOW BUG FIXED
+0024                   *       - RANDOM ACCESS FILE COMPATIBILITY
+0025                   *       - PROTECTED SEQUENTIAL FILES ALLOWED
+0026                   *       - AUTOMATIC RESTORE AFTER DRFIL
+0027                   *       - 2 DISK DRIVES
+0028                   *       - I-FLAG ONLY SET DURING 1 SECTOR R/W
+0029                   *       - FULL FILE NAME(16 CHARS) CHECK
+0030                   *       - HEAD UNLOAD TIME 8 REVOLUTIONS
+0031                   *       - RECOVERY AFTER DISK NOT READY
+0032                   *       - LOADED MESSAGE OPTIONAL
+0033                   *
+0034                   * PAGE ZERO VARIABLES:
+0035                   **********************
+0036                   *
+0037  0000-                    ORG $DA
+0038                   *
+0039  00DA-            FILFLG  BSS 1   FILE ENTRY FLAGS
+0040                   *               BIT 7 1=PROTECTED
+0041                   *               BIT 6 1=NO PRINTING
+0042                   *               BIT 5 1=WRITE, 0=READ
+0043                   *
+0044  00DB-            FILERR  BSS 1   FILE HANDLING ERROR
+0045                   *               01 DISK OR TAPE READ ERROR
+0046                   *               02 CHECKSUM ERROR
+0047                   *               03 ESCAPE EXIT DURING R/W
+0048                   *               04 RECORD NO ERROR ON TAPE
+0049                   *               05 FILE TYPE ERROR
+0050                   *               06 FILE NOT FOUND
+
+----------------------------------------------------------------------
+
+R65 DISK IO - VARIABLES            16/08/82   R65 ASSEMBLER  PAGE 02
+
+0051                   *               07 DISK DRIVE NOT READY
+0052                   *               08 DIRECTORY FULL, NOT STORED
+0053                   *               23 TOO MANY OPEN FILES
+0054                   *               24 DIRECTION OR WRITE PROTECT
+0055                   *               25 WRONG FILE NUMBER, NOT OPEN
+0056                   *               26 DISK FULL, NOT STORED
+0057                   *               27 FILE TOO LONG
+0058                   *
+0059  00DC-            FILDRV  BSS 1   TAPE OR DISK DRIVE
+0060                   *
+0061                   * TAPE TEMPORARIES
+0062                   *
+0063  00DD-            TRECID  BSS 2   RECORD ID OF FIRST RECORD
+0064  00DF-            TRECNO  BSS 1   RECORD NUMBER
+0065  00E0-            TRECST  BSS 2   START ADDRESS POINTER
+0066  00E2-            TRECSI  BSS 1   RECORD SIZE
+0067                   *
+0068                   * DISK TEMPORARIES
+0069                   *
+0070  00E3-                    ORG $DD
+0071  00DD-            TRACK   BSS 1   CURRENT TRACK
+0072  00DE-            SECTOR  BSS 1   CURRENT SECTOR
+0073  00DF-            RESSAV  BSS 1   CURRENT FDC RESULT
+0074  00E0-            DATA    BSS 2   DATA POINTER
+0075  00E2-            DOSPNT  BSS 2   SECOND POINTER
+0076  00E4-            FILCNT  BSS 1   DISK FILE POINTER
+0077  00E5-            FILCN1  BSS 1
+0078                   *
+0079                   POINT   EQU $FA USED AS SEQ FILE PNT
+0080                   KCHAR   EQU $FE CHAR SAVE FOR WRITCH
+0081                   *
+0082                   * PAGE 3 DATA REGISTERS
+0083                   ***********************
+0084                   *
+0085  00E6-                    ORG $300
+0086                   *
+0087  0300-            FILTYP  BSS 1   TYPE OF ACTIVE FILE
+0088  0301-            FILNAM  BSS 16  FILE NAME
+0089  0311-            FILCYC  BSS 1   CYCLUS NUMBER
+0090  0312-            FILSTP  BSS 1   FILE SUBTYPE
+0091  0313-            FILLOC  BSS 2   LOCATION OR SECTOR
+0092  0315-            FILSIZ  BSS 2   FILE SIZE
+0093  0317-            FILDAT  BSS 3   FILE GENERATION DATE
+0094  031A-            FILSA   BSS 2   START ADDRESS
+0095  031C-            FILEA   BSS 2   END ADDRESS
+0096  031E-            FILLNK  BSS 2   FILE LINK
+0097                   *
+0098  0320-            FILNM1  BSS 16
+0099  0330-            FILCY1  BSS 1
+0100  0331-            FILSA1  BSS 2
+
+----------------------------------------------------------------------
+
+R65 DISK IO - VARIABLES            16/08/82   R65 ASSEMBLER  PAGE 03
+
+0101  0333-            SAVRST  BSS 2
+0102                   *
+0103  0335-            CURSEQ  BSS 1   CURRENT SEQUENTIAL FILE
+0104  0336-            MAXSEQ  BSS 1   MAX NO OF SEQ FILE
+0105  0337-            MAXSIZ  BSS 1   MAX SIZE
+0106  0338-            FILBU1  BSS 1   START OF BUFFERS
+0107                   *
+0108                   * TABLE FOR 8 OPEN SEQUENTIAL FILES
+0109                   *
+0110  0339-            FIDRTB  BSS 8   BIT 7 1=WRITE, 0=READ
+0111                   *               BIT 6 1=RANDOM ACCESS
+0112                   *               BIT 5 1=FILE IS OPEN
+0113  0341-            FIDVTB  BSS 8   DRIVE NUMBER
+0114  0349-            FIBPTB  BSS 8   BUFFER POINTER LOW BYTE
+0115  0351-            FIRCTB  BSS 8   NO OF LAST RECORD
+0116  0359-            FIMAXT  BSS 8   MAXIMAL NO OF RECORDS
+0117  0361-            FITEMP  BSS 24  TAPE: RECORD ID SAVE (2)
+0118                   *               DISK: FIRST SECTOR (2)
+0119                   *               AND DIRECTORY ENTRY NO
+0120                   *               (1)
+0121  0379-            EXITPN  BSS 1   DISK STACK POINTER SAVE
+0122  037A-            BUFSEC  BSS 1   CURRENT SECTOR
+0123  037B-            SCY     BSS 1   FOUND CYCLUS
+0124  037C-            SCYFC   BSS 1   FILE ENTRY OF CY
+0125  037D-            SLAST   BSS 1   END OF DIRECTORY MARK
+0126  037E-            DISFLG  BSS 1   DISK FLAG REGISTER
+0127                   *               BIT 7 DRIVE 0 INITIALIZED
+0128                   *               BIT 6 DRIVE 1 INITIALIZED
+0129  037F-            DISCNT  BSS 1   SPECIAL DISK COUNTER
+0130                   *
+0131                   *
+0132                   * BUFFERS:
+0133                   **********
+0134                   *
+0135  0380-                    ORG $D600
+0136  D600-            DIRBUF  BSS $100        DISK DIRECTORY BUFFER
+0137  D700-            FILBUF  BSS $800        FILE BUFFER 8OPEN
+0138                   *                       FILES ALLOWED
+0139                   *
+0140                   * PAGE 17 DATA AREA
+0141                   *******************
+0142                   *
+0143  DF00-                    ORG $1780
+0144                   *
+0145  1780-            VFLAG   BSS 1
+0146  1781-            SFLAG   BSS 1
+0147                   *
+0148                   * INTERFACE ADDRESSES
+0149                   *********************
+0150                   *
+
+----------------------------------------------------------------------
+
+R65 DISK IO - VARIABLES            16/08/82   R65 ASSEMBLER  PAGE 04
+
+0151                   FDCOM   EQU $14C0       COMMAND REGISTER
+0152                   FDSTAT  EQU $14C0       STATUS REGISTER
+0153                   FDPARA  EQU $14C1       PARAMETER REGISTER
+0154                   FDRES   EQU $14C1       RESULT REGISTER
+0155                   FDTSTM  EQU $14C2       TEST MODE REGISTER
+0156                   FDDAT   EQU $14C4       DACK ADDRESS
+0157                   USPBD   EQU $1702       LED DISPLAY
+0158                   *
+0159                   * VECTORS TO OTHER EPROMS OF OS
+0160                   *******************************
+0161                   *
+0162                   GETCHR  EQU $E003       GET CHAR
+0163                   PRTINF  EQU $E027       PRINT A STRING
+0164                   PRTAX   EQU $E030       PRINT TWO BYTES
+0165                   TWRFIL  EQU $E80C       WRITE TAPE FILE LABEL
+0166                   TPWAIT  EQU $E80F       READY MESSAGE FOR TAPE
+0167                   TRDREC  EQU $E812       LOAD A RECORD FROM TAPE
+0168                   TWRREC  EQU $E818       WRITE A RECORD TO TAPE
+0169                   SETID   EQU $E82A       SET SET TAPE ID
+0170                   SETFID  EQU $E81E       SET DATE TO FILE LABEL
+0171                   TAPEON  EQU $E821       START TAPE DRIVE
+0172                   TAPEOF  EQU $E824       STOP TAPE DRIVE
+0173                   TDELAY  EQU $E827       WAIT 1 SEC
+0174                   PRFLAB  EQU $E82D       PRINT FILE LABEL
+0175                   TRDLBR  EQU $E830       READ LABEL RECORD
+0176                   *
+0177                           TIT R65 DISK IO - FILE HANDLER
+0178                           PAG
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 05
+
+0179                   *
+0180                   * START OF PROGRAM
+0181                   *
+0182  1782-                    ORG PSTART
+0183                   *
+0184                   * VECTORS FOR SUBROUTINE CALLS
+0185                   ******************************
+0186                   *
+0187  F000- 4C 81 F7           JMP DWRFIL      WRITE BLOCK TO DISK
+0188  F003- 4C 2E F7           JMP DRDFIL      READ BLOCK FROM DISK
+0189  F006- 4C 2A F3           JMP RSTFLD      RESET DISK CONTROLLER
+0190  F009- 4C 93 F6           JMP DDIR        PRINT DISK DIRECTORY
+0191  F00C- 4C D6 F6           JMP DELETE      DELETE FILE ON DISK
+0192  F00F- 4C 1E F0           JMP OPEN        OPEN SEQUENTIAL FILE
+0193  F012- 4C BF F2           JMP CLOSE       CLOSE SEQUENTIAL FILE
+0194  F015- 4C 09 F3           JMP CLOSAL      CLOSE ALL FILES
+0195  F018- 4C 6B F1           JMP READCH      READ A CHAR FROM FILE
+0196  F01B- 4C 2C F2           JMP WRITCH      WRITE A CHAR TO FILE
+0197                   *
+0198                   *
+0199                   * OPEN SEQUENTIAL FILE
+0200                   **********************
+0201                   *
+0202                   * ENTRY: FILNM1,FILCY1,FILDRV,FILFLG (R/W)
+0203                   *   FOR WRITE ONLY: FILSTP, FILLOC (TAPE)
+0204                   *                   MAXSIZ
+0205                   * FILNAM AND FILCYC ARE COPIED FROM FILNM1
+0206                   * AND FILCY1
+0207                   *
+0208                   * EXIT: NO OF OPEN FILE IN Y, STATUS IN A
+0209                   *       AND FILERR, Y ONLY VALID IF A=0
+0210                   *
+0211  F01E- AC 36 03   OPEN    LDY MAXSEQ      SEARCH AN EMPTY ENTRY
+0212  F021- B9 39 03           LDA FIDRTB,Y    BIT 6=1: ENTRY USED
+0213  F024- 29 20              AND =$20
+0214  F026- F0 08              BEQ OPEN1
+0215  F028- 88                 DEY
+0216  F029- 10 F6              BPL OPEN+3
+0217                   *
+0218  F02B- A9 23              LDA =$23        ERROR 23
+0219  F02D- 85 DB              STA FILERR
+0220  F02F- 60                 RTS
+0221                   *
+0222  F030- 8C 35 03   OPEN1   STY CURSEQ      SAVE CURRENT ENTRY NO
+0223  F033- A5 DA              LDA FILFLG
+0224  F035- 0A                 ASL A
+0225  F036- 0A                 ASL A
+0226  F037- 29 80              AND =$80        GET R/W DIRECTION FLAG
+0227  F039- 99 39 03           STA FIDRTB,Y    BIT 7=1: WRITE
+0228  F03C- F0 23              BEQ OPEN2       SKIP, IF READ
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 06
+
+0229                   *
+0230  F03E- A9 53              LDA ='S'        FOR WRITE ONLY:
+0231  F040- 8D 00 03           STA FILTYP      SET FILTYP TO S
+0232  F043- A9 00              LDA =0
+0233  F045- A2 03              LDX =3
+0234  F047- 9D 1A 03           STA FILSA,X     CLEAR FILSA AND FILEA
+0235  F04A- CA                 DEX
+0236  F04B- 10 FA              BPL *-4
+0237  F04D- 8D 15 03           STA FILSIZ      CLEAR FILSIZ
+0238  F050- 8D 16 03           STA FILSIZ+1
+0239  F053- 20 1E E8           JSR SETFID      SET FILE DATE
+0240                   *
+0241  F056- A2 10              LDX =16         SET FILNM1 AND
+0242  F058- BD 20 03           LDA FILNM1,X    FILCY1
+0243  F05B- 9D 01 03           STA FILNAM,X
+0244  F05E- CA                 DEX
+0245  F05F- 10 F7              BPL *-7
+0246                   *
+0247  F061- A9 00      OPEN2   LDA =0
+0248  F063- 99 49 03           STA FIBPTB,Y    BUFFER POINTER
+0249  F066- 99 51 03           STA FIRCTB,Y    RECORD COUNTER
+0250  F069- A5 DC              LDA FILDRV
+0251  F06B- 99 41 03           STA FIDVTB,Y    SET DRIVE NUMBER
+0252                   *
+0253  F06E- 29 02              AND =2  TEST    DRIVE TYPE
+0254  F070- F0 61              BEQ DOPEN       OPEN A DISK FILE
+0255                   *
+0256  F072- AE 36 03   TOPEN   LDX MAXSEQ      TEST: ONLY ONE OPEN
+0257  F075- BD 39 03   TOPEN1  LDA FIDRTB,X    IS THIS ENTRY OPEN?
+0258  F078- 29 20              AND =$20
+0259  F07A- F0 07              BEQ TOPEN2      SKIP, IF NOT
+0260  F07C- BD 41 03           LDA FIDVTB,X
+0261  F07F- C5 DC              CMP FILDRV
+0262  F081- F0 43              BEQ TOPEN5      SKIP, IF DOUBLE DRIVE
+0263  F083- CA         TOPEN2  DEX
+0264  F084- 10 EF              BPL TOPEN1
+0265                   *
+0266  F086- 20 0F E8           JSR TPWAIT
+0267                   *
+0268  F089- B9 39 03           LDA FIDRTB,Y    TEST DIRECTION
+0269  F08C- 30 3D              BMI TOPEN7
+0270                   *
+0271  F08E- 20 30 E8           JSR TRDLBR      GET LABEL RECORD
+0272  F091- 20 51 F1           JSR PRFLB1      PRINT LABEL, IF ALLOWED
+0273                   *
+0274  F094- AD 00 03           LDA FILTYP
+0275  F097- 29 7F              AND =$7F
+0276  F099- C9 53              CMP ='S'        IS IT A SEQUENTIAL FILE
+0277  F09B- F0 05              BEQ *+7
+0278  F09D- A9 05              LDA =$05        ERROR 5
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 07
+
+0279  F09F- 85 DB              STA FILERR
+0280  F0A1- 60                 RTS
+0281                   *
+0282  F0A2- 20 59 F1           JSR CPOINT      COMPUTE BUFFER POINTER
+0283  F0A5- A9 FE              LDA =$FE        SET EOF MARK
+0284  F0A7- 91 FA              STA (POINT),Y
+0285                   *
+0286  F0A9- 20 2A E8   TOPEN4  JSR SETID       COMPUTE ID
+0287  F0AC- A5 DD              LDA TRECID
+0288  F0AE- AC 35 03           LDY CURSEQ
+0289  F0B1- 99 61 03           STA FITEMP,Y    SAVE ID FOR DATA REC
+0290  F0B4- A5 DE              LDA TRECID+1
+0291  F0B6- 99 69 03           STA FITEMP+8,Y
+0292                   *
+0293  F0B9- B9 39 03   OPEN3   LDA FIDRTB,Y    AND OPEN NOW FILE
+0294  F0BC- 09 20              ORA =$20
+0295  F0BE- 99 39 03           STA FIDRTB,Y
+0296                   *
+0297  F0C1- A9 00              LDA =0          NORMAL EXIT
+0298  F0C3- 85 DB              STA FILERR
+0299  F0C5- 60                 RTS
+0300                   *
+0301  F0C6- A9 26      TOPEN5  LDA =$26        ERROR 26
+0302  F0C8- 85 DB              STA FILERR
+0303  F0CA- 60                 RTS
+0304                   *
+0305  F0CB- 20 0C E8   TOPEN7  JSR TWRFIL      WRITE LABEL RECORD
+0306  F0CE- F0 D9              BEQ TOPEN4      SKIP, IF OK
+0307  F0D0- 85 DB              STA FILERR      OR EXIT WITH ERROR
+0308  F0D2- 60                 RTS
+0309                   *
+0310  F0D3- B9 39 03   DOPEN   LDA FIDRTB,Y    TEST DIRECTION
+0311  F0D6- 30 43              BMI DOPEN2
+0312                   *
+0313  F0D8- 20 2C F6           JSR PREPRD      DISK READ FILE
+0314  F0DB- 20 51 F1           JSR PRFLB1
+0315  F0DE- AD 00 03           LDA FILTYP
+0316  F0E1- 29 7F              AND =$7F
+0317  F0E3- C9 53              CMP ='S'        MUST BE SEQUENTIAL
+0318  F0E5- F0 05              BEQ *+7
+0319  F0E7- A9 05              LDA =5
+0320  F0E9- 4C FD F5           JMP DISCER1
+0321                   *
+0322  F0EC- 20 25 F6           JSR ENDDO
+0323  F0EF- 20 FF F0           JSR DOPEN1
+0324  F0F2- 20 59 F1           JSR CPOINT
+0325  F0F5- A9 FE              LDA =$FE        SET EOR MARK
+0326  F0F7- 91 FA              STA (POINT),Y
+0327  F0F9- AC 35 03           LDY CURSEQ
+0328  F0FC- 4C B9 F0           JMP OPEN3       OPEN THE FILE
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 08
+
+0329                   *
+0330  F0FF- AC 35 03   DOPEN1  LDY CURSEQ      SUBROUTINE
+0331  F102- AD 14 03           LDA FILLOC+1    GET FIRST SECTOR
+0332  F105- 99 61 03           STA FITEMP,Y
+0333  F108- AD 13 03           LDA FILLOC
+0334  F10B- 99 69 03           STA FITEMP+8,Y
+0335  F10E- AD 16 03           LDA FILSIZ+1
+0336  F111- 99 59 03           STA FIMAXT,Y    NO OF SECTORS
+0337  F114- AD 7C 03           LDA SCYFC       DIRECTORY ENTRY NO
+0338  F117- 99 71 03           STA FITEMP+16,Y
+0339  F11A- 60                 RTS
+0340                   *
+0341  F11B- 20 51 F6   DOPEN2  JSR PREPWRA     DISK WRITE FILE
+0342  F11E- 8E 11 03           STX FILCYC
+0343  F121- 20 6D F6           JSR PREPWRB
+0344  F124- A9 FF              LDA =$FF        COMPUTE FREE SPACE
+0345  F126- C0 00              CPY =0          MAX 255 SECTORS
+0346  F128- D0 01              BNE *+3
+0347  F12A- 8A                 TXA
+0348  F12B- 20 34 F1           JSR DOPEN3      SET UP DIRECTORY
+0349  F12E- AC 35 03           LDY CURSEQ
+0350  F131- 4C B9 F0           JMP OPEN3       OPEN NOW THE FILE
+0351                   *
+0352  F134- 8D 16 03   DOPEN3  STA FILSIZ+1    SET SIZE OF FILE
+0353  F137- 8D 1D 03           STA FILEA+1
+0354  F13A- A9 00              LDA =0
+0355  F13C- 8D 1A 03           STA FILSA
+0356  F13F- 8D 1C 03           STA FILEA
+0357  F142- 8D 1B 03           STA FILSA+1
+0358  F145- AD 7D 03   DOPEN4  LDA SLAST
+0359  F148- 8D 7C 03           STA SCYFC
+0360  F14B- 20 FF F0           JSR DOPEN1
+0361  F14E- 4C C6 F7           JMP DWRFI6
+0362                   *
+0363                   * PRINT FILE LABEL, IF ALLOWED
+0364                   ******************************
+0365                   *
+0366  F151- 24 DA      PRFLB1  BIT FILFLG
+0367  F153- 70 03              BVS *+5
+0368  F155- 4C 2D E8           JMP PRFLAB
+0369  F158- 60                 RTS
+0370                   *
+0371                   * COMPUTE BUFFER POINTER (POINT),Y
+0372                   **********************************
+0373                   * CURSEQ IS USED AS FILE NUMBER
+0374                   *
+0375  F159- AE 35 03   CPOINT  LDX CURSEQ
+0376  F15C- BC 49 03           LDY FIBPTB,X    GET LOW POINTER
+0377  F15F- A9 00              LDA =0
+0378  F161- 85 FA              STA POINT
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 09
+
+0379  F163- 8A                 TXA
+0380  F164- 18                 CLC
+0381  F165- 6D 38 03           ADC FILBU1      AND START OF FILE
+0382  F168- 85 FB              STA POINT+1     BUFFERS, FULLPAGE
+0383  F16A- 60                 RTS
+0384                   *
+0385                   * READCH: READ CHAR FROM FILE IN X
+0386                   **********************************
+0387                   * ENTRY: x,FILDRV
+0388                   * EXIT: FILERR IN Y AND STATUS, CHAR IN A
+0389                   * CHAR =$1F MEANS EOF, CHAR=$1D MEANS ERROR
+0390                   *
+0391  F16B- A9 00      READCH  LDA =0          MUST BE READ FILE
+0392  F16D- 20 BD F1           JSR TESTFN
+0393  F170- 8E 35 03           STX CURSEQ
+0394  F173- 20 59 F1           JSR CPOINT
+0395  F176- B1 FA              LDA (POINT),Y   GET ONE CHAR FROM FILE
+0396  F178- 30 23              BMI READC4      SKIP, IF BIT 7 SET
+0397                   *
+0398  F17A- AE 35 03   READC0  LDX CURSEQ
+0399  F17D- C8                 INY             COUNT CHAR
+0400  F17E- D0 09              BNE READC2      SKIP, IF NOT EOR
+0401                   *
+0402  F180- 48         READC1  PHA             SAV CHAR
+0403  F181- 20 15 F2           JSR RDSREC      GET NEXT RECORD
+0404  F184- D0 11              BNE READC3      SKIP, IF ERROR
+0405  F186- 68                 PLA             IF OK, GET CHAR BACK
+0406  F187- A0 00              LDY =0
+0407                   *
+0408  F189- 48         READC2  PHA             SAVE CHAR AGAIN
+0409  F18A- 98                 TYA             POINTER TO A
+0410  F18B- AE 35 03           LDX CURSEQ
+0411  F18E- 9D 49 03           STA FIBPTB,X    STORE POINTER
+0412  F191- 68                 PLA
+0413  F192- A0 00      READC7  LDY =0          NORMAL EXIT
+0414  F194- 84 DB              STY FILERR
+0415  F196- 60                 RTS
+0416                   *
+0417  F197- 98         READC3  TYA             READ ERROR
+0418  F198- 68                 PLA
+0419  F199- A9 1D              LDA =$1D
+0420  F19B- D0 F7              BNE READC7+2    ALLWAYS TAKEN
+0421                   *
+0422  F19D- C9 FE      READC4  CMP =$FE        EOR?
+0423  F19F- D0 06              BNE READC5
+0424  F1A1- 20 80 F1           JSR READC1      GET NEXT RECORD
+0425  F1A4- F0 C5              BEQ READCH      OK, GET CHAR
+0426  F1A6- 60                 RTS             ERROR, RETURN
+0427                   *
+0428  F1A7- C9 FF      READC5  CMP =$FF        END OF FILE?
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 10
+
+0429  F1A9- D0 04              BNE READC6
+0430  F1AB- A9 1F              LDA =$1F        END OF FILE
+0431  F1AD- D0 E3              BNE READC7      ALLWAYS TAKEN, OK
+0432                   *
+0433  F1AF- 38         READC6  SEC             COUNT ONE BLANK
+0434  F1B0- E9 01              SBC =1
+0435  F1B2- 91 FA              STA (POINT),Y
+0436  F1B4- AA                 TAX
+0437  F1B5- A9 20              LDA =$20
+0438  F1B7- E0 80              CPX =$80
+0439  F1B9- F0 BF              BEQ READC0      IF LAST BLANK, INCREASE
+0440  F1BB- D0 D5              BNE READC7      ELSE SAME PNT AGAIN
+0441                   *
+0442                   * TESTFN: TEST FILE NUMBER IN X
+0443                   *******************************
+0444                   * A=00: MUST BE OPEN SEQUENTIAL READ FILE
+0445                   * A=80: MUST BE OPEN SEQUENTIAL WRITE FILE
+0446                   *
+0447  F1BD- EC 36 03   TESTFN  CPX MAXSEQ
+0448  F1C0- B0 0F              BCS TESTF1
+0449                   *
+0450  F1C2- 5D 39 03   TESTF0  EOR FIDRTB,X
+0451  F1C5- 30 15              BMI TESTF2      DIRECTON ERROR, SKIP
+0452  F1C7- BD 39 03           LDA FIDRTB,X
+0453  F1CA- 29 60              AND =$60        TEST FOR NOT OPEN
+0454  F1CC- C9 20              CMP =$20        OR RANDOM ACCESS FILE
+0455  F1CE- D0 03              BNE TESTF3      SKIP, IF NOT OPEN
+0456  F1D0- 60                 RTS
+0457                   *
+0458  F1D1- F0 EF      TESTF1  BEQ TESTF0
+0459  F1D3- A0 25      TESTF3  LDY =$25        WRONG FILE TYPE
+0460  F1D5- 68                 PLA             NUMBER
+0461  F1D6- 68                 PLA
+0462  F1D7- 84 DB              STY FILERR
+0463  F1D9- A9 1E              LDA =$1E
+0464  F1DB- 60                 RTS
+0465                   *
+0466  F1DC- A0 24      TESTF2  LDY =$24        DIRECTION ERROR
+0467  F1DE- D0 F5              BNE TESTF1+4    ALLWAYS TAKEN
+0468                   *
+0469                   * PREPSR: PREPARE SEQUENTIAL RECORD R/W
+0470                   ***************************************
+0471                   *
+0472  F1E0- 20 59 F1   PREPSR  JSR CPOINT
+0473  F1E3- A5 FA              LDA POINT
+0474  F1E5- A4 FB              LDY POINT+1
+0475  F1E7- 85 E0              STA TRECST
+0476  F1E9- 84 E1              STY TRECST+1
+0477  F1EB- BD 51 03           LDA FIRCTB,X
+0478  F1EE- 85 DF              STA TRECNO
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 11
+
+0479  F1F0- E6 DF              INC TRECNO
+0480  F1F2- BD 61 03           LDA FITEMP,X
+0481  F1F5- 85 DD              STA TRECID
+0482  F1F7- BD 69 03           LDA FITEMP+8,X
+0483  F1FA- 85 DE              STA TRECID+1
+0484  F1FC- BD 41 03           LDA FIDVTB,X
+0485  F1FF- 85 DC              STA FILDRV
+0486  F201- 29 02              AND =2          Z=1, IF DISK
+0487  F203- 60                 RTS
+0488                   *
+0489                   * ENDSR: END OF SEQUENTIAL RECORD R/W
+0490                   *************************************
+0491                   *
+0492  F204- 48         ENDSRT  PHA             ENTRY FOR TAPE ROUTINES
+0493  F205- 20 24 E8           JSR TAPEOF
+0494  F208- 58                 CLI
+0495  F209- 68                 PLA
+0496                   *
+0497  F20A- D0 08      ENDSRD  BNE ENDSR1      ENTRY FOR DISK ROUTINES
+0498  F20C- 48                 PHA
+0499  F20D- AE 35 03           LDX CURSEQ
+0500  F210- FE 51 03           INC FIRCTB,X
+0501  F213- 68                 PLA
+0502  F214- 60         ENDSR1  RTS
+0503                   *
+0504                   * RDSREC: READ SEQUENTIAL RECORD
+0505                   ********************************
+0506                   *
+0507  F215- 20 E0 F1   RDSREC  JSR PREPSR
+0508  F218- F0 09              BEQ RDSRE1      SKIP,IFDISK
+0509                   *
+0510  F21A- 20 21 E8           JSR TAPEON
+0511  F21D- 20 12 E8           JSR TRDREC
+0512  F220- 4C 04 F2           JMP ENDSRT
+0513                   *
+0514  F223- 20 9E F2   RDSRE1  JSR PREPSR1
+0515  F226- 20 57 F4           JSR READ
+0516  F229- 4C 98 F2           JMP ENDSR2
+0517                   *
+0518                   * WRITCH: WRITE CHAR IN A TO FILE IN X
+0519                   **************************************
+0520                   * ENTRY: A,X,FILFLG
+0521                   * EXIT: FILERR IN Y AND STATUS
+0522                   *
+0523  F22C- 29 7F      WRITCH  AND =$7F        MASK OFF BIT 7
+0524  F22E- C9 0A              CMP =$A         IGNORE LF
+0525  F230- D0 01              BNE *+3
+0526  F232- 60                 RTS
+0527  F233- 85 FE              STA KCHAR       SAVE CHAR DURING TEST
+0528  F235- A9 80              LDA =$80        MUST BE WRITE FILE
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 12
+
+0529  F237- 20 BD F1           JSR TESTFN
+0530  F23A- 8E 35 03           STX CURSEQ
+0531  F23D- 20 59 F1           JSR CPOINT
+0532  F240- A5 FE              LDA KCHAR
+0533  F242- C9 20              CMP =$20        BLANK?
+0534  F244- F0 20              BEQ WRITC4
+0535                   *
+0536  F246- 91 FA      WRITC0  STA (POINT),Y
+0537  F248- C9 FF              CMP =$FF                EOF?
+0538  F24A- F0 03              BEQ WRITC1      YES, STORE BUFFER
+0539                   *
+0540  F24C- C8                 INY             ELSE COUNT
+0541  F24D- D0 07              BNE WRITC2
+0542                   *
+0543  F24F- 20 7F F2   WRITC1  JSR WRSREC
+0544  F252- D0 0E              BNE WRITC3      SKIP, IF ERROR
+0545  F254- A0 00              LDY =0          ELSE NEW BUFFER
+0546                   *
+0547  F256- AE 35 03   WRITC2  LDX CURSEQ
+0548  F259- 98                 TYA
+0549  F25A- 9D 49 03           STA FIBPTB,X
+0550  F25D- A0 00              LDY =0
+0551  F25F- 84 DB              STY FILERR
+0552  F261- 60                 RTS             NORMAL EXIT
+0553                   *
+0554  F262- 98         WRITC3  TYA
+0555  F263- 84 DB              STY FILERR      ERROR EXIT
+0556  F265- 60                 RTS
+0557                   *
+0558  F266- A9 81      WRITC4  LDA =$81        BLANK
+0559  F268- C0 00              CPY =0          PRINT,IF START OF
+0560  F26A- F0 DA              BEQ WRITC0      BUFFER
+0561  F26C- 88                 DEY             ELSE LOOK AT LAST CHAR
+0562  F26D- B1 FA              LDA (POINT),Y
+0563  F26F- 10 09              BPL WRITC5      SKIP, IF NOT BLANK
+0564  F271- C9 FC              CMP =$FC        MAX BLANK COUNTER
+0565  F273- B0 05              BCS WRITC5
+0566  F275- 18                 CLC
+0567  F276- 69 01              ADC =1
+0568  F278- 30 CC              BMI WRITC0      ALLWAYS TAKEN
+0569                   *
+0570  F27A- C8         WRITC5  INY
+0571  F27B- A9 81              LDA =$81
+0572  F27D- D0 C7              BNE WRITC0      ALLWAYS TAKEN
+0573                   *
+0574                   * WRSREC: WRITE SEQUENTIAL RECORD
+0575                   *********************************
+0576                   *
+0577  F27F- 20 E0 F1   WRSREC  JSR PREPSR
+0578  F282- F0 0E              BEQ WRSRE1      SKIP, IF DISK
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 13
+
+0579                   *
+0580  F284- 20 21 E8           JSR TAPEON
+0581  F287- 20 27 E8           JSR TDELAY
+0582  F28A- A9 00              LDA =0
+0583  F28C- 20 18 E8           JSR TWRREC
+0584  F28F- 4C 04 F2           JMP ENDSRT
+0585                   *
+0586  F292- 20 9E F2   WRSRE1  JSR PREPSR1
+0587  F295- 20 25 F4           JSR WRITE
+0588                   *
+0589  F298- 20 25 F6   ENDSR2  JSR ENDDO
+0590  F29B- 4C 0A F2           JMP ENDSRD
+0591                   *
+0592  F29E- C6 DF      PREPSR1 DEC TRECNO      FIRST RECORD IS 0
+0593  F2A0- A5 DF              LDA TRECNO
+0594  F2A2- DD 59 03           CMP FIMAXT,X    TEST SIZE OF FILE
+0595  F2A5- 90 07              BCC PREPSR2
+0596  F2A7- 68                 PLA
+0597  F2A8- 68                 PLA
+0598  F2A9- A9 27              LDA =$27        FILE TOO LONG
+0599  F2AB- 85 DB              STA FILERR
+0600  F2AD- 60                 RTS
+0601                   *
+0602  F2AE- A5 DE      PREPSR2 LDA SECTOR      SET BINARY RECORD
+0603  F2B0- 18                 CLC
+0604  F2B1- 65 DF              ADC TRECNO
+0605  F2B3- 85 DE              STA SECTOR
+0606  F2B5- 90 02              BCC *+4
+0607  F2B7- E6 DD              INC TRACK
+0608  F2B9- 20 CC F4           JSR PREPDO1
+0609  F2BC- 4C 5C F5           JMP PREPRW1-2   CONVERT TO TRACK/SECTOR
+0610                   *
+0611                   * CLOSE: CLOSE EXISTING FILE IN X
+0612                   *********************************
+0613                   * EXIT: FILERRIN Y AND STATUS
+0614                   *
+0615  F2BF- BD 39 03   CLOSE   LDA FIDRTB,X
+0616  F2C2- 20 BD F1           JSR TESTFN
+0617  F2C5- 8E 35 03           STX CURSEQ
+0618  F2C8- BD 39 03           LDA FIDRTB,X
+0619  F2CB- 29 80              AND =$80
+0620  F2CD- F0 07              BEQ CLOSE1      SKI, IF READ
+0621                   *
+0622  F2CF- A9 FF              LDA =$FF        WRITE LAST CHAR
+0623  F2D1- 20 2E F2           JSR WRITCH+2
+0624  F2D4- D0 13              BNE CLOSE2+2    SKIP, IF ERROR
+0625                   *
+0626  F2D6- BD 39 03   CLOSE1  LDA FIDRTB,X
+0627  F2D9- 29 DF              AND =$DF        CLOSE ENTRY IN TABLE
+0628  F2DB- 9D 39 03           STA FIDRTB,X
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 14
+
+0629  F2DE- BD 41 03           LDA FIDVTB,X
+0630  F2E1- 29 02              AND =2
+0631  F2E3- F0 05              BEQ CLOSE3      SKIP, IF DISK
+0632  F2E5- A0 00              LDY =0          NORMAL EXIT
+0633                   *
+0634  F2E7- 84 DB      CLOSE2  STY FILERR
+0635  F2E9- 60                 RTS
+0636                   *
+0637  F2EA- BD 39 03   CLOSE3  LDA FIDRTB,X    TEST DIRECTION
+0638  F2ED- 30 01              BMI *+3
+0639  F2EF- 60                 RTS
+0640                   *
+0641  F2F0- 20 A7 F4           JSR PREPDO
+0642  F2F3- AE 35 03           LDX CURSEQ
+0643  F2F6- BD 71 03           LDA FITEMP+16,X GET FILE ENTRY NO
+0644  F2F9- 8D 7D 03           STA SLAST
+0645  F2FC- AA                 TAX
+0646  F2FD- 20 D2 F4           JSR GETFENT
+0647  F300- AE 35 03           LDX CURSEQ
+0648  F303- BD 51 03           LDA FIRCTB,X    GET ACTUAL SIZE
+0649  F306- 4C 34 F1           JMP DOPEN3      AND SET UP DIRECTORY
+0650                   *
+0651                   * CLOSAL: CLOSE ALL SEQUENTIAL FILES
+0652                   ************************************
+0653                   *
+0654  F309- AE 36 03   CLOSAL  LDX MAXSEQ
+0655  F30C- 8E 35 03           STX CURSEQ
+0656                   *
+0657  F30F- AE 35 03   CLOSA1  LDX CURSEQ
+0658  F312- BD 39 03           LDA FIDRTB,X    FILE OPEN?
+0659  F315- 29 60              AND =$60        AND SEQUENTIAL
+0660  F317- C9 20              CMP =$20
+0661  F319- D0 03              BNE *+5
+0662  F31B- 20 BF F2           JSR CLOSE       CLOSE IT
+0663  F31E- D0 09              BNE CLOSA2
+0664  F320- CE 35 03           DEC CURSEQ
+0665  F323- 10 EA              BPL CLOSA1
+0666  F325- A0 00              LDY =0
+0667  F327- 84 DB              STY FILERR
+0668  F329- 60         CLOSA2  RTS
+0669                   *
+0670                   * RSTFLD: RESET FLOPPY DISK CONTROLLER
+0671                   **************************************
+0672                   *
+0673  F32A- A2 07      RSTFLD  LDX =7          MAX 8 OPEN FILES
+0674  F32C- 8E 36 03           STX MAXSEQ      DEFAULT, CAN BE <8
+0675  F32F- A9 D7              LDA =>FILBUF    DEFAULT BUFFER
+0676  F331- 8D 38 03           STA FILBU1
+0677  F334- A9 00              LDA =0          CLEAR ENTRIES
+0678  F336- 9D 39 03           STA FIDRTB,X
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 15
+
+0679  F339- CA                 DEX
+0680  F33A- 10 FA              BPL *-4
+0681                   *
+0682  F33C- 8D 7E 03           STA DISFLG      CLEAR INITIALIZED FLAG
+0683  F33F- 60                 RTS
+0684                   *
+0685                           TIT R65 DISK IO - FILE HANDLER
+0686                           PAG
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 16
+
+0687                   *
+0688                   *
+0689  F340- FF FF FF   ITABL   BYT $FF,$FF,$FF,$18     BADTRACK1
+0689  F343- 18 
+0690  F344- FF FF FF           BYT $FF,$FF,$FF,$10     BADTRACK0
+0690  F347- 10 
+0691  F348- 85 05 0D           BYT $85,5,13,$0D        SPECIFY
+0691  F34B- 0D 
+0692                   *
+0693                   *
+0694                   * INITIALIZATION ROUTINE
+0695                   ************************
+0696                   *
+0697  F34C- A2 0B      INITDC  LDX =11
+0698  F34E- A0 03      INITD1  LDY =3
+0699  F350- A9 35              LDA =$35        SPECIFY CMD
+0700  F352- 20 A4 F3           JSR WRCOMM
+0701  F355- BD 40 F3   INITD2  LDA ITABL,X
+0702  F358- 20 AF F3           JSR WRPARA
+0703  F35B- CA                 DEX
+0704  F35C- 30 05              BMI INITD3
+0705  F35E- 88                 DEY
+0706  F35F- 10 F4              BPL INITD2
+0707  F361- 30 EB              BMI INITD1
+0708  F363- 60         INITD3  RTS
+0709                   *
+0710                   *
+0711                   *
+0712                   * DRIVE CODE SUBROUTINE
+0713                   ***********************
+0714                   * SELECTED DRIVE IN FILDRV, OUTPUT IN A
+0715                   *
+0716  F364- A5 DC      DRIVE   LDA FILDRV
+0717  F366- 4A                 LSR A
+0718  F367- A9 80              LDA =$80
+0719  F369- B0 01              BCS *+3
+0720  F36B- 4A                 LSR A
+0721  F36C- 60                 RTS
+0722                   *
+0723                   * SEEK COMMAND
+0724                   **************
+0725                   * SELECT DRIVE IN FILDRV
+0726                   * TRACK ADDRESS IN TRACK
+0727                   *
+0728  F36D- 20 64 F3   SEEK    JSR DRIVE
+0729  F370- 09 29              ORA =$29        FROM SEEK CMD
+0730  F372- 20 A4 F3           JSR WRCOMM
+0731  F375- A5 DD              LDA TRACK       GET TRACK ADDRESS
+0732  F377- 4C AF F3           JMP WRPARA
+0733                   *
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 17
+
+0734                   *
+0735                   * READ DRIVE STATUS
+0736                   *******************
+0737                   * SELECTED DRIVE IN FILDRV
+0738                   *
+0739  F37A- 20 64 F3   RDSTAT  JSR DRIVE
+0740  F37D- 09 2C              ORA =$2C        READ STATUS COMMAND
+0741  F37F- 20 A4 F3           JSR WRCOMM
+0742  F382- 4C BC F3           JMP RESULT
+0743                   *
+0744                   *
+0745                   * READ SPECIAL REGISTER
+0746                   ***********************
+0747                   * REGISTER ADDRESS IN X
+0748                   * RESULT RETURNED IN A
+0749                   *
+0750  F385- 20 64 F3   RDREG   JSR DRIVE       READ SPECIAL REG CMD
+0751  F388- 09 3D              ORA =$3D
+0752  F38A- 20 A4 F3           JSR WRCOMM
+0753  F38D- 8A                 TXA
+0754  F38E- 20 AF F3           JSR WRPARA
+0755  F391- 4C BC F3           JMP RESULT
+0756                   *
+0757                   *
+0758                   * WRITE SPECIAL REGISTER
+0759                   ************************
+0760                   * REGISTER ADDRESS IN X
+0761                   * DATA TO BE WRITTEN IN Y
+0762                   *
+0763  F394- 20 64 F3   WRREG   JSR DRIVE       WRITE SPECIAL REG CMD
+0764  F397- 09 3A              ORA =$3A
+0765  F399- 20 A4 F3           JSR WRCOMM
+0766  F39C- 8A                 TXA
+0767  F39D- 20 AF F3           JSR WRPARA
+0768  F3A0- 98                 TYA
+0769  F3A1- 4C AF F3           JMP WRPARA
+0770                   *
+0771                   *
+0772                   * WRITE IN COMMAND REGISTER
+0773                   ***************************
+0774                   * COMMAND IN A
+0775                   *
+0776  F3A4- 2C C0 14   WRCOMM  BIT FDSTAT      BUSY?
+0777  F3A7- 30 FB              BMI WRCOMM      WAIT IF BUSY
+0778  F3A9- 70 F9              BVS WRCOMM      WAIT IF COMMAND FULL
+0779  F3AB- 8D C0 14           STA FDCOM
+0780  F3AE- 60                 RTS
+0781                   *
+0782                   *
+0783                   * WRITE IN PARAMETER REGISTER
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 18
+
+0784                   *****************************
+0785                   * PARAMETER IN A
+0786                   *
+0787  F3AF- 48         WRPARA  PHA             SAVE PARAMETER
+0788  F3B0- A9 20              LDA =$20        MASK FOR PARAMETER FLAG
+0789  F3B2- 2C C0 14           BIT FDSTAT
+0790  F3B5- D0 FB              BNE *-3         WAIT IF PARAMETER FULL
+0791  F3B7- 68                 PLA
+0792  F3B8- 8D C1 14           STA FDPARA
+0793  F3BB- 60                 RTS
+0794                   *
+0795                   *
+0796                   * TEST RESULT SUBROUTINE
+0797                   ************************
+0798                   * Z=0, IF ERROR (ERROR CODE IN RESSAV AND A)
+0799                   * $FF RETURNED MEANS NO RESULT
+0800                   *
+0801  F3BC- A9 10      RESULT  LDA =$10        RESULT FLAG MASK
+0802  F3BE- 2C C0 14           BIT FDSTAT
+0803  F3C1- 30 FB              BMI *-3         WAIT IF BUSY
+0804  F3C3- D0 04              BNE RESULT1
+0805  F3C5- A9 FF              LDA =$FF        NO RESULT
+0806  F3C7- D0 03              BNE RESULT1+3
+0807                   *
+0808  F3C9- AD C1 14   RESULT1 LDA FDRES       GET RESULT
+0809  F3CC- 85 DF              STA RESSAV
+0810  F3CE- 60                 RTS
+0811                   *
+0812                   *
+0813                   * READ OR WRITE OF SINGLE RECORD COMMAND
+0814                   ****************************************
+0815                   * SELECTED DRIVE AND OPCODE IN A
+0816                   * TRACK ADDRESS IN TRACK
+0817                   * SECTOR ADDRESS IN SECTOR
+0818                   *
+0819  F3CF- 20 A4 F3   SINGLE  JSR WRCOMM
+0820  F3D2- A5 DD              LDA TRACK
+0821  F3D4- 20 AF F3           JSR WRPARA
+0822  F3D7- A5 DE              LDA SECTOR
+0823  F3D9- 20 AF F3           JSR WRPARA
+0824  F3DC- A9 21              LDA =#00100001  ONE SECTOR OF 256 BYTES
+0825  F3DE- 4C AF F3           JMP WRPARA
+0826                   *
+0827                   *
+0828                   * DATWRIT: DATA WRITE SUBROUTINE
+0829                   ********************************
+0830                   * DATA TO WRITE IN A
+0831                   * ERROR, IF FDC NOT BUSY
+0832                   * RETURNS ONE SUB-LEVEL, IF ERROR
+0833                   *
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 19
+
+0834  F3E1- 48         DATWRIT PHA             SAVE CODE
+0835  F3E2- A9 04              LDA =4          MASK FOR DATA REQUEST
+0836  F3E4- 2C C0 14           BIT FDSTAT
+0837  F3E7- 10 07              BPL DATWRT1     FDC NOT BUSY ERROR
+0838  F3E9- F0 F9              BEQ *-5
+0839  F3EB- 68                 PLA
+0840  F3EC- 8D C4 14           STA FDDAT
+0841  F3EF- 60                 RTS
+0842                   *
+0843  F3F0- 68         DATWRT1 PLA             FDC NOT BUSY
+0844  F3F1- 68                 PLA             PULL ONE SUB LEVEL
+0845  F3F2- 68                 PLA             AND SAVED CODE
+0846  F3F3- 4C BC F3           JMP RESULT
+0847                   *
+0848                   *
+0849                   * DATREAD: DATA READ SUBROUTINE
+0850                   *******************************
+0851                   * RETURNS WITH DATA IN A, SEE DATA WRITE SUB
+0852                   *
+0853  F3F6- A9 08      DATREAD LDA =8          MASK FOR DATA PROVIDE
+0854  F3F8- 2C C0 14           BIT FDSTAT
+0855  F3FB- 10 F4              BPL DATWRT1+1   END: FDC NOT BUSY
+0856  F3FD- F0 F9              BEQ *-5         NO IRQ NOW
+0857  F3FF- AD C4 14           LDA FDDAT
+0858  F402- 60                 RTS
+0859                   *
+0860                   *
+0861                   * TURN MOTOR ON SUBROUTINE
+0862                   **************************
+0863                   *
+0864  F403- 20 7A F3   MOTON   JSR RDSTAT      IS MOTOR ON?
+0865  F406- 48                 PHA
+0866  F407- A2 23              LDX =$23        FDC OUTPUT PORT
+0867  F409- 20 85 F3           JSR RDREG
+0868  F40C- 09 20              ORA =$20        MOTOR ON BIT
+0869  F40E- A8                 TAY
+0870  F40F- 20 94 F3           JSR WRREG
+0871  F412- 68                 PLA
+0872  F413- 4A                 LSR A           OPI=1 MOTOR WAS ON
+0873  F414- B0 01              BCS *+3         SKIP, IF NOT
+0874  F416- 60                 RTS
+0875                   *
+0876  F417- 4C 27 E8           JMP TDELAY      WAIT 1 SECOND
+0877                   *
+0878                   *
+0879                   * TURN MOTOR OFF SUBROUTINE
+0880                   ***************************
+0881                   *
+0882  F41A- A2 23      MOTOFF  LDX =$23        FDC OUTPUT PORT
+0883  F41C- 20 85 F3           JSR RDREG
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 20
+
+0884  F41F- 29 DF              AND =$DF        CLEAR MOTOR ON BIT
+0885  F421- A8                 TAY
+0886  F422- 4C 94 F3           JMP WRREG
+0887                   *
+0888                   *
+0889                   * WRITE ONE RECORD TO DISK (256 BYTES)
+0890                   **************************************
+0891                   * TRACK AND SECTOR ADDRESS IN TRACK AND SECTOR
+0892                   * DRIVE CODE IN FILDRV, MOTOR MUST BE ON
+0893                   * INDIRECT DATA POINTER IN DATA
+0894                   * MAX 10 TRIALS ARE DONE, NO VERIFY
+0895                   *
+0896  F425- A2 0A      WRITE   LDX =10         TRIAL COUNTER
+0897  F427- 20 37 F4           JSR WRIT0
+0898  F42A- D0 01              BNE *+3
+0899  F42C- 60                 RTS             OK
+0900                   *
+0901  F42D- 20 7A F3           JSR RDSTAT
+0902  F430- 78                 SEI
+0903  F431- CA                 DEX
+0904  F432- D0 F3              BNE WRITE+2
+0905  F434- 4C F4 F5           JMP DISCERR     NOT OK
+0906                   *
+0907  F437- 20 64 F3   WRIT0   JSR DRIVE
+0908  F43A- 09 0B              ORA =$0B
+0909  F43C- 20 CF F3           JSR SINGLE      WRITE
+0910  F43F- A0 00              LDY =0
+0911  F441- B1 E0      WRIT1   LDA (DATA),Y    LOAD DATA
+0912  F443- 20 E1 F3           JSR DATWRIT     DUMP IT
+0913  F446- C8                 INY
+0914  F447- D0 F8              BNE WRIT1       END TEST
+0915  F449- 4C BC F3           JMP RESULT
+0916                   *
+0917                   *
+0918                   * VERIFY ONE RECORD
+0919                   *******************
+0920                   * SEE WRITE FOR DETAILS, ONLY ONE TRIAL
+0921                   *
+0922  F44C- 20 64 F3   VERIFY  JSR DRIVE
+0923  F44F- 09 1F              ORA =$1F        VERIFY
+0924  F451- 20 CF F3           JSR SINGLE
+0925  F454- 4C BC F3           JMP RESULT      TEST RESULT
+0926                   *
+0927                   *
+0928                   * READ ONE RECORD FROM DISK
+0929                   ***************************
+0930                   * TRACK AND SECTOR ADDRESS IN TRACK AND SECTOR
+0931                   * INDIRECT DATA POINTER IN DATA,DRIVE IN FILDRV
+0932                   * MAX 10 TRIALS ARE DONE
+0933                   *
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 21
+
+0934  F457- A2 0A      READ    LDX =10         TRIAL COUNTER
+0935  F459- 20 69 F4           JSR READ0
+0936  F45C- D0 01              BNE *+3
+0937  F45E- 60                 RTS             OK
+0938                   *
+0939  F45F- 20 7A F3           JSR RDSTAT
+0940  F462- 78                 SEI
+0941  F463- CA                 DEX
+0942  F464- D0 F3              BNE READ+2
+0943  F466- 4C F4 F5           JMP DISCERR     NOT OK
+0944                   *
+0945  F469- 20 64 F3   READ0   JSR DRIVE
+0946  F46C- 09 13              ORA =$13
+0947  F46E- 20 CF F3           JSR SINGLE
+0948  F471- A0 00              LDY =0
+0949  F473- 20 F6 F3   READ1   JSR DATREAD
+0950  F476- 91 E0              STA (DATA),Y
+0951  F478- C8                 INY
+0952  F479- D0 F8              BNE READ1
+0953  F47B- 4C BC F3           JMP RESULT
+0954                   *
+0955                   *
+0956                   * INITIALIZE DISK DRIVE
+0957                   ***********************
+0958                   * NON DMA MODE,MOTOR MUST BE ON
+0959                   * INPUT: FILDRV,EXITPN
+0960                   *
+0961  F47E- 20 4C F3   INITDRV JSR INITDC      INITIALIZE FDC
+0962  F481- EA                 NOP             ################
+0963  F482- EA                 NOP             ################
+0964  F483- EA                 NOP             ################
+0965  F484- A2 17              LDX =$17        MODE REGISTER
+0966  F486- A0 C1              LDY =$C1        NON DMA,DOUBLE ACT
+0967  F488- 20 94 F3           JSR WRREG
+0968  F48B- 20 A0 F4           JSR TRACK0
+0969  F48E- 20 BC F3           JSR RESULT
+0970  F491- F0 03              BEQ *+5
+0971  F493- 4C F4 F5           JMP DISCERR
+0972                   *
+0973  F496- 20 64 F3           JSR DRIVE       SET INITIALIZED FLAG
+0974  F499- 0D 7E 03           ORA DISFLG
+0975  F49C- 8D 7E 03           STA DISFLG
+0976  F49F- 60                 RTS
+0977                   *
+0978                   *       SET HEAD TO TRACK0, NO CHECK
+0979                   *
+0980  F4A0- A2 00      TRACK0  LDX =0
+0981  F4A2- 86 DD              STX TRACK
+0982  F4A4- 4C 6D F3           JMP SEEK
+0983                   *
+
+----------------------------------------------------------------------
+
+R65 DISK IO - FILE HANDLER         16/08/82   R65 ASSEMBLER  PAGE 22
+
+0984                   *
+0985                           TIT R65 DISK IO - DIRECTORY
+0986                           PAG
+
+----------------------------------------------------------------------
+
+R65 DISK IO - DIRECTORY            16/08/82   R65 ASSEMBLER  PAGE 23
+
+0987                   *
+0988                   * PREPARE DISK OPERATION
+0989                   * **********************
+0990                   * INPUT: FILDRV
+0991                   * OUTPUT: EXITPN,BUFSEC
+0992                   *
+0993  F4A7- BA         PREPDO  TSX             SAVE STACK POINTER
+0994  F4A8- E8                 INX
+0995  F4A9- E8                 INX             FOR ERROR EXIT
+0996  F4AA- 8E 79 03           STX EXITPN
+0997  F4AD- A9 FF              LDA =$FF
+0998  F4AF- 8D 7A 03           STA BUFSEC
+0999  F4B2- AD 02 17           LDA USPBD       SET LED 2
+1000  F4B5- 09 04              ORA =4
+1001  F4B7- 8D 02 17           STA USPBD       FOR DISK
+1002  F4BA- 20 03 F4           JSR MOTON
+1003  F4BD- 20 7A F3           JSR RDSTAT      CLEAR READY FLAG
+1004  F4C0- 20 64 F3           JSR DRIVE       IS DRIVE INITIALIZED?
+1005  F4C3- 2D 7E 03           AND DISFLG
+1006  F4C6- D0 03              BNE *+5         YES, SKIP
+1007  F4C8- 20 7E F4           JSR INITDRV     ELSE INITIALIZE IT
+1008  F4CB- 60                 RTS
+1009                   *
+1010  F4CC- BA         PREPDO1 TSX             PULL ONE LEVEL MORE
+1011  F4CD- E8                 INX
+1012  F4CE- E8                 INX
+1013  F4CF- 4C A8 F4           JMP PREPDO+1
+1014                   *
+1015                   *
+1016                   * GETFENT: GET ONE FILE ENTRY
+1017                   *****************************
+1018                   * INPUT: X=NO OF ENTRY, BUFSEC
+1019                   * OUTPUT: ENTRY,FILCNT
+1020                   *
+1021  F4D2- 20 ED F4   GETFENT JSR GETFREC     READ RECORD
+1022  F4D5- 20 E3 F4           JSR SDOSPNT
+1023  F4D8- A0 1F              LDY =31         TRANSFER ENTRY
+1024  F4DA- B1 E2      GETFEN1 LDA (DOSPNT),Y
+1025  F4DC- 99 00 03           STA FILTYP,Y
+1026  F4DF- 88                 DEY
+1027  F4E0- 10 F8              BPL GETFEN1
+1028  F4E2- 60                 RTS
+1029                   *
+1030                   * COMPUTE DOSPNT
+1031                   ****************
+1032                   *
+1033  F4E3- 20 EB F5   SDOSPNT JSR FILENT
+1034  F4E6- 84 E2              STY DOSPNT
+1035  F4E8- A9 D6              LDA =>DIRBUF
+1036  F4EA- 85 E3              STA DOSPNT+1
+
+----------------------------------------------------------------------
+
+R65 DISK IO - DIRECTORY            16/08/82   R65 ASSEMBLER  PAGE 24
+
+1037  F4EC- 60                 RTS
+1038                   *
+1039                   * GET DIRECTORY RECORD
+1040                   **********************
+1041                   * LOADS RECORD ONLY,IF NOT IN MEMORY
+1042                   * INPUT: X=NO OF ENTRY,BUFSEC,EXITPN
+1043                   * OUTPUT: BUDSEC,FILCNT,FILCN1,SECTOR
+1044                   *
+1045  F4ED- 86 E4      GETFREC STX FILCNT      SET FILCNT
+1046  F4EF- 8A                 TXA
+1047  F4F0- 29 07              AND =7
+1048  F4F2- 85 E5              STA FILCN1      AND FILCN1
+1049  F4F4- 8A                 TXA
+1050  F4F5- 4A                 LSR A
+1051  F4F6- 4A                 LSR A
+1052  F4F7- 4A                 LSR A
+1053  F4F8- AA                 TAX
+1054  F4F9- E8                 INX
+1055  F4FA- 86 DE              STX SECTOR
+1056  F4FC- EC 7A 03           CPX BUFSEC      IM MEMORY?
+1057  F4FF- D0 01              BNE READDS      NO, READ IT
+1058  F501- 60                 RTS
+1059                   *
+1060                   * READ DIRECTORY SECTOR
+1061                   ***********************
+1062                   * INPUT: FILDRV,SECTOR,EXITPN
+1063                   * OUTPUT: BUFSEC
+1064                   *
+1065  F502- 20 0E F5   READDS  JSR SDIRBUF
+1066  F505- 20 57 F4           JSR READ        READ RECORD
+1067  F508- A5 DE              LDA SECTOR
+1068  F50A- 8D 7A 03           STA BUFSEC
+1069  F50D- 60                 RTS
+1070                   *
+1071                   * SET DATA TO DIRBUF
+1072                   ********************
+1073                   *
+1074  F50E- A9 00      SDIRBUF LDA =0
+1075  F510- A2 D6              LDX =>DIRBUF
+1076  F512- 85 E0              STA DATA
+1077  F514- 86 E1              STX DATA+1
+1078  F516- 85 DD              STA TRACK
+1079  F518- 60                 RTS
+1080                   *
+1081                   * COMPUTE NUMBER OF EMPTY SECTORS
+1082                   *********************************
+1083                   * INPUT: FILCNT
+1084                   * OUTPUT: Y(HIGH), X(LOW) SECTORS
+1085                   *
+1086  F519- 20 EB F5   EMPTSIZ JSR FILENT      Y=POINTER
+
+----------------------------------------------------------------------
+
+R65 DISK IO - DIRECTORY            16/08/82   R65 ASSEMBLER  PAGE 25
+
+1087  F51C- A9 0C              LDA =<NRSEC
+1088  F51E- 38                 SEC
+1089  F51F- F9 13 D6           SBC DIRBUF+$13,Y
+1090  F522- AA                 TAX
+1091  F523- A9 03              LDA =>NRSEC
+1092  F525- F9 14 D6           SBC DIRBUF+$14,Y
+1093  F528- A8                 TAY
+1094  F529- 60                 RTS
+1095                   *
+1096                   * STORE DIRECTORY RECORD
+1097                   ************************
+1098                   * INPUT: BUFSEC,EXITPN,FILDRV
+1099                   * OUTPUT: SECTOR,TRACK
+1100                   * DIRECTORY RECORDS ARE VERIFIED AFTER STORE
+1101                   *
+1102  F52A- 20 0E F5   WRITDS  JSR SDIRBUF
+1103  F52D- AD 7A 03           LDA BUFSEC
+1104  F530- 85 DE              STA SECTOR
+1105  F532- A9 04              LDA =4          4 TRYALS
+1106  F534- 8D 7F 03           STA DISCNT
+1107  F537- 20 25 F4   WRITD1  JSR WRITE
+1108  F53A- 20 4C F4           JSR VERIFY
+1109  F53D- D0 01              BNE *+3
+1110  F53F- 60                 RTS             OK
+1111                   *
+1112  F540- CE 7F 03           DEC DISCNT
+1113  F543- D0 F2              BNE WRITD1
+1114  F545- 4C F4 F5           JMP DISCERR
+1115                   *
+1116                   * PREPARE DISK READ/WRITE
+1117                   *************************
+1118                   * INPUT: FILSA,FILSIZ,FILLOC
+1119                   * OUTPUT: DATA,TRACK,SECTOR,FILCN1
+1120                   *
+1121  F548- AD 1A 03   PREPRW  LDA FILSA
+1122  F54B- AE 1B 03           LDX FILSA+1
+1123  F54E- 85 E0              STA DATA
+1124  F550- 86 E1              STX DATA+1
+1125  F552- AD 13 03           LDA FILLOC      SET BINARY RECORD
+1126  F555- AE 14 03           LDX FILLOC+1
+1127  F558- 85 DE      PREPWR0 STA SECTOR      COUNTER
+1128  F55A- 86 DD              STX TRACK
+1129                   *
+1130  F55C- A2 01              LDX =1          START DATA TRACK
+1131  F55E- A5 DE      PREPRW1 LDA SECTOR      CONVERT TO TRACK
+1132  F560- 38                 SEC             AND SECTOR BY
+1133  F561- E9 0A              SBC =10         REPEATED SUBTRACTION
+1134  F563- A8                 TAY
+1135  F564- A5 DD              LDA TRACK
+1136  F566- E9 00              SBC =0
+
+----------------------------------------------------------------------
+
+R65 DISK IO - DIRECTORY            16/08/82   R65 ASSEMBLER  PAGE 26
+
+1137  F568- 90 07              BCC PREPRW2     SKIP, IF DONE
+1138                   *
+1139  F56A- 84 DE              STY SECTOR
+1140  F56C- 85 DD              STA TRACK
+1141  F56E- E8                 INX
+1142  F56F- D0 ED              BNE PREPRW1     ALLWAYS TAKEN
+1143                   *
+1144  F571- 86 DD      PREPRW2 STX TRACK
+1145  F573- A5 DE              LDA SECTOR
+1146  F575- 29 0F              AND =$0F
+1147  F577- 85 DE              STA SECTOR
+1148  F579- E6 DE              INC SECTOR      SET SECTOR
+1149  F57B- AD 16 03           LDA FILSIZ+1
+1150  F57E- 85 E5              STA FILCN1      NO OF RECORDS
+1151  F580- 60                 RTS
+1152                   *
+1153                   * PUT FILE ENTRY TO DISK
+1154                   ************************
+1155                   * INPUT: X=FILE ENTRY
+1156                   * OUTPUT:
+1157                   *
+1158  F581- 86 E5      PUTFENT STX FILCN1
+1159  F583- 20 E3 F4           JSR SDOSPNT
+1160  F586- A0 1F              LDY =31
+1161  F588- B9 00 03   PUTFEN1 LDA FILTYP,Y
+1162  F58B- 91 E2              STA (DOSPNT),Y
+1163  F58D- 88                 DEY
+1164  F58E- 10 F8              BPL PUTFEN1
+1165  F590- 4C 2A F5           JMP WRITDS
+1166                   *
+1167                   * SEARCH IN DIRECTORY
+1168                   *********************
+1169                   * INPUT:FILDRV,EXITPN,FILCY1,FILNM1
+1170                   * FILCY1=0: SEARCH MAXIMAL CYCLUS
+1171                   * OUTPUT: SCY,SCYFC,SLAST
+1172                   *
+1173  F593- A2 00      SEARCH  LDX =0
+1174  F595- 8E 7B 03           STX SCY
+1175                   *
+1176  F598- 20 ED F4   SEARCH1 JSR GETFREC     GET ONE RECORD
+1177  F59B- 20 EB F5           JSR FILENT
+1178  F59E- B9 00 D6           LDA DIRBUF,Y    GET FILTYP
+1179  F5A1- D0 07              BNE SEARCH2     SKIP, IF NOT LAST
+1180  F5A3- A6 E4              LDX FILCNT
+1181  F5A5- 8E 7D 03           STX SLAST       END OF DIRECTORY
+1182  F5A8- 58                 CLI
+1183  F5A9- 60                 RTS
+1184                   *
+1185  F5AA- B9 1E D6   SEARCH2 LDA DIRBUF+$1E,Y        GET FILLNK
+1186  F5AD- 10 05              BPL SEARCH4     SKIP, IF NOT DELETED
+
+----------------------------------------------------------------------
+
+R65 DISK IO - DIRECTORY            16/08/82   R65 ASSEMBLER  PAGE 27
+
+1187                   *
+1188  F5AF- A6 E4      SEARCH3 LDX FILCNT      NEXT ENRTY
+1189  F5B1- E8                 INX
+1190  F5B2- D0 E4              BNE SEARCH1     ALLWAYS TAKEN
+1191                   *
+1192  F5B4- 20 E6 F4   SEARCH4 JSR SDOSPNT+3
+1193  F5B7- A0 0F              LDY =15         COMPARE NAME
+1194  F5B9- B1 E2      SEARCH5 LDA (DOSPNT),Y
+1195  F5BB- D9 1F 03           CMP FILNM1-1,Y
+1196  F5BE- D0 EF              BNE SEARCH3     NEXT ENTRY
+1197  F5C0- 88                 DEY
+1198  F5C1- D0 F6              BNE SEARCH5
+1199                   *
+1200  F5C3- 20 EB F5           JSR FILENT      FILNAM IS MATCHING
+1201  F5C6- AD 30 03           LDA FILCY1
+1202  F5C9- D0 16              BNE SEARCH7     CYCLUS=0?
+1203  F5CB- AD 7B 03           LDA SCY         YES, <CURRENT CY?
+1204  F5CE- D9 11 D6           CMP DIRBUF+$11,Y
+1205  F5D1- B0 DC              BCS SEARCH3     NEXT ENTRY, IF NOT
+1206                   *
+1207  F5D3- B9 11 D6   SEARCH6 LDA DIRBUF+$11,Y
+1208  F5D6- 8D 7B 03           STA SCY
+1209  F5D9- A5 E4              LDA FILCNT
+1210  F5DB- 8D 7C 03           STA SCYFC
+1211  F5DE- 4C AF F5           JMP SEARCH3
+1212                   *
+1213  F5E1- AD 30 03   SEARCH7 LDA FILCY1      CYCLUS # 0
+1214  F5E4- D9 11 D6           CMP DIRBUF+$11,Y
+1215  F5E7- F0 EA              BEQ SEARCH6
+1216  F5E9- D0 C4              BNE SEARCH3     ALLWAYS TAKEN
+1217                   *
+1218                   * COMPUTE FILE ENTRY POINTER
+1219                   ****************************
+1220                   * INPUT: FILCN1
+1221                   * OUTPUT: Y
+1222                   *
+1223  F5EB- A5 E5      FILENT  LDA FILCN1
+1224  F5ED- 0A                 ASL A
+1225  F5EE- 0A                 ASL A
+1226  F5EF- 0A                 ASL A
+1227  F5F0- 0A                 ASL A
+1228  F5F1- 0A                 ASL A
+1229  F5F2- A8                 TAY
+1230  F5F3- 60                 RTS
+1231                   *
+1232                   * DISK ERROR FROM CONTROLLER
+1233                   ****************************
+1234                   *
+1235  F5F4- A5 DF      DISCERR LDA RESSAV      GET THE CODE
+1236  F5F6- 4A                 LSR A
+
+----------------------------------------------------------------------
+
+R65 DISK IO - DIRECTORY            16/08/82   R65 ASSEMBLER  PAGE 28
+
+1237  F5F7- 29 0F              AND =$0F
+1238  F5F9- AA                 TAX
+1239  F5FA- BD 18 F6           LDA DISCERT,X   GET FROM TABLE
+1240                   *
+1241  F5FD- 85 DB      DISCER1 STA FILERR
+1242  F5FF- AE 79 03           LDX EXITPN
+1243  F602- 9A                 TXS             SET STACK POINTER
+1244  F603- A5 DF      ENDDO1  LDA RESSAV
+1245  F605- 48                 PHA
+1246  F606- 20 1A F4           JSR MOTOFF
+1247  F609- 68                 PLA
+1248  F60A- 85 DF              STA RESSAV
+1249  F60C- AD 02 17           LDA USPBD       TURN LED 2 OFF
+1250  F60F- 29 FB              AND =$FB
+1251  F611- 8D 02 17           STA USPBD
+1252  F614- 58                 CLI
+1253  F615- A5 DB              LDA FILERR
+1254  F617- 60                 RTS
+1255                   *
+1256  F618- 00 00 00   DISCERT BYT 0,0,0,0,1,1,1,2,7,$24,1,1,1
+1256  F61B- 00 01 01 
+1256  F61E- 01 02 07 
+1256  F621- 24 01 01 
+1256  F624- 01 
+1257                   *
+1258                   * GOOD COMPLETION
+1259                   *****************
+1260                   *
+1261  F625- A9 00      ENDDO   LDA =0
+1262  F627- 85 DB              STA FILERR
+1263  F629- 4C 03 F6           JMP ENDDO1
+1264                   *
+1265                   * PREPARE FILE READ
+1266                   *******************
+1267                   *
+1268  F62C- 20 CC F4   PREPRD  JSR PREPDO1
+1269  F62F- 20 93 F5           JSR SEARCH
+1270  F632- AD 7B 03           LDA SCY
+1271  F635- D0 03              BNE *+5
+1272  F637- 4C DE F6           JMP NOTFND      FILE NOT FOUND
+1273                   *
+1274  F63A- AE 7C 03           LDX SCYFC
+1275  F63D- 4C D2 F4           JMP GETFENT
+1276                   *
+1277                   * INCREMENT POINTERS FOR FILE R/W
+1278                   *********************************
+1279                   *
+1280  F640- E6 E1      INCDATP INC DATA+1
+1281  F642- E6 DE              INC SECTOR
+1282  F644- A5 DE              LDA SECTOR
+
+----------------------------------------------------------------------
+
+R65 DISK IO - DIRECTORY            16/08/82   R65 ASSEMBLER  PAGE 29
+
+1283  F646- C9 0B              CMP =$B
+1284  F648- D0 06              BNE *+8
+1285  F64A- A9 01              LDA =1
+1286  F64C- 85 DE              STA SECTOR
+1287  F64E- E6 DD              INC TRACK
+1288  F650- 60                 RTS
+1289                   *
+1290                   * PREPARE WRITE
+1291                   ***************
+1292                   *
+1293  F651- 20 CC F4   PREPWRA JSR PREPDO1
+1294  F654- 20 93 F5           JSR SEARCH
+1295  F657- AE 30 03           LDX FILCY1
+1296  F65A- D0 05              BNE PREPWRC     SKIP, IF NOT DEFAULT
+1297                   *
+1298  F65C- AE 7B 03           LDX SCY
+1299  F65F- E8                 INX
+1300  F660- 60                 RTS
+1301                   *
+1302  F661- AD 7B 03   PREPWRC LDA SCY
+1303  F664- F0 FA              BEQ PREPWRC-1   SKIP, IF NOT SAME
+1304                   *
+1305  F666- 20 F1 F6           JSR DELETE4     ELSE DELETE THIS FILE
+1306  F669- AE 30 03           LDX FILCY1
+1307  F66C- 60                 RTS
+1308                   *
+1309  F66D- A9 00      PREPWRB LDA =0
+1310  F66F- 8D 1E 03           STA FILLNK
+1311  F672- AE 7D 03           LDX SLAST
+1312  F675- E0 4F              CPX =79         MAX 79 FILE ENTRIES
+1313  F677- D0 05              BNE *+7
+1314  F679- A9 08              LDA =8          DIRECTORY FULL
+1315  F67B- 4C FD F5           JMP DISCER1
+1316                   *
+1317  F67E- 20 ED F4           JSR GETFREC
+1318  F681- 20 EB F5           JSR FILENT
+1319  F684- B9 13 D6           LDA DIRBUF+$13,Y
+1320  F687- 8D 13 03           STA FILLOC
+1321  F68A- B9 14 D6           LDA DIRBUF+$14,Y
+1322  F68D- 8D 14 03           STA FILLOC+1
+1323  F690- 4C 19 F5           JMP EMPTSIZ
+1324                   *
+1325                   *
+1326                           TIT R65 DISK IO - MAIN DISK ROUTINES
+1327                           PAG
+
+----------------------------------------------------------------------
+
+R65 DISK IO - MAIN DISK ROUTINES   16/08/82   R65 ASSEMBLER  PAGE 30
+
+1328                   *
+1329                   ****************************
+1330                   * DDIR: PRINT DISK DIRECTORY
+1331                   ****************************
+1332                   * INPUT: FILDRV
+1333                   * OUTPUT: FILERR
+1334                   *
+1335  F693- 20 27 E0   DDIR    JSR PRTINF
+1336  F696- 0D 8A              BYT $D,$8A
+1337  F698- 20 A7 F4           JSR PREPDO
+1338  F69B- A2 00              LDX =0
+1339                   *
+1340  F69D- 20 D2 F4   DDIR1   JSR GETFENT
+1341  F6A0- AD 00 03           LDA FILTYP      0 MEANS END MARK
+1342  F6A3- F0 0F              BEQ DDIR2
+1343  F6A5- AD 1E 03           LDA FILLNK      BIT 7+1 MEANS DELETED
+1344  F6A8- 30 03              BMI *+5         DO NOT PRINT IF DELETED
+1345  F6AA- 20 2D E8           JSR PRFLAB
+1346  F6AD- B0 05              BCS DDIR2       ESC?
+1347  F6AF- A6 E4              LDX FILCNT
+1348  F6B1- E8                 INX
+1349  F6B2- D0 E9              BNE DDIR1       ALLWAYS TAKEN
+1350                   *
+1351  F6B4- 20 27 E0   DDIR2   JSR PRTINF
+1352  F6B7- 0D 0A 0A           BYT $D,$A,$A
+1353  F6BA- 53 45 43           BYT 'SECTORS FREE:'+128
+1353  F6BD- 54 4F 52 
+1353  F6C0- 53 20 46 
+1353  F6C3- 52 45 45 
+1353  F6C6- BA 
+1354  F6C7- 20 19 F5           JSR EMPTSIZ
+1355  F6CA- 98                 TYA
+1356  F6CB- 20 30 E0           JSR PRTAX
+1357  F6CE- 20 27 E0           JSR PRTINF
+1358  F6D1- 0D 8A              BYT $D,$8A
+1359  F6D3- 4C 25 F6           JMP ENDDO
+1360                   *
+1361                   ****************************
+1362                   * DELETE: DELETE DISK FILE *
+1363                   ****************************
+1364                   * INPUT: FILDRV,FILNM1,FILCY1
+1365                   * OUTPUT: FILERR
+1366                   *
+1367  F6D6- 20 A7 F4   DELETE  JSR PREPDO
+1368  F6D9- AD 30 03           LDA FILCY1
+1369  F6DC- D0 05              BNE DELETE1
+1370                   *
+1371  F6DE- A9 06      NOTFND  LDA =6          FILE NOT FOUND
+1372  F6E0- 4C FD F5           JMP DISCER1
+1373                   *
+
+----------------------------------------------------------------------
+
+R65 DISK IO - MAIN DISK ROUTINES   16/08/82   R65 ASSEMBLER  PAGE 31
+
+1374  F6E3- 20 93 F5   DELETE1 JSR SEARCH
+1375  F6E6- AD 7B 03           LDA SCY
+1376  F6E9- F0 F3              BEQ NOTFND
+1377                   *
+1378  F6EB- 20 F1 F6           JSR DELETE4
+1379  F6EE- 4C 25 F6           JMP ENDDO
+1380                   *
+1381  F6F1- AE 7C 03   DELETE4 LDX SCYFC
+1382  F6F4- 20 ED F4           JSR GETFREC
+1383  F6F7- 20 EB F5           JSR FILENT
+1384  F6FA- B9 00 D6           LDA DIRBUF,Y    PROTECTED?
+1385  F6FD- 10 24              BPL DELETE3
+1386                   *
+1387  F6FF- 98                 TYA
+1388  F700- 48                 PHA
+1389  F701- 20 27 E0           JSR PRTINF
+1390  F704- 0D 0A 44           BYT $D,$a,'DELETE? '+128
+1390  F707- 45 4C 45 
+1390  F70A- 54 45 3F 
+1390  F70D- A0 
+1391  F70E- 20 03 E0           JSR GETCHR
+1392  F711- 29 5F              AND =$5F
+1393  F713- C9 59              CMP ='Y'
+1394  F715- F0 05              BEQ DELETE2
+1395                   *
+1396  F717- A9 03              LDA =3          ESCAPE FROM DISK OP
+1397  F719- 4C FD F5           JMP DISCER1
+1398                   *
+1399  F71C- 20 27 E0   DELETE2 JSR PRTINF
+1400  F71F- 0D 8A              BYT $D,$8A
+1401  F721- 68                 PLA
+1402  F722- A8                 TAY
+1403                   *
+1404  F723- B9 1E D6   DELETE3 LDA DIRBUF+$1E,Y
+1405  F726- 09 80              ORA =$80        SET DELETET FLAG
+1406  F728- 99 1E D6           STA DIRBUF+$1E,Y
+1407  F72B- 4C 2A F5           JMP WRITDS
+1408                   *
+1409                   *
+1410                   **************************
+1411                   * DRDFIL: LOAD DISK FILE *
+1412                   **************************
+1413                   * INPUT: FILDRV,FILNM1,FILCY1
+1414                   * OUTPUT: FILERR
+1415                   *
+1416  F72E- 20 2C F6   DRDFIL  JSR PREPRD
+1417  F731- AD 31 03           LDA FILSA1
+1418  F734- 0D 32 03           ORA FILSA1+1
+1419  F737- F0 21              BEQ DRDFIL1
+1420                   *
+
+----------------------------------------------------------------------
+
+R65 DISK IO - MAIN DISK ROUTINES   16/08/82   R65 ASSEMBLER  PAGE 32
+
+1421  F739- AD 31 03           LDA FILSA1
+1422  F73C- 8D 1A 03           STA FILSA
+1423  F73F- 8D 1C 03           STA FILEA
+1424  F742- AD 32 03           LDA FILSA1+1
+1425  F745- 8D 1B 03           STA FILSA+1
+1426  F748- 18                 CLC
+1427  F749- 6D 16 03           ADC FILSIZ+1
+1428  F74C- 8D 1D 03           STA FILEA+1
+1429  F74F- AD 1C 03           LDA FILEA
+1430  F752- D0 03              BNE *+5
+1431  F754- CE 1D 03           DEC FILEA+1
+1432  F757- CE 1C 03           DEC FILEA
+1433                   *
+1434  F75A- AD 00 03   DRDFIL1 LDA FILTYP
+1435  F75D- 29 7F              AND =$7F
+1436  F75F- C9 42              CMP ='B'        MUST BE BLOCK FILE
+1437  F761- F0 05              BEQ *+7
+1438  F763- A9 05              LDA =5          FILE TYPE ERROR
+1439  F765- 4C FD F5           JMP DISCER1
+1440                   *
+1441  F768- 20 51 F1           JSR PRFLB1
+1442  F76B- 20 48 F5           JSR PREPRW
+1443                   *
+1444  F76E- 20 57 F4   DRDFIL2 JSR READ
+1445  F771- 20 40 F6           JSR INCDATP
+1446  F774- C6 E5              DEC FILCN1
+1447  F776- D0 F6              BNE DRDFIL2
+1448  F778- 20 25 F6           JSR ENDDO
+1449  F77B- 20 A0 F4           JSR TRACK0
+1450  F77E- A9 00              LDA =0
+1451  F780- 60                 RTS
+1452                   *
+1453                   **************************
+1454                   * DWRFIL:STORE DISK FILE *
+1455                   **************************
+1456                   * INPUT: FILDRV,FILNM1,FILCY1,ENTRY,FILSA1
+1457                   * OUTPUT: FILERR
+1458                   *
+1459  F781- 20 51 F6   DWRFIL  JSR PREPWRA
+1460  F784- 8E 11 03           STX FILCYC
+1461  F787- AD 15 03           LDA FILSIZ      SIZE MUST BE FULL
+1462  F78A- F0 16              BEQ DWRFI3      RECORDS
+1463  F78C- EE 16 03           INC FILSIZ+1
+1464  F78F- 49 FF              EOR =$FF
+1465  F791- 38                 SEC
+1466  F792- 6D 1C 03           ADC FILEA
+1467  F795- 8D 1C 03           STA FILEA
+1468  F798- 90 03              BCC *+5
+1469  F79A- EE 1D 03           INC FILEA+1
+1470  F79D- A9 00              LDA =0
+
+----------------------------------------------------------------------
+
+R65 DISK IO - MAIN DISK ROUTINES   16/08/82   R65 ASSEMBLER  PAGE 33
+
+1471  F79F- 8D 15 03           STA FILSIZ
+1472                   *
+1473  F7A2- 20 6D F6   DWRFI3  JSR PREPWRB
+1474  F7A5- 8A                 TXA
+1475  F7A6- CD 16 03           CMP FILSIZ+1
+1476  F7A9- 98                 TYA
+1477  F7AA- E9 00              SBC =0
+1478  F7AC- B0 05              BCS *+7
+1479  F7AE- A9 26              LDA =$26        DISK FULL
+1480  F7B0- 4C FD F5           JMP DISCER1
+1481                   *
+1482  F7B3- AD 31 03           LDA FILSA1
+1483  F7B6- AE 32 03           LDX FILSA1+1
+1484  F7B9- 20 4E F5           JSR PREPRW+6
+1485                   *
+1486  F7BC- 20 25 F4   DWRFI4  JSR WRITE
+1487  F7BF- 20 40 F6           JSR INCDATP
+1488  F7C2- C6 E5              DEC FILCN1
+1489  F7C4- D0 F6              BNE DWRFI4
+1490                   *
+1491  F7C6- AE 7D 03   DWRFI6  LDX SLAST
+1492  F7C9- 8A                 TXA
+1493  F7CA- 29 07              AND =7          LAST ENTRY OF RECORD
+1494  F7CC- 85 E5              STA FILCN1
+1495                   *
+1496  F7CE- 20 81 F5           JSR PUTFENT     STORE THIS ENTRY
+1497  F7D1- AE 7D 03   DWRFI7  LDX SLAST
+1498  F7D4- E8                 INX
+1499  F7D5- 20 ED F4           JSR GETFREC
+1500                   *
+1501  F7D8- 20 EB F5           JSR FILENT
+1502  F7DB- A6 E4              LDX FILCNT
+1503  F7DD- A9 00              LDA =0
+1504  F7DF- 8D 00 03           STA FILTYP      SET NEW END MARK
+1505  F7E2- AD 13 03           LDA FILLOC
+1506  F7E5- 18                 CLC
+1507  F7E6- 6D 16 03           ADC FILSIZ+1
+1508  F7E9- 8D 13 03           STA FILLOC
+1509  F7EC- 90 03              BCC *+5
+1510  F7EE- EE 14 03           INC FILLOC+1
+1511  F7F1- 20 81 F5           JSR PUTFENT     STORE THIS ENTRY
+1512  F7F4- 4C 25 F6           JMP ENDDO
+1513                   *
+1514                   *
+1515                           TIT R65 DISK IO - REFERENCE MAP
+1516                   *
+1517  F7F7-                    END
+LABELS=00D5
+ERRORS=00
+RECORDS=61
+
+
