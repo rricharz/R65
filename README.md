@@ -6,13 +6,25 @@ the system. There is also an emulator for the Raspberry Pi in the R65-Emulator
 folder. The source files for the R65 programs have been tested on the
 emulator.
 
+I have built a fully functional replica 2018 based on a Raspberry Pi.
+
 The original program listings are in the folder Original-Program-Listings.
 
-![Alt text](job.jpg?raw=true "job system") ![Alt text](emulator.jpg?raw=true "emulator")
+Original Job computer built 1977-1979:
+![Alt text](job.jpg?raw=true "job system")
+
+Fully functional replica built 2018:
+![Alt text](replica.jpg?raw=true "replica")
+
+Running pong written in Tiny Pascal:
+![Alt text](replica.jpg?raw=true "screen-1")
+
+The graphic basic interpreter has just been started:
+![Alt text](replica.jpg?raw=true "screen-2")
 
 The R65 computer has been built 1977-1979 by myself together with
 Rudolf Baumann, who has built his own JOB computer at the same time with similar
-hardware. The picture above shows the opened JOB computer. The original
+hardware. The picture above shows the open JOB computer. The original
 R65 computer has not survived. The floppy disks have also not survived.
 
 Most of the original 6502 assembler programs have been written by myself
@@ -34,19 +46,15 @@ These 4 modules run in their original version, with the exception of
 a few minor bug fixes.
 
 The software also includes an extended disk operating system module (EXDOS),
-which has been modified substantially. In this module, the commands allowing
-to manipulate the data on the inherently unreliable floppy disks have been removed.
-They were available in
-the original R65 systems to allow to recover data from broken floppy disks.
-Because the floppy disk emulation of the emulator is reliable, they are not
-required anymore. A number of commands have been added to the emulator version
+which has been modified substantially. A number of commands have been added
+to the emulator version
 of the extended disk operating system module. They allow to import and
 export serial data files to and from the Linux operating system and to
 "change floppy disks". The emulator emulates 2 floppy drives as in the
 original system, but can handle an unlimited number of floppy disks.
 
 The original text editor has not been implemented, because it must be
-considered extremly user unfriendly given todays standards. Instead,
+considered very user unfriendly given todays standards. Instead,
 using the "edit" command of EXDOS, the file to edit is automatically
 exported to the Linux file system, and the Linux text editor "leafpad"
 is called. Once leafpad is quit, the edited file is imported automatically
@@ -60,15 +68,18 @@ The emulator uses a very nice 6502 emulation module written 2011 by
 Mike Chambers (miker00lz@gmail.com). The execution of the 6502 code
 is time accurate, but the emulation of the R65 hardware might cause
 some slight slowdown under certain circumstances. The look and feel and
-speed of the emulated systems is very similar to the original.
+speed of the emulated system is identical to the original.
 
-The original R65 computer also included a basic interpreter, and a "tiny"
-pascal compiler. The R65 Pascal system, which was quite powerfull for
-a 8-bit microprocessor at that time, has now been reconstructed. I'm
-currently working on the reconstruction of the Basic interpreter.
+While the original system used a 8x7 matrix for the character display, I have
+decided to use a high resolution font in the emulation to improve readability.
 
-The manuals had been written in German only, but the OS manual has already
-been translated to English and is available in the Manuals folder.
+The original R65 computer included a basic interpreter, and an improved Tiny
+Pascal compiler. The R65 Pascal system, which was quite powerfull for
+a 8-bit microprocessor at that time, and the Basic interpreter have been reconstructed.
+
+The original manuals had been written in German only, but the most important part has
+been translated to English and is available in the Manuals folder. You should
+find everything you need to install and use the emulator on a Raspberry Pi.
 
 The installation instructions are in the manual.
 
@@ -77,7 +88,8 @@ The following Pascal games have currently been reconstructed:
 - Pong
 - Alien Invasion
 
-Basic games will be made available once the Basic interpreter is ready.
+No Basic games have survived, but I imported a few Basic games from
+http://vintage-basic.net/games.html to test the Basic interpreter.
 
 The contributions in this repository are distributed in the hope that they will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
 Please report any problems or suggestions for improvements to r77@bluewin.ch
