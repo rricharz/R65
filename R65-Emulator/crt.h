@@ -34,7 +34,7 @@
 
 #define MIN_WINDOW_WIDTH    800   // proposed minimal width of main window
 #define MIN_WINDOW_HEIGHT   480   // proposed minimal height of main window
-#define MAX_WINDOW_WIDTH    1358  // proposed max width of main window
+#define MAX_WINDOW_WIDTH    1024  // proposed max width of main window
 #define MAX_WINDOW_HEIGHT   696   // proposed max height of main window
 #define WINDOW_NAME     "R65 Emulator"    // name of main window
 #define ICON_NAME       ""                // path to icon for window
