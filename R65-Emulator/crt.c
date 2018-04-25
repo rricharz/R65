@@ -164,9 +164,13 @@ void infoBar()
     else if (pascalMinFree == 0xFFFF) {
         time_t now = time(NULL);
         char buff[20];
-        strftime(buff,20,"%H%M",localtime(&now));
-        buff[1] |= 0x80;
-        sprintf(s,"%s  %02X", buff, spMin);
+        if (exDisplay) {
+            strftime(buff,20,"%H%M",localtime(&now));
+            buff[1] |= 0x80;
+        }
+        else
+            strftime(buff,20,"%H:%M",localtime(&now));
+        sprintf(s,"%s %02X", buff, spMin);
     }
     else
         sprintf(s,"%05d %02X", pascalMinFree, spMin);
