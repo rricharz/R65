@@ -161,8 +161,13 @@ void infoBar()
     int ledword;
     if (ledword = read6502_16(R16_LED16))
         sprintf(s,"%05d %02X", ledword, spMin);
-    else if (pascalMinFree == 0xFFFF)
-        sprintf(s,"      %02X", spMin);
+    else if (pascalMinFree == 0xFFFF) {
+        time_t now = time(NULL);
+        char buff[20];
+        strftime(buff,20,"%H%M",localtime(&now));
+        buff[1] |= 0x80;
+        sprintf(s,"%s  %02X", buff, spMin);
+    }
     else
         sprintf(s,"%05d %02X", pascalMinFree, spMin);
     if (exDisplay)

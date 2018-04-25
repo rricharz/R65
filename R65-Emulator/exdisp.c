@@ -69,6 +69,7 @@ int segments(char ch)
     case 'U': return(0b00111110); break;
     case '-': return(0b00000001); break;
     case '_': return(0b00001000); break;
+    case '.': return(0b10000000); break;
     default: return(0);
   }
 }
@@ -115,7 +116,7 @@ void led_showstring(char *s, int first)
 {
   int j = 0;
   while ((s[j] != 0) && (j < (8 - first))) {	
-    MAX7219Send(8 - j + first,segments(s[j]));
+    MAX7219Send(8 - j + first,segments(s[j]) | (s[j] & 0x80));
     j++;
   }
 }
