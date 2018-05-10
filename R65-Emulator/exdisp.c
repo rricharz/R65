@@ -16,14 +16,15 @@
 
 // define pins :
 
-#define DATA        0  // GPIO 17 (WiringPi pin num  0)  header pin 11
-#define CLOCK       3  // GPIO 22 (WiringPi pin num  3)  header pin 15
-#define LEDCS       4  // GPIO 23 (WiringPi pin num  4)  header pin 16
-#define BUTTON_DOWN 29 // GPIO 21 (WiringPi pin num 29)  header pin 40
-#define BUTTON_QUIT 22 // GPIO 06 (WiringPi pin num 22)  header pin 31
-#define BUTTON_STOP 21 // GPIO 05 (WiringPi pin num 21)  header pin 29
-#define LED0        27 // GPIO 16 (WiringPi pin num 27)  header pin 36
-#define LED1        23 // GPIO 13 (WiringPi pin num 23)  header pin 33      
+#define DATA          0  // GPIO 17 (WiringPi pin num  0)  header pin 11
+#define CLOCK         3  // GPIO 22 (WiringPi pin num  3)  header pin 15
+#define LEDCS         4  // GPIO 23 (WiringPi pin num  4)  header pin 16
+#define BUTTON_SWITCH 5  // GPIO 24 (WiringPi pin num  5)  header pin 18
+#define BUTTON_DOWN   29 // GPIO 21 (WiringPi pin num 29)  header pin 40
+#define BUTTON_QUIT   22 // GPIO 06 (WiringPi pin num 22)  header pin 31
+#define BUTTON_STOP   21 // GPIO 05 (WiringPi pin num 21)  header pin 29
+#define LED0          27 // GPIO 16 (WiringPi pin num 27)  header pin 36
+#define LED1          23 // GPIO 13 (WiringPi pin num 23)  header pin 33      
 
 
 // The Max7219 Registers :
@@ -124,12 +125,13 @@ void led_showstring(char *s, int first)
 int checkButton(int buttonNumber)
 {
   int button;
-  if ((buttonNumber < 0) || (buttonNumber > 2)) return 1;
+  if ((buttonNumber < 0) || (buttonNumber > 3)) return 1;
   
   switch (buttonNumber) {
-    case 0: button = BUTTON_DOWN; break;
-    case 1: button = BUTTON_QUIT; break;
-    case 2: button = BUTTON_STOP; break;
+    case 0: return digitalRead(BUTTON_SWITCH);
+    case 1: button = BUTTON_DOWN; break;
+    case 2: button = BUTTON_QUIT; break;
+    case 3: button = BUTTON_STOP; break;
     default: return 1;
   }
   if (digitalRead(button) == 0) {
@@ -171,6 +173,8 @@ void init_exdisp(void)
   digitalWrite(LED0, 0);
   digitalWrite(LED1, 0);
   
+  pinMode(BUTTON_SWITCH, INPUT);
+  pullUpDnControl(BUTTON_SWITCH, PUD_UP);
   pinMode(BUTTON_DOWN, INPUT);
   pullUpDnControl(BUTTON_DOWN, PUD_UP);
   pinMode(BUTTON_QUIT, INPUT);

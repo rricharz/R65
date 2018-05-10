@@ -89,13 +89,13 @@ void checkInfoBarButtons()
     checkClick(&x, &y);
     
     if (exDisplay) {
-        if (checkButton(0) == 0) {
+        if (checkButton(1) == 0) {
             QuitProgram(0); // shutdown is handled by service
         }
-        if (checkButton(1) == 0) {
+        if (checkButton(2) == 0) {
             QuitProgram(0);
         }
-        if (checkButton(2) == 0) {
+        if (checkButton(3) == 0) {
             printf("Executing NMI\n");
             pendingNMI = 1;
         }
@@ -164,7 +164,7 @@ void infoBar()
     else if (pascalMinFree == 0xFFFF) {
         time_t now = time(NULL);
         char buff[20];
-        if (exDisplay) {
+        if (exDisplay  && checkButton(0)) {
             strftime(buff,20,"%H%M",localtime(&now));
             buff[1] |= 0x80;
         }
@@ -174,7 +174,7 @@ void infoBar()
     }
     else
         sprintf(s,"%05d %02X", pascalMinFree, spMin);
-    if (exDisplay)
+    if (exDisplay && checkButton(0))
         led_showstring(s, 0);
     else
         Text(NAME_HPOS + LED_HDIST * 2, INFO_HEIGHT - QUIT_VPOS - 3, s, 24, 0);
