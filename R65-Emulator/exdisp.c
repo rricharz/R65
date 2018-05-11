@@ -206,4 +206,6 @@ void quit_exdisp(void)
 {
   led_showstring("        ", 0);
   MAX7219Send(SHUTDOWN, 1);
+  setDriveLed(0, 0);
+  setDriveLed(1, 0);
 }
