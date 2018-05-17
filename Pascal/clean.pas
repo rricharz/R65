@@ -69,6 +69,7 @@ begin
   write('Found ');
   for j:=0 to maxlen do
     write(nametab[16*i3+j]);
+  write('.');
   writeln(hex(cyctab[i3] shr 4),
           hex(cyctab[i3] and 15));
   foundtab[i3]:=true
