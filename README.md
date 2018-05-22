@@ -13,9 +13,6 @@ The original program listings are in the folder Original-Program-Listings.
 Original Job computer built 1977-1979:
 ![Alt text](job.jpg?raw=true "job system")
 
-Original Job computer built 1977-1979:
-![Alt text](job.jpg?raw=true "job system")
-
 The only picture of the original R65 computer available, made early 1978:
 I (left) am demonstrating the R65 computer to Toni Weber (right) from the Swiss toy
 store chain Franz Carl Weber. The keyboard (bottom) and the TV screen (in the back)
