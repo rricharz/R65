@@ -13,8 +13,14 @@ The original program listings are in the folder Original-Program-Listings.
 Original Job computer built 1977-1979:
 ![Alt text](job.jpg?raw=true "job system")
 
-Fully functional replica built 2018:
-![Alt text](replica.jpg?raw=true "replica")
+Original Job computer built 1977-1979:
+![Alt text](job.jpg?raw=true "job system")
+
+The only picture of the original R65 computer available, made early 1978:
+I (left) am demonstrating the R65 computer to Toni Weber (right) from the Swiss toy
+store chain Franz Carl Weber. The keyboard (bottom) and the TV screen (in the back)
+are visible. The very early reaction time test game played used the led's on the front panel.
+ ![Alt text](original.jpg?raw=true "original")
 
 Running pong written in Tiny Pascal:
 ![Alt text](screen-1.jpg?raw=true "screen-1")
