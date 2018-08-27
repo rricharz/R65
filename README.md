@@ -80,6 +80,9 @@ The original R65 computer included a basic interpreter, and an improved Tiny
 Pascal compiler. The R65 Pascal system, which was quite powerfull for
 a 8-bit microprocessor at that time, and the Basic interpreter have been reconstructed.
 
+The basic floating point subroutines of the R65 Pascal system were published in Dr. Dobbs
+Journal, Volume 1, Number 7, August 1976, page 17 by Steve Wozniak.
+
 The original manuals had been written in German only, but the most important part has
 been translated to English and is available in the Manuals folder. You should
 find everything you need to install and use the emulator on a Raspberry Pi.
