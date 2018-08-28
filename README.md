@@ -30,6 +30,15 @@ Rudolf Baumann, who has built his own JOB computer at the same time with similar
 hardware. The picture above shows the open JOB computer. The original
 R65 computer has not survived. The floppy disks have also not survived.
 
+Hardware specifications of the original R65 Computer:
+- 6502 8-bit microprocessor
+- 1 MHz clock speed
+- 17 kByte, 33 kByte, 57 kByte memory (expanded 2 times between 1977 an 1979)
+- 40 x 16 char monochrome display with 2 kByte memory
+- 224 x 118 dot monochrome graphics display (switchable with char display)
+- 2 floppy disk drives. Formatted capacity 199680 bytes each.
+- Interfaces: Teletype, RS232, parallel printer, audio tape, golf-ball typewriter, tv
+
 Most of the original 6502 assembler programs have been written by myself
 1977 - 1980, some of them based on code snippets found in publications.
 They have been modified and improved up to 1982 by Rudolf Baumann
