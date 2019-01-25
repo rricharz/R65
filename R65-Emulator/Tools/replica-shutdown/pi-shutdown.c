@@ -16,6 +16,10 @@
 
 int ledState = 0;
 
+FILE *temperatureFile;
+
+double T;
+
 int main (int argc, char **argv)
 {
 
@@ -25,7 +29,7 @@ int main (int argc, char **argv)
 	wiringPiSetup();
 	pinMode(PIN, INPUT);
 	pullUpDnControl (PIN, PUD_UP);
-         // pinMode(LED, OUTPUT),
+         // pinMode(LED, OUTPUT);
          // digitalWrite(LED, 1);
 
 	do {
@@ -40,10 +44,25 @@ int main (int argc, char **argv)
                                 exit(0);
                         }
 		}
-                // else {
-                //        ledState = !ledState;
-                //         digitalWrite(LED, ledState);
-                // }
+                else {
+                    ledState = !ledState;
+                    //         digitalWrite(LED, ledState)
+                    temperatureFile = fopen(
+                        "/sys/class/thermal/thermal_zone0/temp", "r");
+                    if (temperatureFile != NULL) {
+                        fscanf(temperatureFile, "%lf", &T);
+                        T = T / 1000.0;
+                        char s[64];
+                        if (ledState)
+                            sprintf(s,"/home/pi/bin/max7219 'Pi65 %2.0fC'", T);
+                        else
+                            sprintf(s,"/home/pi/bin/max7219 'Pi65-%2.0fC'", T);
+                        printf("%s\n",s);
+                        system(s);
+                    }
+                    fclose (temperatureFile);
+                }
+                
 		delay(1000);
 	}
 	while (1);

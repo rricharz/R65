@@ -13,6 +13,8 @@
 
 #include "main.h"
 
+#define NOEXPDISPLAY 1    // standard is no external display
+
 
 // define pins :
 
@@ -164,6 +166,11 @@ void init_exdisp(void)
       exDisplay = 0;
       return;
   }
+  if (NOEXPDISPLAY == 1) {
+      exDisplay = 0;
+      return;
+  }
+  
   
   for (int i = 0; i < 3; i ++)
       buttonDebounce[i] = 0;
