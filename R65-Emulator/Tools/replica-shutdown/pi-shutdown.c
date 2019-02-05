@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 #define PIN 29       // pin 40, wiring pi 29
+#define SWITCH 5     // pin 18, wiring pi 5
 //#define LED 26       // pin 32, wiring pi 26
 
 int ledState = 0;
@@ -29,6 +30,8 @@ int main (int argc, char **argv)
 	wiringPiSetup();
 	pinMode(PIN, INPUT);
 	pullUpDnControl (PIN, PUD_UP);
+        pinMode(SWITCH, INPUT);
+	pullUpDnControl (SWITCH, PUD_UP);
          // pinMode(LED, OUTPUT);
          // digitalWrite(LED, 1);
 
@@ -44,7 +47,7 @@ int main (int argc, char **argv)
                                 exit(0);
                         }
 		}
-                else {
+                else if (digitalRead(SWITCH) != 0){
                     ledState = !ledState;
                     //         digitalWrite(LED, ledState)
                     temperatureFile = fopen(

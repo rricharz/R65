@@ -164,19 +164,19 @@ void infoBar()
     else if (pascalMinFree == 0xFFFF) {
         time_t now = time(NULL);
         char buff[20];
-//        if (exDisplay) {
-//            strftime(buff,20,"%H%M",localtime(&now));
-//            buff[1] |= 0x80;
-//        }
-//        else
+        if (exDisplay) {
+            strftime(buff,20,"%H%M",localtime(&now));
+            buff[1] |= 0x80;
+        }
+        else
             strftime(buff,20,"%H:%M",localtime(&now));
         sprintf(s,"%s %02X", buff, spMin);
     }
     else
         sprintf(s,"%05d %02X", pascalMinFree, spMin);
-//    if (exDisplay)
-//        led_showstring(s, 0);
-//    else
+    if (exDisplay)
+        led_showstring(s, 0);
+    else
         Text(NAME_HPOS + LED_HDIST * 2, INFO_HEIGHT - QUIT_VPOS - 3, s, 24, 0);
 }
 
