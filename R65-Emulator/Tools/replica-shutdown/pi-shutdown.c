@@ -57,16 +57,16 @@ int main (int argc, char **argv)
                         T = T / 1000.0;
                         char s[64];
                         if (ledState)
-                            sprintf(s,"/home/pi/bin/max7219 'Pi65 %2.0fC'", T);
+                            sprintf(s,"/home/pi/bin/max7219 'Pi-65 %2.0f'", T);
                         else
-                            sprintf(s,"/home/pi/bin/max7219 'Pi65-%2.0fC'", T);
+                            sprintf(s,"/home/pi/bin/max7219 'Pi 65 %2.0f'", T);
                         printf("%s\n",s);
                         system(s);
                     }
                     fclose (temperatureFile);
                 }
                 
-		delay(1000);
+		delay(500);
 	}
 	while (1);
 }
