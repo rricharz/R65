@@ -2,7 +2,7 @@
 // pi-shutdown.c
 // Version for R65 Replica
 //
-// Without LED heartbeat
+// Without LED heartbeat:
 //   LED heartbeat is handled by the kernel
 //   put the following line at the end of
 //   /boot/config.txt:
@@ -29,7 +29,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#define PIN 29       // pin 40, wiring pi 29
+#define PIN     29      // pin 40, wiring pi 29
+#define REDLED1 27      // pin 36, wiring pi 27
+#define REDLED2 23      // pin 33, wiring pi 23
 
 FILE *temperatureFile;
      
@@ -62,6 +64,19 @@ int *parser_result(const char *buf, int size){
 	return ret;
 }
 
+int blinkForOneSecond(int usage) {
+// blink for one second, rate based on usage
+    int n = (usage / 10) + 1;
+    int d = 500 / n;
+    for (int i = 0; i < n; i++) {
+        digitalWrite(REDLED1, 1);
+        digitalWrite(REDLED2, 0);
+        delay(d);
+        digitalWrite(REDLED1, 0);
+        digitalWrite(REDLED2, 1);
+        delay(d);
+    }
+}
 
 
 int main (int argc, char **argv)
@@ -78,14 +93,19 @@ int main (int argc, char **argv)
 	wiringPiSetup();
 	pinMode(PIN, INPUT);
 	pullUpDnControl (PIN, PUD_UP);
+        pinMode(REDLED1, OUTPUT);
+        pinMode(REDLED2, OUTPUT);
+        digitalWrite(REDLED1, 0);
+        digitalWrite(REDLED1, 0);
 
 	do {
 		if (digitalRead(PIN) == 0) {
-			printf("Shutting down...\n");
                         delay(1000);
                         if (digitalRead(PIN) == 0) {
                                 // digitalWrite(LED, 1);
                                 system("/home/pi/bin/max7219 'PI OFF'");
+                                digitalWrite(REDLED1, 0);
+                                digitalWrite(REDLED1, 0);
                                 delay(100);
                                 system("shutdown -h now");
                                 exit(0);
@@ -109,7 +129,6 @@ int main (int argc, char **argv)
 		        int diff_idle = idle-prev_idle;
 		        int diff_total = total-prev_total;
 		        usage = (double)(((double)(1000*(diff_total-diff_idle))/(double)diff_total+5)/(double)10);
-                        printf("\r%%%6.2f", usage);
 		        fflush(stdout);
                     }
                     else {
@@ -138,12 +157,11 @@ int main (int argc, char **argv)
                     char s[64];
                     sprintf(s,"/home/pi/bin/max7219 'PI %02.0f %02.0f'",
                         usage, T);
-                    printf("%s\n",s);
                     system(s);
+                    blinkForOneSecond((int)usage);
                 
                 }
-                
-		delay(1000);
+                else delay(1000);
 	}
 	while (1);
 }
