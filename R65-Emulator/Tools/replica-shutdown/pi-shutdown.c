@@ -30,14 +30,9 @@
 #include <unistd.h>
 
 #define PIN 29       // pin 40, wiring pi 29
-#define SWITCH 5     // pin 18, wiring pi 5
-
-int ledState = 0;
 
 FILE *temperatureFile;
      
-int switchIsSet;
-
 double T;
 
 int *parser_result(const char *buf, int size){
@@ -83,10 +78,6 @@ int main (int argc, char **argv)
 	wiringPiSetup();
 	pinMode(PIN, INPUT);
 	pullUpDnControl (PIN, PUD_UP);
-        pinMode(SWITCH, INPUT);
-	pullUpDnControl (SWITCH, PUD_UP);
-        
-        switchIsSet = 0;
 
 	do {
 		if (digitalRead(PIN) == 0) {
@@ -100,10 +91,9 @@ int main (int argc, char **argv)
                                 exit(0);
                         }
 		}
-                else if (digitalRead(SWITCH) != 0){
-                    ledState = !ledState;
-                    switchIsSet = 1;
-                    
+                
+                else if (system("pidof -x emulator >/dev/null") != 0) {
+                
                     size = read(fd, buf, sizeof(buf));
                     if(size > 0) {
 
@@ -146,21 +136,13 @@ int main (int argc, char **argv)
                     else T = 0.0;
                 
                     char s[64];
-                    if (ledState)
-                        sprintf(s,"/home/pi/bin/max7219 'PI %02.0f %02.0f'",
-                            usage, T);
-                    else
-                        sprintf(s,"/home/pi/bin/max7219 'PI %02.0f-%02.0f'",
-                            usage, T);
+                    sprintf(s,"/home/pi/bin/max7219 'PI %02.0f %02.0f'",
+                        usage, T);
                     printf("%s\n",s);
                     system(s);
                 
                 }
-                else if (switchIsSet) {
-                    switchIsSet = 0;
-                    system ("/home/pi/bin/max7219 '        '");
-                        
-                }              
+                
 		delay(1000);
 	}
 	while (1);
