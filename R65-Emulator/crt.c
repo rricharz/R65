@@ -162,18 +162,23 @@ void infoBar()
     if (ledword = read6502_16(R16_LED16))
         sprintf(s,"%05d %02X", ledword, spMin);
     else if (pascalMinFree == 0xFFFF) {
-        time_t now = time(NULL);
         char buff[20];
-        if (exDisplay) {
-            strftime(buff,20,"%H%M",localtime(&now));
-            buff[1] |= 0x80;
-        }
-        else
-            strftime(buff,20,"%H:%M",localtime(&now));
-        sprintf(s,"%s %02X", buff, spMin);
+        sprintf(buff,"%04X",pc);
+        sprintf(s,"%s  %02X", buff, spMin);
     }
-    else
-        sprintf(s,"%05d %02X", pascalMinFree, spMin);
+    else {
+        if (exDisplay) {
+            sprintf(s,"%05d%03d",
+                (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),
+                pascalMinFree >> 8);
+            s[4] += 128;  // dot
+        }
+        else {
+            sprintf(s,"%05d.%03d",
+                (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),
+                pascalMinFree >> 8);
+        }
+    }
     if (exDisplay)
         led_showstring(s, 0);
     else

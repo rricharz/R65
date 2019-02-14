@@ -1460,6 +1460,7 @@ begin { *** body of factor *** }
                       code3(35,2*t3[idpnt]+2);
                       idpnt:=prec(idpnt);
                       prcall(idpnt); scan;
+		      restype:=low(t0[idpnt]);
                       idpnt:=succ(idpnt);
                       arsize3:=t3[idpnt]
                     end
