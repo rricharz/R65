@@ -81,10 +81,9 @@ a KIM-1 emulator. Only the KIM-1 hardware required for the operation of the
 R65 computer system is emulated in the emulator.
 
 The emulator uses a very nice 6502 emulation module written 2011 by
-Mike Chambers (miker00lz@gmail.com). The execution of the 6502 code
-is time accurate, but the emulation of the R65 hardware might cause
-some slight slowdown under certain circumstances. The look and feel and
-speed of the emulated system is identical to the original.
+Mike Chambers (miker00lz@gmail.com). The look and feel and
+speed of the emulated system is very similar to the original. Floppy
+disk access is much faster
 
 While the original system used a 8x7 matrix for the character display, I have
 decided to use a high resolution font in the emulation to improve readability.
