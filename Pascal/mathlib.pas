@@ -99,12 +99,12 @@ begin
   while m<1.0 do begin
     e:=e-1; m:=10.0*m;
   end;
-  m:=m+0.0005; { round }
+  m:=m+0.00005; { round }
   if m>=10.0 then begin
     e:=e+1; m:=m/10.0;
   end;
   write(@f,sign,trunc(m),'.');
-  for i:=1 to 3 do begin
+  for i:=1 to 4 do begin
     m:=10.0*(m-conv(trunc(m)));
     write(@f,trunc(m));
   end;
@@ -135,7 +135,7 @@ begin
     sign:='-'; m:=-m;
   end;
   m:=m+rnd; { round }
-  if m>=max then writeflo(f,r)
+  if m>(max+rnd) then writeflo(f,r)
   else begin
     if m<2.0*rnd then sign:=' ';
     write(@f,sign,trunc(m));
