@@ -429,10 +429,21 @@ proc setval;
 var r: real;
     n,n1: integer;
     ems: boolean;
+
+  func times10(r:real):real;
+  { slightly more accurate than 10.0*r }
+  var r2,r4:real;
+  begin
+    r2:=r+r;
+    r4:=r2+r2;
+    times10:=r2+r4+r4;
+  end;
+
 begin
   r:=0.0;
   repeat
-    r:=10.0*r+conv(ord(ch)-ord('0'));
+    {r:=10.0*r+conv(ord(ch)-ord('0'));}
+    r:=times10(r)+conv(ord(ch)-ord('0'));
     getchr;
   until (ch<'0') or (ch>'9');
   if ch<>'.' then begin {numeric integer}
@@ -442,7 +453,8 @@ begin
   else begin {numeric real}
     n:=0; getchr;
     while (ch<='9') and (ch>='0') do begin
-      r:=r*10.0+conv(ord(ch)-ord('0'));
+      {r:=r*10.0+conv(ord(ch)-ord('0'));}
+      r:=times10(r)+conv(ord(ch)-ord('0'));
       n:=prec(n); getchr
     end;
     if ch='e' then begin
@@ -463,7 +475,9 @@ begin
       end
     end;
     while n>0 do begin
-      n:=prec(n); r:=r*10.0
+      n:=prec(n);
+      {r:=r*10.0;}
+      r:=times10(r);
     end;
     while n<0 do begin
       n:=succ(n); r:=0.1*r;
@@ -1460,7 +1474,7 @@ begin { *** body of factor *** }
                       code3(35,2*t3[idpnt]+2);
                       idpnt:=prec(idpnt);
                       prcall(idpnt); scan;
-		      restype:=low(t0[idpnt]);
+                      restype:=low(t0[idpnt]);
                       idpnt:=succ(idpnt);
                       arsize3:=t3[idpnt]
                     end
