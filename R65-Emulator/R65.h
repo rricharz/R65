@@ -4,7 +4,8 @@
 
 #define R8_EMUCOM   0x1430      // Command register
 #define R8_EMURES   0x1431      // Result register
-#define R16_LED16   0x1432      // LED register
+#define R16_LEDA    0x1432      // LEDA register
+#define R16_LEDB    0x1434      // LEDB register
 #define R16_PPC     0x000A      // Pascal program pounter
 #define R16_STPROG  0x0011      // Pascal start of program
 

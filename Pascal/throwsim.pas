@@ -13,12 +13,12 @@ var angle,speed,xspeed,yspeed: real;
 begin
   grinit;
   cleargr;
-  speed:=1.0;
+  speed:=1.;
   for i:=1 to 11 do begin
     angle:=7.5*conv(i);
     xspeed:=speed*cos(angle);
     yspeed:=speed*sin(angle);
-    x:=0.0; y:=0.0;
+    x:=0.; y:=0.;
     repeat
       if (trunc(y)<ysize) then
         plot(trunc(x),trunc(y),white);

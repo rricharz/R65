@@ -13,13 +13,13 @@ begin
   move(0,ysize div 2);
   draw(xsize,ysize div 2,white);
   for x:=0 to xsize do begin
-    a:=conv(x)*360.0/conv(xsize);
+    a:=conv(x)*360./conv(xsize);
     b:=sin(a);
     y:=trunc(b*conv(ysize)/2.1)+(ysize div 2);
     plot(x,y,white);
   end;
   for x:=0 to xsize do begin
-    a:=conv(x)*360.0/conv(xsize);
+    a:=conv(x)*360./conv(xsize);
     b:=cos(a);
     y:=trunc(b*conv(ysize)/2.1)+(ysize div 2);
     plot(x,y,white);

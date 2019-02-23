@@ -20,7 +20,7 @@ uses syslib,mathlib;
 
 var ch: char;
     r: real;
-    stop: boolean;
+    stop,dotused: boolean;
 
 { end of modified mathlib functions }
 
@@ -95,11 +95,13 @@ begin
 
   sign:=' ';
   m:=r;
-  if m<0.0 then begin
+  if m<0. then begin
     sign:='-'; m:=-m;
   end;
 
-  if m=0.0 then
+  if dotused then
+    writeflo(f,r)
+  else if m=0. then
     begin
       write(@f,' 0',tab8,tab8);
       writehex(f,0);
@@ -119,15 +121,15 @@ begin
     writeflo(f,r)
   else begin
 
-    if m>=10000.0 then
+    if m>=10000. then
       begin d1:=0; rnd:=0.5 end
-    else if m>=1000.0 then
+    else if m>=1000. then
       begin d1:=1; rnd:=0.05 end
-    else if m>=100.0 then
+    else if m>=100. then
       begin d1:=2; rnd:=0.005 end
-    else if m>=10.0 then
+    else if m>=10. then
       begin d1:=3; rnd:=0.0005 end
-    else if m>=1.0 then
+    else if m>=1. then
       begin d1:=4; rnd:=0.00005 end
     else if m>=0.1 then
       begin d1:=5; rnd:=0.000005 end
@@ -140,7 +142,7 @@ begin
     m1:=m-conv(trunc(m));
     if d1>0 then write(@f,'.');
     for i1:=1 to d1 do begin
-      m1:=10.0*m1;
+      m1:=10.*m1;
       write(@f,trunc(m1));
       m1:=m1-conv(trunc(m1));
     end;
@@ -181,7 +183,7 @@ var negative:boolean;
     i,iv: integer;
 begin
   negative:=false;
-  rf:=0.0;
+  rf:=0.;
   read(@input,ch);
   if ch='(' then
     begin
@@ -235,13 +237,14 @@ begin
             end;
           if ch='.' then
             begin
+              dotused:=true;
               read(@input,ch);
-              rt:=0.1;  {compiler bug}
+              rt:=0.1;
               while isnumber(ch) do
                 begin
                   rf:=rf+conv(ord(ch)-
                     ord('0'))*rt;
-                  rt:=rt/10.0;
+                  rt:=rt/10.;
                   read(@input,ch);
                 end;
             end;
@@ -283,18 +286,22 @@ end;
 
 begin {main body}
   writeln('Enter an expression, examples are:');
-  writeln('32767');
-  writeln('$FFF');
-  writeln('%1101');
-  writeln('-55.35');
-  writeln('2*(5+28)');
-  writeln('<return> to exit');
-  r:=0.0;
+  writeln('32767     input decimal number');
+  writeln('88.       force scientific display');
+  writeln('$FFF      input hex number');
+  writeln('%1101     input binary number');
+  writeln('-55.35    input negative number');
+  writeln('2*(5+28)  expression +,-,*,/,()');
+  writeln('<return>  exit');
+  writeln('hex and binary numbers are truncated');
+  r:=0.;
+  dotused:=false;
   repeat
     stop:=true;
     write(invvid);
     writeauto(output,r);
     writeln(norvid);
+    dotused:=false;
     r:=express;
     checkfor(cr);
   until stop;
