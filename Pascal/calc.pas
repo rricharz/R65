@@ -260,27 +260,33 @@ var
   rs: real;
 begin
   rs:=factor;
-  case ch of
-    '*': begin
-           rs:=rs*factor;
-         end;
-    '/': begin
-           rs:=rs/factor;
-         end
-  end {case};
+  while (ch='*') or (ch='/') do
+    begin
+      case ch of
+        '*': begin
+               rs:=rs*factor;
+             end;
+        '/': begin
+               rs:=rs/factor;
+             end
+      end {case};
+    end;
   simexp:=rs;
 end;
 
 begin {body of express}
   re:=simexp;
-  case ch of
-    '+': begin
-           re:=re+simexp;
-         end;
-    '-': begin
-           re:=re-simexp;
-         end
-  end {case};
+  while (ch='+') or (ch='-') do
+    begin
+      case ch of
+        '+': begin
+               re:=re+simexp;
+             end;
+        '-': begin
+               re:=re-simexp;
+             end
+      end {case};
+    end;
   express:=re;
 end;
 
@@ -293,7 +299,6 @@ begin {main body}
   writeln('-55.35    input negative number');
   writeln('2*(5+28)  expression +,-,*,/,()');
   writeln('<return>  exit');
-  writeln('hex and binary numbers are truncated');
   r:=0.;
   dotused:=false;
   repeat
