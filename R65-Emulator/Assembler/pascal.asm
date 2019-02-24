@@ -615,7 +615,7 @@ CALA1   JMP (ACCU)
 *****************
 *
 RLIN    JSR GETLIN
-        BCS RLINESC	IF ESC
+        BCS RLINESC     IF ESC
         LDX =0
         LDA (VIDPNT),Y
         AND =$7F
@@ -638,7 +638,7 @@ RLIN    JSR GETLIN
         BYT $D,$8A
         RTS
 *
-RLINESC	JMP STOP	ESCAPE
+RLINESC JMP STOP        ESCAPE
 *
 * P-CODE 1B: GETC
 *****************
@@ -1463,13 +1463,19 @@ FEQU    JSR TESTF
 FALSE   LDX =0
         STX ACCU
         STX ACCU+1
-        JMP DECS2
+DECS6   LDA SP
+        SEC
+        SBC =6
+        STA SP
+        BCS *+4
+        DEC SP+1
+        RTS
 *
 TRUE    LDX =1
         STX ACCU
         DEX
         STX ACCU+1
-        JMP DECS2
+        JMP DECS6
 *
 TESTF   JSR GETFLP2
         JSR FSUB

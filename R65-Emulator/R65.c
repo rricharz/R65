@@ -207,7 +207,7 @@ uint8_t read6502(uint16_t address)
                 memory[0x1],memory[0x0],memory[0x9],memory[0x8],memory[0xb],memory[0xa],
                 memory[0x1a],memory[0x19],memory[0x18],memory[0x17]);
         }
-    }*/
+    } */
     
     // optimization for speed, only check addresses in the io area
     // otherwise return right away
@@ -412,6 +412,14 @@ void write6502(uint16_t address, uint8_t value)
     else if ((address >= R8_FDCOM) && (address <= R8_FDDAT)) {
         memory[address] = value;
         fdc_write(address, value);
+        return;
+    }
+    
+    // 7 segment led display register
+    
+    else if ((address >= R16_LEDA) && (address <= R16_LEDB)) {
+        memory[address] = value;
+        global_pendingCrtUpdate = 1;
         return;
     }
     
