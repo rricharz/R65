@@ -11,9 +11,18 @@
 
    Written 2019 by rricharz to demonstate
    R65 Pascal capabilities.
+
+   The following operators are allowed:
+
+     +,-       prefix for decimal input
+     +,-,*,/   arithmetic operators
+     ()        brackets
+     |,&       bitwise operators
+     <<,>>     bitwise shift operators
+
+     $XX..     hex numeric input
+     %XX..     binary numeric input
 }
-
-
 
 program calc;
 uses syslib,mathlib;
@@ -22,18 +31,38 @@ var ch: char;
     r: real;
     stop,dotused: boolean;
 
-{ end of modified mathlib functions }
+func fix(rf: real): integer;
+{**************************}
+begin
+  if (rf>32767.5) then
+    begin
+      write(invvid,'Integer value exceeds');
+      write(' upper limit, set to 32767');
+      writeln(norvid);
+      fix:=$7fff;
+    end
+  else if (rf<-32768.5) then
+    begin
+      write(invvid,'Integer value exceeds');
+      write(' lower limit, set to -32768');
+      writeln(norvid);
+      fix:=$8000;
+    end
+  else
+    fix:=trunc(rf);
+end;
 
 proc checkfor(c: char);
+{*********************}
 begin
   if ch<>c then
     begin
-      write('SYNTAX ERROR: expected ');
+      write(invvid,'SYNTAX ERROR: expected ');
       if c=cr then write('<eol>')
       else write(c);
       write(' but found ');
-      if ch=cr then writeln('<eol>')
-      else writeln(ch);
+      if ch=cr then writeln('<eol>',norvid)
+      else writeln(ch,norvid);
     end;
 end;
 
@@ -163,7 +192,7 @@ func binval: integer;
 begin
   if (ch='0') then binval:=0
   else if (ch='1') then binval:=1
-  else binval:=-1
+  else binval:=-1;
 end;
 
 func hexval: integer;
@@ -173,7 +202,7 @@ begin
     then hexval:=ord(ch)-ord('0')
   else if (ch>='A') and (ch<='F')
     then hexval:=ord(ch)-ord('A')+10
-  else hexval:=-1
+  else hexval:=-1;
 end;
 
 func factor:real;
@@ -260,7 +289,9 @@ var
   rs: real;
 begin
   rs:=factor;
-  while (ch='*') or (ch='/') do
+  while (ch='*') or (ch='/')
+       or (ch='&') or (ch='<')
+       or (ch='>') do
     begin
       case ch of
         '*': begin
@@ -268,15 +299,33 @@ begin
              end;
         '/': begin
                rs:=rs/factor;
+             end;
+        '&': begin
+               rs:=conv(fix(rs) and
+                     fix(factor));
+             end;
+        '<': begin
+               read(@input,ch);
+               checkfor('<');
+               rs:=conv(fix(rs) shl
+                     fix(factor));
+             end;
+        '>': begin
+               read(@input,ch);
+               checkfor('>');
+               rs:=conv(fix(rs) shr
+                     fix(factor));
              end
       end {case};
     end;
   simexp:=rs;
 end;
 
-begin {body of express}
+{********body of express********}
+begin
   re:=simexp;
-  while (ch='+') or (ch='-') do
+  while (ch='+') or (ch='-') or
+            (ch='|') do
     begin
       case ch of
         '+': begin
@@ -284,21 +333,27 @@ begin {body of express}
              end;
         '-': begin
                re:=re-simexp;
+             end;
+        '|': begin
+               re:=conv(fix(re) or
+                     fix(factor));
              end
       end {case};
     end;
   express:=re;
 end;
 
-begin {main body}
+{*********main body********}
+begin
   writeln('Enter an expression, examples are:');
   writeln('32767     input decimal number');
   writeln('88.       force scientific display');
   writeln('$FFF      input hex number');
   writeln('%1101     input binary number');
   writeln('-55.35    input negative number');
-  writeln('2*(5+28)  expression +,-,*,/,()');
+  writeln('2*(5+28)');
   writeln('<return>  exit');
+  writeln('operators: +,-,*,/,(),&,|,<<,>>');
   r:=0.;
   dotused:=false;
   repeat
