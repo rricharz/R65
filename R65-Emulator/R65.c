@@ -417,7 +417,7 @@ void write6502(uint16_t address, uint8_t value)
     
     // 7 segment led display register
     
-    else if ((address >= R16_LEDA) && (address <= R16_LEDB)) {
+    else if ((address >= RS8_LED) && (address <= (RS8_LED+8))) {
         memory[address] = value;
         global_pendingCrtUpdate = 1;
         return;

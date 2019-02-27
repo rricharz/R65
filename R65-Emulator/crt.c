@@ -158,11 +158,10 @@ void infoBar()
     
     // show spMin and pascalMinFree
     char s[16];
-    if (read6502_16(R16_LEDA) || read6502_16(R16_LEDB)) {
-        sprintf(s,"%04X%04X", read6502_16(R16_LEDA), 
-                                read6502_16(R16_LEDB));
-        if (exDisplay)
-            s[3] += 128;  // dot
+    if (read6502_8(RS8_LED)) {
+        for (int i=0; i<8; i++)
+          s[i]=read6502_8(RS8_LED+i);
+        s[8]=0;
     }
     else if (pascalMinFree == 0xFFFF) {
         char buff[20];
