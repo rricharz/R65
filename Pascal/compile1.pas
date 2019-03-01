@@ -42,8 +42,6 @@ usage:
                  n: no loader file
   [] means not required                     }
 
-
-
 program compile1;
 
 uses syslib, arglib;
@@ -280,15 +278,8 @@ begin
     ch:=' '
   end {if}
   else if ch=eof then begin
-    if fipnt>0 then begin
-      close(fno);
-      fno:=filstk[fipnt];
-      fipnt:=fipnt-1;
-      getchr
-    end else begin
-      writeln('Illegal eof');
-      abort
-    end
+    writeln('Illegal eof');
+    abort
   end {else if}
   else write(ch)
   if ch='}' then write(norvid);
@@ -442,7 +433,6 @@ var r: real;
 begin
   r:=0.0;
   repeat
-    {r:=10.0*r+conv(ord(ch)-ord('0'));}
     r:=times10(r)+conv(ord(ch)-ord('0'));
     getchr;
   until (ch<'0') or (ch>'9');
@@ -453,7 +443,6 @@ begin
   else begin {numeric real}
     n:=0; getchr;
     while (ch<='9') and (ch>='0') do begin
-      {r:=r*10.0+conv(ord(ch)-ord('0'));}
       r:=times10(r)+conv(ord(ch)-ord('0'));
       n:=prec(n); getchr
     end;
@@ -476,7 +465,6 @@ begin
     end;
     while n>0 do begin
       n:=prec(n);
-      {r:=r*10.0;}
       r:=times10(r);
     end;
     while n<0 do begin
@@ -501,24 +489,6 @@ end {setid};
 begin { ***** body of scan ***** }
   count:=1; while ch=' ' do getchr;
   tpos:=curpos;
-
-{  if ch='!' then             next source file
-    if fipnt>=maxfi then begin
-       error(18); scan
-    end
-    else begin
-      getchr; scan;
-      if token<>'id' then merror(2,'id');
-      for i1:=0 to 7 do name[i1]:=ident[i1+1];
-      fipnt:=fipnt+1;
-      filstk[fipnt]:=fno;
-      setfile(name&'        ',0,0,'S');
-      write(prtof);
-      openr(fno);
-      clrf;
-      If prt then write(pon);
-        while ch=' ' do getchr;
-    end; }
 
   if (ch<'a') or (ch>'z') then begin {main if}
     if (ch<'0') or (ch>'9') then begin {symb}
@@ -658,11 +628,7 @@ proc testtype(ttype: char);
 begin
   if restype<>ttype then
     if (restype<>'u') and (ttype<>'u') then
-    begin
-      {*writeln(invvid,'restype=',restype,}
-      {*  ',ttype=',ttype,norvid);}
       error(14);
-    end;
 end;
 
 { * find ident *    (of block) }
@@ -675,10 +641,6 @@ var k,i: integer;
     debugch: char;
 
 begin
-
-  {* writeln; }
-  {* write(invvid,'find ident '); }
-  {* for i:=1 to 8 do write(ident[i]); }
 
   i:=1; k:=8*spnt+9; id1:=ident[1];
 
@@ -694,13 +656,9 @@ begin
     until (i>8) or (k<=0);
   if k<=0 then begin
     findid:=0;
-    {* write(invvid,', not found',norvid); }
   end
-  else begin
+  else
     findid:=(k-1) shr 3;
-    {* writeln(invvid,'found, k=',
-    {*     k shr 3,norvid); }
-  end
 end;
 
 { * code1 *      (of block) }
@@ -749,10 +707,6 @@ var i,addr: integer;
 begin
   if spnt>symbsize then error(7)
   else spnt:=succ(spnt);
-  {* writeln; }
-  {* write(invvid,'putsym ',spnt,':'); }
-  {* for i:=1 to 8 do write(ident[i]); }
-  {* writeln(norvid); }
   if spnt>spntmax then spntmax:=spnt;
   t0[spnt]:=packed(ltyp1,ltyp2);
   t3[spnt]:=0;
@@ -788,9 +742,6 @@ begin
   end else begin
     sign:='+'; if token=' +' then scan
   end;
-  {* writeln; }
-  {* writeln(invvid,'getcon1:',token,
-  {*     ' ',norvid); }
   case token of
     'nu': val:=value[0];
     'ru': begin val:=value[0];
@@ -829,9 +780,6 @@ begin
       end
     end
   end {case};
-  {* writeln; }
-  {* writeln(invvid,'getcon2:',restype,
-  {*     ',',sign,val,norvid); }
   if sign='-' then
     case restype of
       'i': getcon:=-val;
@@ -898,7 +846,7 @@ begin
     'fl': typ2:='f'
     else begin error(11); typ2:='i';end
   end {case}
-end{gettype};
+end {gettype};
 
 { * variable *        ( of block) }
 
@@ -1268,10 +1216,6 @@ begin {body of prcall}
     end;
     testto(' )');
   end {then};
-  {*writeln;}
-  {*write(invvid,'prcall:l=',level-t1[idpn1]);}
-  {*writeln(',idpn1=',idpn1,',a=',}
-  {*    t2[idpn1],norvid);}
   code4(43,level-t1[idpn1],t2[idpn1]);
   if t3[idpn1]<>0 then begin
     n:=0; i:=bstack+numpar;
@@ -1389,9 +1333,6 @@ begin { *** body of factor *** }
             idpnt:=findid;
             if idpnt=0 then error(5);
             restype:=low(t0[idpnt]);
-            {* writeln; }
-            {* writeln(invvid,'Factor ',
-            {*     t0[idpnt],norvid); }
             case high(t0[idpnt]) of
               'v','w','d':
                     begin code4(39,
@@ -1407,8 +1348,6 @@ begin { *** body of factor *** }
                         index(true); code1($03);
                         code1($17)
                       end else begin
-                        {*writeln(invvid,}
-                        {*'f1',norvid);}
                         error(16)
                       end
                     end;
@@ -1772,11 +1711,9 @@ begin {assign}
       if vartyp2='i' then error(16);
       testto(':='); scan;
       if relad=3 then begin
-        {*writeln(invvid,'a1',norvid);}
         arrayexp(1,vartype); relad:=1;
         code1($53);
         if vartyp2='n' then begin
-          {*writeln(invvid,'a2',norvid);}
           code1($3f);
           code3($22,1);code1($12);
           code3($22,t2[idpnt]+2);
@@ -1786,10 +1723,8 @@ begin {assign}
             2*t2[idpnt]+2);
         code2($3c,1)
       end else begin
-        {*writeln(invvid,'a3',norvid);*}
         arrayexp(t3[idpnt],vartype);
         if vartyp2='n' then begin
-        {*writeln(invvid,'a4',norvid);*}
           code3($22,t2[idpnt]+2*t3[idpnt]);
           code1($3e);
         end else
@@ -2119,19 +2054,10 @@ var i,j,sav1: integer;
   var ii,i9: integer;
   begin {compare}
     ii:= 0;
-    {*writeln;}
-    {*write(invvid,'Found:start=',}
-    {*    start,', ident=');}
-    {*for i9:=0 to 7 do}
-    {*  write(ident[i9]);}
-    {*write(',s=');}
-    {*for i9:=0 to 7 do}
-    {*  write(idtab[start+i9]);}
     repeat
       ii:=succ(ii);
     until (ii >= 8) or
       (ident[ii] <> idtab[start+ii]);
-    {*writeln(',ii=',ii,norvid);}
     found:=(ii >= 8);
   end {compare};
 
@@ -2243,16 +2169,10 @@ var i,j,num: integer;
 
 begin
   writeln(@ofno,spnt,',',pc+2);
-  {*write(invvid,}
-  {*     'Saving library idents:spnt=');}
-  {*writeln(spnt,',pc+2=',pc+2);}
   for i:=1 to spnt do begin {for every entry }
-    {*write(invvid);}
     for j:=1 to 8 do begin
       write(@ofno,idtab[8*i+j])
-      {*write(idtab[8*i+j])}
     end;
-    {*writeln(norvid);}
     writeln(@ofno,',',t0[i],',',t1[i],',',
       t2[i],',',t3[i]);
     vtype1:=high(t0[i]);
