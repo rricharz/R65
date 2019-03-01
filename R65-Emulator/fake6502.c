@@ -1,6 +1,8 @@
 /* Fake6502 CPU emulator core v1.1 *******************
  * (c)2011 Mike Chambers (miker00lz@gmail.com)       *
  *****************************************************
+ * modified 2019 by rricharz, timing code removed    *
+ *****************************************************
  * v1.1 - Small bugfix in BIT opcode, but it was the *
  *        difference between a few games in my NES   *
  *        emulator working and being broken!         *
@@ -55,11 +57,6 @@
  * void with no parameters expected to be passed to  *
  * it.                                               *
  *                                                   *
- * This can be very useful. For example, in a NES    *
- * emulator, you check the number of clock ticks     *
- * that have passed so you can know when to handle   *
- * APU events.                                       *
- *                                                   *
  * To pass Fake6502 this pointer, use the            *
  * hookexternal(void *funcptr) function provided.    *
  *                                                   *
@@ -69,10 +66,6 @@
  *                                                   *
  * void reset6502()                                  *
  *   - Call this once before you begin execution.    *
- *                                                   *
- * void exec6502(uint32_t tickcount)                 *
- *   - Execute 6502 code up to the next specified    *
- *     count of clock ticks.                         *
  *                                                   *
  * void step6502()                                   *
  *   - Execute a single instruction.                 *
@@ -92,13 +85,9 @@
  *****************************************************
  * Useful variables in this emulator:                *
  *                                                   *
- * uint32_t clockticks6502                           *
- *   - A running total of the emulated cycle count.  *
- *                                                   *
  * uint32_t instructions                             *
  *   - A running total of the total emulated         *
- *     instruction count. This is not related to     *
- *     clock cycle timing.                           *
+ *     instruction count.                            *
  *                                                   *
  *****************************************************/
 
@@ -164,7 +153,6 @@ uint8_t sp, a, x, y, status;
 
 //helper variables
 uint32_t instructions = 0; //keep track of total instructions executed
-uint32_t clockticks6502 = 0, clockgoal6502 = 0;
 uint16_t oldpc, ea, reladdr, value, result;
 uint8_t opcode, oldstatus;
 
@@ -206,7 +194,6 @@ void reset6502() {
 
 static void (*addrtable[256])();
 static void (*optable[256])();
-uint8_t penaltyop, penaltyaddr;
 
 //addressing mode functions, calculates effective addresses
 static void imp() { //implied
@@ -247,10 +234,6 @@ static void absx() { //absolute,X
     startpage = ea & 0xFF00;
     ea += (uint16_t)x;
 
-    if (startpage != (ea & 0xFF00)) { //one cycle penlty for page-crossing on some opcodes
-        penaltyaddr = 1;
-    }
-
     pc += 2;
 }
 
@@ -259,10 +242,6 @@ static void absy() { //absolute,Y
     ea = ((uint16_t)read6502(pc) | ((uint16_t)read6502(pc+1) << 8));
     startpage = ea & 0xFF00;
     ea += (uint16_t)y;
-
-    if (startpage != (ea & 0xFF00)) { //one cycle penlty for page-crossing on some opcodes
-        penaltyaddr = 1;
-    }
 
     pc += 2;
 }
@@ -288,10 +267,6 @@ static void indy() { // (indirect),Y
     ea = (uint16_t)read6502(eahelp) | ((uint16_t)read6502(eahelp2) << 8);
     startpage = ea & 0xFF00;
     ea += (uint16_t)y;
-
-    if (startpage != (ea & 0xFF00)) { //one cycle penlty for page-crossing on some opcodes
-        penaltyaddr = 1;
-    }
 }
 
 static uint16_t getvalue() {
@@ -311,7 +286,6 @@ static void putvalue(uint16_t saveval) {
 
 //instruction handler functions
 static void adc() {
-    penaltyop = 1;
     value = getvalue();
     result = (uint16_t)a + value + (uint16_t)(status & FLAG_CARRY);
    
@@ -330,8 +304,6 @@ static void adc() {
             result += 0x60;
             setcarry();
         }
-        
-        clockticks6502++;
     }
 #endif
    
@@ -339,7 +311,6 @@ static void adc() {
 }
 
 static void and() {
-    penaltyop = 1;
     value = getvalue();
     result = (uint16_t)a & value;
    
@@ -364,8 +335,6 @@ static void bcc() {
     if ((status & FLAG_CARRY) == 0) {
         oldpc = pc;
         pc += reladdr;
-        if ((oldpc & 0xFF00) != (pc & 0xFF00)) clockticks6502 += 2; //check if jump crossed a page boundary
-            else clockticks6502++;
     }
 }
 
@@ -373,8 +342,6 @@ static void bcs() {
     if ((status & FLAG_CARRY) == FLAG_CARRY) {
         oldpc = pc;
         pc += reladdr;
-        if ((oldpc & 0xFF00) != (pc & 0xFF00)) clockticks6502 += 2; //check if jump crossed a page boundary
-            else clockticks6502++;
     }
 }
 
@@ -382,8 +349,6 @@ static void beq() {
     if ((status & FLAG_ZERO) == FLAG_ZERO) {
         oldpc = pc;
         pc += reladdr;
-        if ((oldpc & 0xFF00) != (pc & 0xFF00)) clockticks6502 += 2; //check if jump crossed a page boundary
-            else clockticks6502++;
     }
 }
 
@@ -399,8 +364,6 @@ static void bmi() {
     if ((status & FLAG_SIGN) == FLAG_SIGN) {
         oldpc = pc;
         pc += reladdr;
-        if ((oldpc & 0xFF00) != (pc & 0xFF00)) clockticks6502 += 2; //check if jump crossed a page boundary
-            else clockticks6502++;
     }
 }
 
@@ -408,8 +371,6 @@ static void bne() {
     if ((status & FLAG_ZERO) == 0) {
         oldpc = pc;
         pc += reladdr;
-        if ((oldpc & 0xFF00) != (pc & 0xFF00)) clockticks6502 += 2; //check if jump crossed a page boundary
-            else clockticks6502++;
     }
 }
 
@@ -417,8 +378,6 @@ static void bpl() {
     if ((status & FLAG_SIGN) == 0) {
         oldpc = pc;
         pc += reladdr;
-        if ((oldpc & 0xFF00) != (pc & 0xFF00)) clockticks6502 += 2; //check if jump crossed a page boundary
-            else clockticks6502++;
     }
 }
 
@@ -436,8 +395,6 @@ static void bvc() {
     if ((status & FLAG_OVERFLOW) == 0) {
         oldpc = pc;
         pc += reladdr;
-        if ((oldpc & 0xFF00) != (pc & 0xFF00)) clockticks6502 += 2; //check if jump crossed a page boundary
-            else clockticks6502++;
     }
 }
 
@@ -445,8 +402,6 @@ static void bvs() {
     if ((status & FLAG_OVERFLOW) == FLAG_OVERFLOW) {
         oldpc = pc;
         pc += reladdr;
-        if ((oldpc & 0xFF00) != (pc & 0xFF00)) clockticks6502 += 2; //check if jump crossed a page boundary
-            else clockticks6502++;
     }
 }
 
@@ -467,7 +422,6 @@ static void clv() {
 }
 
 static void cmp() {
-    penaltyop = 1;
     value = getvalue();
     result = (uint16_t)a - value;
    
@@ -525,7 +479,6 @@ static void dey() {
 }
 
 static void eor() {
-    penaltyop = 1;
     value = getvalue();
     result = (uint16_t)a ^ value;
    
@@ -577,7 +530,6 @@ static void jsr() {
 }
 
 static void lda() {
-    penaltyop = 1;
     value = getvalue();
     a = (uint8_t)(value & 0x00FF);
    
@@ -586,7 +538,6 @@ static void lda() {
 }
 
 static void ldx() {
-    penaltyop = 1;
     value = getvalue();
     x = (uint8_t)(value & 0x00FF);
    
@@ -595,7 +546,6 @@ static void ldx() {
 }
 
 static void ldy() {
-    penaltyop = 1;
     value = getvalue();
     y = (uint8_t)(value & 0x00FF);
    
@@ -616,20 +566,9 @@ static void lsr() {
 }
 
 static void nop() {
-    switch (opcode) {
-        case 0x1C:
-        case 0x3C:
-        case 0x5C:
-        case 0x7C:
-        case 0xDC:
-        case 0xFC:
-            penaltyop = 1;
-            break;
-    }
 }
 
 static void ora() {
-    penaltyop = 1;
     value = getvalue();
     result = (uint16_t)a | value;
    
@@ -694,7 +633,6 @@ static void rts() {
 }
 
 static void sbc() {
-    penaltyop = 1;
     value = getvalue() ^ 0x00FF;
     result = (uint16_t)a + value + (uint16_t)(status & FLAG_CARRY);
    
@@ -714,8 +652,6 @@ static void sbc() {
             result += 0x60;
             setcarry();
         }
-        
-        clockticks6502++;
     }
 #endif
    
@@ -796,43 +732,36 @@ static void tya() {
         sta();
         stx();
         putvalue(a & x);
-        if (penaltyop && penaltyaddr) clockticks6502--;
     }
 
     static void dcp() {
         dec();
         cmp();
-        if (penaltyop && penaltyaddr) clockticks6502--;
     }
 
     static void isb() {
         inc();
         sbc();
-        if (penaltyop && penaltyaddr) clockticks6502--;
     }
 
     static void slo() {
         asl();
         ora();
-        if (penaltyop && penaltyaddr) clockticks6502--;
     }
 
     static void rla() {
         rol();
         and();
-        if (penaltyop && penaltyaddr) clockticks6502--;
     }
 
     static void sre() {
         lsr();
         eor();
-        if (penaltyop && penaltyaddr) clockticks6502--;
     }
 
     static void rra() {
         ror();
         adc();
-        if (penaltyop && penaltyaddr) clockticks6502--;
     }
 #else
     #define lax nop
@@ -925,40 +854,12 @@ void irq6502() {
 uint8_t callexternal = 0;
 void (*loopexternal)();
 
-void exec6502(uint32_t tickcount) {
-    clockgoal6502 += tickcount;
-   
-    while (clockticks6502 < clockgoal6502) {
-        opcode = read6502(pc++);
-        status |= FLAG_CONSTANT;
-
-        penaltyop = 0;
-        penaltyaddr = 0;
-
-        (*addrtable[opcode])();
-        (*optable[opcode])();
-        clockticks6502 += ticktable[opcode];
-        if (penaltyop && penaltyaddr) clockticks6502++;
-
-        instructions++;
-
-        if (callexternal) (*loopexternal)();
-    }
-
-}
-
 void step6502() {
     opcode = read6502(pc++);
     status |= FLAG_CONSTANT;
 
-    penaltyop = 0;
-    penaltyaddr = 0;
-
     (*addrtable[opcode])();
     (*optable[opcode])();
-    clockticks6502 += ticktable[opcode];
-    if (penaltyop && penaltyaddr) clockticks6502++;
-    clockgoal6502 = clockticks6502;
 
     instructions++;
 

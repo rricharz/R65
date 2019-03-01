@@ -828,9 +828,7 @@ int r65Loop()
             timeOfSpMin = time(NULL) % 86400;
             global_pendingCrtUpdate = 1;
         }
-        checkEventCounter++;
-        if (checkEventCounter > 60000) {    // roughly every 200 msec, except when waiting for key
-            // printf("60000 opcodes took %0.f msec\n", (double)((clock() - startTime)/1000));
+        if (checkEventCounter++ > 200000) {
             checkPendingEvents();
             checkMotorTurnoff(1);
             crtUpdate();

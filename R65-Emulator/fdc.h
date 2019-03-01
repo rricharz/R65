@@ -24,7 +24,7 @@ struct Ddrive {
     int track;
     int sector;
     FILE *file;
-    char name[12];
+    char name[18];
 };
 
 extern struct Ddrive floppy[2];
