@@ -34,7 +34,7 @@ begin
       delay10msec(1);
     end;
   delay10msec(100);
-  writeln('Dssplaying binary numbers');
+  writeln('Displaying binary numbers');
   for j:=0 to 255 do
     begin
       ledbyte(j);
