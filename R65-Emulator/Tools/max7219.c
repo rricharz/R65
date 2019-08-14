@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
   char *s = argv[1];
   int j = 0;
   while ((s[j] != 0) && (j < 8)) {	
-    MAX7219Send(8 - j ,segments(s[j]));
+    MAX7219Send(8 - j ,segments(s[j]) | (s[j] & 128));
     j++;
   }
   while (j < 8) {

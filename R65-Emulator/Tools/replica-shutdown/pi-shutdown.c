@@ -122,13 +122,23 @@ int main (int argc, char **argv)
 		    if (ip) {
 			int ch;
 			int i = 0;
-			while (( i < 8) && ((ch = fgetc(ip)) != EOF)) {
-			    i1[i++] = ch;
+			int dot = 0;
+			while (( i < 8)  && (dot < 2) && ((ch = fgetc(ip)) != EOF)) {
+			    if (ch == '.') {
+				i1[i-1] += 128;
+				dot++;
+			    }
+			    else i1[i++] = ch;
 			}
 			i1[i] = 0; // end of string
 			i = 0;
+			dot = 0;
 			while (( i < 8) && ((ch = fgetc(ip)) != EOF)) {
-			    i2[i++] = ch;
+			    if (ch == '.') {
+				i2[i-1] += 128;
+				dot++;
+			    }
+			    else i2[i++] = ch;
 			}
 			i2[i] = 0; // end of string
 			
