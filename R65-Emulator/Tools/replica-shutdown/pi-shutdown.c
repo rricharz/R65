@@ -14,7 +14,8 @@
 // if SWITCH is on. Turn SWITCH off when
 // running R65 emulator to see R65 stack
 // pointer and free Pascal memory
-// 
+//
+// display IP address if BREAK button is pressed 
 // 
 // Copyright 2017,2018,2019  rricharz
 //
@@ -32,18 +33,19 @@
 #define PIN     29      // pin 40, wiring pi 29
 #define REDLED1 27      // pin 36, wiring pi 27
 #define REDLED2 23      // pin 33, wiring pi 23
+#define BREAK	21	// pin 29, wiring pi 21  
 
 FILE *temperatureFile;
      
 double T;
 
-int *parser_result(const char *buf, int size){
+int *parser_result(const char *buf, int size) {
 	static int ret[10];
 	int i, j = 0, start = 0;
 
 	for(i=0; i<size; i++){
 		char c = buf[i];
-		if(c >= '0' && c <= '9'){
+		if(c >= '0' && c <= '9') {
 			if(!start){
 				start = 1;
 				ret[j] = c-'0';
@@ -93,6 +95,8 @@ int main (int argc, char **argv)
 	wiringPiSetup();
 	pinMode(PIN, INPUT);
 	pullUpDnControl (PIN, PUD_UP);
+	pinMode(BREAK, INPUT);
+	pullUpDnControl (BREAK, PUD_UP);
         pinMode(REDLED1, OUTPUT);
         pinMode(REDLED2, OUTPUT);
         digitalWrite(REDLED1, 0);
@@ -110,6 +114,32 @@ int main (int argc, char **argv)
                                 system("shutdown -h now");
                                 exit(0);
                         }
+		}
+		
+		else if (digitalRead(BREAK) == 0) {
+		    char s[255], i1[10], i2[10];
+		    FILE *ip = popen("hostname -I","r");
+		    if (ip) {
+			int ch;
+			int i = 0;
+			while (( i < 8) && ((ch = fgetc(ip)) != EOF)) {
+			    i1[i++] = ch;
+			}
+			i1[i] = 0; // end of string
+			i = 0;
+			while (( i < 8) && ((ch = fgetc(ip)) != EOF)) {
+			    i2[i++] = ch;
+			}
+			i2[i] = 0; // end of string
+			
+			sprintf(s,"/home/pi/bin/max7219 '%s'", i1);
+			system(s);
+			sleep(5);
+			sprintf(s,"/home/pi/bin/max7219 '%s'", i2);
+			system(s);
+			sleep(5);
+			pclose(ip);
+			}
 		}
                 
                 else if (system("pidof -x emulator >/dev/null") != 0) {
