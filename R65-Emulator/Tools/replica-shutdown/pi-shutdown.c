@@ -15,7 +15,11 @@
 // running R65 emulator to see R65 stack
 // pointer and free Pascal memory
 //
-// display IP address if BREAK button is pressed 
+// display IP address if BREAK button is pressed
+//
+// The program also controls a FAN
+// If the CPU temperature is above HIGH_TEMP, the fan is turned on
+// If the CPU temperature is below LOW_TEMP, the fan is turned off
 // 
 // Copyright 2017,2018,2019  rricharz
 //
@@ -33,7 +37,11 @@
 #define PIN     29      // pin 40, wiring pi 29
 #define REDLED1 27      // pin 36, wiring pi 27
 #define REDLED2 23      // pin 33, wiring pi 23
-#define BREAK	21	// pin 29, wiring pi 21  
+#define BREAK	21	// pin 29, wiring pi 21
+#define FAN  	02	// pin 13, wiring pi 02
+
+#define HIGH_TEMP 63.0		// turn fan on above this temperature (in °C)
+#define LOW_TEMP  53.0		// turn fan off below this temperature (in °C)
 
 FILE *temperatureFile;
      
@@ -86,6 +94,7 @@ int main (int argc, char **argv)
         char buf[256];
 	int size, fd, *nums, prev_idle = 0, prev_total = 0, idle, total, i;
         double usage;
+	int fanIsOn;
         
 	fd = open("/proc/stat", O_RDONLY);
 
@@ -101,8 +110,22 @@ int main (int argc, char **argv)
         pinMode(REDLED2, OUTPUT);
         digitalWrite(REDLED1, 0);
         digitalWrite(REDLED1, 0);
+	pinMode(FAN, OUTPUT);
+	digitalWrite(FAN, 0);		// fan initially turned off
+	fanIsOn = 0;
 
 	do {
+		temperatureFile = fopen(
+                        "/sys/class/thermal/thermal_zone0/temp", "r");
+		if (temperatureFile != NULL) {
+		    fscanf(temperatureFile, "%lf", &T);
+                        if (T < 0.0) T = 0.0;
+                        if (T > 99999.0) T = 99999.0;
+                        T = T / 1000.0;
+                        fclose (temperatureFile);
+                    }
+		else T = 0.0;
+		    
 		if (digitalRead(PIN) == 0) {
                         delay(1000);
                         if (digitalRead(PIN) == 0) {
@@ -182,17 +205,6 @@ int main (int argc, char **argv)
 		    prev_idle = idle;
 
 		    lseek(fd, 0, SEEK_SET);
-                    
-                    temperatureFile = fopen(
-                        "/sys/class/thermal/thermal_zone0/temp", "r");
-                    if (temperatureFile != NULL) {
-                        fscanf(temperatureFile, "%lf", &T);
-                        if (T < 0.0) T = 0.0;
-                        if (T > 99999.0) T = 99999.0;
-                        T = T / 1000.0;
-                        fclose (temperatureFile);
-                    }
-                    else T = 0.0;
                 
                     char s[64];
                     sprintf(s,"/home/pi/bin/max7219 'PI %02.0f %02.0f'",
@@ -202,6 +214,16 @@ int main (int argc, char **argv)
                 
                 }
                 else delay(1000);
+		if (T > HIGH_TEMP) {
+		    // printf("Fan on, T=%f\n", T);
+		    digitalWrite(FAN,1);
+		    fanIsOn = 1;
+	        }
+		else if (T < LOW_TEMP) {
+		    // printf("Fan off, T=%f\n", T);
+		    digitalWrite(FAN,0);
+		    fanIsOn = 0;
+	    }
 	}
 	while (1);
 }
