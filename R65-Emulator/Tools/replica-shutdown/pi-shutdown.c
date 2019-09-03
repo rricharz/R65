@@ -9,11 +9,12 @@
 //   dtoverlay=pi3-act-led,gpio=12
 //   where 12 is the gpio of the external led
 //
+// If SWITCH is off and R65 emulator is not running:
 // Displays CPU load and temperature on
-// segment display of R65 Replica,
-// if SWITCH is on. Turn SWITCH off when
-// running R65 emulator to see R65 stack
-// pointer and free Pascal memory
+// 7 segment display of R65 Replica
+// and blinks the red leds based on CPU usage
+// 
+// Turn SWITCH on to use 7 segment display and red leds
 //
 // display IP address if BREAK button is pressed
 //
@@ -34,11 +35,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#define PIN     29      // pin 40, wiring pi 29
-#define REDLED1 27      // pin 36, wiring pi 27
-#define REDLED2 23      // pin 33, wiring pi 23
-#define BREAK	21	// pin 29, wiring pi 21
-#define FAN  	02	// pin 13, wiring pi 02
+#define SHUTDOWN	29      // pin 40, wiring pi 29
+#define REDLED1		27      // pin 36, wiring pi 27
+#define REDLED2		23      // pin 33, wiring pi 23
+#define BREAK		21	// pin 29, wiring pi 21
+#define FAN		02	// pin 13, wiring pi 02
+#define SWITCH		05	// pin 18, wiring pi 05
 
 #define HIGH_TEMP 63.0		// turn fan on above this temperature (in °C)
 #define LOW_TEMP  53.0		// turn fan off below this temperature (in °C)
@@ -95,17 +97,20 @@ int main (int argc, char **argv)
 	int size, fd, *nums, prev_idle = 0, prev_total = 0, idle, total, i;
         double usage;
 	int fanIsOn;
+	int max7219IsUsed;
         
 	fd = open("/proc/stat", O_RDONLY);
 
-	printf("Monitoring wiringPi pin %i for shutdown\n", PIN);
+	printf("Monitoring wiringPi pin %i for shutdown\n", SHUTDOWN);
         system("/home/pi/bin/max7219 'pi-65'");
 
 	wiringPiSetup();
-	pinMode(PIN, INPUT);
-	pullUpDnControl (PIN, PUD_UP);
+	pinMode(SHUTDOWN, INPUT);
+	pullUpDnControl(SHUTDOWN, PUD_UP);
 	pinMode(BREAK, INPUT);
-	pullUpDnControl (BREAK, PUD_UP);
+	pullUpDnControl(BREAK, PUD_UP);
+	pinMode(SWITCH, INPUT);
+	pullUpDnControl(SWITCH, PUD_UP);
         pinMode(REDLED1, OUTPUT);
         pinMode(REDLED2, OUTPUT);
         digitalWrite(REDLED1, 0);
@@ -113,6 +118,7 @@ int main (int argc, char **argv)
 	pinMode(FAN, OUTPUT);
 	digitalWrite(FAN, 0);		// fan initially turned off
 	fanIsOn = 0;
+	max7219IsUsed = 0;
 
 	do {
 		temperatureFile = fopen(
@@ -126,9 +132,9 @@ int main (int argc, char **argv)
                     }
 		else T = 0.0;
 		    
-		if (digitalRead(PIN) == 0) {
+		if (digitalRead(SHUTDOWN) == 0) {
                         delay(1000);
-                        if (digitalRead(PIN) == 0) {
+                        if (digitalRead(SHUTDOWN) == 0) {
                                 // digitalWrite(LED, 1);
                                 system("/home/pi/bin/max7219 'PI OFF'");
                                 digitalWrite(REDLED1, 0);
@@ -172,10 +178,12 @@ int main (int argc, char **argv)
 			system(s);
 			sleep(5);
 			pclose(ip);
+			max7219IsUsed = 1;
 			}
 		}
                 
-                else if (system("pidof -x emulator >/dev/null") != 0) {
+                else if ((digitalRead(SWITCH) == 0) &&
+				(system("pidof -x emulator >/dev/null") != 0)) {
                 
                     size = read(fd, buf, sizeof(buf));
                     if(size > 0) {
@@ -210,10 +218,19 @@ int main (int argc, char **argv)
                     sprintf(s,"/home/pi/bin/max7219 'PI %02.0f %02.0f'",
                         usage, T);
                     system(s);
+		    max7219IsUsed = 1;
                     blinkForOneSecond((int)usage);
                 
                 }
-                else delay(1000);
+                else { 
+		    if (max7219IsUsed) {
+			digitalWrite(REDLED1, 0);
+			digitalWrite(REDLED2, 0);
+			system("/home/pi/bin/max7219 '        '");
+			max7219IsUsed = 0;
+		    }
+		    delay(1000);
+		}
 		if (T > HIGH_TEMP) {
 		    // printf("Fan on, T=%f\n", T);
 		    digitalWrite(FAN,1);
