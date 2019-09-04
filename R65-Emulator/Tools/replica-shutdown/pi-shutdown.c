@@ -82,11 +82,25 @@ int blinkForOneSecond(int usage) {
     int d = 500 / n;
     for (int i = 0; i < n; i++) {
         digitalWrite(REDLED1, 1);
-        digitalWrite(REDLED2, 0);
-        delay(d);
-        digitalWrite(REDLED1, 0);
-        digitalWrite(REDLED2, 1);
-        delay(d);
+	if (d > 15) {
+	    delay(10);
+	    digitalWrite(REDLED1, 0);
+	    delay(d - 10);
+	}
+	else {
+	    delay(d);
+	    digitalWrite(REDLED1, 0);
+	}
+	digitalWrite(REDLED2, 1);
+        if (d > 15) {
+	    delay(10);
+	    digitalWrite(REDLED2, 0);
+	    delay(d - 10);
+	}
+	else {
+	    delay(d);
+	    digitalWrite(REDLED2, 0);
+	}
     }
 }
 
