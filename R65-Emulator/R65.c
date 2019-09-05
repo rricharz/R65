@@ -78,6 +78,8 @@ int timeOfPascalMin;
 int spMin;              // minimum value of sp during execution
 int pascalMinFree;      // minimal value of pascalFreeStack
 
+int rawPrint = 0;       // for Tektronix plotter
+
 // source input file
 FILE *sourceFile;
 #define M_INBUFF 0x0000 // assembler input line
@@ -569,12 +571,23 @@ int catchSubroutine(uint16_t ea)
     int apc,aa;
     if (ea == 0xE95E) {
         // printf("******** IO: PRTRSA (print to rs232) called, currently implemented in emulator\n");
-        if (lastPrintedCharacter == 0x1B) {         // ignore printer control characted
+        if ((a == 0x12) && rawPrint) {         // device control 2, switch to normal mode
+                printf("Printer switched to normal mode\n");
+                rawPrint = 0;
+                return 1;
+            }
+        if ((lastPrintedCharacter == 0x1B) && (!rawPrint)) {   
+            // ignore printer control characted
             lastPrintedCharacter = 0;
             return 1;
         }
-        if (a < 0x20) { // produce a linux style text file
+        if ((a < 0x20) && (!rawPrint)) {       // produce a linux style text file
             if (a == 0x0D) {                   // linux text files have no cr, change for windows
+                return 1;
+            }
+            if (a == 0x11) {                   // device control 1, switch to raw mode
+                printf("Printer switched to raw mode\n");
+                rawPrint = 1;
                 return 1;
             }
             if (a == 0x14) {                   // ignore printer control character
@@ -613,6 +626,7 @@ int catchSubroutine(uint16_t ea)
         }
         else {
             fprintf(printFile, "%c", a);
+            if (rawPrint /*&& (a < 0x20)*/) fflush(printFile);
             colNumber++;
         }
         return 1;
