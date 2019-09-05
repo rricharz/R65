@@ -47,6 +47,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #include "time.h"
 #include "main.h"
@@ -453,7 +454,14 @@ int export_file()
     char name[32];
     int pnt = 0;
     
-    // printf("Export called\n");
+    // printf("Export called\n")
+    
+    // check whether directory "Files" exists
+    DIR* dir = opendir("Files");
+    if (dir)
+        closedir(dir);
+    else
+        system("mkdir Files");
     
     filtyp = memory[M8_FILTYP];
     // printf("Filtyp = %c\n", filtyp);
@@ -590,6 +598,13 @@ int import_file()
     FILE *finput;
     
     // printf("Import called\n");
+    
+    // check whether directory "Files" exists
+    DIR* dir = opendir("Files");
+    if (dir)
+        closedir(dir);
+    else
+        system("mkdir Files");
     
     drive = memory[M8_FILDRV];
     // printf("Drive = %d\n", drive);
