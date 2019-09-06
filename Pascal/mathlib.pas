@@ -6,6 +6,7 @@ Pascal math library
 
 Math real functions:
   fabs(r)
+  sqrt(r)
   sin(r)        r in deg
   cos(r)        r in deg
   tan(r)        r in deg
@@ -26,6 +27,28 @@ func fabs(x:real):real;
 begin
   if x<0. then fabs:=-x
   else fabs:=x;
+end;
+
+func sqrt(n:real):real;
+{*********************}
+{ Newton's approximation }
+const accuracy = 0.0001; {rel accuracy }
+var lower,upper,guess:real;
+begin
+  if n<1.0 then begin
+    lower:=n;
+    upper:=1.0
+  end else begin
+    lower:=1.0;
+    upper:=n
+  end;
+  guess:=1.0;
+  while (upper-lower)>(accuracy*guess) do begin
+    guess:=(upper+lower)/2.0;
+    if (guess*guess)>n then upper:=guess
+    else lower:=guess
+  end;
+  sqrt:=(upper+lower)/2.0;
 end;
 
 func cos(x:real):real;
