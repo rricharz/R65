@@ -113,6 +113,7 @@ proc writeflo(f:file;r:real);
 { write real in floating point format  }
 { right justified in field of 11 chars }
 { 3 digits after decimal point         }
+
 var m: real;
     e,i: integer;
     sign: char;
@@ -153,6 +154,7 @@ proc writefix(f:file;d:integer;r:real);
 { d digits after decimal point         }
 { Warning! The floating point accuracy }
 { is only approximately 5 digits!      }
+
 var m,rnd: real;
     d1,i1,m1,n:integer;
     sign: char;
@@ -192,6 +194,70 @@ begin
       m:=m-conv(trunc(m));
     end;
   end;
+end;
+
+func readflo(f:file):real;
+{*************************************}
+{ read real number                    }
+
+var r: real;
+    n,n1: integer;
+    neg,ems: boolean;
+    ch: char;
+
+begin
+  r:=0.0;
+  neg:=false;
+  read(@f,ch);
+  if (ch='+') then
+      read(@f,ch)
+  else if (ch='-') then begin
+    neg:=true;
+      read(@f,ch);
+  end;
+  while (ch<='9') and (ch>='0') do begin
+    r:=10.*r+conv(ord(ch)-ord('0'));
+    read(@f,ch);
+  end;
+  if (ch<>'.') and (ch<>'E') and (ch<>'e') then
+  begin
+    {numeric integer}
+    if neg then r:=-r;
+    readflo:=r
+  end else begin {numeric real}
+    n:=0;
+    if (ch<>'E') and (ch<>'e') then read(@f,ch);
+    while (ch<='9') and (ch>='0') do begin
+      r:=10.*r+conv(ord(ch)-ord('0'));
+      n:=prec(n); read(@f,ch)
+    end;
+    if (ch='E') or (ch='e') then begin
+      ems:=false; read(@f,ch);
+      case ch of
+        '+': read(@f,ch);
+        '-': begin ems:=true; read(@f,ch) end
+      end;
+      n1:=0;
+      if (ch<='9') or (ch>='0') then begin
+        n1:=ord(ch)-ord('0');
+        read(@f,ch);
+        if (ch<='9') and (ch>='0') then begin
+          n1:=10*n1+ord(ch)-ord('0');
+          read(@f,ch);
+        end;
+        if ems then n:=n-n1 else n:=n+n1
+      end
+    end;
+    while n>0 do begin
+      n:=prec(n);
+      r:=10.*r;
+    end;
+    while n<0 do begin
+      n:=succ(n); r:=0.1*r;
+    end;
+    if neg then r:=-r;
+    readflo:=r;
+  end
 end;
 
 begin
