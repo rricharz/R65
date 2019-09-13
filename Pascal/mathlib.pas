@@ -4,6 +4,8 @@
 
 Pascal math library
 
+Version 1.1 RR 2019
+
 Math real functions:
   fabs(r)
   sqrt(r)
@@ -108,6 +110,9 @@ end;
 
 proc writeflo(f:file;r:real);
 {***************************}
+{ write real in floating point format  }
+{ right justified in field of 11 chars }
+{ 3 digits after decimal point         }
 var m: real;
     e,i: integer;
     sign: char;
@@ -123,35 +128,43 @@ begin
     while m<1. do begin
       e:=e-1; m:=10.*m;
     end;
-  m:=m+0.00005; { round }
+  m:=m+0.0005; { round }
   if m>=10. then begin
     e:=e+1; m:=m/10.;
   end;
-  write(@f,sign,trunc(m),'.');
-  for i:=1 to 4 do begin
+  write(@f,' ',sign,trunc(m),'.');
+  for i:=1 to 3 do begin
     m:=10.*(m-conv(trunc(m)));
     write(@f,trunc(m));
   end;
-  if e>=0 then write(@f,'E+',e)
-  else if e<0 then write(@f,'E',e);
+  if e<0 then begin
+    write(@f,'e-'); e:=-e
+  end else
+    write(@f,'e+');
+  if e>=10 then write(@f,e)
+  else if e>=1 then write(@f,'0',e)
+  else write(@f,'00');
 end;
 
 proc writefix(f:file;d:integer;r:real);
 {*************************************}
-var m,max,rnd: real;
-    d1,i1:integer;
+{ write real in fixed point format     }
+{ right justified in field of 11 chars }
+{ d digits after decimal point         }
+{ Warning! The floating point accuracy }
+{ is only approximately 5 digits!      }
+var m,rnd: real;
+    d1,i1,m1,n:integer;
     sign: char;
 begin
   d1:=d;
   if d1<0 then d1:=0;
-  if d1>5 then d1:=5;
+  if d1>3 then d1:=3;
   case d1 of
-    0: begin max:=32767.; rnd:=0.5 end;
-    1: begin max:=10000.; rnd:=0.05 end;
-    2: begin max:=1000.; rnd:=0.005 end;
-    3: begin max:=100.; rnd:=0.0005 end;
-    4: begin max:=10.; rnd:=0.00005 end;
-    5: begin max:=1.; rnd:=0.000005 end
+    0: rnd:=0.5;
+    1: rnd:=0.05;
+    2: rnd:=0.005;
+    3: rnd:=0.0005
   end {case};
   sign:=' ';
   m:=r;
@@ -159,11 +172,19 @@ begin
     sign:='-'; m:=-m;
   end;
   m:=m+rnd; { round }
-  if m>(max+rnd) then writeflo(f,r)
+  if m>32767. then writeflo(f,r)
   else begin
-    if m<2.*rnd then sign:=' ';
-    write(@f,sign,trunc(m));
-    m:=m-conv(trunc(m));
+    { if m<2.*rnd then sign:=' ';}
+    m1:=trunc(m);
+    if m1<10 then n:=8-d
+    else if m1<100 then n:=7-d
+    else if m1<1000 then n:=6-d
+    else if m1<10000 then n:=5-d
+    else n:=4-d;
+    if d=0 then n:=n+1;
+    for i1:=1 to n do write(@f,' ');
+    write(@f,sign,m1);
+    m:=m-conv(m1);
     if d1>0 then write(@f,'.');
     for i1:=1 to d1 do begin
       m:=10.*m;
