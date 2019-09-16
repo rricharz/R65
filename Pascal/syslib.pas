@@ -21,7 +21,7 @@ library syslib;
 
 const
   tab8=chr(9);      {tabulate}
-  hom=chr(1);	    {cursor home}
+  hom=chr(1);       {cursor home}
   csc=chr($11);     {clear screen}
   lf=chr($a);       {line feed}
   formfeed=chr($c); {form feed}
@@ -67,7 +67,7 @@ mem  { The & below are required for 8-bit!}
 var day,month,year: integer;
 
 { * getbcd(address)          * }
-{ get 18-bit data from memory in bcd format }
+{ get 16-bit data from memory in bcd format }
 
 func getbcd(address: integer): integer;
 var data: integer;
@@ -113,7 +113,7 @@ begin
 end;
 
 { * abort * }
-{ stop execution and go tp Pascal system }
+{ stop execution and go to Pascal system }
 
 proc abort;
 const stopcode=$2010;

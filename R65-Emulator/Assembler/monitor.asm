@@ -709,7 +709,8 @@ INTC8   JSR TEST
         JSR PRTINF
         BYT $D,$8A
         JSR PRTDAT
-        JMP GETDAT
+        RTS             was JMP GETDAT
+        NOP             changed for emulator
 *
 PRTDAT  LDX =0
         LDA DATE,X
@@ -737,11 +738,12 @@ PRTTIM  LDX =3
 INTC9   JSR TEST
         BYT 'TIM',128+'E'   *** TIME ***
         BCS INTC10
+        LDA DATE      added for emulator
         JSR ENDLER
         JSR PRTINF
         BYT $0D,$8A
         JSR PRTTIM
-        JMP GETTIM
+        RTS           was JMP GETTIM
 *
 *
 INTC10  JSR TEST

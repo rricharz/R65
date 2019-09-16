@@ -171,6 +171,39 @@ int translateKey(int key)
     return chr;
 }
 
+/************************/
+uint8_t bcd(uint8_t value)
+/************************/
+// convert to bcd
+{
+    int dig0 = value % 10;
+    int dig1 = (value / 10) % 10;
+    return (16 * dig1 + dig0);
+}
+
+/*******************/
+void setDateAndTime()
+/*******************/
+{
+    // get system date and time
+    time_t sysTime = time(NULL);
+    struct tm systm = *localtime(&sysTime);
+    int year = systm.tm_year % 100;
+    int month = systm.tm_mon + 1;
+    int day = systm.tm_mday;
+    int hours = systm.tm_hour;
+    int minutes = systm.tm_min;
+    int seconds = systm.tm_sec;
+    // make it available
+    memory[M8_DATE] = bcd(day);
+    memory[M8_DATE + 1] = bcd(month);
+    memory[M8_DATE + 2] = bcd(year);
+    memory[M8_TIME] = 0;
+    memory[M8_TIME + 1] = bcd(seconds);
+    memory[M8_TIME + 2] = bcd(minutes);
+    memory[M8_TIME + 3] = bcd(hours);
+}
+
 /********************************/
 uint8_t read6502(uint16_t address)
 /********************************/
@@ -217,7 +250,14 @@ uint8_t read6502(uint16_t address)
     if (address < 0x1400)
         return memory[address];
     else if (address >= 0x1800)
-        return memory[address];   
+        return memory[address];
+        
+    // Update date and time.
+    // Important, read memory[M8_DATE] first to update
+    // date and time!
+    
+    if (address == M8_DATE)
+        setDateAndTime();
     
     // floppy disk controller
     
@@ -723,17 +763,6 @@ int loadCodeFromListing(char* s, int storeFlag)
     codeFile = NULL;
 }
 
-/************************/
-uint8_t bcd(uint8_t value)
-/************************/
-// convert to bcd
-{
-    int dig0 = value % 10;
-    int dig1 = (value / 10) % 10;
-    return (16 * dig1 + dig0);
-    
-}
-
 /************/
 int r65Setup()
 /************/
@@ -785,27 +814,10 @@ int r65Setup()
     }
     fdc_init();
     
-    // get system date and time and set as default
-    time_t sysTime = time(NULL);
-    struct tm systm = *localtime(&sysTime);
-    int year = systm.tm_year;
-    while (year > 100) 
-        year -= 100;
-    int month = systm.tm_mon + 1;
-    int day = systm.tm_mday;
-    int hours = systm.tm_hour;
-    int minutes = systm.tm_min;
-    int seconds = systm.tm_sec;
-    memory[M8_DATE] = bcd(day);
-    memory[M8_DATE + 1] = bcd(month);
-    memory[M8_DATE + 2] = bcd(year);
-    memory[M8_TIME] = 0;
-    memory[M8_TIME + 1] = bcd(seconds);
-    memory[M8_TIME + 2] = bcd(minutes);
-    memory[M8_TIME + 3] = bcd(hours);
+    setDateAndTime();
     
     // initialize random number generator (rand)
-    srand((unsigned) sysTime);
+    srand((unsigned)time(NULL));
 }
 
 /***********/
