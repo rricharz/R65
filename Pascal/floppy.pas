@@ -12,9 +12,9 @@ Change floppy disk
 Written 2019 to test the R65 emulator and
 to demonstrate the power of R65 Pascal.
 
-Usage:  floppy name[,drive]]
+Usage:  floppy name drive
 
-  [drive]: disk drive (0,1), default 1
+  [drive]: disk drive (0,1), no default
 }
 
 program floppy;
@@ -35,8 +35,13 @@ begin
 end;
 
 begin
-  cyclus:=0; drive:=1;
+  cyclus:=0; drive:=0;
   agetstring(name,default,cyclus,drive);
+  agetval(drive,default);
+  if default then begin
+    writeln('Usage: floppy name drive');
+    abort;
+  end;
   asetfile(name,cyclus,drive,' ');
   call(afloppy);
   if filerr<>0 then bcderror(filerr);
