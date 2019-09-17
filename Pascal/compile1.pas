@@ -66,7 +66,7 @@ space. An array of packed chars would require
 more coding and slow the scanner module of the
 compiler down.                               }
 
-    nresw=58;   {number of res. words, max 64}
+    nresw=60;   {number of res. words, max 64}
     symbsize=256;     {id table entries}
     reswtabpos=$c600; { up to $c7ff }
     idtabpos=$be00;   { up to $c5ff }
@@ -1989,7 +1989,7 @@ begin {body of statement }
 
     'ow': openrw(48);
 
-    'ob': openrw(50);
+    'ob': openrw(80);
 
     'gb': begin
             parse(' ('); scan; express;
@@ -1999,7 +1999,7 @@ begin {body of statement }
             idpnt:=findid;
             if idpnt=0 then error(5);
             getvar;
-            if relad=0 then error(15);
+            if relad<>0 then error(15);
             code1($51); testferror;
             gpval(idpnt,true,vartyp2);
             testto(' )'); scan

@@ -412,11 +412,14 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
             QuitProgram(1);      
             return;
         }
+        else global_char = event->keyval & 0x1F;
     }
                 
     // normal keys
-    else
+    else {
+        if ((event->keyval == 0xFFE1) || (event->keyval == 0xFFE3)) return;
         global_char = event->keyval;
+        }
                 
     setKeyboardInterrupt();
 }
