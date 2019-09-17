@@ -5,7 +5,7 @@
          *               *
          *****************
 
-    2018 rricharz (r77@bluewin.ch)
+    2018,2019 rricharz (r77@bluewin.ch)
 
 Display the directory of a disk drive.
 Uses EPROM (disk.asm) calls to get info
@@ -28,6 +28,9 @@ uses syslib,arglib;
 const aprepdo =$f4a7;
       agetentx=$f63a;
       aenddo  =$f625;
+
+      tsectors = 780;
+
 mem   filtyp  =$0300: char&;
       filcyc  =$0311: integer&;
       filstp  =$0312: char&;
@@ -41,6 +44,7 @@ var default: boolean;
     drive,index,i,ti,maxlen,nument,col,
     ncol,row,nspaces,sfree,sdel,
     lines       : integer;
+    ffree,fdel  : real;
     { 1280 = 80 names of 20 chars }
     nametab     : array[1600] of char;
     filstptab   : array[80] of char;
@@ -113,7 +117,7 @@ begin
       end else {deleted}
         sdel:=sdel+(filsiz shr 8);
     end else {end mark}
-      sfree:=780-filloc;
+      sfree:=tsectors-filloc;
     index:=index+1
   until (index>=79) or (filtyp=chr(0));
   call(aenddo);
@@ -142,7 +146,11 @@ begin
     end;
     writeln
   end;
-  writeln;
-  write('Sectors free: ',sfree,
-    ', deleted: ',sdel);
+  ffree:=conv(sfree)/conv(tsectors);
+  fdel:=conv(sdel)/conv(tsectors);
+  write('Sectors free:',sfree,'(',
+    trunc(100.0*ffree+0.5),
+    '%),deleted:',sdel,'(',
+    trunc(100.0*fdel+0.5),'%),',
+    'files:',index-1);
 end. 
