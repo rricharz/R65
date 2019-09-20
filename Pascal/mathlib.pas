@@ -12,6 +12,8 @@ Math real functions:
   sin(r)        r in deg
   cos(r)        r in deg
   tan(r)        r in deg
+  ln(r)
+  exp(r)
 
 Real output functions:
   writeflo(f,r)         exponential format
@@ -23,6 +25,7 @@ Real output functions:
 library mathlib;
 
 const pi = 3.14159;
+      e  = 2.27282;
 
 func fabs(x:real):real;
 {*********************}
@@ -33,7 +36,7 @@ end;
 
 func sqrt(n:real):real;
 {*********************}
-{ Newton's approximation }
+{ using Newton's approximation }
 const accuracy = 0.0001; {rel accuracy }
 var lower,upper,guess:real;
 begin
@@ -197,7 +200,7 @@ begin
 end;
 
 func readflo(f:file):real;
-{*************************************}
+{************************}
 { read real number                    }
 
 var r: real;
@@ -258,6 +261,75 @@ begin
     if neg then r:=-r;
     readflo:=r;
   end
+end;
+
+func ln(r:real):real;
+{*******************}
+{ compute natural logarithm ln     }
+var r0,rm1,rp1,a,b,res,d,q: real;
+    e1:integer;
+
+  proc getexp(var r1:array[1] of %integer;
+    var e2: integer);
+  { extract exponent and set it to 0 }
+  begin
+    e2:=(r1[1] and $ff)-$7f;
+    r1[1]:=(r1[1] and $ff00) or $7f;
+  end;
+
+begin
+  if r<0.0 then begin
+    writeln('ln(x) for x<0 called');
+    ln:=-1.0e-38
+  end else begin
+    r0:=r;
+    { for faster calculation, extract exp }
+    getexp(r0,e1);
+    rm1:=r0-1.0; rp1:=r0+1.0; d:=1.0;
+    a:=rm1; b:=rp1; res:=0.0;
+    rm1:=rm1*rm1;
+    rp1:=rp1*rp1;
+    repeat
+      q:=a/(d*b);
+      res:=res+q;
+      a:=a*rm1;
+      b:=b*rp1;
+      d:=d+2.0;
+    until (q<0.0001)and(q>-0.0001);
+    ln:=2.0*res+conv(e1)*0.69315
+  end
+end;
+
+func exp(x:real):real;
+{********************}
+{ compute exponential function }
+const ln2=0.69315;
+var x0,f,res:real;
+    n,e2:integer;
+
+  proc addpof2(var r1:array[1] of %integer;
+    e1: integer);
+  { add power of two }
+  begin
+    e2:=e1+(r1[1] and $ff);
+    r1[1]:=(r1[1] and $ff00)+e2;
+  end;
+
+begin
+  { reduce to range -ln2 .. +ln2 }
+  x0:=fabs(x)/ln2;
+  e2:=trunc(x0);
+  x0:=(x0-conv(e2))*ln2;
+  { compute e-function }
+  res:=1.0; f:=1.0;
+  for n:=1 to 7 do begin
+    f:=f*x0/conv(n);
+    res:=res+f;
+  end;
+  { add e2 back into result }
+  addpof2(res,e2);
+  if x<0.0 then res:=1.0/res;
+  exp:=res;
 end;
 
 begin
