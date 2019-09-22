@@ -14,7 +14,7 @@ written 2018 out of memory to demonstrate
 the capabilities of the R65 computer
 system.
 
-          rricharz 2018                 }
+          rricharz 2018,2019             }
 
 program alien;
 uses syslib,plotlib;
@@ -31,14 +31,6 @@ var shipmap: array[1] of integer;
     lasercount          : integer;
 
     exit,landed         : boolean;
-
-proc show16chars(x,y:integer;
-             s:array[15] of char);
-var i: integer;
-begin
-  for i:=0 to 15 do
-    plotchar(x+8*i,y,s[i]);
-end;
 
 proc showship;
 begin
@@ -74,8 +66,8 @@ begin
   end;
   if shipy<=0 then begin
     exit:=true; landed:=true;
-    show16chars(0,  ysize-8,
-        'ALIENS LANDED   ');
+    move(0,ysize-9);
+    write(@plotdev,'ALIENS LANDED   ');
   end;
 end;
 
@@ -93,16 +85,16 @@ end;
 
 proc showscore;
 begin
-  plotchar(xsize-17,ysize-9,
-    chr(score div 10 + ord('0')));
-  plotchar(xsize-9,ysize-9,
+  move(xsize-17,ysize-9);
+  write(@plotdev,
+    chr(score div 10 + ord('0')),
     chr(mod(score,10) + ord('0')));
 end;
 
 proc hitbird;
 begin
-  show16chars(0,  ysize-8,
-     'YOU HIT A BIRD! ');
+  move(0,ysize-9);
+  write(@plotdev,'YOU HIT A BIRD! ');
   score:=0;
   birdx:=-1;
   showbird;
@@ -110,8 +102,8 @@ end;
 
 proc hitship;
 begin
-  show16chars(0,  ysize-8,
-      'YOU HIT A SHIP! ');
+  move(0,ysize-9);
+  write(@plotdev,'YOU HIT A SHIP! ');
   score:=score+1;
   shipx:=-1;
   showship;
@@ -133,8 +125,8 @@ begin
        (laserx<=(birdx+3)) then
        hitbird
     else begin
-       show16chars(0,  ysize-8,
-               '                ');
+       move(0,ysize-9);
+       write(@plotdev,'                ');
     end;
     move(laserx,1);
     draw(laserx,ysize-8,black);
@@ -158,8 +150,8 @@ begin
   exit:=false; landed:=false;
   grinit;
   cleargr;
-  show16chars(0,  ysize-8,
-      'USE SPACE BAR   ');
+  move(0,ysize-9);
+  write(@plotdev,'USE SPACE BAR   ');
 end;
 
 begin

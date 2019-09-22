@@ -18,6 +18,7 @@ const xsize=223;
       white=0;
       inverse=1;
       black=2;
+      plotdev=@128;
 
 mem keypressed=$1785: char&;
 
@@ -104,6 +105,8 @@ end;
 { move graphics cursor }
 
 proc move(x,y:integer);
+mem grx=$03ae: integer&;
+    gry=$03af: integer&;
 begin
   xcursor:=x;
   ycursor:=y;
@@ -111,6 +114,8 @@ begin
   if x>xsize then xcursor:=xsize;
   if y<0 then ycursor:=0;
   if y>ysize then ycursor:=ysize;
+  grx:=xcursor;
+  gry:=ycursor;
 end;
 
 { draw(x,y,c)          }
@@ -192,26 +197,6 @@ begin
   xcursor:=xnew; ycursor:=ynew;
 end;
 
-{ plotchar(x,y,ch)          }
-{ plot character            }
-
-proc plotchar(x,y:integer;ch:char);
-const aplotch=$c818;
-mem fonttb=$d540: array[191] of integer&;
-    grx=$03ae: integer&;
-    gry=$03af: integer&;
-    grc=$03b0: integer&;
-begin
-  grx:=x;
-  gry:=y;
-  if x<0 then grx:=0;
-  if x>(xsize-8) then grx:=xsize-8;
-  if y<0 then gry:=0;
-  if y>(ysize-8) then gry:=ysize-8;
-  grc:=ord(ch);
-  call(aplotch);
-end;
-
 { plotmap(x,y,map)              }
 { plot 4x4 bitmap               }
 { the top left corner is bit 15 }
@@ -230,6 +215,16 @@ begin
   if y>(ysize-4) then gry:=ysize-4;
   grmap:=m;
   call(abitmap);
+end;
+
+{ waitforkey                    }
+{ wait for a key to be typed    }
+
+proc waitforkey;
+const key=@1;
+var ch:char;
+begin
+  read(@key,ch);
 end;
 
 begin {initialization}

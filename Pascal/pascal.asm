@@ -4,6 +4,8 @@
 *       **********************
 *
 * VERSION 5.3 01/06/82 RRICHARZ,RBAUMANN
+* Modified 22/09/19 RRICHARZ
+* Graphics text devices added
 *
         TIT R65 PASCAL RUNTIME
 *
@@ -71,10 +73,14 @@ FIDRTB  EQU $0339
 FIDVTB  EQU $0341
 FIBPTB  EQU $0349
 FIRCTB  EQU $0351
+GRX     EQU $03AE
+GRY     EQU $03AF
+GRC     EQU $03B0
 SFLAG   EQU $1781
 NUMCHR  EQU $178A
 VMON    EQU $17D5
 *
+APLOTCH EQU $C818
 GETKEY  EQU $E000
 AUTOPR  EQU $E00C
 ENDLIN  EQU $E024
@@ -1575,7 +1581,7 @@ GETR1   JSR DECS2
 * P-CODE 52: PUTR       PUT TO RA=FILE
 *****************
 *
-* NO AUTOMATIC ERROR CHECLING
+* NO AUTOMATIC ERROR CHECKING
 *
 PUTR    LDA ACCU
         STA KCHAR
@@ -1643,6 +1649,7 @@ GETCHR6 RTS
 ***************************************
 *
 PRTCHR0 LDX DEVICE
+        BMI PRTCHR3     Plot text?
         BNE PRTCHR1
         JMP PRTCHR
 *
@@ -1656,6 +1663,24 @@ PRTCHR2 DEX
         JSR WRITCH
         JMP TFER
 *
+PRTCHR3 CMP =$0C        Plot CR?
+        BNE PRTCHR4
+        LDA =0
+        STA GRX
+PRTCHRE RTS
+*
+PRTCHR4 CMP =$0A        PLOT LF?
+        BNE PRTCHR6
+        LDA GRY
+        SBC =8
+        BPL PRTCHR5
+        LDA =0
+*
+PRTCHR5 STA GRY
+        RTS
+*
+PRTCHR6 STA GRC
+        JMP APLOTCH     PLOT THE CHARACTER
 *
 * PERROR: PASCAL RUNTIME ERROR
 ******************************

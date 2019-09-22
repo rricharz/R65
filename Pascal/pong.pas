@@ -13,7 +13,7 @@ lost. This is a recreation written 2018 out
 of memory to demonstrate the capabilities
 of the R65 computer system.
 
-          rricharz 2018                 }
+          rricharz 2018,2019             }
 
 program pong;
 uses syslib,plotlib;
@@ -100,24 +100,18 @@ proc showcount(x,y,count:integer);
 var digit: integer;
 begin
   digit:=count div 10;
-  plotchar(x,y,chr(ord('0')+digit));
-  digit:=mod(count,10);
-  plotchar(x+8,y,chr(ord('0')+digit));
-end;
-
-proc show4letters(x,y:integer;
-                      s:array[3] of char);
-var i: integer;
-begin
-  for i:=0 to 3 do
-    plotchar(x+8*i,y,s[i]);
+  move(x,y);
+  write(@plotdev,chr(ord('0')+digit),
+    chr(ord('0')+mod(count,10)));
 end;
 
 begin
   init;
-  show4letters(1,100,'Hit ');
+  move(1,100);
+  write(@plotdev,'Hit ');
   showcount(1,90,hit);
-  show4letters(1,70,'Miss');
+  move(1,70);
+  write(@plotdev,'Miss');
   showcount(1,60,miss);
   showball;
   showpaddle;

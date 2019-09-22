@@ -13,8 +13,8 @@ var f:file;
 
 begin
 
-  dalpha;
-
+  dalpha; { go to alpha display } 
+  
   f:=attach('TABLE:X         ',0,1,fread,
     0,0,'X');
   size:=getsize div 4;
@@ -34,13 +34,9 @@ begin
   write('Max: ');
   writefix(output,2,max);
   writeln;
-  writeln('Use ctrl-l to toggle ',
-    'alpha and graphics display');
 
-  delay10mses(200);
-
-  dgraphics;
   cleargr;
+  dgraphics; {now go to graphics}
   xs:=2;
   xw:=xsize-4;
   ys:=2;
@@ -61,9 +57,9 @@ begin
     y:=trunc((v-min)/(max-min)*conv(yw));
     draw(xs+x,ys+y,white);
   end;
-  delay10msec(200);
 
   close(f);
-  dalpha;
+  waitforkey;
+  grend;
 
 end.  
