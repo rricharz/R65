@@ -1663,7 +1663,7 @@ PRTCHR2 DEX
         JSR WRITCH
         JMP TFER
 *
-PRTCHR3 CMP =$0C        Plot CR?
+PRTCHR3 CMP =$0D        Plot CR?
         BNE PRTCHR4
         LDA =0
         STA GRX
