@@ -189,7 +189,7 @@ begin {main}
           else if (ch>='A') and (ch<='Z') then
             begin {letter}
               { default for arg is drive 1 }
-              drive2:=1; cyclus2:=0;
+              drive2:=255; cyclus2:=0;
               getfname(aname,' ',ok,
                 drive2,cyclus2);
               if not ok then synerr:=1;
@@ -204,8 +204,13 @@ begin {main}
               end;
             arglist[n+1]:=cyclus2;
             argtype[n+1]:='i';
-            arglist[n+2]:=drive2;
-            argtype[n+2]:='i';
+            if drive2=255 then begin {default}
+              arglist[n+2]:=1;
+              argtype[n+2]:='d';
+            end else begin
+              arglist[n+2]:=drive2;
+              argtype[n+2]:='i';
+            end;
             n:=n+2;
           end {letter}
           else begin

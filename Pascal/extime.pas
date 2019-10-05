@@ -9,13 +9,14 @@ var cyclus,drive,i,etime: integer;
     default: boolean;
 
 begin
+  write('extime start - ');
+  prttime(output); writeln;
   if argtype[carg]<>'s' then begin
     write('Usage: extime program,drive');
     writeln(' arguments of program');
     abort;
   end;
-  write('extime start - ');
-  prttime(output); writeln;
+  cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
   asetfile(name,cyclus,drive,'R');
   for i:=carg to 31 do begin

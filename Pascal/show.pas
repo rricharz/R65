@@ -44,10 +44,12 @@ end;
 
 begin
   line := 0; aline:=1;
+  cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
   asetfile(name,cyclus,drive,' ');
   openr(fno);
 
+  value:=1;
   agetval(value,default);      {starting line}
   if value<1 then value:=1;
   if value>1 then begin

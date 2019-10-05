@@ -339,6 +339,7 @@ begin {init}
   writeln(tab8,'   Pass 1  Version 3.7');
 
   sdrive:=1; {default drive for source }
+  scyclus:=0;
   agetstring(pname,default,scyclus,sdrive);
 
   agetstring(request,default,dummy,dummy);

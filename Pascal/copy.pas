@@ -103,6 +103,7 @@ end {error};
 { * main * }
 
 begin
+  cyclus:=0; drive:=0;
   agetstring(name,default,cyclus,drive);
   if (drive<0) or (drive>1) then
     begin

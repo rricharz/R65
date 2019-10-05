@@ -18,7 +18,7 @@ mem numarg=$5f:   integer&;
     arglist=$60:  array[3] of integer;
     arglists=$60: array[63] of char&;
     argtype=$a0:  array[31] of char&;
-    
+
     filflg=$00da: integer&;
     fildrv=$00dc: integer&;
     filcyc=$0311: integer&;
@@ -26,7 +26,7 @@ mem numarg=$5f:   integer&;
     filnam=$0301: array[15] of char&;
     filnm1=$0320: array[15] of char&;
     filstp=$0312: char&;
-    
+
 var carg: integer;
 
 {       * argerror *        }
@@ -46,16 +46,16 @@ end;
 
 proc agetval(var value: integer;
   var default: boolean);
-  
+
 begin
   case argtype[carg] of
     'i': begin value:=arglist[carg];
            carg:=succ(carg); default:=false;
          end;
-    'd': begin value:=0; 
+    'd': begin
            carg:=succ(carg); default:=true;
          end;
-    chr(0): 
+    chr(0):
          begin
            value:=0; default:=true;
          end
@@ -68,7 +68,7 @@ end;
 proc agetstring(var string: array[15] of char;
   var default: boolean;
   var cyclus, drive: integer);
-  
+
 var i: integer;
     dummy: boolean;
 
@@ -106,11 +106,11 @@ begin
     uppercase := ch1;
 end;
 
-{	* asetfile *    }
+{       * asetfile *    }
 
 proc asetfile(name: array[15] of char;
   cyclus,device: integer; subtype: char);
-  
+
 var i,e: integer;
 
 begin
@@ -120,7 +120,7 @@ begin
     filnm1[i]:=uppercase(name[i]);
     if (e=0) and ((name[i]=':')
         or (name[i]=' ')) then
-      e:=i; 
+      e:=i;
   end;
   if (subtype<>' ') and (e<>0)
       and (e<15) then begin
@@ -138,6 +138,6 @@ end;
 begin
   carg:=0;
 end.
-  
+
 
 

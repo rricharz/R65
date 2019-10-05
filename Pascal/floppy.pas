@@ -37,11 +37,6 @@ end;
 begin
   cyclus:=0; drive:=0;
   agetstring(name,default,cyclus,drive);
-  agetval(drive,default);
-  if default then begin
-    writeln('Usage: floppy name drive');
-    abort;
-  end;
   asetfile(name,cyclus,drive,' ');
   call(afloppy);
   if filerr<>0 then bcderror(filerr);
