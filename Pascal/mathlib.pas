@@ -190,7 +190,7 @@ begin
     else n:=fl-7-d;
     if d=0 then n:=n+1;
     n1:=n;
-    if centered then n:=(n+1) div 2;
+    if centered then n:=n div 2;
     for i1:=1 to n do write(@f,' ');
     write(@f,sign,m1);
     m:=m-conv(m1);
