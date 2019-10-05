@@ -1,7 +1,9 @@
 { graph -                            }
 { display a table of real numbers    }
+{ the first 3 values in the table    }
+{ are fsize, xmin and xmax           }
 {                                    }
-{   rricharz 2019 to test ralib      }
+{   rricharz 2019                    }
 
 program graph;
 uses syslib,ralib,mathlib,plotlib;
@@ -13,18 +15,18 @@ var f:file;
 
 begin
 
-  dalpha; { go to alpha display } 
-  
+  dalpha; { go to alpha display }
+
   f:=attach('TABLE:X         ',0,1,fread,
     0,0,'X');
-  size:=getsize div 4;
+  getword(f,0,size);
   writeln;
   writeln('Elements: ', size);
 
   min:=1.0e10;
   max:=-1.0e10;
   for i:=0 to size - 1 do begin
-    getreal(f,i,v);
+    getreal(f,i+3,v);
     if v>max then max:=v;
     if v<min then min:=v;
   end;
@@ -48,13 +50,13 @@ begin
   draw(xs-1,ys+yw+1,white);
   draw(xs-1,ys-1,white);
 
-  getreal(f,0,v);
-  y:=trunc((v-min)/(max-min)*conv(yw));
+  getreal(f,3,v);
+  y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
   move(xs,ys+y);
   for i:=1 to size-1 do begin
-    getreal(f,i,v);
-    x:=trunc(conv(xw)/conv(size-1)*conv(i));
-    y:=trunc((v-min)/(max-min)*conv(yw));
+    getreal(f,i+3,v);
+    x:=trunc(conv(xw)/conv(size-1)*conv(i)+0.5);
+    y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
     draw(xs+x,ys+y,white);
   end;
 

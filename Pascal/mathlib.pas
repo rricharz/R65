@@ -150,16 +150,18 @@ begin
   else write(@f,'00');
 end;
 
-proc writefix(f:file;d:integer;r:real);
-{*************************************}
+proc writef0(f:file;d:integer;
+    r:real;fl:integer;centered:boolean);
+{**************************************}
 { write real in fixed point format     }
-{ right justified in field of 11 chars }
+{ right justified or centered in field }
+{ of fl chars (more if necessary)      }
 { d digits after decimal point         }
 { Warning! The floating point accuracy }
 { is only approximately 5 digits!      }
 
 var m,rnd: real;
-    d1,i1,m1,n:integer;
+    d1,i1,m1,n,n1:integer;
     sign: char;
 begin
   d1:=d;
@@ -181,12 +183,14 @@ begin
   else begin
     { if m<2.*rnd then sign:=' ';}
     m1:=trunc(m);
-    if m1<10 then n:=8-d
-    else if m1<100 then n:=7-d
-    else if m1<1000 then n:=6-d
-    else if m1<10000 then n:=5-d
-    else n:=4-d;
+    if m1<10 then n:=fl-3-d
+    else if m1<100 then n:=fl-4-d
+    else if m1<1000 then n:=fl-5-d
+    else if m1<10000 then n:=fl-6-d
+    else n:=fl-7-d;
     if d=0 then n:=n+1;
+    n1:=n;
+    if centered then n:=(n+1) div 2;
     for i1:=1 to n do write(@f,' ');
     write(@f,sign,m1);
     m:=m-conv(m1);
@@ -196,7 +200,19 @@ begin
       write(@f,trunc(m));
       m:=m-conv(trunc(m));
     end;
+    for i1:=1 to n1-n do write(@f,' ');
   end;
+end;
+
+proc writefix(f:file;d:integer;r:real);
+{*************************************}
+{ write real in fixed point format     }
+{ right justified in field of 11 chars }
+{ d digits after decimal point         }
+{ Warning! The floating point accuracy }
+{ is only approximately 5 digits!      }
+begin
+  writef0(f,d,r,11,false);
 end;
 
 func readflo(f:file):real;

@@ -127,5 +127,22 @@ begin
     emucom:=6;
 end;
 
+proc setchsize(size:integer);
+{ set character size }
+begin
+  if (size>=1)and(size <= 4) then begin
+  write(@plotter,chr(27));
+  write(@plotter,chr(ord('7') + size));
+  end;
+end;
+
+proc setlinemode(type:integer);
+begin
+  if (type>=solid)and(type<=longdash) then begin
+    write(@plotter,chr(27));
+    write(@plotter,chr(95+type));
+  end;
+end;
+
 begin
 end. 
