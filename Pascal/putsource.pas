@@ -135,6 +135,14 @@ begin
     asetfile(dname,cyclus,drive,' ');
     call(afloppy);
 
+    { clean WORK }
+    writeln('Calling CLEAN 1');
+    setargi(1,0);
+    argtype[1]:=chr(0);
+    cyclus:=0; drive:=0; filerr:=0;
+    runprog('CLEAN:R         ',cyclus,drive);
+    writeln;
+
     { copy the source file }
     write('Calling COPY ');
     writename(fname);
@@ -142,6 +150,7 @@ begin
     setargs(fname,0,0,1);
     argtype[10]:='i';
     arglist[10]:=0; {copy to drive 0}
+    argtype[11]:=chr(0);
     cyclus:=0; drive:=0; filerr:=0;
     runprog('COPY:R          ',cyclus,drive);
     writeln;
@@ -166,6 +175,7 @@ begin
       { clean the destination drive }
       writeln('Calling CLEAN 0');
       setargi(0,0);
+      argtype[1]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
       runprog('CLEAN:R         ',cyclus,drive);
       writeln;
@@ -173,6 +183,7 @@ begin
       { pack the destination drive }
       writeln('Calling PACK 0');
       setargi(0,0);
+      argtype[1]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
       runprog('PACK:R          ',cyclus,drive);
       writeln
