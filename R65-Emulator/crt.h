@@ -21,7 +21,7 @@
 #define QUIT_VPOS    1   // Vertical position of QUIT button
 #define QUIT_HSIZE  45   // Horizontal size of QUIT button
 
-#define NUM_LEDS     3   // Number of leds
+#define NUM_LEDS     2   // Number of leds
 #define LED_VPOS    24
 #define LED_HPOS   140
 #define LED_SIZE    13
