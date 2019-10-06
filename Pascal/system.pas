@@ -219,7 +219,7 @@ begin {main}
           end;
           n:=n+1; numarg:=numarg+1;
         until (synerr<>0) or (n>31)
-            or (ch<>' ');
+            or ((ch<>' ') and (ch<>','));
         if ch<>cr then synerr:=3;
       end; {arguments}
       if ch<>cr then synerr:=4;

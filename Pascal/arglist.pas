@@ -24,6 +24,7 @@ begin
          end;
     'd': begin
            carg:= succ(carg);
+           write(val);
          end
     end;
     writeln;

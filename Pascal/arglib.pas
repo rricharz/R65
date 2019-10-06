@@ -46,7 +46,7 @@ end;
 
 proc agetval(var value: integer;
   var default: boolean);
-
+{ does not change value, if no argument }
 begin
   case argtype[carg] of
     'i': begin value:=arglist[carg];
@@ -57,7 +57,7 @@ begin
          end;
     chr(0):
          begin
-           value:=0; default:=true;
+           default:=true;
          end
     else argerror(2)
   end {case}
@@ -68,7 +68,7 @@ end;
 proc agetstring(var string: array[15] of char;
   var default: boolean;
   var cyclus, drive: integer);
-
+{ set string to blank if no argument }
 var i: integer;
     dummy: boolean;
 
