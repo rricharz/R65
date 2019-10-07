@@ -22,7 +22,7 @@ mem filerr=$db: integer&;
 
 var cyclus,drive,k: integer;
     fname,dname: array[15] of char;
-    default: boolean;
+    default,ok: boolean;
 
 func contains(t:array[7] of char):boolean;
 { check for substring in fname }
@@ -105,6 +105,9 @@ begin
 end;
 
 begin
+  ok:=true;
+  filerr:=0;
+
   { get the argument (file name) }
   cyclus:=0; drive:=0;
   agetstring(fname,default,cyclus,drive);
@@ -126,6 +129,7 @@ begin
     asetfile('WORK            ',
                       cyclus,drive,' ');
     call(afloppy);
+    if (filerr<>0) then ok:=false;
 
     { make sure that dname is on drive 0 }
     write('Putting disk ');
@@ -134,6 +138,7 @@ begin
     cyclus:=0; drive:=0;
     asetfile(dname,cyclus,drive,' ');
     call(afloppy);
+    if (filerr<>0) then ok:=false;
 
     { clean WORK }
     writeln('Calling CLEAN 1');
@@ -142,6 +147,8 @@ begin
     cyclus:=0; drive:=0; filerr:=0;
     runprog('CLEAN:R         ',cyclus,drive);
     writeln;
+    if (filerr<>0) or (runerr<>0) then
+      ok:=false;
 
     { copy the source file }
     write('Calling COPY ');
@@ -154,12 +161,13 @@ begin
     cyclus:=0; drive:=0; filerr:=0;
     runprog('COPY:R          ',cyclus,drive);
     writeln;
-    if filerr<>0 then begin
+    if (filerr<>0) or (runerr<>0) then begin
+      ok:=false;
       if filerr=6 then
-        write(invvid,'Source file not found',
-                             norvid)
+        writeln(invvid,
+          'Source file not found',norvid)
       else
-        write(invvid,'Copy failed',norvid);
+        writeln(invvid,'Copy failed',norvid);
     end else begin {if successfull}
 
       { delete the source file }
@@ -168,9 +176,11 @@ begin
       drive:=0; filerr:=0;
       runprog('DELETE:R        ',cyclus,drive);
       writeln;
-      if filerr<>0 then
+      if (filerr<>0) or (runerr<>0) then  begin
+        ok:=false;
         writeln(invvid,
           'Deleting original failed',norvid);
+      end;
 
       { clean the destination drive }
       writeln('Calling CLEAN 0');
@@ -179,6 +189,8 @@ begin
       cyclus:=0; drive:=0; filerr:=0;
       runprog('CLEAN:R         ',cyclus,drive);
       writeln;
+      if (filerr<>0) or (runerr<>0) then
+         ok:=false;
 
       { pack the destination drive }
       writeln('Calling PACK 0');
@@ -186,7 +198,9 @@ begin
       argtype[1]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
       runprog('PACK:R          ',cyclus,drive);
-      writeln
+      writeln;
+      if (filerr<>0) or (runerr<>0) then
+         ok:=false;
     end;
 
     { make sure that PASCAL is on drive 0 }
@@ -195,5 +209,12 @@ begin
     asetfile('PASCAL          ',
                       cyclus,drive,' ');
     call(afloppy);
+    if (filerr<>0) then ok:=false;
+
+  end;
+
+  if (not ok) or (runerr<>0) then begin
+    writeln(invvid,'Putsource failed',norvid);
+    filerr:=0; runerr:=0;
   end;
 end.

@@ -595,7 +595,7 @@ RENAME  JSR NGETNE
         BYT ','+128
         BCS SYNERR
         JSR TEST
-        BYT 'P'+128     PROTECTED?
+        BYT '!'+128     PROTECTED?
         LDA FILTYP
         AND =$7F
         BCS *+4

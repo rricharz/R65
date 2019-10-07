@@ -22,7 +22,7 @@ mem filerr=$db: integer&;
 
 var cyclus,drive,k: integer;
     fname,dname: array[15] of char;
-    default: boolean;
+    default,ok: boolean;
 
 proc runprog
   (name: array[15] of char;
@@ -82,6 +82,9 @@ begin
 end;
 
 begin
+  ok:=true;
+  filerr:=0;
+
   { get the argument (file name) }
   cyclus:=0; drive:=0;
   agetstring(fname,default,cyclus,drive);
@@ -96,6 +99,7 @@ begin
     asetfile('WORK            ',
                       cyclus,drive,' ');
     call(afloppy);
+    if (filerr<>0) then ok:=false;
 
     { make sure that PASCAL is on drive 0 }
     writeln('Putting disk PASCAL in drive 1');
@@ -103,6 +107,7 @@ begin
     asetfile('PASCAL          ',
                       cyclus,drive,' ');
     call(afloppy);
+    if (filerr<>0) then ok:=false;
 
     { clean WORK }
     writeln('Calling CLEAN 1');
@@ -111,6 +116,8 @@ begin
     cyclus:=0; drive:=0; filerr:=0;
     runprog('CLEAN:R         ',cyclus,drive);
     writeln;
+    if (filerr<>0) or (runerr<>0) then
+      ok:=false;
 
     { copy the object file }
     write('Calling COPY ');
@@ -123,7 +130,8 @@ begin
     cyclus:=0; drive:=0; filerr:=0;
     runprog('COPY:R          ',cyclus,drive);
     writeln;
-    if filerr<>0 then begin
+    if (filerr<>0) or (runerr<>0) then begin
+      ok:=false;
       if filerr=6 then
         writeln(invvid,
              'Object file not found',norvid)
@@ -138,9 +146,11 @@ begin
       drive:=0; filerr:=0;
       runprog('DELETE:R        ',cyclus,drive);
       writeln;
-      if filerr<>0 then
+      if (filerr<>0) or (runerr<>0) then begin
         writeln(invvid,
           'Deleting original failed',norvid);
+        ok:=false;
+      end;
 
       { clean the destination drive }
       writeln('Calling CLEAN 0');
@@ -149,6 +159,8 @@ begin
       cyclus:=0; drive:=0; filerr:=0;
       runprog('CLEAN:R         ',cyclus,drive);
       writeln;
+      if (filerr<>0) or (runerr<>0) then
+         ok:=false;
 
       { pack the destination drive }
       writeln('Calling PACK 0');
@@ -156,7 +168,14 @@ begin
       argtype[1]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
       runprog('PACK:R          ',cyclus,drive);
-      writeln
+      writeln;
+      if (filerr<>0) or (runerr<>0) then
+         ok:=false;
     end;
+  end;
+
+  if (not ok) or (runerr<>0) then begin
+    writeln(invvid,'Putobject failed',norvid);
+    filerr:=0; runerr:=0;
   end;
 end.
