@@ -27,7 +27,7 @@ var shipmap: array[1] of integer;
     shipx,shipy,sspeedx,sspeedy,
     lastsx,lastsy,birdx,birdy,
     lastbirdx,birdcount,sbird,
-    score,lastscore,
+    score,lastscore,dummy,
     lasercount          : integer;
 
     exit,landed         : boolean;
@@ -195,6 +195,7 @@ begin
       showbird;
     end;
 
+    dummy:=syncscreen;
     delay10msec(5);
     if (keypressed<>chr(0)) then begin
       if keypressed=' ' then laser

@@ -35,6 +35,17 @@ begin
     emucom:=6;
 end;
 
+func syncscreen;
+{ synchronize screen and sleep
+  up to 30 msec since last sync.
+  returns sleep time in msec    }
+mem emucom=$1430: integer&;
+    emures=$1431: integer&;
+begin
+  emucom := 7;
+  syncscreen := emures; 
+end;
+
 { grinit: initialize memory for }
 { alpha/graphics display        }
 

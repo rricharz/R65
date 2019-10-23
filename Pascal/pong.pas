@@ -23,7 +23,7 @@ const paddlesize = 24;
 
 var i,xball,yball,lastxball,lastyball,
     ypaddle,lastypaddle,maxx,maxy,xspeed,
-    yspeed,hit,miss: integer;
+    yspeed,hit,miss,dummy: integer;
 
 proc showball;
 begin
@@ -160,7 +160,7 @@ begin
       if (ypaddle<>lastypaddle) then
         showpaddle;
     end;
-    delay10msec(3);
+    dummy:=syncscreen;
     if (xball<>lastxball) or
        (yball<>lastyball) then begin
       eraseball;

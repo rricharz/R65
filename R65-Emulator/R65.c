@@ -94,6 +94,9 @@ int curLocLow               = 0;
 
 int dotrace = 0;        // pascal user program tracer
 
+int checkEventCounter = 0;
+clock_t lastCrtSync = 0;
+
 
 /********************/
 void checkMinTimeout()
@@ -507,6 +510,19 @@ void write6502(uint16_t address, uint8_t value)
             memory[R8_EMURES] = 0;
             memory[R8_EMUCOM] = 0;
         }
+        else if (value == 7) {              // sync screen and wait 30 msec
+                                            // since last call
+            int sleepmicros = lastCrtSync - clock() + 30000;
+            if ((sleepmicros > 0) && (sleepmicros < 30000))
+                usleep(sleepmicros);
+            else
+                sleepmicros = 0;
+            lastCrtSync = clock();
+            checkEventCounter = -20000;
+            crtUpdate();
+            memory[R8_EMURES] = sleepmicros / 1000;
+            memory[R8_EMUCOM] = 0;
+        }
         else {
             printf("Unknown emulator command %02X, pc=%04X\n", value, pc-3);
         memory[R8_EMURES] = 0X67;           // set result to 0
@@ -828,7 +844,7 @@ int r65Loop()
     
     clearClicks();
     
-    int checkEventCounter = 0;
+    
     pc = 0xF800;            // initialize the program counter, start R65 Monitor
     spMin = 255;
     pascalMinFree = 0xFFFF;
