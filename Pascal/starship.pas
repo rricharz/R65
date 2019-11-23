@@ -21,7 +21,7 @@ var sinetable: array[90] of integer;
     energy,damage: array[4] of integer;
     radarsize,charging,score: integer;
     shield,quit: boolean;
-    phaserrange: integer;
+    phaserrange,step: integer;
 
 proc startwritethrough;
 begin
@@ -78,117 +78,169 @@ begin
     atan2:=360.0-atanp(-x,y)
 end;
 
-proc checkradar(angle,cx,cy:integer);
-var i,xi,yi,dist:integer;
+proc checkradar(angle,cx,cy,mode:integer);
+var i,xi,yi,dist,rsize0,a:integer;
     x,y:real;
 begin
+  rsize0:=radarsize;
+  if mode=0 then rsize0:=rsize0 div 10;
   for i:=0 to maxships-1 do
-    if ashiptable[i]=angle then begin
-      if dshiptable[i]<=radarsize then begin
+    if (ashiptable[i]>=angle) and
+      (ashiptable[i]<angle+step) then begin
+      if dshiptable[i]<=rsize0 then begin
         dist:=dshiptable[i];
+        a:=ashiptable[i];
         if angle<90 then begin
-          x:=conv(sinetable[angle])*
+          x:=conv(sinetable[a])*
             conv(dist)/32000.0;
-          y:=conv(sinetable[89-angle])*
+          y:=conv(sinetable[89-a])*
             conv(dist)/32000.0
-         end else if angle<180 then begin
-          x:=conv(sinetable[179-angle])*
+        end else if angle<180 then begin
+          x:=conv(sinetable[179-a])*
             conv(dist)/32000.0;
-          y:=-conv(sinetable[angle-90])*
+          y:=-conv(sinetable[a-90])*
             conv(dist)/32000.0
-         end else if angle<270 then begin
-          x:=-conv(sinetable[angle-180])*
+        end else if angle<270 then begin
+          x:=-conv(sinetable[a-180])*
             conv(dist)/32000.0;
-          y:=-conv(sinetable[269-angle])*
+          y:=-conv(sinetable[269-a])*
             conv(dist)/32000.0
-         end else begin
-          x:=-conv(sinetable[359-angle])*
+        end else begin
+          x:=-conv(sinetable[359-a])*
             conv(dist)/32000.0;
-          y:=conv(sinetable[angle-270])*
+          y:=conv(sinetable[a-270])*
             conv(dist)/32000.0
-         end;
-         endwritethrough;
-         xi:=cx+trunc(x);
-         yi:=cy+trunc(y);
-         startdraw(xi-3,yi-3);
-         draw(xi+3,yi-3);
-         draw(xi,yi+2);
-         draw(xi-3,yi-3);
-         enddraw;
-         moveto(xi+6,yi-7);
-         write(@plotter,i+1);
-         moveto(20,maxy-16*i-78);
-         write(@plotter,i+1,': ');
-         writef0(plotter,0,conv(angle),4,false);
-         writef0(plotter,1,conv(dist)*0.1,
-           6,false);
-         write(@plotter,' pc');
-         startwritethrough;
+        end;
+        if mode=0 then begin
+          x:=x*10.0;
+          y:=y*10.0;
+        end;
+        xi:=cx+trunc(x);
+        yi:=cy+trunc(y);
+        startdraw(xi-3,yi-3);
+        draw(xi+3,yi-3);
+        draw(xi,yi+2);
+        draw(xi-3,yi-3);
+        enddraw;
+        moveto(xi+6,yi-7);
+        write(@plotter,i+1);
+        if mode=1 then begin
+          moveto(20,maxy-16*i-78);
+          write(@plotter,i+1,': ');
+          writef0(plotter,0,conv(angle),
+            4,false);
+          writef0(plotter,1,conv(dist)*0.1,
+            6,false);
+          write(@plotter,' pc');
+        end;
       end;
     end;
-  delay10msec(1);
 end;
 
-proc scan;
+proc scan(mode:integer);
 var i,angle: integer;
     cx,cy: integer;
-    csize: real;
+    x,y,csize,ticfactor,ticf1,ticf2: real;
+
+  proc drawsegment;
+  begin
+    startwritethrough;
+    drawvector(cx,cy,cx+trunc(x),cy+trunc(y));
+    endwritethrough;
+    drawvector(cx+trunc(x),
+      cy+trunc(y),
+      cx+trunc(ticfactor*x),
+      cy+trunc(ticfactor*y));
+    if mode=0 then begin
+      drawvector(cx+trunc(ticf1*x),
+      cy+trunc(ticf1*y),
+      cx+trunc(ticf2*x),
+      cy+trunc(ticf2*y));
+    end;
+    angle:=angle+step;
+  end;
+
 begin
   setchsize(1);
-  moveto((maxx div 2)-72,maxy-25);
-  write(@plotter,'R65 Starship');
-  radarsize:=(310*damage[0]) div 100;
-  csize:=conv(radarsize)/32000.0;
-  write('Scanning, range =');
-  writef0(output,1,conv(radarsize)*0.1,
-    6,false);
-  writeln(' pc');
-  cx:=maxx div 2;
-  cy:=maxy div 2;
+  if mode=0 then begin
+    step:=6;
+    cx:=maxx-130;
+    cy:=150;
+    moveto((maxx div 2)-72,maxy-25);
+    radarsize:=100;
+    ticfactor:=1.0+3.0/conv(radarsize);
+    ticf1:=conv(phaserrange)/10.0;
+    ticf2:=0.01+conv(phaserrange)/10.0;
+    csize:=conv(radarsize)/32000.0;
+    moveto(cx-130,cy-radarsize-28);
+    write(@plotter,'Phaser range');
+    writef0(plotter,1,
+      conv(phaserrange)/10.0,
+      4,false);
+    write(@plotter,' pc');
+  end else begin
+    step:=3;
+    cx:=maxx div 2;
+    cy:=maxy div 2;
+    moveto((maxx div 2)-72,maxy-25);
+    write(@plotter,'R65 Starship');
+    radarsize:=(310*damage[0]) div 100;
+    ticfactor:=1.0+3.0/conv(radarsize);
+    csize:=conv(radarsize)/32000.0;
+    moveto(cx-150,cy-radarsize-28);
+    write(@plotter,'Long range scan');
+    writef0(plotter,1,conv(radarsize)*0.1,
+      4,false);
+    write(@plotter,' pc');
+  end;
   angle:=0;
   setlinemode(2);
   setchsize(2);
   drawvector(cx-radarsize,cy,cx+radarsize,cy);
   drawvector(cx,cy-radarsize,cx,cy+radarsize);
   setlinemode(1);
-  drawrectange(10,maxy-200,240,maxy-10);
-  moveto(20,maxy-30);
-  write(@plotter,'SCANNER');
-  moveto(20,maxy-46);
-  write(@plotter,'Objects located:');
-  moveto(20,maxy-60);
-  write(@plotter,'   angle distance');
-  setlinemode(1);
-  startwritethrough;
-  for i:=0 to 89 do begin
-    checkradar(angle,cx,cy);
-    drawvector(cx,cy,
-      cx+trunc(csize*conv(sinetable[i])),
-      cy+trunc(csize*conv(sinetable[89-i])));
-    angle:=angle+1;
+  if (mode=1) then begin
+    drawrectange(10,maxy-200,240,maxy-10);
+    moveto(20,maxy-30);
+    write(@plotter,'SCANNER');
+    moveto(20,maxy-46);
+    write(@plotter,'Objects located:');
+    moveto(20,maxy-60);
+    write(@plotter,'   angle distance');
   end;
-  for i:=0 to 89 do begin
-    checkradar(angle,cx,cy);
-    drawvector(cx,cy,
-      cx+trunc(csize*conv(sinetable[89-i])),
-      cy-trunc(csize*conv(sinetable[i])));
-    angle:=angle+1;
-  end;
-  for i:=0 to 89 do begin
-    checkradar(angle,cx,cy);
-    drawvector(cx,cy,
-      cx-trunc(csize*conv(sinetable[i])),
-      cy-trunc(csize*conv(sinetable[89-i])));
-    angle:=angle+1;
-  end;
-  for i:=0 to 89 do begin
-    checkradar(angle,cx,cy);
-    drawvector(cx,cy,
-      cx-trunc(csize*conv(sinetable[89-i])),
-      cy+trunc(csize*conv(sinetable[i])));
-    angle:=angle+1;
-  end;
-  endwritethrough;
+  angle:=0;
+  i:=0
+  repeat
+    checkradar(angle,cx,cy,mode);
+    x:=csize*conv(sinetable[i]);
+    y:=csize*conv(sinetable[89-i]);
+    drawsegment;
+    i:=i+step;
+  until i>=90;
+  i:=0;
+  repeat
+    checkradar(angle,cx,cy,mode);
+    x:=csize*conv(sinetable[89-i]);
+    y:=-csize*conv(sinetable[i]);
+    drawsegment;
+    i:=i+step;
+  until i>=90;
+  i:=0;
+  repeat
+    checkradar(angle,cx,cy,mode);
+    x:=-csize*conv(sinetable[i]);
+    y:=-csize*conv(sinetable[89-i]);
+    drawsegment;
+    i:=i+step;
+  until i>=90;
+  i:=0;
+  repeat
+    checkradar(angle,cx,cy,mode);
+    x:=-csize*conv(sinetable[89-i]);
+    y:=csize*conv(sinetable[i]);
+    drawsegment;
+   i:=i+step;
+  until i>=90;
 end;
 
 proc showEnergy;
@@ -273,7 +325,8 @@ begin
       'Not enough energy for scan',norvid)
   else begin
     energy[0]:=energy[0]-8;
-    scan;
+    scan(1);
+    scan(0);
   end;
 end;
 
@@ -507,9 +560,10 @@ begin
       writeln(invvid,'Raising shield',norvid);
       shield:=sshield;
     end;
-    doscan;
+    phaserrange:=10*damage[2] div 100;
     showEnergy;
     showStatus;
+    doscan;
     moveto(5,maxx-20);
     s:=0;
     for i:=0 to 3 do
@@ -579,12 +633,12 @@ end;
 begin {main}
   starttek;
   initialize;
-  scan;
   showEnergy;
   showStatus;
+  scan(1);
+  scan(0);
   moveto(5,maxx-20);
   repeat
-    phaserrange:=10*damage[2] div 100;
     action;
   until quit;
   writeln(invvid,'Final score: ',score,norvid);

@@ -105,6 +105,7 @@ The following Pascal games have currently been reconstructed:
 - Reversi
 - Pong
 - Alien Invasion
+- Starship (using an external tek4010 terminal emulator)
 
 No Basic games have survived, but I imported a few Basic games from
 http://vintage-basic.net/games.html to test the Basic interpreter.
