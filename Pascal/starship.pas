@@ -124,6 +124,8 @@ begin
         enddraw;
         moveto(xi+6,yi-7);
         write(@plotter,i+1);
+        if shipdamage[i]<100 then
+          write(@plotter,'d');
         if mode=1 then begin
           moveto(20,maxy-16*i-78);
           write(@plotter,i+1,': ');
@@ -132,6 +134,8 @@ begin
           writef0(plotter,1,conv(dist)*0.1,
             6,false);
           write(@plotter,' pc');
+          if shipdamage[i]<100 then
+            write(@plotter,' d');
         end;
       end;
     end;
@@ -325,6 +329,7 @@ begin
       'Not enough energy for scan',norvid)
   else begin
     energy[0]:=energy[0]-8;
+    if energy[0]<0 then energy[0]:=0;
     scan(1);
     scan(0);
   end;
@@ -506,8 +511,9 @@ begin
 end;
 
 proc action;
-var i,s,select:integer;
+var i,s:integer;
     sshield:boolean;
+    select:char;
 begin
   sshield:=shield;
   writeln(invvid,'Current score: ',
@@ -515,28 +521,28 @@ begin
   if not shield then
     writeln(invvid,'Shield is down',norvid);
   writeln('Select action:');
-  writeln('1: Repair stations');
+  writeln('R: Repair stations');
   if shield then
-    writeln('2: Lower shield')
+    writeln('S: Lower shield')
   else
-    writeln('2: Rase shield');
-  write('3: Phaser (range ');
+    writeln('S: Rase shield');
+  write('P: Phaser (range ');
   writef0(output,1,conv(phaserrange)/10.0,
     2,false);
   writeln(' pc)');
-  writeln('4: Warp');
-  writeln('5: Select station for fast charge');
-  writeln('6: Quit game');
-  write('Which action (1..6)? ');
+  writeln('W: Warp');
+  writeln('C: Choose station for fast charge');
+  writeln('Q: Quit game');
+  write('Which action (R,S,P,W,C,Q)? ');
   read(select);
   case select of
-    1: repair;
-    2: shield:= not shield;
-    3: shoot;
-    4: warp;
-    5: setcharging;
-    6: quit:=true
-    else writeln(invvid,'Illegal selection',
+    'R': repair;
+    'S': shield:= not shield;
+    'P': shoot;
+    'W': warp;
+    'C': setcharging;
+    'Q': quit:=true
+    else writeln(invvid,'No action taken',
       norvid)
   end;
   energy[charging]:=energy[charging]+10;
@@ -548,14 +554,20 @@ begin
       energy[i]:=damage[i];
   end;
   if shield then begin
-    energy[1]:=energy[1]-10;
-    if energy[1]>damage[1] then
-      energy[1]:=damage[1];
+    if energy[1]<10 then begin
+       writeln(invvid,'Not enough energy, ',
+         'shield down',norvid);
+      shield:=false;
+    end else begin
+      energy[1]:=energy[1]-10;
+      if energy[1]>damage[1] then
+        energy[1]:=damage[1];
+    end;
   end;
   if not quit then begin
     clearscreen;
     enemy;
-    if (select=3) and (shield<>sshield)
+    if (select='P') and (shield<>sshield)
     then begin
       writeln(invvid,'Raising shield',norvid);
       shield:=sshield;
@@ -566,9 +578,9 @@ begin
     doscan;
     moveto(5,maxx-20);
     s:=0;
-    for i:=0 to 3 do
+    for i:=1 to 3 do
       s:=s+damage[i];
-    if s<40 then begin
+    if s<30 then begin
       writeln('Starship heavily damaged,',
         ' game over!');
       quit:=true;
