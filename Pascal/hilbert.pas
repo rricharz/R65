@@ -58,7 +58,6 @@ program hilbert;
 
   proc a(i: integer);
   begin
-    writeln('a(',i,')');
     if i > 0 then
       begin
         d(i - 1); x := x - h; plot;
@@ -70,7 +69,6 @@ program hilbert;
 
   proc b(i: integer);
   begin
-    writeln('b(',i,')');
     if i > 0 then
       begin
         c(i - 1); y := y + h; plot;
@@ -82,7 +80,6 @@ program hilbert;
 
   proc c(i: integer);
   begin
-    writeln('c(',i,')');
     if i > 0 then
       begin
         b(i - 1); x := x + h; plot;
@@ -94,7 +91,6 @@ program hilbert;
 
   proc d(i: integer);
   begin
-    writeln('d(',i,')');
     if i > 0 then
       begin
         a(i - 1); y := y - h; plot;
@@ -105,7 +101,9 @@ program hilbert;
   end {d};
 
 begin {Hilbert}
-  write('enter n of levels: ');
+  writeln('Requires an attached',
+          ' Tektronix 4010 terminal');
+  write('Enter n of levels: ');
   read(n);
   erase := n<0;
   if erase then n :=  - n;
@@ -127,8 +125,6 @@ begin {Hilbert}
     x0 := x0 + (h div 2);
     y0 := y0 + (h div 2);
     x := x0;   y := y0;   move;
-    writeln('i=',i,', h=',h,' ,x=',x,
-    ', y=',y);
     a(i)
   until i = n;
   endplot
