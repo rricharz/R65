@@ -270,20 +270,19 @@ uint8_t read6502(uint16_t address)
     // Hardware multiplier
     
     else if (address == R16_MULTR) {
-        int m = memory[R8_MULTX] * memory[R8_MULTY];
         memory[R16_MULTR] = (memory[0x14E0] * memory[0x14E1]) & 0xFF;
     }
     else if (address == R16_MULTR + 1) {
-        int m = memory[R8_MULTX] * memory[R8_MULTY];
         memory[R16_MULTR + 1] = (memory[0x14E0] * memory[0x14E1]) >> 8;
     }
     
     // Hardware timer 1, count down miliseconds
 
     else if (address == R8_TMSEC) {
-        if (memory[R8_TMSEC] >= 0)
+        if (memory[R8_TMSEC] >= 0) {
             usleep(1000);                   // this is not an exact implementation
             memory[R8_TMSEC]--;
+        }
     }
     
     // Keyboard
@@ -624,7 +623,6 @@ void setKeyboardInterrupt()
 int catchSubroutine(uint16_t ea)
 /******************************/
 {
-    int apc,aa;
     if (ea == 0xE95E) {
         // printf("******** IO: PRTRSA (print to rs232) called, currently implemented in emulator\n");
         if ((a == 0x12) && rawPrint) {         // device control 2, switch to normal mode
@@ -716,10 +714,9 @@ int loadCodeFromListing(char* s, int storeFlag)
     // open the listing file
     
     FILE *codeFile;
-    int res;
-	codeFile = fopen(s,"r");
-  	if (codeFile == NULL) {
-		printf("Cannot open %s\n",s);
+    codeFile = fopen(s,"r");
+    if (codeFile == NULL) {
+	printf("Cannot open %s\n",s);
         exit(1);
 	}
     

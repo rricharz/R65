@@ -5,7 +5,7 @@
 
 */
  
-#include <wiringPi.h>
+#include <pigpiod_if2.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -16,15 +16,15 @@
 
 // define pins :
 
-#define DATA          0  // GPIO 17 (WiringPi pin num  0)  header pin 11
-#define CLOCK         3  // GPIO 22 (WiringPi pin num  3)  header pin 15
-#define LEDCS         4  // GPIO 23 (WiringPi pin num  4)  header pin 16
-#define BUTTON_SWITCH 5  // GPIO 24 (WiringPi pin num  5)  header pin 18
-#define BUTTON_DOWN   29 // GPIO 21 (WiringPi pin num 29)  header pin 40
-#define BUTTON_QUIT   22 // GPIO 06 (WiringPi pin num 22)  header pin 31
-#define BUTTON_STOP   21 // GPIO 05 (WiringPi pin num 21)  header pin 29
-#define LED0          27 // GPIO 16 (WiringPi pin num 27)  header pin 36
-#define LED1          23 // GPIO 13 (WiringPi pin num 23)  header pin 33      
+#define DATA          17 // GPIO 17 header pin 11
+#define CLOCK         22 // GPIO 22 header pin 15
+#define LEDCS         23 // GPIO 23 header pin 16
+#define BUTTON_SWITCH 24 // GPIO 24 header pin 18
+#define BUTTON_DOWN   21 // GPIO 21 header pin 40
+#define BUTTON_QUIT   06 // GPIO 06 header pin 31
+#define BUTTON_STOP   05 // GPIO 05 header pin 29
+#define LED0          16 // GPIO 16 header pin 36
+#define LED1          13 // GPIO 13 header pin 33      
 
 
 // The Max7219 Registers :
@@ -35,7 +35,9 @@
 #define SHUTDOWN      0x0c                        
 #define DISPLAY_TEST  0x0f
 
-int buttonDebounce[3];                    
+int buttonDebounce[3];
+
+int pig;                   
 
 int segments(char ch)
 {
@@ -85,19 +87,19 @@ static void Send16bits (unsigned short output)
   {
     unsigned short mask = 1 << (i - 1); // calculate bitmask
   
-    digitalWrite(CLOCK, 0);  // set clock to 0
+    gpio_write(pig,CLOCK, 0);  // set clock to 0
     usleep(1);
     
     // Send one bit on the data pin
     
     if (output & mask)   
-      digitalWrite(DATA, 1);          
+      gpio_write(pig,DATA, 1);          
 		else                              
-      digitalWrite(DATA, 0);
+      gpio_write(pig,DATA, 0);
       
     usleep(1);
         
-    digitalWrite(CLOCK, 1);  // set clock to 1  	 
+    gpio_write(pig,CLOCK, 1);  // set clock to 1  	 
   }
 }
 
@@ -106,11 +108,11 @@ static void Send16bits (unsigned short output)
 
 static void MAX7219Send(unsigned char reg_number, unsigned char dataout)
 {
-  digitalWrite(LEDCS, 1);  // set LEDCS 1 to start
+  gpio_write(pig,LEDCS, 1);  // set LEDCS 1 to start
   Send16bits((reg_number << 8) + dataout);   // send 16 bits ( reg number + dataout )
-  digitalWrite(LEDCS, 0);  // LEDCS 0 to latch
+  gpio_write(pig,LEDCS, 0);  // LEDCS 0 to latch
   usleep(1);
-  digitalWrite(LEDCS, 1);  // set LEDCS 1 to finish
+  gpio_write(pig,LEDCS, 1);  // set LEDCS 1 to finish
 }
 
 void led_showstring(char *s, int first)
@@ -128,13 +130,13 @@ int checkButton(int buttonNumber)
   if ((buttonNumber < 0) || (buttonNumber > 3)) return 1;
   
   switch (buttonNumber) {
-    case 0: return digitalRead(BUTTON_SWITCH);
+    case 0: return gpio_read(pig,BUTTON_SWITCH);
     case 1: button = BUTTON_DOWN; break;
     case 2: button = BUTTON_QUIT; break;
     case 3: button = BUTTON_STOP; break;
     default: return 1;
   }
-  if (digitalRead(button) == 0) {
+  if (gpio_read(pig,button) == 0) {
     // debounce
     if (buttonDebounce[buttonNumber] <= 0){
        buttonDebounce[buttonNumber] = 5;
@@ -154,13 +156,14 @@ int checkButton(int buttonNumber)
 void setDriveLed(int led, int val)
 {
   // printf("SetDriveLed %d,%d\n", led, val);
-  if (led == 0) digitalWrite(LED0, val);
-  else if (led == 1) digitalWrite(LED1, val);
+  if (led == 0) gpio_write(pig,LED0, val);
+  else if (led == 1) gpio_write(pig,LED1, val);
 }
 
 void init_exdisp(void)
 {
-  if (wiringPiSetup () == -1) {
+  if (pig = pigpio_start (NULL,NULL) < 0) {
+      printf("CANNOT CONNECT TO PIGPIO DEAMON\n");
       exDisplay = 0;
       return;
   }
@@ -168,24 +171,24 @@ void init_exdisp(void)
   for (int i = 0; i < 3; i ++)
       buttonDebounce[i] = 0;
   
-  pinMode(LED0, OUTPUT);
-  pinMode(LED1, OUTPUT);
-  digitalWrite(LED0, 0);
-  digitalWrite(LED1, 0);
+  set_mode(pig,LED0, PI_OUTPUT);
+  set_mode(pig,LED1, PI_OUTPUT);
+  gpio_write(pig,LED0, 0);
+  gpio_write(pig,LED1, 0);
   
-  pinMode(BUTTON_SWITCH, INPUT);
-  pullUpDnControl(BUTTON_SWITCH, PUD_UP);
-  pinMode(BUTTON_DOWN, INPUT);
-  pullUpDnControl(BUTTON_DOWN, PUD_UP);
-  pinMode(BUTTON_QUIT, INPUT);
-  pullUpDnControl(BUTTON_QUIT, PUD_UP);
-  pinMode(BUTTON_STOP, INPUT);
-  pullUpDnControl(BUTTON_STOP, PUD_UP);
+  set_mode(pig,BUTTON_SWITCH, PI_INPUT);
+  set_pull_up_down(pig,BUTTON_SWITCH, PI_PUD_UP);
+  set_mode(pig,BUTTON_DOWN, PI_INPUT);
+  set_pull_up_down(pig,BUTTON_DOWN, PI_PUD_UP);
+  set_mode(pig,BUTTON_QUIT, PI_INPUT);
+  set_pull_up_down(pig,BUTTON_QUIT, PI_PUD_UP);
+  set_mode(pig,BUTTON_STOP, PI_INPUT);
+  set_pull_up_down(pig,BUTTON_STOP, PI_PUD_UP);
 
-  pinMode(DATA, OUTPUT);  
-  pinMode(CLOCK, OUTPUT);
-  pinMode(LEDCS, OUTPUT);
-  digitalWrite(LEDCS, 0);
+  set_mode(pig,DATA, PI_OUTPUT);  
+  set_mode(pig,CLOCK, PI_OUTPUT);
+  set_mode(pig,LEDCS, PI_OUTPUT);
+  gpio_write(pig,LEDCS, 0);
 	
   MAX7219Send(SCAN_LIMIT, 7);     // set up to scan all eight digits
  
@@ -208,4 +211,5 @@ void quit_exdisp(void)
   MAX7219Send(SHUTDOWN, 1);
   setDriveLed(0, 0);
   setDriveLed(1, 0);
+  pigpio_stop(pig);
 }

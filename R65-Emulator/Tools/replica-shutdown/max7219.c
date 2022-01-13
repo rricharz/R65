@@ -2,12 +2,6 @@
  
  Raspberry Pi driving the Max7219
 
- to compile : gcc -Wall -pthread -o max7219 max7219.c -lpigpio -lrt
-
- usage: max7219 string
- 
- where string is a up to a character string to display
-
 */
  
 #include <pigpio.h>
@@ -112,16 +106,9 @@ static void MAX7219Send (unsigned char reg_number, unsigned char dataout)
 
 
 
-int main(int argc, char *argv[])
+void max7219Init()
 {
 	
-  if (argc != 2) {
-        printf("Usage: max7219 string\n");
-        exit(1);
-    }
-
-  if (gpioInitialise () < 0) exit (1) ;
-
   //We need 3 output pins to control the Max7219: Data, Clock and Load
 
   gpioSetMode(DATA, PI_OUTPUT);  
@@ -148,7 +135,11 @@ int main(int argc, char *argv[])
   	
   MAX7219Send(SHUTDOWN, 1);      // come out of shutdown mode	/ turn on the digits
   
-  char *s = argv[1];
+}
+
+
+void maxSendString(char *s)
+{
   int j = 0;
   while ((s[j] != 0) && (j < 8)) {	
     MAX7219Send(8 - j ,segments(s[j]) | (s[j] & 128));
@@ -159,6 +150,4 @@ int main(int argc, char *argv[])
     j++;
   }
   
-  gpioTerminate();
-  return 0;
 }

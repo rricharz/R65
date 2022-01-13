@@ -6,7 +6,7 @@
 //   LED heartbeat is handled by the kernel
 //   put the following line at the end of
 //   /boot/config.txt:
-//   dtoverlay=pi3-act-led,gpio=12
+//   dtoverlay=act-led,gpio=12
 //   where 12 is the gpio of the external led
 //
 // If SWITCH is off and R65 emulator is not running:
@@ -22,25 +22,26 @@
 // If the CPU temperature is above HIGH_TEMP, the fan is turned on
 // If the CPU temperature is below LOW_TEMP, the fan is turned off
 // 
-// Copyright 2017,2018,2019  rricharz
+// Copyright 2017,2018,2019,2022  rricharz
 //
 // cpu usage code from Matheus (https://github.com/hc0d3r)
 
 
-#include <wiringPi.h>
+#include <pigpio.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "max7219.h"
 
-#define SHUTDOWN	29      // pin 40, wiring pi 29
-#define REDLED1		27      // pin 36, wiring pi 27
-#define REDLED2		23      // pin 33, wiring pi 23
-#define BREAK		21	// pin 29, wiring pi 21
-#define FAN		02	// pin 13, wiring pi 02
-#define SWITCH		05	// pin 18, wiring pi 05
+#define SHUTDOWN	21      // pin 40
+#define REDLED1		16      // pin 36
+#define REDLED2		13      // pin 33
+#define BREAK		05	// pin 29
+#define FAN		27	// pin 13
+#define SWITCH		24	// pin 18
 
 #define HIGH_TEMP 63.0		// turn fan on above this temperature (in °C)
 #define LOW_TEMP  53.0		// turn fan off below this temperature (in °C)
@@ -76,30 +77,30 @@ int *parser_result(const char *buf, int size) {
 	return ret;
 }
 
-int blinkForOneSecond(int usage) {
+void blinkForOneSecond(int usage) {
 // blink for one second, rate based on usage
     int n = (usage / 10) + 1;
     int d = 500 / n;
     for (int i = 0; i < n; i++) {
-        digitalWrite(REDLED1, 1);
+        gpioWrite(REDLED1, 1);
 	if (d > 15) {
-	    delay(10);
-	    digitalWrite(REDLED1, 0);
-	    delay(d - 10);
+	    usleep(10000);
+	    gpioWrite(REDLED1, 0);
+	    usleep(1000*(d - 10));
 	}
 	else {
-	    delay(d);
-	    digitalWrite(REDLED1, 0);
+	    usleep(d*1000);
+	    gpioWrite(REDLED1, 0);
 	}
-	digitalWrite(REDLED2, 1);
+	gpioWrite(REDLED2, 1);
         if (d > 15) {
-	    delay(10);
-	    digitalWrite(REDLED2, 0);
-	    delay(d - 10);
+	    usleep(1000);
+	    gpioWrite(REDLED2, 0);
+	    usleep(1000*(d - 10));
 	}
 	else {
-	    delay(d);
-	    digitalWrite(REDLED2, 0);
+	    usleep(d*1000);
+	    gpioWrite(REDLED2, 0);
 	}
     }
 }
@@ -110,29 +111,28 @@ int main (int argc, char **argv)
         char buf[256];
 	int size, fd, *nums, prev_idle = 0, prev_total = 0, idle, total, i;
         double usage;
-	int fanIsOn;
 	int max7219IsUsed;
         
 	fd = open("/proc/stat", O_RDONLY);
 
-	printf("Monitoring wiringPi pin %i for shutdown\n", SHUTDOWN);
-        system("/home/pi/bin/max7219 'pi-65'");
+	printf("Monitoring BCM pin %i for shutdown\n", SHUTDOWN);
 
-	wiringPiSetup();
-	pinMode(SHUTDOWN, INPUT);
-	pullUpDnControl(SHUTDOWN, PUD_UP);
-	pinMode(BREAK, INPUT);
-	pullUpDnControl(BREAK, PUD_UP);
-	pinMode(SWITCH, INPUT);
-	pullUpDnControl(SWITCH, PUD_UP);
-        pinMode(REDLED1, OUTPUT);
-        pinMode(REDLED2, OUTPUT);
-        digitalWrite(REDLED1, 0);
-        digitalWrite(REDLED1, 0);
-	pinMode(FAN, OUTPUT);
-	digitalWrite(FAN, 0);		// fan initially turned off
-	fanIsOn = 0;
+	gpioInitialise();
+	gpioSetMode(SHUTDOWN, PI_INPUT);
+	gpioSetPullUpDown(SHUTDOWN, PI_PUD_UP);
+	gpioSetMode(BREAK, PI_INPUT);
+	gpioSetPullUpDown(BREAK, PI_PUD_UP);
+	gpioSetMode(SWITCH, PI_INPUT);
+	gpioSetPullUpDown(SWITCH, PI_PUD_UP);
+        gpioSetMode(REDLED1, PI_OUTPUT);
+        gpioSetMode(REDLED2, PI_OUTPUT);
+        gpioWrite(REDLED1, 0);
+        gpioWrite(REDLED1, 0);
+	gpioSetMode(FAN, PI_OUTPUT);
+	gpioWrite(FAN, 0);		// fan initially turned off
+        max7219Init();
 	max7219IsUsed = 0;
+	maxSendString("pi-65");
 
 	do {
 		temperatureFile = fopen(
@@ -146,20 +146,22 @@ int main (int argc, char **argv)
                     }
 		else T = 0.0;
 		    
-		if (digitalRead(SHUTDOWN) == 0) {
-                        delay(1000);
-                        if (digitalRead(SHUTDOWN) == 0) {
-                                // digitalWrite(LED, 1);
-                                system("/home/pi/bin/max7219 'PI OFF'");
-                                digitalWrite(REDLED1, 0);
-                                digitalWrite(REDLED1, 0);
-                                delay(100);
+		if (gpioRead(SHUTDOWN) == 0) {
+                        usleep(1000*1000);
+                        if (gpioRead(SHUTDOWN) == 0) {
+                                // gpioWrite(LED, 1);
+                                maxSendString("PI OFF");
+                                gpioWrite(REDLED1, 0);
+                                gpioWrite(REDLED1, 0);
+                                usleep(100000);
+				gpioTerminate();
                                 system("shutdown -h now");
                                 exit(0);
                         }
 		}
 		
-		else if (digitalRead(BREAK) == 0) {
+		else if (gpioRead(BREAK) == 0) {
+		    printf("Break\n");
 		    char s[255], i1[10], i2[10];
 		    FILE *ip = popen("hostname -I","r");
 		    if (ip) {
@@ -185,18 +187,18 @@ int main (int argc, char **argv)
 			}
 			i2[i] = 0; // end of string
 			
-			sprintf(s,"/home/pi/bin/max7219 '%s'", i1);
-			system(s);
+			sprintf(s,"%s", i1);
+			maxSendString(s);
 			sleep(5);
-			sprintf(s,"/home/pi/bin/max7219 '%s'", i2);
-			system(s);
+			sprintf(s,"%s", i2);
+			maxSendString(s);
 			sleep(5);
 			pclose(ip);
 			max7219IsUsed = 1;
 			}
 		}
                 
-                else if ((digitalRead(SWITCH) == 0) &&
+                else if ((gpioRead(SWITCH) == 0) &&
 				(system("pidof -x emulator >/dev/null") != 0)) {
                 
                     size = read(fd, buf, sizeof(buf));
@@ -230,31 +232,28 @@ int main (int argc, char **argv)
 		    lseek(fd, 0, SEEK_SET);
                 
                     char s[64];
-                    sprintf(s,"/home/pi/bin/max7219 'PI %02.0f %02.0f'",
-                        usage, T);
-                    system(s);
+                    sprintf(s,"PI %02.0f %02.0f", usage, T);
+                    maxSendString(s);
 		    max7219IsUsed = 1;
                     blinkForOneSecond((int)usage);
                 
                 }
                 else { 
 		    if (max7219IsUsed) {
-			digitalWrite(REDLED1, 0);
-			digitalWrite(REDLED2, 0);
-			system("/home/pi/bin/max7219 '        '");
+			gpioWrite(REDLED1, 0);
+			gpioWrite(REDLED2, 0);
+			maxSendString("        ");
 			max7219IsUsed = 0;
 		    }
-		    delay(1000);
+		    usleep(1000000);
 		}
 		if (T > HIGH_TEMP) {
 		    // printf("Fan on, T=%f\n", T);
-		    digitalWrite(FAN,1);
-		    fanIsOn = 1;
+		    gpioWrite(FAN,1);
 	        }
 		else if (T < LOW_TEMP) {
 		    // printf("Fan off, T=%f\n", T);
-		    digitalWrite(FAN,0);
-		    fanIsOn = 0;
+		    gpioWrite(FAN,0);
 	    }
 	}
 	while (1);

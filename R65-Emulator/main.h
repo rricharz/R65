@@ -17,7 +17,7 @@ void Paint(void);
 // wrapper for main gtk functions
 void Alert(char *s, int halt);
 void QuitProgram(int shutDownFlag);
-int checkPendingEvents();
+void checkPendingEvents();
 
 extern int windowWidth, windowHeight;
 extern int global_char;

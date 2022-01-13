@@ -142,7 +142,6 @@ void Text(int x, int y, char *s, int fontSize, int erase)
 	if (erase) {
 		cairo_text_extents(global_surface_cr, s, &extents);
 		cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
-		int below = extents.height / 4;
 		cairo_rectangle(global_surface_cr, x, 
 		  y - extents.height - 1, 
 		  extents.width + ((3 * fontSize) / 4), (7 * extents.height) / 5);
@@ -166,7 +165,6 @@ void TextMid(int x, int y, char *s, int fontSize, int erase)
 	cairo_text_extents(global_surface_cr, s, &extents);
 	if (erase) {
 		cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
-		int below = extents.height / 4;
 		cairo_rectangle(global_surface_cr, x, 
 		  y - extents.height - 1, 
 		  extents.width + ((3 * fontSize) / 4), (7 * extents.height) / 5);
@@ -265,7 +263,7 @@ void checkClick(int *x, int *y)
 }
 
 ////////////////////////
-int checkPendingEvents()
+void checkPendingEvents()
 ////////////////////////
 {
     while (gtk_events_pending())            // check for gtk events
@@ -345,7 +343,7 @@ static gboolean clicked(GtkWidget *widget, GdkEventButton *event, gpointer user_
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
-static gboolean released(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+static void released(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
 //////////////////////////////////////////////////////////////////////////////////////
 {
 	global_click.down   = 0;
