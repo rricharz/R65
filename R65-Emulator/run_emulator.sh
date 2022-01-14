@@ -3,6 +3,7 @@
 
 sudo pkill pi-shutdown
 sudo pkill pigpiod
+sleep 1
 sudo pigpiod
 /home/pi/Projects/R65/R65-Emulator/emulator -E
 sudo pkill pigpiod
