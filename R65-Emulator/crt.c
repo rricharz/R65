@@ -53,10 +53,6 @@ void crt_init()
         led[i] = 0;
     global_cursor_color = 0xFF;
     global_graphicsFlag = 0;
-    hcell = windowWidth / NUMCHAR;
-    vcell = (windowHeight - INFO_HEIGHT - 20) / NUMLINES;
-    csize = vcell - 2;
-    printf("Cell size = %d x %d\n", hcell, vcell);
     xdot2 = windowWidth / 112;
     ydot2 = (windowHeight - INFO_HEIGHT - 20) / 59;
     printf("Dot size = %0.1f x %0.1f\n", (double)xdot2/2.0, (double)ydot2/2.0);
@@ -195,6 +191,11 @@ void crtUpdate()
 {
     char s[2];
     s[1] = 0;
+
+    hcell = windowWidth / NUMCHAR;
+    vcell = (windowHeight - INFO_HEIGHT - 20) / NUMLINES;
+    csize = vcell - 2;
+//  printf("Cell size = %d x %d, numchr = %d\n", hcell, vcell, NUMCHAR);
     
     checkInfoBarButtons();
     
@@ -232,8 +233,8 @@ void crtUpdate()
         }
         else {
             for (yy = 0; yy < 16; yy++) {
-                for (xx = 0; xx < 48; xx++) {
-                    s[0] = read6502(global_videoBaseAddress + (48 * yy) + xx);
+                for (xx = 0; xx < NUMCHAR; xx++) {
+                    s[0] = read6502(global_videoBaseAddress + (NUMCHAR * yy) + xx);
                     if (s[0] & 0x80)
                         SETINVERSETEXTCOLOR;
                     else if (memory[M8_SFLAG] & 1)

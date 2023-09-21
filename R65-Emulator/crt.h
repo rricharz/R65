@@ -13,7 +13,7 @@
 #define M8_CHAR     0x1785      // char register
 
 #define BORDER      12   // border in pixels
-#define NUMCHAR     48   // number of chars per line
+#define NUMCHAR     (read6502(0x178A)+1)
 #define NUMLINES    16   // number of lines
 
 #define INFO_HEIGHT 30   // vertical pixels for info bar area

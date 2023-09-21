@@ -164,8 +164,10 @@ int translateKey(int key)
         default: {
             if (key & 0xFF00)                           // ignore all other special keys
                 chr = 0;
-            else if ((key >= 0x61) && (key <= 0x7A))    // translate all chars to upper case
-                chr = (key - 0x20);
+            else if ((key >= 0x61) && (key <= 0x7A)) {  // translate all chars to upper case
+                if (NUMCHAR==48) chr = (key - 0x20);
+                else chr = key;
+                }
             else
                 chr = key;
         }
