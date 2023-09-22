@@ -160,16 +160,15 @@ begin {main}
   maxseq:=mmaxseq;
   for i:=0 to mmaxseq-1 do fidrtb[i]:=0;
   clearinput;
-  {write(hom,csc);}
-
-  writeln(tab8,'--- R65 Pascal---');
+  writeln;
+  writeln('R65 Pascal System (9/22/23)');
   ok:=true;
 
   repeat {main loop (endless)}
     writeln;
     write('P*');
     next;
-    while ch=' ' do next;
+    while (ch=' ') or (ch=chr(13)) do next;
     { default for program to run is drive 0}
     drive1:=0; cyclus1:=0;
     getfname(runname,'R',ok,drive1,cyclus1);
@@ -235,6 +234,7 @@ begin {main}
       clearinput;
       endstk:=topmem-144;
       runprog(runname,drive1,cyclus1);
+      endstk:=topmem-144;
       iocheck:=true;
       if runerr<>0 then begin
         writeln;
