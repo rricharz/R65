@@ -5,7 +5,7 @@ uses syslib, arglib;
 const
     linelength = 56;
     scrlins = 16;
-    maxlines = 32;
+    maxlines = 400;
     eol    = chr($0);
     clrscr = chr($11);
     clrlin = chr($17);
@@ -28,6 +28,7 @@ var line, nlines, topline: integer;
     linepnt: array[maxlines] of integer;
 
 proc setnumlin(l,c:integer);
+{**************************}
 mem numlin=$1789: integer&;
     numchr=$178a: integer&;
 begin
@@ -36,6 +37,7 @@ begin
 end;
 
 func new:integer;
+{***************}
 begin
   endstk:=endstk-linelength-1; {space for eol}
   new:=endstk+144;
@@ -43,23 +45,27 @@ begin
 end;
 
 proc endheap;
+{***********}
 begin
   endstk := topmem - 144;
 end;
 
 func column:integer;
+{******************}
 begin
   column:=line-topline+1;
 end;
 
 func readline(fin: file; pnt: integer): boolean;
+{**********************************************}
+const alteof=chr(127);
 var ch1: char;
     pos: integer;
 begin
   pos := 0;
   read(@fno,ch1);
-  while (ch1<>eof) and (ch1<>cr) and (ch1<>eol)
-    and (pos<linelenght-1) do begin
+  while (ch1>=' ') and (ch1<>alteof) and
+      (pos<linelenght-1) do begin
     memory[pnt+ pos] := ch1;
     pos := pos + 1;
     read(@fno,ch1);
@@ -68,10 +74,11 @@ begin
     memory[pnt+ pos] := ' ';
     pos:=pos+1;
   end;
-  readline := (ch1 = eof);
+  readline:=(ch1=eof) or (ch1=alteof);
 end;
 
 proc goto(xpos, ypos: integer);
+{*****************************}
 begin
   curlin := ypos; { top on line 2 }
   if curlin>15 then curlin:=15;
@@ -79,6 +86,7 @@ begin
 end;
 
 proc showline(pnt,y: integer);
+{****************************}
 var lstart,pos: integer;
 begin
   lstart:=y*linelenght;
@@ -87,25 +95,32 @@ begin
 end;
 
 proc showtop;
+{***********}
 begin
   goto(1,0);
   write(invvid,clrlin);
   write('line ', line, ' of ',nlines-1);
-  write(' top ',topline);
   write(norvid);
 end;
 
 proc showall;
-var y: integer;
+{***********}
+var y,i,l,lstart: integer;
 begin
   showtop;
   for y:=1 to scrlins-1 do begin
-    goto(1, y);
-    showline(linepnt[topline-1+y],y);
+    l:=topline-1+y;
+    lstart:=y*linelenght;
+    if l<nlines then
+      showline(linepnt[l],y)
+    else
+      for i:=0 to linelenght-1 do
+        video[lstart+i]:=' ';
   end;
 end;
 
 proc updline(pnt,lstart: integer);
+{********************************}
 var pos: integer;
 begin
   for pos:=0 to linelenght-1 do
@@ -113,6 +128,7 @@ begin
 end;
 
 func edlin(pnt: integer): char;
+{*****************************}
 const key    = @1;
       cleft  = chr($03);
       inschr = chr($15);
@@ -142,12 +158,14 @@ begin
 end;
 
 proc chkline;
+{***********}
 begin
   if line<1 then line:=1
   else if line>nlines-1 then line:=nlines-1;
 end;
 
 proc chktop(show: boolean);
+{*************************}
 var savetop,bottom:integer;
 begin
   savetop:=topline;
@@ -158,18 +176,75 @@ begin
   if show and (savetop<>topline) then showall;
 end;
 
+proc readinput;
+{*************}
+begin
+  cyclus:=0; drive:=1;
+  agetstring(name,default,cyclus,drive);
+  asetfile(name,cyclus,drive,' ');
+  openr(fno);
+  write(hom, clrscr);
+  setnumlin($0f,$37);
+  nlines := 1;
+  line:=1;
+  topline:=1;
+  repeat
+    linepnt[nlines] := new;
+    iseof := readline(fno, linepnt[nlines]);
+    nlines := nlines+1;
+    showtop; write(invvid,' reading',norvid);
+    until iseof or (nlines >= maxlines-4);
+  close(fno);
+end;
+
+proc writeoutput;
+{***************}
+var pos,endpos,saveline:integer;
+begin
+  saveline:=line;
+  cyclus:=0; drive:=1;
+  asetfile(name,cyclus,drive,'P');
+  openw(fno);
+  for line:=1 to nlines-1 do begin
+    showtop; write(invvid,' writing',norvid);
+    endpos:=linelenght-1;
+    while (memory[linepnt[line]+endpos]=' ')
+      and (endpos>0) do endpos:=endpos-1;
+    for pos:=0 to endpos do
+      write(@fno,memory[linepnt[line]+pos]);
+    write(@fno,cr,lf);
+  end;
+  write(@fno,eof);
+  close(fno);
+  line:=saveline;
+end;
+
 func doesc: boolean;
-{ escape handler }
-const xpos = 36;
+{******************}
+const xpos = 28;
 var ch:char;
+  proc ctoeol;
+  begin
+    repeat
+      read(@input,ch);
+      until (ch<' ');
+  end;
 begin
   doesc:=false;
   goto(xpos,0);
   write(invvid,'q',norvid,'uit, ',invvid,
-    'l',norvid,'ine',invvid,'n',norvid,'?');
+    'l',norvid,'ine',invvid,'n',norvid,
+    ', ',invvid,'w',norvid,'rite?');
   read(@input,ch);
   case ch of
-    'q': doesc:=true;
+    'q': begin
+           ctoeol;
+           doesc:=true;
+         end;
+    'w': begin
+           ctoeol;
+           writeoutput;
+         end;
     'l': begin
            read(@input,line);
            chkline;
@@ -180,13 +255,12 @@ begin
 end;
 
 proc appendline;
+{**************}
 var i:integer;
-
 begin
   if nlines<maxlines-1 then begin
     if line<nlines-1 then begin
-      {insert line in linepnt list}
-      for i:=nlines-2 downto line+1 do
+      for i:=nlines-1 downto line+1 do
         linepnt[i+1]:=linepnt[i];
       end;
     linepnt[line+1]:=new;
@@ -205,28 +279,8 @@ begin
   end;
 end;
 
-begin
-
-  { Open input file }
-  cyclus:=0; drive:=1;
-  agetstring(name,default,cyclus,drive);
-  asetfile(name,cyclus,drive,' ');
-  openr(fno);
-  write(hom, clrscr);
-
-  setnumlin($0f,$37);
-
-  { Read and store lines from input file }
-  nlines := 1;
-  line:=1;
-  topline:=1;
-  repeat
-    linepnt[nlines] := new;
-    iseof := readline(fno, linepnt[nlines]);
-    nlines := nlines+1;
-    showtop;
-    until iseof or (nlines >= maxlines-4);
-  close(fno);
+begin {main}
+  readinput;
   topline := 1
   line := 1;
   showall;
