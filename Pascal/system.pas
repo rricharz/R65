@@ -157,7 +157,7 @@ end;
 { * main * }
 
 begin {main}
-  maxseq:=mmaxseq;
+  maxseq:=mmaxseq-1;
   for i:=0 to mmaxseq-1 do fidrtb[i]:=0;
   clearinput;
   writeln;
