@@ -1,7 +1,7 @@
 
 #define TIME_INTERVAL   300                         // time interval for timer function in msec
 
-// wrapper for cairo grapics
+// wrapper for cairo graphics
 void Background(int r, int g, int b);
 void Stroke(int r, int g, int b);
 void Fill(int r, int g, int b, int alpha);

@@ -13,18 +13,19 @@
 #include "exdisp.h"
 
 
-#define SETNORMALTEXTCOLOR  Stroke(210,210,210)
-#define SETDOTCOLOR         Stroke(0,225,225); Fill(0,225,225,0)
-#define SETPASCALCOLOR      Stroke(0,210,210)
-#define SETHIDETEXTCOLOR    Stroke(0,0,0) 
-#define SETINVERSETEXTCOLOR Stroke(210,210,0)
-#define SETDISKNAMECOLOR    Stroke(255,0,0)
-#define SETBACKGROUNDCOLOR  Fill(0,0,0,0)
-#define SETBUTTONCOLOR      Stroke(210,210,210); Fill(63,63,63,0)
-#define SETLEDBORDERCOLOR   Stroke(210,210,210);
-#define SETLEDONCOLOR       Fill(255, 0, 0, 0)
-#define SETLEDOFFCOLOR      Fill(127, 0, 0, 0)
-#define SETINFOBACKGROUND   Stroke(10,45,60); Fill(10,45,60,255)
+#define SETNORMALTEXTCOLOR   Stroke(210,210,210)
+#define SETDOTCOLOR          Stroke(0,225,225); Fill(0,225,225,0)
+#define SETPASCALCOLOR       Stroke(0,210,210)
+#define SETHIDETEXTCOLOR     Stroke(0,0,0) 
+#define SETINVERSETEXTCOLOR  Stroke(210,210,210); Fill(210,210,210,0)
+#define SETINVERSEPTEXTCOLOR Stroke(0,210,210); Fill(0,210,210,0)
+#define SETDISKNAMECOLOR     Stroke(255,0,0)
+#define SETBACKGROUNDCOLOR   Fill(0,0,0,0)
+#define SETBUTTONCOLOR       Stroke(210,210,210); Fill(63,63,63,0)
+#define SETLEDBORDERCOLOR    Stroke(210,210,210);
+#define SETLEDONCOLOR        Fill(255, 0, 0, 0)
+#define SETLEDOFFCOLOR       Fill(127, 0, 0, 0)
+#define SETINFOBACKGROUND    Stroke(10,45,60); Fill(10,45,60,255)
 
 int      global_pendingCrtUpdate;
 int      global_videoBaseAddress;
@@ -235,8 +236,15 @@ void crtUpdate()
             for (yy = 0; yy < 16; yy++) {
                 for (xx = 0; xx < NUMCHAR; xx++) {
                     s[0] = read6502(global_videoBaseAddress + (NUMCHAR * yy) + xx);
-                    if (s[0] & 0x80)
-                        SETINVERSETEXTCOLOR;
+                    if (s[0] & 0x80) {
+                        if (memory[M8_SFLAG] & 1) {
+                            SETINVERSEPTEXTCOLOR; }
+                    	else {
+                            SETINVERSETEXTCOLOR; }
+                        Rect(hcell*xx + BORDER, vcell*(yy+1) + BORDER + 3 + INFO_HEIGHT,
+                            hcell, vcell);
+                        Stroke(0,0,0);
+                        }
                     else if (memory[M8_SFLAG] & 1)
                         SETPASCALCOLOR;
                     else
