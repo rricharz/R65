@@ -265,7 +265,7 @@ int main(int argc, char *argv[])
     for (i = 0;  i < 16; i++)
         r65name[i] = ' ';
         
-    maxCharPerLine = 48;
+    maxCharPerLine = 56;
         
     if ((end = strstr(argv[1],".asm")) != NULL) {
         type = 'S';
