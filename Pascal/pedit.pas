@@ -1,35 +1,27 @@
 program pedit;
-
+ 
 { Pascal editor, original 1980 RR
-  rewritten 2023 RR for R65 system    }
-
+  rewritten 2023 RR for R65 system }
+ 
 uses syslib, arglib;
-
+ 
 const
-    xmax = 56;
-    scrlins = 16;
-    maxfs = 20;
-    maxlines = 500;
-    eol    = chr($00);
-    esc    = chr($00);
-    pgdown = chr($02);
-    pgup   = chr($08);
-    pgend  = chr($10);
-    clrscr = chr($11);
-    clrlin = chr($17);
-    cdown  = chr($18);
-    cup    = chr($1a);
-    cleft  = chr($03);
-    inschr = chr($15);
-    delchr = chr($19);
+    xmax = 56;         scrlins = 16;
+    maxfs = 20;        maxlines = 603;
+    eol    = chr($00); esc    = chr($00);
+    pgdown = chr($02); pgup   = chr($08);
+    pgend  = chr($10); clrscr = chr($11);
+    clrlin = chr($17); cdown  = chr($18);
+    cup    = chr($1a); cleft  = chr($03);
+    inschr = chr($15); delchr = chr($19);
     rubout = chr($5f);
-
-mem
-    memory = 0: array[32767] of char&;
+ 
+mem memory = 0: array[32767] of char&;
     curlin = $ed: integer&;
     curpos = $ee: integer&;
     video  = $400: array[768] of char&;
-
+    patchesc=$230c:integer; {patch interpreter!}
+ 
 var line, nlines, topline,relpnt: integer;
     name: array[15] of char;
     fno: file;
@@ -38,82 +30,74 @@ var line, nlines, topline,relpnt: integer;
     default, iseof, exit: boolean;
     linepnt: array[maxlines] of integer;
     fs: array[maxfs] of char;
-
+    copybuf: array[xmax] of char;
 proc setnumlin(l,c:integer);
 {**************************}
 mem numlin=$1789: integer&;
     numchr=$178a: integer&;
 begin
-  numlin:=l;
-  numchr:=c;
+  numlin:=l; numchr:=c;
 end;
-
+ 
 func new:integer;
 {***************}
 begin
   if relpnt<maxlines-1 then begin
-    relpnt:=relpnt+1;
-    new:=linepnt[relpnt];
+    relpnt:=relpnt+1; new:=linepnt[relpnt];
   end else begin
-    endstk:=endstk-xmax;
-    new:=endstk+144;
+    endstk:=endstk-xmax; new:=endstk+144;
   end;
 end;
-
+ 
 proc release(p:integer);
 {**********************}
 begin
-  linepnt[relpnt]:=p;
-  relpnt:=relpnt-1;
+  linepnt[relpnt]:=p; relpnt:=relpnt-1;
 end;
-
+ 
 proc startheap;
 {*************}
 begin
   relpnt:=maxlines-1;
 end;
-
+ 
 proc endheap;
 {***********}
 begin
   endstk := topmem - 144;
 end;
-
+ 
 func column:integer;
 {******************}
 begin
   column:=line-topline+1;
 end;
-
+ 
 func readline(fin: file; pnt: integer): boolean;
 {**********************************************}
 const alteof=chr(127);
 var ch1: char;
     pos: integer;
 begin
-  pos := 0;
-  read(@fno,ch1);
+  pos := 0; read(@fno,ch1);
   while (ch1>=' ') and (ch1<>alteof) and
       (pos<xmax-1) do begin
-    memory[pnt+ pos] := ch1;
-    pos := pos + 1;
-    read(@fno,ch1);
+    memory[pnt+pos]:=ch1; pos:=pos+1; read(@fno,ch1);
     end;
   while pos<xmax do begin
-    memory[pnt+ pos] := ' ';
-    pos:=pos+1;
+    memory[pnt+pos]:=' '; pos:=pos+1;
   end;
   readline:=(ch1=eof) or (ch1=alteof);
 end;
-
+ 
 proc goto(xpos, ypos: integer);
 {*****************************}
 begin
-  curlin := ypos; { top on line 2 }
+  curlin:=ypos; { top on line 2 }
   if curlin>15 then curlin:=15;
-  curpos := xpos - 1;
+  curpos:=xpos-1;
 end;
-
+ 
 proc showline(pnt,y: integer);
 {****************************}
 var lstart,pos: integer;
@@ -122,24 +106,34 @@ begin
   for pos:=0 to xmax-1 do
     video[lstart+pos]:=memory[pnt+pos]
 end;
-
+ 
 proc showtop;
 {***********}
 begin
-  goto(1,0);
-  write(invvid,clrlin);
+  goto(1,0); write(invvid,clrlin);
   write('line ', line, ' of ',nlines-1);
   write(norvid);
 end;
-
+ 
+proc showerror(s:array[15] of char);
+{**********************************}
+const xpos=28;
+var i: integer;
+    ch: char;
+begin
+  goto(xpos,0); write(invvid,clrlin);
+  for i:=0 to 15 do write(s[i]);
+  read(@input,ch);
+  goto(xpos,0); write(norvid,clrlin);
+end;
+ 
 proc showall;
 {***********}
 var y,i,l,lstart: integer;
 begin
   showtop;
   for y:=1 to scrlins-1 do begin
-    l:=topline-1+y;
-    lstart:=y*xmax;
+    l:=topline-1+y; lstart:=y*xmax;
     if l<nlines then
       showline(linepnt[l],y)
     else
@@ -147,7 +141,7 @@ begin
         video[lstart+i]:=' ';
   end;
 end;
-
+ 
 proc updline(pnt,lstart: integer);
 {********************************}
 var pos: integer;
@@ -155,7 +149,7 @@ begin
   for pos:=0 to xmax-1 do
     memory[pnt+pos]:=video[lstart+pos];
 end;
-
+ 
 func lastpos(l:integer):integer;
 {******************************}
 var endpos:integer;
@@ -165,39 +159,37 @@ begin
     and (endpos>0) do endpos:=endpos-1;
   lastpos:=endpos;
 end;
-
+ 
 proc chkline;
 {***********}
 begin
   if line<1 then line:=1
   else if line>nlines-1 then line:=nlines-1;
 end;
-
+ 
 proc chktop(show: boolean);
 {*************************}
 var savetop,bottom:integer;
 begin
-  savetop:=topline;
-  bottom:=topline+scrlins-1;
+  savetop:=topline; bottom:=topline+scrlins-1;
   if line<topline then topline:=line;
   if line>=bottom then
     topline:=line-scrlins+2;
   if show and (savetop<>topline) then showall;
 end;
-
+ 
 proc delline;
 {***********}
 var i,savpnt:integer;
 begin
-  chkline;
-  savpnt:=linepnt[line];
+  chkline; savpnt:=linepnt[line];
   for i:=line to nlines-2 do
     linepnt[i]:=linepnt[i+1];
-  release(savpnt);
-  nlines:=nlines-1;
+  release(savpnt); nlines:=nlines-1;
   chkline; chktop(false);
+  line:=line-1;
 end;
-
+ 
 proc join;
 {********}
 var p,p1,p2,pm:integer;
@@ -218,7 +210,7 @@ begin
   end;
   chkline; chktop(false); showall;
 end;
-
+ 
 func edlin(pnt: integer): char;
 {*****************************}
 const key    = @1;
@@ -255,7 +247,7 @@ begin
   updline(pnt,lstart);
   edlin := ch1;
 end;
-
+ 
 proc readinput;
 {*************}
 begin
@@ -265,18 +257,18 @@ begin
   openr(fno);
   write(hom, clrscr);
   setnumlin($0f,$37);
-  nlines := 1;
-  line:=1;
-  topline:=1;
+  nlines := 1; line:=1; topline:=1;
   repeat
     linepnt[nlines] := new;
     iseof := readline(fno, linepnt[nlines]);
     nlines := nlines+1;
     showtop; write(invvid,' reading',norvid);
-    until iseof or (nlines >= maxlines-4);
+    until iseof or (nlines >= maxlines-2);
+    if nlines >= maxlines-2 then
+      showerror('too many lines  ');
   close(fno);
 end;
-
+ 
 proc writeoutput;
 {***************}
 var pos,endpos,saveline:integer;
@@ -294,23 +286,21 @@ begin
     if (line<nlines-1) or (endpos<>0) then
       write(@fno,cr);
   end;
-  close(fno);
-  line:=nlines-1;
+  close(fno); line:=nlines-1;
 end;
-
-proc find;
+ 
+proc find(again:boolean);
 {********}
 const xpos=28;
 var pos,x,i:integer;
     ch:char;
     found:boolean;
-
+ 
   proc checkrest;
   var failed:boolean;
       x1:integer;
   begin
-    failed:=false;
-    pos:=1; x1:=x+1;
+    failed:=false; pos:=1; x1:=x+1;
     while (fs[pos]<>cr) and (pos<maxfs)
       and (x1<xmax) do begin
       if memory[linepnt[line]+x1] <> fs[pos]
@@ -320,82 +310,70 @@ var pos,x,i:integer;
      if (failed=false) and (fs[pos]=cr)
       then found:=true;
   end;
-
+ 
+  proc clrmarks;
+  var savel,x:integer;
+  begin
+    savel:=line;
+    for line:=1 to nlines-1 do begin
+      for x:=0 to xmax-1 do
+        memory[linepnt[line]+x]:=
+          chr(ord(memory[linepnt[line]+x]) and $7f);
+      showtop;
+      end;
+    line:=savel
+    showall;
+  end;
+ 
 begin
   pos:=0;
-  goto(xpos,0);
-  write(invvid,'find?',clrlin);
-  repeat
-    read(@input,ch);
-    fs[pos]:=ch;
-    pos:=pos+1;
-    until (ch=cr) or (pos>=maxfs);
-  write(norvid);
-  found:=false;
-  repeat
-    pos:=0;
-    x:=0;
+  if not again then begin
+    goto(xpos,0);
+    write(invvid,'find?',clrlin);
     repeat
-      if memory[linepnt[line]+x]=fs[pos]
-        then checkrest;
-      x:=x+1;
-      until found or (x>=xmax);
-    line:=line+1;
-    until found or (line>=nlines);
-  if found then begin
-    line:=line-1; x:=x-1; i:=0;
-    while fs[i]<>chr(13) do begin
-      memory[linepnt[line]+x+i] :=
-        chr(ord(memory[linepnt[line]+x+i])
-        or $80);
-       i:=i+1;
+      read(@input,ch); fs[pos]:=ch; pos:=pos+1;
+      until (ch=cr) or (pos>=maxfs);
+    write(norvid);
+    end
+  else begin
+    goto(xpos,0); write(invvid,
+     'find?',clrlin);
+    pos:=0;
+      while(fs[pos]<>cr) do begin
+        write(fs[pos]); pos:=pos+1;
+      end;
+    end;
+  if fs[0]=cr then begin
+    {empty string -> delete all marks}
+    clrmarks;
+    end
+  else begin
+    found:=false;
+    repeat
+      pos:=0; x:=0;
+      repeat
+        if memory[linepnt[line]+x]=fs[pos]
+          then checkrest;
+        x:=x+1;
+        until found or (x>=xmax);
+      showtop;
+      line:=line+1;
+      until found or (line>=nlines);
+    if found then begin
+      line:=line-1; x:=x-1; i:=0;
+      while fs[i]<>cr do begin {*4*}
+        memory[linepnt[line]+x+i] :=
+          chr(ord(memory[linepnt[line]+x+i])
+          or $80);
+         i:=i+1;
+        end
+      end
+    else begin
+      line:=nlines-1;
     end
   end
-  else begin
-    line:=nlines-1;
-  end;
 end;
-
-func doesc: boolean;
-{******************}
-const xpos = 28;
-var ch:char;
-    i,n:integer;
-begin
-  doesc:=false;
-  goto(xpos,0);
-  write(invvid,'t,b,ln,f,d,w,q,k?');
-  read(@input,ch);read(@input,n);
-  case ch of
-    't': begin {top}
-           line:=1; chktop(true);
-         end;
-    'b': begin {bottom}
-           line:=nlines-1; chktop(true);
-         end;
-    'l': begin {line number}
-           line:=n; chkline; chktop(true);
-         end;
-    'f': begin {find string}
-           find;
-           chkline; chktop(false);
-           showall;
-         end;
-    'd': begin {delete line}
-           delline;
-           chkline; chktop(false);
-           showall;
-         end;
-    'w': writeoutput; {write output}
-    'q': begin {write output and quit}
-           writeoutput;
-           doesc:=true;
-         end;
-    'k': doesc:=true {kill program}
-  end {case};
-  goto(xpos,0); write(norvid,clrlin);
-end;
-
+ 
 proc appendline;
 {**************}
 var i:integer;
@@ -413,35 +391,83 @@ begin
         memory[linepnt[line]+i];
       memory[linepnt[line]+i]:=' ';
       end;
-    line:=line+1;
-    nlines:=nlines+1;
-    chkline;
-    chktop(false);
-    showall;
+    line:=line+1; nlines:=nlines+1;
+    chkline; chktop(false); showall;
   end;
 end;
-
+ 
+func doesc: boolean;
+{******************}
+const xpos=28;
+var ch:char;
+    i,n,savl:integer;
+begin
+  doesc:=false;
+  goto(xpos,0);
+  write(invvid,'t,b,ln,f,g,c,p,d,w,q,k?');
+  read(@input,ch);
+  if ch<>cr then read(@input,n);
+  case ch of
+    't': begin {top}
+           line:=1; chktop(true);
+         end;
+    'b': begin {bottom}
+           line:=nlines-1; chktop(true);
+         end;
+    'l': begin {line number}
+           line:=n; chkline; chktop(true);
+         end;
+    'f','g': begin {find string}
+           find(ch='g'); chkline; chktop(false);
+           showall;
+         end;
+    'c': begin {copy line to buffer}
+           for i:=0 to xmax-1 do begin
+             copybuf[i]:=memory[linepnt[line]+i];
+             memory[linepnt[line]+i]:=
+               chr(ord(copybuf[i]) or $80);
+           end;
+           showall;
+         end;
+    'p': begin {paste line from copy buffer}
+           savl:=line;
+           if savl=line then
+             showerror('too many lines  ')
+           else begin
+             appendline;
+             for i:=0 to xmax-1 do
+               memory[linepnt[line]+i]:=copybuf[i];
+             showall;
+           end;
+         end;
+    'd': begin {delete line}
+           delline; line:=line+1; chkline;
+           chktop(false); showall;
+         end;
+    'w': writeoutput; {write output}
+    'q': begin {write output and quit}
+           writeoutput; doesc:=true;
+         end;
+    'k': doesc:=true {kill program}
+  end {case};
+  goto(xpos,0); write(norvid,clrlin);
+end;
+ 
 begin {main}
-  startheap;
-  readinput;
-  fs[0]:=chr(0);
-  topline := 1
-  line := 1;
-  showall;
-  exit:=false;
+  patchesc:=$eaea; {patch twice nop}
+  startheap; readinput; fs[0]:=chr(0);
+  topline:= 1; line:=1; copybuf[0]:=chr(0);
+  showall; exit:=false;
   repeat
-    showtop;
-    chi := edlin(linepnt[line]);
+    showtop; chi := edlin(linepnt[line]);
     case chi of
       cup: begin
              line:=line-1;
-             chkline;
-             chktop(true);
+             chkline; chktop(true);
            end;
       cdown: begin
              line:=line+1;
-             chkline;
-             chktop(true);
+             chkline; chktop(true);
            end;
       pgup: begin
              line:=line-15;
@@ -457,17 +483,13 @@ begin {main}
       pgend: begin
              line:=nlines-1; chktop(true);
            end;
-      cr: begin
-             appendline;
-           end;
+      cr:  appendline;
       esc: if doesc then exit:=true
     end {case};
     until exit;
-
+ 
   setnumlin($29,$2f);
   writeln(hom, clrscr, 'closing...');
   endheap;
-
+  patchesc:=$27b0; {restore original}
 end.
-
- 
