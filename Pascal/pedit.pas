@@ -30,7 +30,8 @@ var line, nlines, topline,relpnt: integer;
     default, iseof, exit: boolean;
     linepnt: array[maxlines] of integer;
     fs: array[maxfs] of char;
-    copybuf: array[xmax] of char;
+    mark,nmark:integer;
+ 
 proc setnumlin(l,c:integer);
 {**************************}
 mem numlin=$1789: integer&;
@@ -112,12 +113,14 @@ proc showtop;
 begin
   goto(1,0); write(invvid,clrlin);
   write('line ', line, ' of ',nlines-1);
+  if mark>0 then
+    write(', copy: ',mark,'-',mark+nmark-1);
   write(norvid);
 end;
  
 proc showerror(s:array[15] of char);
 {**********************************}
-const xpos=28;
+const xpos=26;
 var i: integer;
     ch: char;
 begin
@@ -183,6 +186,8 @@ proc delline;
 var i,savpnt:integer;
 begin
   chkline; savpnt:=linepnt[line];
+  if line<mark then mark:=mark-1
+  else if line<mark+nmark then nmark:=nmark-1;
   for i:=line to nlines-2 do
     linepnt[i]:=linepnt[i+1];
   release(savpnt); nlines:=nlines-1;
@@ -289,9 +294,24 @@ begin
   close(fno); line:=nlines-1;
 end;
  
+proc clrmarks;
+{************}
+var savel,x:integer;
+begin
+  savel:=line;
+  for line:=1 to nlines-1 do begin
+    for x:=0 to xmax-1 do
+      memory[linepnt[line]+x]:=
+        chr(ord(memory[linepnt[line]+x]) and $7f);
+    showtop;
+    end;
+  line:=savel
+  mark:=0; nmark:=0;
+end;
+ 
 proc find(again:boolean);
 {********}
-const xpos=28;
+const xpos=26;
 var pos,x,i:integer;
     ch:char;
     found:boolean;
@@ -309,20 +329,6 @@ var pos,x,i:integer;
       end;
      if (failed=false) and (fs[pos]=cr)
       then found:=true;
-  end;
- 
-  proc clrmarks;
-  var savel,x:integer;
-  begin
-    savel:=line;
-    for line:=1 to nlines-1 do begin
-      for x:=0 to xmax-1 do
-        memory[linepnt[line]+x]:=
-          chr(ord(memory[linepnt[line]+x]) and $7f);
-      showtop;
-      end;
-    line:=savel
-    showall;
   end;
  
 begin
@@ -345,7 +351,7 @@ begin
     end;
   if fs[0]=cr then begin
     {empty string -> delete all marks}
-    clrmarks;
+    clrmarks; showall;
     end
   else begin
     found:=false;
@@ -374,11 +380,13 @@ begin
   end
 end;
  
-proc appendline;
+proc insertline;
 {**************}
 var i:integer;
 begin
   if nlines<maxlines-1 then begin
+    if line<mark then mark:=mark+1
+    else if line<mark+nmark then nmark:=nmark+1;
     if line<nlines-1 then begin
       for i:=nlines-1 downto line+1 do
         linepnt[i+1]:=linepnt[i];
@@ -396,15 +404,32 @@ begin
   end;
 end;
  
+proc paste;
+{*********}
+var l,i:integer;
+begin
+  for i:=nlines-1 downto line do
+    linepnt[i+nmark]:=linepnt[i];
+  nlines:=nlines+nmark;
+  if mark>line then mark:=mark+nmark;
+  for l:=mark to mark+nmark-1 do begin
+    linepnt[line]:=new;
+    for i:=0 to xmax-1 do
+      memory[linepnt[line]+i]:=memory[linepnt[l]+i];
+    line:=line+1;
+  end;
+  showall;
+end;
+ 
 func doesc: boolean;
 {******************}
-const xpos=28;
+const xpos=26;
 var ch:char;
     i,n,savl:integer;
 begin
   doesc:=false;
   goto(xpos,0);
-  write(invvid,'t,b,ln,f,g,c,p,d,w,q,k?');
+  write(invvid,'t,b,ln,f,g,cn,p,dn,w,q,k?');
   read(@input,ch);
   if ch<>cr then read(@input,n);
   case ch of
@@ -421,42 +446,55 @@ begin
            find(ch='g'); chkline; chktop(false);
            showall;
          end;
-    'c': begin {copy line to buffer}
-           for i:=0 to xmax-1 do begin
-             copybuf[i]:=memory[linepnt[line]+i];
-             memory[linepnt[line]+i]:=
-               chr(ord(copybuf[i]) or $80);
+    'c': begin {mark lines for copy}
+           if n<1 then clrmarks
+           else begin
+             if line+n>= nlines-1 then
+               showerror('too many lines  ')
+             else begin
+               mark:=line; nmark:=n;
+               for line:=mark to mark+nmark-1 do
+                 for i:=0 to xmax-1 do
+                   memory[linepnt[line]+i]:=
+                     chr(ord(memory[linepnt[line]+i])
+                       or $80);
+               line:=mark;
+             end;
            end;
            showall;
          end;
-    'p': begin {paste line from copy buffer}
-           savl:=line;
-           if savl=line then
-             showerror('too many lines  ')
+    'p': begin {paste marked lines}
+           if mark=0 then showerror('nothing marked  ')
            else begin
-             appendline;
-             for i:=0 to xmax-1 do
-               memory[linepnt[line]+i]:=copybuf[i];
-             showall;
+             if nlines+nmark>=maxlines then
+               showerror('too many lines  ')
+             else paste;
            end;
          end;
-    'd': begin {delete line}
-           delline; line:=line+1; chkline;
-           chktop(false); showall;
+    'd': begin {delete n lines}
+           if n<1 then n:=1;
+           if line+n=maxlines-3 then
+             n:=maxlines-3-line;
+           for i:=1 to n do begin
+             delline; line:=line+1;
+           end;
+           chkline; chktop(false); showall;
          end;
     'w': writeoutput; {write output}
     'q': begin {write output and quit}
            writeoutput; doesc:=true;
          end;
     'k': doesc:=true {kill program}
+    else showerror('unknown escape  ')
   end {case};
   goto(xpos,0); write(norvid,clrlin);
 end;
  
 begin {main}
   patchesc:=$eaea; {patch twice nop}
+  mark:=0; nmark:=0;
   startheap; readinput; fs[0]:=chr(0);
-  topline:= 1; line:=1; copybuf[0]:=chr(0);
+  topline:= 1; line:=1;
   showall; exit:=false;
   repeat
     showtop; chi := edlin(linepnt[line]);
@@ -483,7 +521,7 @@ begin {main}
       pgend: begin
              line:=nlines-1; chktop(true);
            end;
-      cr:  appendline;
+      cr:  insertline;
       esc: if doesc then exit:=true
     end {case};
     until exit;
@@ -493,3 +531,4 @@ begin {main}
   endheap;
   patchesc:=$27b0; {restore original}
 end.
+ 

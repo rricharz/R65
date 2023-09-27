@@ -345,9 +345,9 @@ void write6502_8(uint16_t address, uint8_t value)
     memory[address] = value;
 }
 
-/***********/
-int leafpad()
-/***********/
+/************/
+int mousepad()
+/************/
 {
 int i, end, filtyp, filstp;
     char *extension;
@@ -393,8 +393,8 @@ int i, end, filtyp, filstp;
     sprintf(name, "Files/%s%s", s, extension);
     // printf("Editing %s\n", name);
     
-    // execute leafpad command
-    sprintf(estring, "leafpad Files/%s%s", s, extension);
+    // execute mousepad command
+    sprintf(estring, "mousepad Files/%s%s", s, extension);
     printf("Running %s, waiting for completion\n", estring);   
     int res = system(estring);
     // printf("result =%d\n", res);
@@ -482,11 +482,11 @@ void write6502(uint16_t address, uint8_t value)
             memory[R8_EMUCOM] = 0;          // and clear command
         }
         else if (value == 3) {
-            memory[R8_EMURES] = leafpad();  // execute leafpad
+            memory[R8_EMURES] = mousepad();  // execute mousepad
             memory[R8_EMUCOM] = 0;          // and clear command
         }
         else if (value == 4) {
-            memory[R8_EMURES] = change_floppy(); // execute leafpad
+            memory[R8_EMURES] = change_floppy(); // execute change floppy
             memory[R8_EMUCOM] = 0;          // and clear command
         }
         else if (value == 5) {
