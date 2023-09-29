@@ -1,13 +1,13 @@
 program pedit;
- 
+
 { Pascal editor, original 1980 RR
   rewritten 2023 RR for R65 system }
- 
+
 uses syslib, arglib;
- 
+
 const
     xmax = 56;         scrlins = 16;
-    maxfs = 20;        maxlines = 603;
+    maxfs = 20;        maxlines = 503;
     eol    = chr($00); esc    = chr($00);
     pgdown = chr($02); pgup   = chr($08);
     pgend  = chr($10); clrscr = chr($11);
@@ -15,33 +15,30 @@ const
     cup    = chr($1a); cleft  = chr($03);
     inschr = chr($15); delchr = chr($19);
     rubout = chr($5f);
- 
+
 mem memory = 0: array[32767] of char&;
     curlin = $ed: integer&;
     curpos = $ee: integer&;
     video  = $400: array[768] of char&;
     patchesc=$230c:integer; {patch interpreter!}
- 
+
 var line, nlines, topline,relpnt: integer;
     name: array[15] of char;
     fno: file;
     chi : char;
-    cyclus,drive: integer;
+    cyclus,drive,mark,nmark: integer;
     default, iseof, exit: boolean;
     linepnt: array[maxlines] of integer;
     fs: array[maxfs] of char;
-    mark,nmark:integer;
- 
+
 proc setnumlin(l,c:integer);
-{**************************}
 mem numlin=$1789: integer&;
     numchr=$178a: integer&;
 begin
   numlin:=l; numchr:=c;
 end;
- 
+
 func new:integer;
-{***************}
 begin
   if relpnt<maxlines-1 then begin
     relpnt:=relpnt+1; new:=linepnt[relpnt];
@@ -49,33 +46,28 @@ begin
     endstk:=endstk-xmax; new:=endstk+144;
   end;
 end;
- 
+
 proc release(p:integer);
-{**********************}
 begin
   linepnt[relpnt]:=p; relpnt:=relpnt-1;
 end;
- 
+
 proc startheap;
-{*************}
 begin
   relpnt:=maxlines-1;
 end;
- 
+
 proc endheap;
-{***********}
 begin
   endstk := topmem - 144;
 end;
- 
+
 func column:integer;
-{******************}
 begin
   column:=line-topline+1;
 end;
- 
+
 func readline(fin: file; pnt: integer): boolean;
-{**********************************************}
 const alteof=chr(127);
 var ch1: char;
     pos: integer;
@@ -90,26 +82,23 @@ begin
   end;
   readline:=(ch1=eof) or (ch1=alteof);
 end;
- 
+
 proc goto(xpos, ypos: integer);
-{*****************************}
 begin
   curlin:=ypos; { top on line 2 }
   if curlin>15 then curlin:=15;
   curpos:=xpos-1;
 end;
- 
+
 proc showline(pnt,y: integer);
-{****************************}
 var lstart,pos: integer;
 begin
   lstart:=y*xmax;
   for pos:=0 to xmax-1 do
     video[lstart+pos]:=memory[pnt+pos]
 end;
- 
+
 proc showtop;
-{***********}
 begin
   goto(1,0); write(invvid,clrlin);
   write('line ', line, ' of ',nlines-1);
@@ -117,9 +106,8 @@ begin
     write(', copy: ',mark,'-',mark+nmark-1);
   write(norvid);
 end;
- 
+
 proc showerror(s:array[15] of char);
-{**********************************}
 const xpos=26;
 var i: integer;
     ch: char;
@@ -129,9 +117,8 @@ begin
   read(@input,ch);
   goto(xpos,0); write(norvid,clrlin);
 end;
- 
+
 proc showall;
-{***********}
 var y,i,l,lstart: integer;
 begin
   showtop;
@@ -144,17 +131,15 @@ begin
         video[lstart+i]:=' ';
   end;
 end;
- 
+
 proc updline(pnt,lstart: integer);
-{********************************}
 var pos: integer;
 begin
   for pos:=0 to xmax-1 do
     memory[pnt+pos]:=video[lstart+pos];
 end;
- 
+
 func lastpos(l:integer):integer;
-{******************************}
 var endpos:integer;
 begin
   endpos:=xmax-1;
@@ -163,16 +148,14 @@ begin
     and (endpos>0) do endpos:=endpos-1;
   lastpos:=endpos;
 end;
- 
+
 proc chkline;
-{***********}
 begin
   if line<1 then line:=1
   else if line>nlines-1 then line:=nlines-1;
 end;
- 
+
 proc chktop(show: boolean);
-{*************************}
 var savetop,bottom:integer;
 begin
   savetop:=topline; bottom:=topline+scrlins-1;
@@ -181,9 +164,8 @@ begin
     topline:=line-scrlins+2;
   if show and (savetop<>topline) then showall;
 end;
- 
+
 proc delline;
-{***********}
 var i,savpnt:integer;
 begin
   chkline; savpnt:=linepnt[line];
@@ -195,9 +177,8 @@ begin
   chkline; chktop(false);
   line:=line-1;
 end;
- 
+
 proc join;
-{********}
 var p,p1,p2,pm:integer;
 begin
   p1:=lastpos(line-1);
@@ -216,9 +197,8 @@ begin
   end;
   chkline; chktop(false); showall;
 end;
- 
+
 func edlin(pnt: integer): char;
-{*****************************}
 const key    = @1;
 var   ch1: char;
       exit: boolean;
@@ -226,8 +206,7 @@ var   ch1: char;
 begin
   goto(1,column);
   write(cleft); {to update cursor}
-  exit:=false;
-  lstart:=column*xmax;
+  exit:=false; lstart:=column*xmax;
   repeat
     read(@key,ch1);
     case ch1 of
@@ -253,16 +232,13 @@ begin
   updline(pnt,lstart);
   edlin := ch1;
 end;
- 
+
 proc readinput;
-{*************}
 begin
   cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
   asetfile(name,cyclus,drive,'P');
-  openr(fno);
-  write(hom, clrscr);
-  setnumlin($0f,$37);
+  openr(fno); write(hom, clrscr); setnumlin($0f,$37);
   nlines := 1; line:=1; topline:=1;
   repeat
     linepnt[nlines] := new;
@@ -274,9 +250,8 @@ begin
       showerror('too many lines  ');
   close(fno);
 end;
- 
+
 proc writeoutput;
-{***************}
 var pos,endpos,saveline:integer;
 begin
   cyclus:=0; drive:=1;
@@ -294,9 +269,8 @@ begin
   end;
   close(fno); line:=nlines-1;
 end;
- 
+
 proc clrmarks;
-{************}
 var savel,x:integer;
 begin
   savel:=line;
@@ -306,17 +280,15 @@ begin
         chr(ord(memory[linepnt[line]+x]) and $7f);
     showtop;
     end;
-  line:=savel
-  mark:=0; nmark:=0;
+  line:=savel; mark:=0; nmark:=0;
 end;
- 
+
 proc find(again:boolean);
-{********}
 const xpos=26;
 var pos,x,i:integer;
     ch:char;
     found:boolean;
- 
+
   proc checkrest;
   var failed:boolean;
       x1:integer;
@@ -331,7 +303,7 @@ var pos,x,i:integer;
      if (failed=false) and (fs[pos]=cr)
       then found:=true;
   end;
- 
+
 begin
   pos:=0;
   if not again then begin
@@ -380,9 +352,8 @@ begin
     end
   end
 end;
- 
+
 proc insertline;
-{**************}
 var i:integer;
 begin
   if nlines<maxlines-1 then begin
@@ -404,9 +375,8 @@ begin
     chkline; chktop(false); showall;
   end;
 end;
- 
+
 proc paste;
-{*********}
 var l,i:integer;
 begin
   for i:=nlines-1 downto line do
@@ -421,15 +391,13 @@ begin
   end;
   showall;
 end;
- 
+
 func doesc: boolean;
-{******************}
 const xpos=26;
 var ch:char;
     i,n,savl:integer;
 begin
-  doesc:=false;
-  goto(xpos,0);
+  doesc:=false; goto(xpos,0);
   write(invvid,'t,b,ln,f,g,cn,p,dn,w,q,k?');
   read(@input,ch);
   if ch<>cr then read(@input,n);
@@ -490,31 +458,26 @@ begin
   end {case};
   goto(xpos,0); write(norvid,clrlin);
 end;
- 
+
 begin {main}
   patchesc:=$eaea; {patch twice nop}
   mark:=0; nmark:=0;
   startheap; readinput; fs[0]:=chr(0);
-  topline:= 1; line:=1;
-  showall; exit:=false;
+  topline:= 1; line:=1; showall; exit:=false;
   repeat
     showtop; chi := edlin(linepnt[line]);
     case chi of
       cup: begin
-             line:=line-1;
-             chkline; chktop(true);
+             line:=line-1; chkline; chktop(true);
            end;
       cdown: begin
-             line:=line+1;
-             chkline; chktop(true);
+             line:=line+1; chkline; chktop(true);
            end;
       pgup: begin
-             line:=line-15;
-             chkline; chktop(true);
+             line:=line-15; chkline; chktop(true);
            end;
       pgdown: begin
-             line:=line+15;
-             chkline; chktop(true);
+             line:=line+15; chkline; chktop(true);
            end;
       hom: begin
              line:=1; chktop(true);
@@ -526,10 +489,8 @@ begin {main}
       esc: if doesc then exit:=true
     end {case};
     until exit;
- 
   setnumlin($29,$2f);
   writeln(hom, clrscr, 'closing...');
   endheap;
   patchesc:=$27b0; {restore original}
 end.
- 
