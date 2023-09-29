@@ -158,7 +158,8 @@ func lastpos(l:integer):integer;
 var endpos:integer;
 begin
   endpos:=xmax-1;
-  while (memory[linepnt[l]+endpos]=' ')
+  while (memory[linepnt[l]+endpos]
+    =chr(ord(' ') and $7f))
     and (endpos>0) do endpos:=endpos-1;
   lastpos:=endpos;
 end;
