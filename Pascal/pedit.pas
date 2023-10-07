@@ -3,11 +3,10 @@ program pedit;
 { Pascal editor, original 1980 RR
   rewritten 2023 RR for R65 system }
  
-uses syslib, arglib;
+uses syslib, arglib, heaplib;
  
 const
-    xmax = 56;         scrlins = 16;
-    maxfs = 20;        maxlines = 503;
+    scrlins = 16; maxfs = 20; line1x = 20;
     eol    = chr($00); esc    = chr($00);
     pgdown = chr($02); pgup   = chr($08);
     pgend  = chr($10); clrscr = chr($11);
@@ -22,13 +21,13 @@ mem memory = 0: array[32767] of char&;
     video  = $400: array[768] of char&;
     patchesc=$230c:integer; {patch interpreter!}
  
-var line, nlines, topline,relpnt: integer;
+var line, nlines, topline: integer;
     name: array[15] of char;
     fno: file;
     chi : char;
     cyclus,drive,mark,nmark,savecx: integer;
     default, iseof, exit: boolean;
-    linepnt: array[maxlines] of integer;
+ 
     fs: array[maxfs] of char;
  
 proc setnumlin(l,c:integer);
@@ -36,30 +35,6 @@ mem numlin=$1789: integer&;
     numchr=$178a: integer&;
 begin
   numlin:=l; numchr:=c;
-end;
- 
-func new:integer;
-begin
-  if relpnt<maxlines-1 then begin
-    relpnt:=relpnt+1; new:=linepnt[relpnt];
-  end else begin
-    endstk:=endstk-xmax; new:=endstk+144;
-  end;
-end;
- 
-proc release(p:integer);
-begin
-  linepnt[relpnt]:=p; relpnt:=relpnt-1;
-end;
- 
-proc startheap;
-begin
-  relpnt:=maxlines-1;
-end;
- 
-proc endheap;
-begin
-  endstk := topmem - 144;
 end;
  
 func column:integer;
@@ -105,14 +80,13 @@ begin
 end;
  
 proc showerror(s:array[15] of char);
-const xpos=26;
 var i: integer;
     ch: char;
 begin
-  goto(xpos,0); write(invvid,clrlin);
+  goto(line1x,0); write(invvid,clrlin);
   for i:=0 to 15 do write(s[i]);
   read(@input,ch);
-  goto(xpos,0); write(norvid,clrlin);
+  goto(line1x,0); write(norvid,clrlin);
 end;
  
 proc showall;
@@ -244,9 +218,10 @@ begin
     iseof := readline(fno, linepnt[nlines]);
     nlines := nlines+1;
     showtop; write(invvid,' reading',norvid);
-    until iseof or (nlines >= maxlines-2);
-    if nlines >= maxlines-2 then
+    until iseof or (nlines >= maxlines-1);
+    if nlines >= maxlines-1 then
       showerror('too many lines  ');
+ 
   close(fno);
 end;
  
@@ -283,7 +258,6 @@ begin
 end;
  
 proc find(again:boolean);
-const xpos=26;
 var pos,x,i:integer;
     ch:char;
     found:boolean;
@@ -306,7 +280,7 @@ var pos,x,i:integer;
 begin
   pos:=0;
   if not again then begin
-    goto(xpos,0);
+    goto(line1x,0);
     write(invvid,'find?',clrlin);
     repeat
       read(@input,ch); fs[pos]:=ch; pos:=pos+1;
@@ -314,7 +288,7 @@ begin
     write(norvid);
     end
   else begin
-    goto(xpos,0); write(invvid,'find?',clrlin);
+    goto(line1x,0); write(invvid,'find what? ',clrlin);
     pos:=0;
     while(fs[pos]<>cr) do begin
       write(fs[pos]); pos:=pos+1;
@@ -388,13 +362,37 @@ begin
   showall;
 end;
  
+proc move;
+var i,j,savepnt,saveline: integer;
+begin
+  saveline:=line; { insert above}
+  if line>=mark+nmark then begin
+    mark:=mark+nmark-1;
+    for j:=0 to nmark-1 do begin
+      savepnt:=linepnt[mark];
+      for i:=mark to line-1 do
+        linepnt[i]:=linepnt[i+1];
+      mark:=mark-1; line:=line-1;
+      linepnt[line]:=savepnt;
+    end;
+  end else if line<mark then begin
+    for j:=0 to nmark-1 do begin
+      savepnt:=linepnt[mark];
+      for i:=mark downto line+1 do
+        linepnt[i]:=linepnt[i-1];
+      linepnt[line]:=savepnt;
+      mark:=mark+1; line:=line+1;
+    end;
+  end else showerror('move inside move');
+ mark:=saveline; line:=saveline; showall;
+end;
+ 
 func doesc: boolean;
-const xpos=26;
 var ch:char;
     i,n,savl:integer;
 begin
-  doesc:=false; goto(xpos,0); savecx:=1;
-  write(invvid,'t,b,ln,f,g,cn,p,dn,w,q,k?');
+  doesc:=false; goto(line1x,0); savecx:=1;
+  write(invvid,'t,b,ln,f,g,cn,p,m,dn,w,q,k?');
   read(@input,ch); if ch<>cr then read(@input,n);
   case ch of
     't': begin {top}
@@ -426,11 +424,19 @@ begin
          end;
     'p': begin {paste marked lines}
            if mark=0 then showerror('nothing marked  ')
+ 
            else begin
+ 
              if nlines+nmark>=maxlines then
                showerror('too many lines  ')
              else paste;
            end;
+         end;
+    'm': begin {move marked lines }
+           if mark=0 then showerror('nothing marked  ')
+ 
+           else move;
+ 
          end;
     'd': begin {delete n lines}
            if n<1 then n:=1;
@@ -448,13 +454,13 @@ begin
     'k': doesc:=true {kill program}
     else showerror('unknown escape  ')
   end {case};
-  goto(xpos,0); write(norvid,clrlin);
+  goto(line1x,0); write(norvid,clrlin);
 end;
  
 begin {main}
   patchesc:=$eaea; {patch twice nop}
   mark:=0; nmark:=0; savecx:=1;
-  startheap; readinput; fs[0]:=chr(0);
+  readinput; fs[0]:=chr(0);
   topline:= 1; line:=1; showall; exit:=false;
   repeat
     showtop; chi := edlin(linepnt[line]);

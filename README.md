@@ -72,8 +72,8 @@ original system, but can handle an unlimited number of floppy disks.
 The original text editor has not been implemented, because it must be
 considered very user unfriendly given todays standards. Instead,
 using the "edit" command of EXDOS, the file to edit is automatically
-exported to the Linux file system, and the Linux text editor "leafpad"
-is called. Once leafpad is quit, the edited file is imported automatically
+exported to the Linux file system, and the Linux text editor "mousepad"
+is called. Once mousepad is quit, the edited file is imported automatically
 back into the R65 file system. This happens automatically and very quickly.
 
 Please note that even so the emulator includes the original KIM-1 ROM, it is NOT
