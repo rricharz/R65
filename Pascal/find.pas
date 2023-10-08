@@ -12,7 +12,12 @@ program find;
   2023 rricharz                       }
  
 uses syslib,arglib;
+ 
 const namesize=15;
+      afloppy=$d0db; { exdos vector }
+ 
+mem   filerr=$db: integer&;
+ 
 var   cyclus,drive,entry: integer;
       default,found,last: boolean;
       name: array[namesize] of char;
@@ -71,7 +76,6 @@ begin {test}
   found:=match(0,0);
 end;
  
-{********************************************}
 proc findentry(var nm:array[namesize] of char;
        drv:integer;var ent: integer;
        var fnd,lst:boolean);
@@ -79,7 +83,6 @@ proc findentry(var nm:array[namesize] of char;
 const aprepdo    = $f4a7;
       agetentx   = $f63a;
       aenddo     = $f625;
-      prflab     = $ece3;
       numentries = 79;
  
 mem   filtyp     = $0300: char&;
@@ -108,37 +111,76 @@ begin
     fnd:=true;
     i:=0;
     test(nm,fnd);
-    if (fillnk and $80)<>0 then {deleted file}          
-      fnd:=false;                                       
+    if (fillnk and $80)<>0 then {deleted file}
+      fnd:=false;
     ent:=ent+1;
     lst:=(filtyp=chr(0));
     until fnd or lst or (ent>=numentries);
   call (aenddo);
-  if fnd and (not lst) then begin
-    ent:=ent-1;
-    call(prflab); writeln;
-    end;
+ 
 end;
  
-proc findond(d:integer);
+proc findond(nm:array[15] of char; d:integer);
+{********************************************}
 const numentries = 79;
+      prflab     = $ece3;
+ 
+ 
+var first: boolean;
+    i: integer;
+ 
+proc writename(nm1:array[15] of char);
+var j,k:integer;
 begin
-  entry:=0;
-  writeln(invvid,'Disk ',d,':',norvid);
-  last:=false;
-  while (entry<numentries) and not last do begin
-    cyclus:=0;
-    findentry(name,d,entry,found,last);
-    entry:=entry+1;
-    end;
+  k:=15;
+  while (nm1[k]=' ') and (k>1) do k:=k-1;
+  for j:=0 to k do write(nm1[j]);
 end;
  
 begin
-  cyclus:=0; drive:=0; {defaults}
+  first:=true;
+  cyclus:=0; drive:=d;
+  asetfile(nm,cyclus,drive,' ');
+  call(afloppy);
+  if filerr=0 then begin
+    last:=false; entry:=0;
+    while (entry<numentries) and not last do begin
+      cyclus:=0;
+      findentry(name,d,entry,found,last);
+      if found and (not last) then begin
+        if first then begin
+          write(invvid,'Disk ');
+          writename(nm); writeln(':',norvid);
+          first:=false;
+        end;
+        call(prflab); writeln;
+        end;
+      end;
+    entry:=entry+1;
+  end else begin
+    write('disk ');
+    writename(nm);
+    writeln(' not found');
+  end;
+end;
+ 
+begin
+  cyclus:=0; drive:=0;
   agetstring(name,default,cyclus,drive);
-  { drive and cyclus are ignored }
-  findond(0);
-  writeln;
-  findond(1);
+ 
+  findond('WORK            ',1);
+  findond('PROGRAMS        ',0);
+ 
+  findond('SOURCE          ',0);
+ 
+  findond('SOURCEEPROM     ',0);
+ 
+  findond('BASIC           ',0);
+ 
+  findond('SOURCECOMPIL    ',0);
+ 
+  findond('SOURCEPASCAL    ',0);
+ 
+  findond('PASCAL          ',0);
 end.
  
