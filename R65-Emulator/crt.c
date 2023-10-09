@@ -31,7 +31,6 @@ int      global_pendingCrtUpdate;
 int      global_videoBaseAddress;
 int      global_curlin;
 int      global_curpos;
-int      global_cursor_color;
 int      global_curloc;
 int      global_graphicsFlag;
 int      hcell;
@@ -52,7 +51,6 @@ void crt_init()
     global_videoBaseAddress = M_CRTMEM;
     for (int i = 0; i < NUM_LEDS; i++)
         led[i] = 0;
-    global_cursor_color = 0xFF;
     global_graphicsFlag = 0;
     xdot2 = windowWidth / 112;
     ydot2 = (windowHeight - INFO_HEIGHT - 20) / 59;
@@ -195,7 +193,7 @@ void crtUpdate()
 
     hcell = windowWidth / NUMCHAR;
     vcell = (windowHeight - INFO_HEIGHT - 20) / NUMLINES;
-    csize = vcell - 2;
+    csize = hcell * 1.7;
 //  printf("Cell size = %d x %d, numchr = %d\n", hcell, vcell, NUMCHAR);
     
     checkInfoBarButtons();
@@ -262,10 +260,13 @@ void crtUpdate()
             // Display cursor
             int onscreenCurlin = (global_curloc - global_videoBaseAddress) / NUMCHAR;
             int onscreenCurpos = (global_curloc - global_videoBaseAddress) % NUMCHAR;
-            SETNORMALTEXTCOLOR;
+            if (memory[M8_SFLAG] & 1)
+                SETPASCALCOLOR;
+            else
+                SETNORMALTEXTCOLOR;
             xx = hcell * onscreenCurpos + BORDER;
             yy = vcell * (onscreenCurlin + 1) + BORDER + 3;
-            StrokeWidth(2);
+            StrokeWidth(hcell / 5);
             Line(xx, yy  + INFO_HEIGHT, xx + hcell - 1, yy  + INFO_HEIGHT);
         }
         
