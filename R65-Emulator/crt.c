@@ -198,17 +198,9 @@ void infoPanel()
         sprintf(s,"%04X  %02X",pc, spMin);
     }
     else {
-        if (exDisplay) {
-            sprintf(s,"%05d%03d",
+        sprintf(s,"%05d %02X",
                 (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),
                 pascalMinFree >> 8);
-            s[4] += 128;  // dot
-        }
-        else {
-            sprintf(s,"%05d.%03d",
-                (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),
-                pascalMinFree >> 8);
-        }
     }
 //  printf("Displaying string >%s<\n",s);
     if (exDisplay) led_showstring(s, 0);
