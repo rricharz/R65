@@ -19,7 +19,7 @@
 #define SETHIDETEXTCOLOR     Stroke(0,0,0) 
 #define SETINVERSETEXTCOLOR  Stroke(160,160,160); Fill(160,160,160,0)
 #define SETINVERSEPTEXTCOLOR Stroke(0,160,160); Fill(0,160,160,0)
-#define SETDISKNAMECOLOR     Stroke(255,0,0)
+#define SETDISKNAMECOLOR     Stroke(255, 20, 20)
 #define SETBACKGROUNDCOLOR   Fill(0,0,0,0)
 #define SETBUTTONCOLOR       Stroke(210,210,210); Fill(63,63,63,0)
 #define SETLEDBORDERCOLOR    Stroke(210,210,210);
@@ -38,6 +38,7 @@ int      vcell;
 int      csize;
 int      xdot2;
 int      ydot2;
+int      QUIT_HPOS;
 
 int led[NUM_LEDS];
 
@@ -52,8 +53,8 @@ void crt_init()
     for (int i = 0; i < NUM_LEDS; i++)
         led[i] = 0;
     global_graphicsFlag = 0;
-    xdot2 = windowWidth / 112;
-    ydot2 = (windowHeight - INFO_HEIGHT - 20) / 59;
+    xdot2 = crtWidth / 112;
+    ydot2 = crtHeight / 59;
     printf("Dot size = %0.1f x %0.1f\n", (double)xdot2/2.0, (double)ydot2/2.0);
     // In order to handle the fractional expansion
     // factor on some displays, white (cyan) dots are one dot larger
@@ -99,35 +100,70 @@ void checkInfoBarButtons()
     if (x > 0) {
     
         // check for Quit button
-        if ((x >= QUIT_HPOS) && (x <= QUIT_HPOS + QUIT_HSIZE) && (y <= INFO_HEIGHT - QUIT_VPOS)) {
+        if ((x >= QUIT_HPOS) && (x <= QUIT_HPOS + QUIT_HSIZE)
+            && (y <= QUIT_HPOS) && (y >= QUIT_VPOS - QUIT_VSIZE)) {
             QuitProgram(0);
         }
     
         // check for Stop button
-        if ((x >= STOP_HPOS) && (x <= STOP_HPOS + QUIT_HSIZE) && (y <= INFO_HEIGHT - QUIT_VPOS)) {
+        if ((x >= STOP_HPOS) && (x <= QUIT_HPOS + QUIT_HSIZE)
+           && (y <= QUIT_HPOS) && (y >= QUIT_VPOS - QUIT_VSIZE)) {        
             printf("Executing NMI\n");
             pendingNMI = 1;
+        }
+            
+        // check for Shutdown button
+        if ((x >= SDOWN_HPOS) && (x <= SDOWN_HPOS + SDOWN_HSIZE)
+           && (y <= QUIT_HPOS) && (y >= QUIT_VPOS - QUIT_VSIZE)) {        
+            printf("Executing shutdown\n");
+            system("sudo shutdown -h now");
         }
     }
 }
 
-/************/
-void infoBar()
-/************/
-// display the information bar
+/*********************************/
+void crt_showstring(char* s, int y)
+/*********************************/
+
 {
-    // display the background
-    SETINFOBACKGROUND;
-    Rect(1,INFO_HEIGHT+5,windowWidth-1,INFO_HEIGHT+1);
-    
+    int x;
+    int i = 0;
+    do {
+        if (s[i] == ' ') s[i] = '!';
+        i++;
+    }
+    while ((i<16) && (s[i] != 0));
+    x = panelOffset + 5 * panelScale;
+    Stroke(210,210,210); Fill(0, 0, 0, 0);
+    Rect(x - 2 * panelScale, y + 4 * panelScale, 160 * panelScale, 32 * panelScale);
+    Stroke(70, 70, 70);
+    Text(x, y, "8.8.8.8.8.8.8.8.",
+                "DSEG7 Classic", 24 * panelScale, 0, 1);
+    Stroke(255, 20, 20);
+    Text(x, y, s,
+                "DSEG7 Classic", 24 * panelScale, 0, 1);
+}
+
+/**************/
+void infoPanel()
+/**************/
+// display the information bar
+{    
     // show Quit button
     SETBUTTONCOLOR;
-    Rect(QUIT_HPOS, INFO_HEIGHT - QUIT_VPOS, QUIT_HSIZE, INFO_HEIGHT - 9);
-    Text(QUIT_HPOS+2, INFO_HEIGHT - QUIT_VPOS - 5, "QUIT", 16, 0);
+    Rect(QUIT_HPOS, QUIT_VPOS, QUIT_HSIZE, QUIT_VSIZE);
+    Text(QUIT_HPOS + (PANEL_FONTSIZE / 2), QUIT_VPOS - (PANEL_FONTSIZE / 3),
+      "QUIT", "Monospace", PANEL_FONTSIZE, 0, 0);
     
     // show STOP button
-    Rect(STOP_HPOS, INFO_HEIGHT - QUIT_VPOS, QUIT_HSIZE, INFO_HEIGHT - 9);
-    Text(STOP_HPOS+2, INFO_HEIGHT - QUIT_VPOS - 5, "STOP", 16, 0);
+    Rect(STOP_HPOS, QUIT_VPOS, QUIT_HSIZE, QUIT_VSIZE);
+    Text(STOP_HPOS + (PANEL_FONTSIZE / 3), QUIT_VPOS - (PANEL_FONTSIZE / 3),
+      "BREAK", "Monospace", PANEL_FONTSIZE, 0, 0);
+      
+    // show SHUTDOWN button
+    Rect(SDOWN_HPOS, QUIT_VPOS, SDOWN_HSIZE, QUIT_VSIZE);
+    Text(SDOWN_HPOS + (PANEL_FONTSIZE / 3), QUIT_VPOS - (PANEL_FONTSIZE / 3),
+      "SHUTDOWN", "Monospace", PANEL_FONTSIZE, 0, 0);
     
     // show leds
     SETLEDBORDERCOLOR;
@@ -136,7 +172,7 @@ void infoBar()
             SETLEDONCOLOR;
         else
             SETLEDOFFCOLOR;
-        Rect(LED_HPOS + i * LED_HDIST, LED_VPOS, LED_SIZE, LED_SIZE);
+        Rect(LED_HPOS, LED_VPOS  + i * LED_VDIST, LED_SIZE, LED_SIZE);
     }
     if (exDisplay) {
         setDriveLed(0, led[0]);
@@ -147,8 +183,8 @@ void infoBar()
     SETDISKNAMECOLOR;
     SETBACKGROUNDCOLOR;
     for (int drive = 0; drive <2; drive++) {
-        Text(NAME_HPOS + LED_HDIST * drive, INFO_HEIGHT - QUIT_VPOS - 3,
-            floppy[drive].name, 24, 0);
+        Text(LED_HPOS + 30 * panelScale, LED_VPOS - panelScale + drive * LED_VDIST,
+            floppy[drive].name, "Monospace", 18 * panelScale, 0, 0);
     }
     
     // show spMin and pascalMinFree
@@ -159,9 +195,7 @@ void infoBar()
         s[8]=0;
     }
     else if (pascalMinFree == 0xFFFF) {
-        char buff[20];
-        sprintf(buff,"%04X",pc);
-        sprintf(s,"%s  %02X", buff, spMin);
+        sprintf(s,"%04X  %02X",pc, spMin);
     }
     else {
         if (exDisplay) {
@@ -176,10 +210,9 @@ void infoBar()
                 pascalMinFree >> 8);
         }
     }
-    if (exDisplay)
-        led_showstring(s, 0);
-    else
-        Text(NAME_HPOS + LED_HDIST * 2, INFO_HEIGHT - QUIT_VPOS - 3, s, 24, 0);
+//  printf("Displaying string >%s<\n",s);
+    if (exDisplay) led_showstring(s, 0);
+    crt_showstring(s, QUIT_VPOS + 2 * QUIT_VSIZE + 16 * panelScale);
 }
 
 /**************/
@@ -191,8 +224,8 @@ void crtUpdate()
     char s[2];
     s[1] = 0;
 
-    hcell = windowWidth / NUMCHAR;
-    vcell = (windowHeight - INFO_HEIGHT - 20) / NUMLINES;
+    hcell = crtWidth / NUMCHAR;
+    vcell = crtHeight / NUMLINES;
     csize = hcell * 1.7;
 //  printf("Cell size = %d x %d, numchr = %d\n", hcell, vcell, NUMCHAR);
     
@@ -202,13 +235,15 @@ void crtUpdate()
         
         clock_t start = clock();
         
-        Background(0, 0, 0);
+        Background(0.2, 0.2, 0.2);
         
         // Display Info bar
         
-        infoBar();
+        infoPanel();
         
         // Display characters
+        
+        Crt_Background(0.0, 0.0, 0.0);
         
         SETDOTCOLOR;
         int xx, yy;
@@ -221,8 +256,8 @@ void crtUpdate()
                     pnt++;
                     for (int bit = xdot2 * xx; bit < xdot2 * (xx + 8); bit+= xdot2) {
                         if (val & mask) {
-                            Rect((bit >> 1) + 9, 
-                                windowHeight - (yy >> 1) - 15,
+                            Rect((bit >> 1) + 9 + crtOffset, 
+                                crtHeight - (yy >> 1) - 15 + crtOffset,
                                     (xdot2 - 3) >> 1, (ydot2 - 3) >> 1);
                         }
                         mask = mask >> 1;                         
@@ -239,7 +274,7 @@ void crtUpdate()
                             SETINVERSEPTEXTCOLOR; }
                     	else {
                             SETINVERSETEXTCOLOR; }
-                        Rect(hcell*xx + BORDER, vcell*(yy+1) + BORDER + 3 + INFO_HEIGHT,
+                        Rect(hcell*xx + crtOffset, vcell*(yy+1) + 3 + crtOffset,
                             hcell, vcell);
                         Stroke(0,0,0);
                         }
@@ -249,11 +284,11 @@ void crtUpdate()
                         SETNORMALTEXTCOLOR;
                     s[0] = s[0] & 0x7F;
                     if (s[0] == '*')   // the star needs to be placed lower
-                        Text(hcell * xx + BORDER, vcell * (yy + 1) + BORDER + 3 + INFO_HEIGHT,
-                            s, csize, 0);
+                        Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset,
+                            s, "Monospace", csize, 0, 0);
                     else
-                        Text(hcell * xx + BORDER, vcell * (yy + 1) + BORDER - 3 + INFO_HEIGHT,
-                            s, csize, 0);
+                        Text(hcell * xx + crtOffset, vcell * (yy + 1)  - 4 + crtOffset,
+                            s, "Monospace", csize, 0, 0);
                 }
             }
         
@@ -264,10 +299,12 @@ void crtUpdate()
                 SETPASCALCOLOR;
             else
                 SETNORMALTEXTCOLOR;
-            xx = hcell * onscreenCurpos + BORDER;
-            yy = vcell * (onscreenCurlin + 1) + BORDER + 3;
+            xx = hcell * onscreenCurpos;
+            yy = vcell * (onscreenCurlin + 1) + 3;
             StrokeWidth(hcell / 5);
-            Line(xx, yy  + INFO_HEIGHT, xx + hcell - 1, yy  + INFO_HEIGHT);
+            Line(xx + crtOffset, yy  + crtOffset,
+                xx + hcell - 1 + crtOffset, yy  + crtOffset);
+            StrokeWidth(2);
         }
         
         // Update complete

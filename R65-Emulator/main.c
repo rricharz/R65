@@ -47,6 +47,7 @@ int global_firstcall;
 guint global_timeout_ref;
 int cursorDisabled;
 int exDisplay;
+int fullscreen;
 
 struct tColor {
 	double r, g, b;
@@ -59,16 +60,31 @@ struct tClick {
 int global_char;
 
 int windowWidth, windowHeight;
+int crtWidth, crtHeight, crtOffset;
+int panelSize, panelOffset;
+double panelScale;
 
-////////////////////////////////////
-void Background(int r, int g, int b)
-////////////////////////////////////
+/////////////////////////////////////////////
+void Background(double r, double g, double b)
+/////////////////////////////////////////////
 {
-	cairo_set_source_rgb(global_surface_cr, 0.0, 0.0, 0.0);
-	cairo_rectangle (global_surface_cr, 0, 0, windowWidth, windowHeight);
-	cairo_fill(global_surface_cr);
-	global_surface_has_been_updated = TRUE;
+    cairo_set_source_rgb(global_surface_cr, r, g, b);
+    cairo_rectangle (global_surface_cr, 0, 0, windowWidth, windowHeight);
+    cairo_fill(global_surface_cr);
+    global_surface_has_been_updated = TRUE;
 }
+
+/////////////////////////////////////////////////
+void Crt_Background(double r, double g, double b)
+/////////////////////////////////////////////////
+{
+    cairo_set_source_rgb(global_surface_cr, r, g, b);
+    cairo_rectangle (global_surface_cr, crtOffset / 2, crtOffset / 2, 
+        crtWidth + crtOffset, crtHeight + crtOffset);
+    cairo_fill(global_surface_cr);
+    global_surface_has_been_updated = TRUE;
+}
+
 
 ////////////////////////////////
 void Stroke(int r, int g, int b)
@@ -131,13 +147,17 @@ void Circle(int x, int y, int r)
 	global_surface_has_been_updated = TRUE;
 }
 
-/////////////////////////////////////////////////////////
-void Text(int x, int y, char *s, int fontSize, int erase)
-/////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+void Text(int x, int y, char *s, char *fn, int fontSize, int erase, int bold)
+///////////////////////////////////////////////////////////////////////////////
 {
 	cairo_text_extents_t extents;
-	cairo_select_font_face(global_surface_cr, "Monospace", CAIRO_FONT_SLANT_NORMAL,
-	    CAIRO_FONT_WEIGHT_NORMAL);
+	cairo_font_weight_t weight;
+	if (bold)
+	    weight = CAIRO_FONT_WEIGHT_BOLD;
+	else
+	    weight = CAIRO_FONT_WEIGHT_NORMAL;
+	cairo_select_font_face(global_surface_cr, fn, CAIRO_FONT_SLANT_NORMAL, weight);
 	cairo_set_font_size(global_surface_cr, fontSize);
 	if (erase) {
 		cairo_text_extents(global_surface_cr, s, &extents);
@@ -426,84 +446,91 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
 int main (int argc, char *argv[])
 /////////////////////////////////
 {
-	GtkWidget *darea;
+    GtkWidget *darea;
+	
+    int firstArg = 1;
         
-        exDisplay = 0;
-        int askWindowWidth = MIN_WINDOW_WIDTH;
-        int askWindowHeight = MIN_WINDOW_HEIGHT;
-        
-        if (argc == 2) {
-            int ci = 0;
-            while (argv[1][ci] != 0) {
-                switch (argv[1][ci]) {
-                    case 'L': askWindowWidth = MAX_WINDOW_WIDTH;
-                              askWindowHeight = MAX_WINDOW_HEIGHT;
-                              break;
-                    case 'E': exDisplay = 1; break;
-                }
-                ci++;
-            }
+    exDisplay = FALSE;
+    fullscreen = FALSE;
+	
+    while (firstArg < argc) {
+	if (strcmp(argv[firstArg],"-full") == 0)
+	    fullscreen = TRUE;
+	else if (strcmp(argv[firstArg],"-extern") == 0)
+	    exDisplay = TRUE;          
+        else {
+            printf("R65: unknown argument %s\n", argv[firstArg]);
+            exit(1);
         }
+        firstArg++;
+    }
   
-	gtk_init(&argc, &argv);
+    gtk_init(&argc, &argv);
 	
-	global_firstcall = TRUE;
-	cursorDisabled = FALSE;
+    global_firstcall = TRUE;
+    cursorDisabled = FALSE;
 	
-	clearClicks();
+    clearClicks();
 
-	global_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    global_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
-	darea = gtk_drawing_area_new();
-	gtk_container_add(GTK_CONTAINER(global_window), darea);
-	gtk_widget_add_events(global_window, GDK_BUTTON_PRESS_MASK);
-	gtk_widget_add_events(global_window, GDK_BUTTON_RELEASE_MASK);
-        gtk_widget_add_events(global_window, GDK_KEY_PRESS_MASK);
+    darea = gtk_drawing_area_new();
+    gtk_container_add(GTK_CONTAINER(global_window), darea);
+    gtk_widget_add_events(global_window, GDK_BUTTON_PRESS_MASK);
+    gtk_widget_add_events(global_window, GDK_BUTTON_RELEASE_MASK);
+    gtk_widget_add_events(global_window, GDK_KEY_PRESS_MASK);
+        	
+    GdkScreen *screen = gtk_window_get_screen(GTK_WINDOW(global_window));
+    int screenWidth = gdk_screen_get_width(screen);
+    int screenHeight = gdk_screen_get_height(screen);
+    printf("Screen dimensions: %d x %d\n", screenWidth, screenHeight);
         
+    if (fullscreen) {	    
+	// DISPLAY UNDECORATED MAXIMIZED WINDOW
+	gtk_window_set_decorated(GTK_WINDOW(global_window), FALSE);
+	gtk_window_fullscreen(GTK_WINDOW(global_window));
+	windowWidth  = screenWidth;
+	windowHeight = screenHeight;
+	panelScale = (double)(windowWidth) / (double)(MIN_WINDOW_WIDTH);
+    }	
+    else {
+	// DISPLAY DECORATED WINDOW
+	gtk_window_set_decorated(GTK_WINDOW(global_window), TRUE);
+	gtk_window_set_default_size(GTK_WINDOW(global_window),
+		MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
+	windowWidth  = MIN_WINDOW_WIDTH;
+	windowHeight = MIN_WINDOW_HEIGHT;
+	panelScale = 1.0;
+    }
+    printf("Window dimensions: %d x %d\n", windowWidth, windowHeight);
+    
+    crtOffset = windowHeight / 10;
+    crtHeight = windowHeight - (2 * crtOffset);
+    // Aspect ratio of original display
+    crtWidth  = 4 * crtHeight / 3;
+    
+    panelOffset = crtWidth +  (2 * crtOffset); 
+    panelSize   = windowWidth -panelOffset - ( crtOffset / 2);
+    printf("PanelOffset: %d\n", panelOffset, windowHeight);
+	
+    gtk_window_set_title(GTK_WINDOW(global_window), WINDOW_NAME);
+	
+    g_signal_connect(G_OBJECT(darea), "draw",  G_CALLBACK(on_draw_event), NULL);
+    g_signal_connect(G_OBJECT(global_window), "destroy", G_CALLBACK(on_quit_event), NULL);
+    g_signal_connect(G_OBJECT(global_window), "button-press-event", G_CALLBACK(clicked), NULL);
+    g_signal_connect(G_OBJECT(global_window), "button-release-event", G_CALLBACK(released), NULL);
+    g_signal_connect(G_OBJECT(global_window), "key_press_event", G_CALLBACK(on_key_press), NULL);
 
-	g_signal_connect(G_OBJECT(darea), "draw",  G_CALLBACK(on_draw_event), NULL);
-	g_signal_connect(G_OBJECT(global_window), "destroy", G_CALLBACK(on_quit_event), NULL);
-	g_signal_connect(G_OBJECT(global_window), "button-press-event", G_CALLBACK(clicked), NULL);
-	g_signal_connect(G_OBJECT(global_window), "button-release-event", G_CALLBACK(released), NULL);
-        g_signal_connect(G_OBJECT(global_window), "key_press_event", G_CALLBACK(on_key_press), NULL);
 	
-	GdkScreen *screen = gtk_window_get_screen(GTK_WINDOW(global_window));
-	int screenWidth = gdk_screen_get_width(screen);
-	int screenHeight = gdk_screen_get_height(screen);
-	printf("Screen dimensions: %d x %d\n", screenWidth, screenHeight);
-        
-        if ((screenWidth >= askWindowWidth+8) && (screenHeight >= (askWindowHeight+72))) {
-                // DISPLAY DECORATED WINDOW
-                gtk_window_set_decorated(GTK_WINDOW(global_window), TRUE);
-		gtk_window_set_default_size(GTK_WINDOW(global_window),
-			askWindowWidth, askWindowHeight);
-		windowWidth  = askWindowWidth;
-		windowHeight = askWindowHeight;
-        }	
-	else {
-                // DISPLAY UNDECORATED FULL SCREEN WINDOW
-		gtk_window_set_decorated(GTK_WINDOW(global_window), FALSE);
-		gtk_window_fullscreen(GTK_WINDOW(global_window));
-		gtk_window_set_keep_above(GTK_WINDOW(global_window), FALSE);
-		windowWidth  = screenWidth;
-		windowHeight = screenHeight;
-        }
-        printf("Window dimensions: %d x %d\n", windowWidth, windowHeight);
-	
-	gtk_window_set_title(GTK_WINDOW(global_window), WINDOW_NAME);
-	
-	if (strlen(ICON_NAME) > 0) {
-		gtk_window_set_icon_from_file(GTK_WINDOW(global_window), ICON_NAME, NULL);	
-	}
+    if (strlen(ICON_NAME) > 0) {
+	gtk_window_set_icon_from_file(GTK_WINDOW(global_window), ICON_NAME, NULL);	
+    }
 
-	gtk_widget_show_all(global_window);
+    gtk_widget_show_all(global_window);
 	
-	if (windowWidth  == screenWidth)     // full screen
-	  disableCursor();
-          
-        r65Setup();
+    r65Setup();
 
-	gtk_main();
+    gtk_main();
 
 	return 0;
 }
