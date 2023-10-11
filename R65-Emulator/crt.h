@@ -17,11 +17,11 @@
 
 #define QUIT_HPOS   (SDOWN_HPOS + SDOWN_HSIZE + panelScale * 7)  // Horizontal position of QUIT button
 #define QUIT_VPOS   (QUIT_VSIZE + (crtOffset / 2))                // Vertical position of QUIT button
-#define QUIT_HSIZE  (50 * panelScale)                             // horizontal size of QUIT button
-#define QUIT_VSIZE  (18 * panelScale)                             // vertical size of QUIT button
+#define QUIT_HSIZE  (42 * panelScale)                             // horizontal size of QUIT button
+#define QUIT_VSIZE  (15 * panelScale)                             // vertical size of QUIT button
 #define STOP_HPOS   (SDOWN_HPOS + SDOWN_HSIZE + QUIT_HSIZE + panelScale * 14) // STOP button
-#define SDOWN_HPOS  panelOffset // SHUTDOWN button
-#define SDOWN_HSIZE (75 * panelScale)
+#define SDOWN_HPOS  (panelOffset + 2 * panelScale) // SHUTDOWN button
+#define SDOWN_HSIZE (63 * panelScale)
 
 
 #define NUM_LEDS    2   // Number of leds
@@ -32,7 +32,7 @@
 
 #define MIN_WINDOW_WIDTH    800   // proposed minimal width of main window
 #define MIN_WINDOW_HEIGHT   480   // proposed minimal height of main window
-#define PANEL_FONTSIZE      (14.0 * panelScale)
+#define PANEL_FONTSIZE      (12.0 * panelScale)
 #define WINDOW_NAME     "R65 Emulator"    // name of main window
 #define ICON_NAME       ""                // path to icon for window
 

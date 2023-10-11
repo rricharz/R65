@@ -185,15 +185,15 @@ void infoPanel()
     // show disk names
     for (int drive = 0; drive <2; drive++) {
         Stroke(210,210,210); Fill(0, 0, 0, 0);
-        Rect(LED_HPOS + 29 * panelScale, LED_VPOS  + drive * LED_VDIST + 5 * panelScale,
+        Rect(LED_HPOS + 25 * panelScale, LED_VPOS  + drive * LED_VDIST + 5 * panelScale,
             132 * panelScale, 22 * panelScale);
         Stroke(65, 65, 65);
-        Text(LED_HPOS + 30 * panelScale, LED_VPOS + drive * LED_VDIST,
+        Text(LED_HPOS + 26 * panelScale, LED_VPOS + drive * LED_VDIST,
             "\x08\x08\x08\x08\x08\x08\x08\x08\x08\x08\x08\x08",
             "Led Panel Station On", 18 * panelScale, 0, 1);       
         SETDISKNAMECOLOR;
         SETBACKGROUNDCOLOR;
-        Text(LED_HPOS + 30 * panelScale, LED_VPOS + drive * LED_VDIST,
+        Text(LED_HPOS + 26 * panelScale, LED_VPOS + drive * LED_VDIST,
             floppy[drive].name, "Led Panel Station On", 18 * panelScale, 0, 1);
     }
     
@@ -226,8 +226,8 @@ void infoPanel()
         "Pascal pc and free pages");
 
     SETBUTTONCOLOR;
-    Text(panelOffset + 5 * panelScale, 430 * panelScale,
-            " R65 System 1978-1982 RR", "Monospace", 11 * panelScale, 0, 0);    
+    Text(panelOffset + 14 * panelScale, 430 * panelScale,
+            "R65 System 1978-1982 RR", "Monospace", 10 * panelScale, 0, 0);    
 }
 
 /**************/
