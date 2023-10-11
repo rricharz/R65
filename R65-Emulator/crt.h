@@ -15,21 +15,20 @@
 #define NUMCHAR     (read6502(0x178A)+1)
 #define NUMLINES    16   // number of lines
 
-#define QUIT_HPOS   panelOffset   // Horizontal position of QUIT button
-#define QUIT_VPOS   (QUIT_VSIZE + (crtOffset / 2)) // Vertical position of QUIT button
-#define QUIT_HSIZE  (50 * panelScale)   // horizontal size of QUIT button
-#define QUIT_VSIZE  (18 * panelScale)   // vertical size of QUIT button
+#define QUIT_HPOS   (SDOWN_HPOS + SDOWN_HSIZE + panelScale * 7)  // Horizontal position of QUIT button
+#define QUIT_VPOS   (QUIT_VSIZE + (crtOffset / 2))                // Vertical position of QUIT button
+#define QUIT_HSIZE  (50 * panelScale)                             // horizontal size of QUIT button
+#define QUIT_VSIZE  (18 * panelScale)                             // vertical size of QUIT button
+#define STOP_HPOS   (SDOWN_HPOS + SDOWN_HSIZE + QUIT_HSIZE + panelScale * 14) // STOP button
+#define SDOWN_HPOS  panelOffset // SHUTDOWN button
+#define SDOWN_HSIZE (75 * panelScale)
 
 
 #define NUM_LEDS    2   // Number of leds
-#define LED_VPOS   (140 * panelScale)
+#define LED_VPOS   (300 * panelScale)
 #define LED_HPOS   (panelOffset + 5 * panelScale)
 #define LED_SIZE   (13 * panelScale)
 #define LED_VDIST  (50 * panelScale)
-
-#define STOP_HPOS   (QUIT_HPOS + QUIT_HSIZE + panelScale * 10) // STOP button
-#define SDOWN_HPOS  (QUIT_HPOS + 2 * (QUIT_HSIZE + panelScale * 10)) // SHUTDOWN button
-#define SDOWN_HSIZE (75 * panelScale)
 
 #define MIN_WINDOW_WIDTH    800   // proposed minimal width of main window
 #define MIN_WINDOW_HEIGHT   480   // proposed minimal height of main window

@@ -38,7 +38,6 @@ int      vcell;
 int      csize;
 int      xdot2;
 int      ydot2;
-int      QUIT_HPOS;
 
 int led[NUM_LEDS];
 
@@ -115,15 +114,14 @@ void checkInfoBarButtons()
         // check for Shutdown button
         if ((x >= SDOWN_HPOS) && (x <= SDOWN_HPOS + SDOWN_HSIZE)
            && (y <= QUIT_HPOS) && (y >= QUIT_VPOS - QUIT_VSIZE)) {        
-            printf("Executing shutdown\n");
-            system("sudo shutdown -h now");
+            QuitProgram(1);
         }
     }
 }
 
-/*********************************/
-void crt_showstring(char* s, int y)
-/*********************************/
+/*******************************************************/
+void crt_show7segmentDisplay(char* s, int y, char* label)
+/*******************************************************/
 
 {
     int x;
@@ -136,19 +134,24 @@ void crt_showstring(char* s, int y)
     x = panelOffset + 5 * panelScale;
     Stroke(210,210,210); Fill(0, 0, 0, 0);
     Rect(x - 2 * panelScale, y + 4 * panelScale, 160 * panelScale, 32 * panelScale);
-    Stroke(70, 70, 70);
+    Stroke(65, 65, 65);
     Text(x, y, "8.8.8.8.8.8.8.8.",
                 "DSEG7 Classic", 24 * panelScale, 0, 1);
     Stroke(255, 20, 20);
     Text(x, y, s,
                 "DSEG7 Classic", 24 * panelScale, 0, 1);
+    SETBUTTONCOLOR;
+    Text(x, y + 15 * panelScale, label,
+                "Monospace", 10 * panelScale, 0, 0);
 }
 
 /**************/
 void infoPanel()
 /**************/
 // display the information bar
-{    
+{
+    char s1[16], s2[16], s3[16];
+    char * s; 
     // show Quit button
     SETBUTTONCOLOR;
     Rect(QUIT_HPOS, QUIT_VPOS, QUIT_HSIZE, QUIT_VSIZE);
@@ -180,31 +183,51 @@ void infoPanel()
     }
     
     // show disk names
-    SETDISKNAMECOLOR;
-    SETBACKGROUNDCOLOR;
     for (int drive = 0; drive <2; drive++) {
-        Text(LED_HPOS + 30 * panelScale, LED_VPOS - panelScale + drive * LED_VDIST,
-            floppy[drive].name, "Monospace", 18 * panelScale, 0, 0);
+        Stroke(210,210,210); Fill(0, 0, 0, 0);
+        Rect(LED_HPOS + 29 * panelScale, LED_VPOS  + drive * LED_VDIST + 5 * panelScale,
+            132 * panelScale, 22 * panelScale);
+        Stroke(65, 65, 65);
+        Text(LED_HPOS + 30 * panelScale, LED_VPOS + drive * LED_VDIST,
+            "\x08\x08\x08\x08\x08\x08\x08\x08\x08\x08\x08\x08",
+            "Led Panel Station On", 18 * panelScale, 0, 1);       
+        SETDISKNAMECOLOR;
+        SETBACKGROUNDCOLOR;
+        Text(LED_HPOS + 30 * panelScale, LED_VPOS + drive * LED_VDIST,
+            floppy[drive].name, "Led Panel Station On", 18 * panelScale, 0, 1);
     }
     
     // show spMin and pascalMinFree
-    char s[16];
+    for (int i=0; i<8; i++)
+          s1[i]=read6502_8(RS8_LED+i);
+    s1[8]=0;
+    sprintf(s2,"%04X  %02X",pc, spMin);
+    sprintf(s3,"%05d %02X", (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),
+        pascalMinFree >> 8);
+        
+    if ((memory[M8_SFLAG] & 1) == 0)
+        s3[0] = 0;
+    
     if (read6502_8(RS8_LED)) {
-        for (int i=0; i<8; i++)
-          s[i]=read6502_8(RS8_LED+i);
-        s[8]=0;
+        s = s1;
     }
-    else if (pascalMinFree == 0xFFFF) {
-        sprintf(s,"%04X  %02X",pc, spMin);
+    else if ((memory[M8_SFLAG] & 1) == 0) {
+        s = s2;
     }
     else {
-        sprintf(s,"%05d %02X",
-                (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),
-                pascalMinFree >> 8);
+        s = s3;
     }
-//  printf("Displaying string >%s<\n",s);
     if (exDisplay) led_showstring(s, 0);
-    crt_showstring(s, QUIT_VPOS + 2 * QUIT_VSIZE + 16 * panelScale);
+    crt_show7segmentDisplay(s1, QUIT_VPOS + 2 * QUIT_VSIZE + 16 * panelScale,
+        "KIM-1 display");
+    crt_show7segmentDisplay(s2, QUIT_VPOS + 2 * QUIT_VSIZE + 76 * panelScale,
+        "6502 pc and s");
+    crt_show7segmentDisplay(s3, QUIT_VPOS + 2 * QUIT_VSIZE + 136 * panelScale,
+        "Pascal pc and free pages");
+
+    SETBUTTONCOLOR;
+    Text(panelOffset + 5 * panelScale, 430 * panelScale,
+            " R65 System 1978-1982 RR", "Monospace", 11 * panelScale, 0, 0);    
 }
 
 /**************/
@@ -275,11 +298,7 @@ void crtUpdate()
                     else
                         SETNORMALTEXTCOLOR;
                     s[0] = s[0] & 0x7F;
-                    if (s[0] == '*')   // the star needs to be placed lower
-                        Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset,
-                            s, "Monospace", csize, 0, 0);
-                    else
-                        Text(hcell * xx + crtOffset, vcell * (yy + 1)  - 4 + crtOffset,
+                    Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset,
                             s, "Monospace", csize, 0, 0);
                 }
             }

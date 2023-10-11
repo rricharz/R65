@@ -504,7 +504,7 @@ int main (int argc, char *argv[])
     }
     printf("Window dimensions: %d x %d\n", windowWidth, windowHeight);
     
-    crtOffset = windowHeight / 10;
+    crtOffset = windowHeight / 15;
     crtHeight = windowHeight - (2 * crtOffset);
     // Aspect ratio of original display
     crtWidth  = 4 * crtHeight / 3;
