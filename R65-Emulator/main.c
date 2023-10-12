@@ -48,6 +48,7 @@ guint global_timeout_ref;
 int cursorDisabled;
 int exDisplay;
 int fullscreen;
+int pixelated;
 
 struct tColor {
 	double r, g, b;
@@ -78,8 +79,9 @@ void Background(double r, double g, double b)
 void Crt_Background(double r, double g, double b)
 /////////////////////////////////////////////////
 {
-    cairo_set_source_rgb(global_surface_cr, r, g, b);
-    cairo_rectangle (global_surface_cr, crtOffset / 2, crtOffset / 2, 
+    // cairo_set_source_rgb(global_surface_cr, r, g, b);
+    Stroke(210, 210, 210); Fill(0, 0, 0, 0);
+    Rect(crtOffset/2,  windowHeight - crtOffset/2,
         crtWidth + crtOffset, crtHeight + crtOffset);
     cairo_fill(global_surface_cr);
     global_surface_has_been_updated = TRUE;
@@ -450,21 +452,23 @@ int main (int argc, char *argv[])
 	
     int firstArg = 1;
         
-    exDisplay = FALSE;
+    exDisplay  = FALSE;
     fullscreen = FALSE;
+    pixelated      = FALSE;
 	
     while (firstArg < argc) {
 	if (strcmp(argv[firstArg],"-full") == 0)
 	    fullscreen = TRUE;
 	else if (strcmp(argv[firstArg],"-extern") == 0)
-	    exDisplay = TRUE;          
+	    exDisplay = TRUE;  
+	else if (strcmp(argv[firstArg],"-pixelated") == 0)
+	    pixelated = TRUE; 
         else {
             printf("R65: unknown argument %s\n", argv[firstArg]);
-            exit(1);
         }
         firstArg++;
     }
-  
+      
     gtk_init(&argc, &argv);
 	
     global_firstcall = TRUE;

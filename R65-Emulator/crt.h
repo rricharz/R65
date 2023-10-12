@@ -25,7 +25,7 @@
 
 
 #define NUM_LEDS    2   // Number of leds
-#define LED_VPOS   (300 * panelScale)
+#define LED_VPOS   (245 * panelScale)
 #define LED_HPOS   (panelOffset + 5 * panelScale)
 #define LED_SIZE   (13 * panelScale)
 #define LED_VDIST  (50 * panelScale)

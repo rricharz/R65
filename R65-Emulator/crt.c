@@ -241,7 +241,11 @@ void crtUpdate()
 
     hcell = crtWidth / NUMCHAR;
     vcell = crtHeight / NUMLINES;
-    csize = hcell * 1.7;
+    if (pixelated) 
+        csize = hcell * 2.1;       
+    else
+        csize = hcell * 1.7;
+        
 //  printf("Cell size = %d x %d, numchr = %d\n", hcell, vcell, NUMCHAR);
     
     checkInfoBarButtons();
@@ -289,7 +293,7 @@ void crtUpdate()
                             SETINVERSEPTEXTCOLOR; }
                     	else {
                             SETINVERSETEXTCOLOR; }
-                        Rect(hcell*xx + crtOffset, vcell*(yy+1) + 3 + crtOffset,
+                        Rect(hcell*xx + crtOffset, vcell*(yy+1) + 8 * panelScale + crtOffset,
                             hcell, vcell);
                         Stroke(0,0,0);
                         }
@@ -298,8 +302,15 @@ void crtUpdate()
                     else
                         SETNORMALTEXTCOLOR;
                     s[0] = s[0] & 0x7F;
-                    Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset,
-                            s, "Monospace", csize, 0, 0);
+                    int coffset;
+                    if (s[0] == '*') coffset = csize/5;
+                    else coffset = 0;
+                    if (pixelated)
+                        Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset + coffset,
+                            s, "7:12 Serif", csize, 0, 0);
+                    else
+                        Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset + coffset,
+                            s, "Monospace", csize, 0, 1);
                 }
             }
         
