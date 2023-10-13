@@ -175,7 +175,7 @@ void infoPanel()
             SETLEDONCOLOR;
         else
             SETLEDOFFCOLOR;
-        Rect(LED_HPOS, LED_VPOS  + i * LED_VDIST, LED_SIZE, LED_SIZE);
+        Circle(LED_HPOS + LED_SIZE / 2, LED_VPOS  + i * LED_VDIST - LED_SIZE / 2, LED_SIZE);
     }
     if (exDisplay) {
         setDriveLed(0, led[0]);
@@ -197,10 +197,18 @@ void infoPanel()
             floppy[drive].name, "Led Panel Station On", 18 * panelScale, 0, 1);
     }
     
-    // show spMin and pascalMinFree
+    // show 7 segment dsiplays
+    int usedByUser = 0;
     for (int i=0; i<8; i++)
-          s1[i]=read6502_8(RS8_LED+i);
+          if (s1[i]=read6502_8(RS8_LED+i)) usedByUser = 1;
     s1[8]=0;
+    if (!usedByUser) {
+        time_t now;
+        struct tm * now_tm;
+        now = time(NULL);
+        now_tm = localtime(&now);
+        sprintf(s1," %02d. %02d", now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec);
+    }
     sprintf(s2,"%04X  %02X",pc, spMin);
     sprintf(s3,"%05d %02X", (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),
         pascalMinFree >> 8);

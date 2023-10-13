@@ -141,10 +141,9 @@ void Circle(int x, int y, int r)
 ////////////////////////////////
 {
 	cairo_set_source_rgb(global_surface_cr, strokeColor.r, strokeColor.g, strokeColor.b);
-	cairo_arc(global_surface_cr, x, windowHeight - y, r / 2, 0, 2*M_PI);
-	cairo_stroke(global_surface_cr);
-	cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
-	cairo_arc(global_surface_cr, x, y, (r / 2) - 1, 0, 2*M_PI);
+	cairo_arc(global_surface_cr, x, y, r / 2, 0, 2*M_PI);
+	cairo_stroke_preserve(global_surface_cr);
+        cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
 	cairo_fill(global_surface_cr);
 	global_surface_has_been_updated = TRUE;
 }

@@ -109,7 +109,7 @@ void checkMinTimeout()
         timeOfSpMin = now;
         global_pendingCrtUpdate = 1;
     }
-    if ((now - timeOfPascalMin) > 5) {
+    if ((now - timeOfPascalMin) > 3) {
         if (memory[M8_SFLAG] & 1) {
             int pascalSp = memory[0x0a] + (memory[0x0b] << 8);
             int pascalEndstk = memory[0x0e] + (memory[0x0f] << 8);
