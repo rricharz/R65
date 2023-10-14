@@ -197,7 +197,7 @@ void infoPanel()
             floppy[drive].name, "Led Panel Station On", 18 * panelScale, 0, 1);
     }
     
-    // show 7 segment dsiplays
+    // show 7 segment displays
     int usedByUser = 0;
     for (int i=0; i<8; i++)
           if (s1[i]=read6502_8(RS8_LED+i)) usedByUser = 1;
@@ -207,7 +207,7 @@ void infoPanel()
         struct tm * now_tm;
         now = time(NULL);
         now_tm = localtime(&now);
-        sprintf(s1," %02d. %02d", now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec);
+        sprintf(s1," %02d.%02d", now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec);
     }
     sprintf(s2,"%04X  %02X",pc, spMin);
     sprintf(s3,"%05d %02X", (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),
@@ -331,9 +331,10 @@ void crtUpdate()
                 SETNORMALTEXTCOLOR;
             xx = hcell * onscreenCurpos;
             yy = vcell * (onscreenCurlin + 1) + 3;
-            StrokeWidth(hcell / 5);
-            Line(xx + crtOffset, yy  + crtOffset,
-                xx + hcell - 1 + crtOffset, yy  + crtOffset);
+            if (hcell < 10) StrokeWidth(2);
+            else StrokeWidth(hcell / 5);
+            Line(xx + crtOffset, yy  + crtOffset + hcell/3,
+                xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell / 3);
             StrokeWidth(2);
         }
         

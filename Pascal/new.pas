@@ -35,10 +35,23 @@ begin
   write(e and 15);
 end;
 
+func haswildcard(nm1:array[15] of char): boolean;
+var k:integer;
+begin
+  haswildcard:=false;
+  for k:=0 to 15 do
+    if (nm1[k]='*') or (nm1[k]='?') then
+      haswildcard:=true;
+end;
+
 begin
   cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
-  asetfile(name,cyclus,drive,'P');
-  call(anew);
-  if filerr<>0 then bcderror(filerr);
+  if haswildcard(name) then
+    writeln('Wild cards not allowed in new')
+  else begin
+    asetfile(name,cyclus,drive,'P');
+    call(anew);
+    if filerr<>0 then bcderror(filerr);
+  end;
 end.  
