@@ -1,12 +1,13 @@
 {
-         *****************
-         *               *
-         *   dir drive   *
-         *               *
-         *****************
+         *******************
+         *                 *
+         *   dir <drive>   *
+         *                 *
+         *******************
  
     2018,2019 rricharz (r77@bluewin.ch)
     2023 removed inverse video display
+    2023 default drive 1
  
 Display the directory of a disk drive.
 Uses EPROM (disk.asm) calls to get info
@@ -69,7 +70,7 @@ begin
 end;
  
 begin
-  drive:=0; {default drive}
+  drive:=1; {default drive}
   filerr:=0;
   agetval(drive,default);
   if (drive<0) or (drive>1) then begin
