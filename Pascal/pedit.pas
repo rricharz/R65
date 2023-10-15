@@ -286,13 +286,6 @@ begin
       read(@input,ch); fs[pos]:=ch; pos:=pos+1;
       until (ch=cr) or (pos>=maxfs);
     write(norvid);
-    end
-  else begin
-    goto(line1x,0); write(invvid,'find what? ',clrlin);
-    pos:=0;
-    while(fs[pos]<>cr) do begin
-      write(fs[pos]); pos:=pos+1;
-      end;
     end;
   if fs[0]=cr then begin
     {empty string -> delete all marks}
@@ -301,8 +294,9 @@ begin
   else begin
     found:=false;
     repeat
-      pos:=0; x:=0;
+      x:=0;
       repeat
+        pos:=0;
         if memory[linepnt[line]+x]=fs[pos]
           then checkrest;
         x:=x+1;

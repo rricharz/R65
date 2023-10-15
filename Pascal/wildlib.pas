@@ -7,7 +7,6 @@ library wildlib;
   2023 rricharz                       }
  
 const namesize=15;
-      afloppy=$d0db; { exdos vector }
       numentries=79;
  
 mem filnam=$0301: array[namesize] of char&;

@@ -9,6 +9,8 @@ program find;
  
 uses syslib,arglib,wildlib;
  
+const afloppy=$c827;
+ 
 mem   filerr=$db: integer&;
  
 var   cyclus,drive,entry: integer;
