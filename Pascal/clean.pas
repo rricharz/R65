@@ -101,7 +101,7 @@ begin
   fildrv:=drive;
   call(aprepdo);
 
-  scyfc:=79; { write disk name }
+  scyfc:=255; { write disk name }
   call(agetentx);
   write(tab8,'Cleaning drive ',
       drive,': ');
@@ -138,9 +138,9 @@ begin
       end else {deleted}
         sdel:=sdel+(filsiz shr 8);
     end else {end mark}
-      sfree:=780-filloc;
+      sfree:=2560-filloc;
     index:=index+1
-  until (index>=79) or (filtyp=chr(0));
+  until (index>=255) or (filtyp=chr(0));
   call(aenddo);
   nument:=ti;
 

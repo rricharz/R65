@@ -1,12 +1,13 @@
 *
-******************************************
-* R65/JOB EXTENDED DISK OPERATING SYSTEM *
-******************************************
+**************************************
+* R65 EXTENDED DISK OPERATING SYSTEM *
+**************************************
 *
 * BASED ON VERSION 3.2 21/08/82
-* CC RRICHARZ RBAUMANN 1978-1982
-* VERSION 4.5 2018-2023
+* RRICHARZ RBAUMANN 1978-1982
+* VERSION 4.6 2018-2023
 *   MODIFIED FOR R65 EMULATOR
+*   AND LARGER DISK SIZE
 *   BY RRICHARZ
 *
 *
@@ -31,8 +32,8 @@
 *   DRAWY(X,Y,MODE,N)   DRAW N POINTS
 *   DRAWXY(X,Y,MODE,N,XONC,YINC)
 *
-* WITH FAST PACK AND SAVE ROUTINES
-* BOTH USE SCRATCH MEMORY $D700-$DEFF
+* WITH FAST PACK ROUTINE
+* USES SCRATCH MEMORY $D700-$DEFF
 * UPDATED FOR DUAL DISK DRIVE SYSTEMS
 * WITH WILD CARD DIRECTORY
 *
@@ -47,7 +48,9 @@
 *
 *
 PSTART  EQU $C800       START OF PROGRAM
-NTRACK  EQU 80          80 TRACK DRIVE
+SPERTR  EQU 16          SECTORS PER TRACK
+NTRACK  EQU 160         TRACKS
+NRSEQ   EQU 2560        TOTAL SECTORS (16*160)
 *
         TIT EXTENDED DISK OPERATING SYSTEM
 *
@@ -318,7 +321,7 @@ START   SEI
         STA VMON
         STX VMON+1
         JSR PRTINF
-        BYT 'R65 EXDOS VERSION 4.4     ',$A0
+        BYT 'R65 EXDOS VERSION 4.6',$A0
         CLI
 FGETCM0 JSR PRTINF      MAIN LOOP
         BYT $D,$A,'E*'+128
@@ -404,23 +407,9 @@ FINTC6  JSR TEST
 *
 FINTC7  JSR TEST
         BYT 'RENAME'+128
-        BCS FINTC8
+        BCS FINTC10
         JSR RENAME      *** RENAME ***
 DERROR1 BNE DERROR      (FILNAM.CY,DRIVE)
-        RTS
-*
-FINTC8  JSR TEST
-        BYT 'SAVE'+128
-        BCS FINTC9
-        JSR SAVE        *** SAVE ***
-        BNE DERROR      (DRIVE)
-        RTS
-*
-FINTC9  JSR TEST
-        BYT 'SWAP'+128  *** SWAP ***
-        BCS FINTC10     (DRIVE)
-        JSR SWAP
-        BNE DERROR
         RTS
 *
 FINTC10 JSR TEST
@@ -523,20 +512,20 @@ INITD2  LDY =0
         STA DIRBUF,Y
         DEY
         BNE *-4
-        LDX =1          STORE SECTOR 1-9
+        LDX =1          STORE SECTORS 1-31
         STX BUFSEC
 INITD3  JSR WRITDS
         INC BUFSEC
         LDX BUFSEC
-        CPX =10
+        CPX =32
         BCC INITD3
         LDX =16         LOAD DISK NAME AND NO
 INITD4  LDA FILNM1,X
         STA DIRBUF+$E1,X
         DEX
         BPL INITD4
-        JSR WRITDS      STORE SECTOR 10
-        JMP PACK7       MAKE BACKUP COPY
+        JSR WRITDS      STORE SECTOR 32
+        RTS
 *
 *
 SETEND1 JSR HEXPZE
@@ -644,76 +633,6 @@ PROTECT JSR NGETNE
         JSR PUTFENT
         JMP ENDDO
 *
-* SAVE: SAVE DISK DIRECTORY
-***************************
-*
-SAVE    JSR SAVE2
-        JSR DSKONLY
-        JSR CLOSAL
-        LDX =1
-        JSR SAVE3
-        LDX =6
-        JSR SAVE3
-        JMP ENDDO
-*
-SAVE2   JSR HEXPZE
-        STA FILDRV
-        JSR ENDLER
-        JMP PREPDO
-*
-SAVE3   STX SECTOR
-        STX NEWREC
-        LDA =0
-        LDX =5
-        STX COUNTER
-        STA TRACK
-        STA DATA
-        LDX =>FILBUF
-        STX DATA+1
-SAVE4   JSR READ
-        INC DATA+1
-        INC SECTOR
-        DEC COUNTER
-        BNE SAVE4
-*
-        LDX =5
-        STX COUNTER
-        LDX =>FILBUF
-        STX DATA+1
-        LDA =NTRACK-1
-        STA TRACK
-        LDX NEWREC
-        STX SECTOR
-SAVE5   JSR WRITE
-        INC DATA+1
-        INC SECTOR
-        DEC COUNTER
-        BNE SAVE5
-        RTS
-*
-* SWAP: SWAP DISK DIRECTORY
-***************************
-*
-SWAP    JSR SAVE2
-        JSR DSKONLY
-        JSR CLOSAL
-        LDX =10
-        STX SECTOR
-SWAP1   JSR READDS
-        LDA =NTRACK-1
-        STA TRACK
-        INC DATA+1
-        JSR READ
-        DEC DATA+1
-        JSR WRITDS+8
-        INC DATA+1
-        LDA =0
-        STA TRACK
-        JSR WRITDS+8
-        DEC SECTOR
-        BNE SWAP1
-        JMP ENDDO
-*
 * IFNAME: READ FILE NAME, IF THERE
 **********************************
 *
@@ -750,7 +669,7 @@ FDIR0   LDA FILDRV      ENTRY FOR VECTOR CALL
         JMP TDIR
 *
         JSR PREPDO
-        LDX =79
+        LDX =255
         JSR GETFENT
         JSR PRTINF
         BYT $D,$A,'      DIRECTORY '
@@ -969,11 +888,9 @@ PACK8   LDA =0          SET END MARK
         JSR GETFREC
         JSR PUTFENT+2
         JSR PRTINF
-        BYT 'PACKING FINISHED, '+128
+        BYT 'PACKING COMPLETE',' '+128
 *
-PACK7   JSR PRTINF
-        BYT 'DIRECTORY COPY'+128
-        JMP SAVE+3
+PACK7   JMP ENDDO
 *
 * NGETNAM: GET FILE NAME AND CYCLUS
 ***********************************
@@ -1051,7 +968,7 @@ NEXTE30 INC SCYFC
 *
 VOLUME  JSR DSKONLY
         JSR PREPDO
-        LDX =79
+        LDX =255
         JSR GETFENT
         JSR PRTINF
         BYT $D,$A,'OLD VOLUME: '+128
@@ -1077,10 +994,9 @@ VOL20   LDA FILNM1,X
         STA DIRBUF+$E1,X
         DEX
         BPL VOL20
-        LDA =10
+        LDA =$20        Last directory entry
         STA BUFSEC
-        JSR WRITDS
-        JMP SAVE+3
+        JMP WRITDS
 *
 * DELETE: DELETE ONE OR SEVERAL FILES
 *************************************

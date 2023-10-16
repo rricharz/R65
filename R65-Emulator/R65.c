@@ -420,11 +420,11 @@ void write6502(uint16_t address, uint8_t value)
             printf("writing into EPROM address space not allowed\n");
             return;
         }
-        else if ((address>=0xc800) && (address<=0xd5ff)) {
-            printf("writing into EXDOS address space not allowed\n");
-            printf("pc=%04x, address=%04x\n",pc,address);
-            return;
-        }
+        //else if ((address>=0xc800) && (address<=0xd5ff)) {
+        //    printf("writing into EXDOS address space not allowed\n");
+        //    printf("pc=%04x, address=%04x\n",pc,address);
+        //    return;
+        // }
         else {
             memory[address] = value;
             return;

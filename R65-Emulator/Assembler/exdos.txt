@@ -1,2049 +1,1954 @@
+
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 01
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 01
 
 0001                   *
-0002                   ******************************************
-0003                   * R65/JOB EXTENDED DISK OPERATING SYSTEM *
-0004                   ******************************************
+0002                   **************************************
+0003                   * R65 EXTENDED DISK OPERATING SYSTEM *
+0004                   **************************************
 0005                   *
 0006                   * BASED ON VERSION 3.2 21/08/82
-0007                   * CC RRICHARZ RBAUMANN 1978-1982
-0008                   * VERSION 4.5 2018-2023
+0007                   * RRICHARZ RBAUMANN 1978-1982
+0008                   * VERSION 4.6 2018-2023
 0009                   *   MODIFIED FOR R65 EMULATOR
-0010                   *   BY RRICHARZ
-0011                   *
+0010                   *   AND LARGER DISK SIZE
+0011                   *   BY RRICHARZ
 0012                   *
-0013                   * NEW COMMANDS FOR EMULATED SYSTEM:
-0014                   *   EXPORT FILNAM.CY,DRIVE
-0015                   *               EXPORT SEQUENTIAL FILE
-0016                   *   IMPORT FILNAM.CY,DRIVE
-0017                   *               IMPORT SEQUENTIAL FILE
-0018                   *   EDIT FILNAM.CY,DRIVE
-0019                   *               EDIT A SEQUENTIAL FILE
-0020                   *               USING LEAFPAD
-0021                   *   FLOPPY FILNAM,DRIVE
-0022                   *               CHANGE FLOPPY DISK
-0023                   *   NEW FILNAM.CY,DRIVE
-0024                   *               NEW SEQUENTIAL FILE
-0025                   *
-0026                   * NEW GRAPHICS SUBROUTINES
-0027                   *   PLOT(X,Y,MODE)      PLOT A DOT
-0028                   *   PLOTCH(X,Y,CHR)     PLOT A 8x8 CHAR
-0029                   *   BITMAP(X,Y,MAP)     PLOT A 4x4 MAP
-0030                   *   DRAWX(X,Y,MODE,N)   DRAW N POINTS
-0031                   *   DRAWY(X,Y,MODE,N)   DRAW N POINTS
-0032                   *   DRAWXY(X,Y,MODE,N,XONC,YINC)
-0033                   *
-0034                   * WITH FAST PACK AND SAVE ROUTINES
-0035                   * BOTH USE SCRATCH MEMORY $D700-$DEFF
-0036                   * UPDATED FOR DUAL DISK DRIVE SYSTEMS
-0037                   * WITH WILD CARD DIRECTORY
-0038                   *
-0039                   *   ERROR 61: WILD CARD NOT ALLOWED
-0040                   *   ERROR 62: ONLY FOR DISK, NOT TAPE
-0041                   *   ERROR 63: ILLEGAL COPY
-0042                   *   ERROR 64: FILE TOO LARGE
-0043                   *   ERROR 65: WRITE ERROR
-0044                   *   ERROR 66: IMPORT ERROR
-0045                   *   ERROR 67: UNKNOWN EMU COMMAND
-0046                   *   ERROR 68: UNABLE TO RUN LEAFPAD
-0047                   *
+0013                   *
+0014                   * NEW COMMANDS FOR EMULATED SYSTEM:
+0015                   *   EXPORT FILNAM.CY,DRIVE
+0016                   *               EXPORT SEQUENTIAL FILE
+0017                   *   IMPORT FILNAM.CY,DRIVE
+0018                   *               IMPORT SEQUENTIAL FILE
+0019                   *   EDIT FILNAM.CY,DRIVE
+0020                   *               EDIT A SEQUENTIAL FILE
+0021                   *               USING LEAFPAD
+0022                   *   FLOPPY FILNAM,DRIVE
+0023                   *               CHANGE FLOPPY DISK
+0024                   *   NEW FILNAM.CY,DRIVE
+0025                   *               NEW SEQUENTIAL FILE
+0026                   *
+0027                   * NEW GRAPHICS SUBROUTINES
+0028                   *   PLOT(X,Y,MODE)      PLOT A DOT
+0029                   *   PLOTCH(X,Y,CHR)     PLOT A 8x8 CHAR
+0030                   *   BITMAP(X,Y,MAP)     PLOT A 4x4 MAP
+0031                   *   DRAWX(X,Y,MODE,N)   DRAW N POINTS
+0032                   *   DRAWY(X,Y,MODE,N)   DRAW N POINTS
+0033                   *   DRAWXY(X,Y,MODE,N,XONC,YINC)
+0034                   *
+0035                   * WITH FAST PACK ROUTINE
+0036                   * USES SCRATCH MEMORY $D700-$DEFF
+0037                   * UPDATED FOR DUAL DISK DRIVE SYSTEMS
+0038                   * WITH WILD CARD DIRECTORY
+0039                   *
+0040                   *   ERROR 61: WILD CARD NOT ALLOWED
+0041                   *   ERROR 62: ONLY FOR DISK, NOT TAPE
+0042                   *   ERROR 63: ILLEGAL COPY
+0043                   *   ERROR 64: FILE TOO LARGE
+0044                   *   ERROR 65: WRITE ERROR
+0045                   *   ERROR 66: IMPORT ERROR
+0046                   *   ERROR 67: UNKNOWN EMU COMMAND
+0047                   *   ERROR 68: UNABLE TO RUN LEAFPAD
 0048                   *
-0049                   PSTART  EQU $C800       START OF PROGRAM
-0050                   NTRACK  EQU 80          80 TRACK DRIVE
+0049                   *
+0050                   PSTART  EQU $C800       START OF PROGRAM
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 02
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 02
 
-0051                   *
-0052                           TIT EXTENDED DISK OPERATING SYSTEM
-0053                   *
+0051                   SPERTR  EQU 16          SECTORS PER TRACK
+0052                   NTRACK  EQU 160         TRACKS
+0053                   NRSEQ   EQU 2560        TOTAL SECTORS (16*160)
 0054                   *
-0055                   * PAGE ZERO VARIABLES
-0056                   *********************
+0055                           TIT EXTENDED DISK OPERATING SYSTEM
+0056                   *
 0057                   *
-0058  0000-                    ORG $D8
-0059                   *
-0060  00D8-            COPYBN  BSS 2   POINTER FOR COPY SEQF
-0061                   *
-0062  00DA-            FILFLG  BSS 1   FILE ENTRY FLAGS
-0063                   *               BIT 7=1: PROTECTED
-0064                   *               BIT 6=1: NO PRINTED OUTPUT
-0065                   *               BIT 5: DIRECTION (1=WRITE)
-0066                   *
-0067  00DB-            FILERR  BSS 1   FILE HANDLING ERROR
-0068  00DC-            FILDRV  BSS 1   TAPE OR DISK DRIVE
+0058                   * PAGE ZERO VARIABLES
+0059                   *********************
+0060                   *
+0061  0000-                    ORG $D8
+0062                   *
+0063  00D8-            COPYBN  BSS 2   POINTER FOR COPY SEQF
+0064                   *
+0065  00DA-            FILFLG  BSS 1   FILE ENTRY FLAGS
+0066                   *               BIT 7=1: PROTECTED
+0067                   *               BIT 6=1: NO PRINTED OUTPUT
+0068                   *               BIT 5: DIRECTION (1=WRITE)
 0069                   *
-0070                   * TAPE TEMPORARIES
-0071                   *
-0072  00DD-            TRECID  BSS 2   RECORD ID OF FIRST RECORD
-0073  00DF-            TRECNO  BSS 1   RECORD NUMBER
-0074  00E0-            TRECST  BSS 2   START ADDRESS POINTER
-0075  00E2-            TRECSI  BSS 1   RECORD SIZE
-0076                   *
-0077                   * DISK TEMPORARIES
-0078                   *
-0079  00E3-                    ORG $DD
-0080  00DD-            TRACK   BSS 1   CURRENT TRACK
-0081  00DE-            SECTOR  BSS 1   CURRENT SECTOR
-0082  00DF-            RESSAV  BSS 1   CURRENT FDC RESULT
-0083  00E0-            DATA    BSS 2   DATA POINTER
-0084  00E2-            DOSPNT  BSS 2   SECOND POINTER
-0085  00E4-            FILCNT  BSS 1   DISK FILE POINTER
-0086  00E5-            FILCN1  BSS 1
-0087                   *
-0088                   VIDPNT  EQU $E9 VIDEO MEMORY POINTER
-0089                   POINT   EQU $FA USED AS SEQ FILE PNT
-0090                   KCHAR   EQU $FE CHAR SAVE FOR WRITCH
-0091                   *
-0092                   * PAGE 3 DATA AREA
-0093                   ******************
+0070  00DB-            FILERR  BSS 1   FILE HANDLING ERROR
+0071  00DC-            FILDRV  BSS 1   TAPE OR DISK DRIVE
+0072                   *
+0073                   * TAPE TEMPORARIES
+0074                   *
+0075  00DD-            TRECID  BSS 2   RECORD ID OF FIRST RECORD
+0076  00DF-            TRECNO  BSS 1   RECORD NUMBER
+0077  00E0-            TRECST  BSS 2   START ADDRESS POINTER
+0078  00E2-            TRECSI  BSS 1   RECORD SIZE
+0079                   *
+0080                   * DISK TEMPORARIES
+0081                   *
+0082  00E3-                    ORG $DD
+0083  00DD-            TRACK   BSS 1   CURRENT TRACK
+0084  00DE-            SECTOR  BSS 1   CURRENT SECTOR
+0085  00DF-            RESSAV  BSS 1   CURRENT FDC RESULT
+0086  00E0-            DATA    BSS 2   DATA POINTER
+0087  00E2-            DOSPNT  BSS 2   SECOND POINTER
+0088  00E4-            FILCNT  BSS 1   DISK FILE POINTER
+0089  00E5-            FILCN1  BSS 1
+0090                   *
+0091                   VIDPNT  EQU $E9 VIDEO MEMORY POINTER
+0092                   POINT   EQU $FA USED AS SEQ FILE PNT
+0093                   KCHAR   EQU $FE CHAR SAVE FOR WRITCH
 0094                   *
-0095  00E6-                    ORG $300
-0096                   *
-0097  0300-            FILTYP  BSS 1   TYPE OF ACTIVE FILE
-0098  0301-            FILNAM  BSS 16  FILE NAME
-0099  0311-            FILCYC  BSS 1   CYCLUS NUMBER
-0100  0312-            FILSTP  BSS 1   FILE SUBTYPE
+0095                   * PAGE 3 DATA AREA
+0096                   ******************
+0097                   *
+0098  00E6-                    ORG $300
+0099                   *
+0100  0300-            FILTYP  BSS 1   TYPE OF ACTIVE FILE
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 03
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 03
 
-0101  0313-            FILLOC  BSS 2   LOCATION OR SECTOR
-0102  0315-            FILSIZ  BSS 2   FILE SIZE
-0103  0317-            FILDAT  BSS 3   FILE GENERATION DATE
-0104  031A-            FILSA   BSS 2   START ADDRESS
-0105  031C-            FILEA   BSS 2   END ADDRESS
-0106  031E-            FILLNK  BSS 2   FILE LINK
-0107                   *
-0108  0320-            FILNM1  BSS 16
-0109  0330-            FILCY1  BSS 1
-0110  0331-            FILSA1  BSS 2
-0111  0333-            SAVRST  BSS 2
-0112                   *
-0113  0335-            CURSEQ  BSS 1   CURRENT SEQUENTIAL FILE
-0114  0336-            MAXSEQ  BSS 1   MAX NO OF SEQ FILE
-0115  0337-            MAXSIZ  BSS 1   MAX SIZE
-0116  0338-            FILBU1  BSS 1   START OF BUFFERS
-0117                   *
-0118                   * TABLE FOR 8 OPEN SEQUENTIAL FILES
-0119                   *
-0120  0339-            FIDRTB  BSS 8   BIT 7 1=WRITE, 0=READ
-0121                   *               BIT 5 1=FILE IS OPEN
-0122  0341-            FIDVTB  BSS 8   DRIVE NUMBER
-0123  0349-            FIBPTB  BSS 8   BUFFER POINTER LOW BYTE
-0124  0351-            FIRCTB  BSS 8   NO OF LAST RECORD
-0125  0359-            FIMAXT  BSS 8   MAXIMAL NO OF RECORDS
-0126  0361-            FITEMP  BSS 24  TAPE: RECORD ID SAVE (2)
-0127                   *               DISK: FIRST SECTOR (2)
-0128                   *               AND DIRECTORY ENTRY NO
-0129                   *               (1)
-0130  0379-            EXITPN  BSS 1   DISK STACK POINTER SAVE
-0131  037A-            BUFSEC  BSS 1   CURRENT SECTOR
-0132  037B-            SCY     BSS 1   FOUND CYCLUS
-0133  037C-            SCYFC   BSS 1   FILE ENTRY OF CY
-0134  037D-            SLAST   BSS 1   END OF DIRECTORY MARK
-0135  037E-            DISFLG  BSS 1   DISK FLAG REGISTER
-0136                   *               BIT 7 DRIVE 0 INITIALIZED
-0137                   *               BIT 6 DRIVE 1 INITIALIZED
-0138  037F-            DISCNT  BSS 1   SPECIAL DISK COUNTER
-0139                   *
-0140  0380-                    ORG $388
-0141                   *
-0142  0388-            OLDENT  BSS 1
-0143  0389-            OLDREC  BSS 2
-0144  038B-            NEWENT  BSS 1
-0145  038C-            NEWREC  BSS 2
-0146  038E-            COUNTER BSS 1
-0147  038F-            COUNT2  BSS 1
-0148                   *
-0149  0390-            PFILENO BSS 1
-0150  0391-            PAGING  BSS 1
+0101  0301-            FILNAM  BSS 16  FILE NAME
+0102  0311-            FILCYC  BSS 1   CYCLUS NUMBER
+0103  0312-            FILSTP  BSS 1   FILE SUBTYPE
+0104  0313-            FILLOC  BSS 2   LOCATION OR SECTOR
+0105  0315-            FILSIZ  BSS 2   FILE SIZE
+0106  0317-            FILDAT  BSS 3   FILE GENERATION DATE
+0107  031A-            FILSA   BSS 2   START ADDRESS
+0108  031C-            FILEA   BSS 2   END ADDRESS
+0109  031E-            FILLNK  BSS 2   FILE LINK
+0110                   *
+0111  0320-            FILNM1  BSS 16
+0112  0330-            FILCY1  BSS 1
+0113  0331-            FILSA1  BSS 2
+0114  0333-            SAVRST  BSS 2
+0115                   *
+0116  0335-            CURSEQ  BSS 1   CURRENT SEQUENTIAL FILE
+0117  0336-            MAXSEQ  BSS 1   MAX NO OF SEQ FILE
+0118  0337-            MAXSIZ  BSS 1   MAX SIZE
+0119  0338-            FILBU1  BSS 1   START OF BUFFERS
+0120                   *
+0121                   * TABLE FOR 8 OPEN SEQUENTIAL FILES
+0122                   *
+0123  0339-            FIDRTB  BSS 8   BIT 7 1=WRITE, 0=READ
+0124                   *               BIT 5 1=FILE IS OPEN
+0125  0341-            FIDVTB  BSS 8   DRIVE NUMBER
+0126  0349-            FIBPTB  BSS 8   BUFFER POINTER LOW BYTE
+0127  0351-            FIRCTB  BSS 8   NO OF LAST RECORD
+0128  0359-            FIMAXT  BSS 8   MAXIMAL NO OF RECORDS
+0129  0361-            FITEMP  BSS 24  TAPE: RECORD ID SAVE (2)
+0130                   *               DISK: FIRST SECTOR (2)
+0131                   *               AND DIRECTORY ENTRY NO
+0132                   *               (1)
+0133  0379-            EXITPN  BSS 1   DISK STACK POINTER SAVE
+0134  037A-            BUFSEC  BSS 1   CURRENT SECTOR
+0135  037B-            SCY     BSS 1   FOUND CYCLUS
+0136  037C-            SCYFC   BSS 1   FILE ENTRY OF CY
+0137  037D-            SLAST   BSS 1   END OF DIRECTORY MARK
+0138  037E-            DISFLG  BSS 1   DISK FLAG REGISTER
+0139                   *               BIT 7 DRIVE 0 INITIALIZED
+0140                   *               BIT 6 DRIVE 1 INITIALIZED
+0141  037F-            DISCNT  BSS 1   SPECIAL DISK COUNTER
+0142                   *
+0143  0380-                    ORG $388
+0144                   *
+0145  0388-            OLDENT  BSS 1
+0146  0389-            OLDREC  BSS 2
+0147  038B-            NEWENT  BSS 1
+0148  038C-            NEWREC  BSS 2
+0149  038E-            COUNTER BSS 1
+0150  038F-            COUNT2  BSS 1
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 04
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 04
 
-0151  0392-            LINE    BSS 1
-0152  0393-            OLDDRV  BSS 1
-0153  0394-            NEWDRV  BSS 1
-0154  0395-            OLDFIL  BSS 1
-0155  0396-            NEWFIL  BSS 1
-0156  0397-            FULLFLG BSS 1
-0157  0398-            NAMEFLG BSS 1
-0158  0399-            DIRCNT  BSS 1
-0159  039A-            DELCNT  BSS 2
-0160  039C-            FILNM2  BSS 17
-0161  03AD-            SUCCESS BSS 1   COUNT SUCCESS (COPY,DELETE)
-0162  03AE-            GRX     BSS 1   X FOR GRAHICSS
-0163  03AF-            GRY     BSS 1   Y FOR GRAPHICS
-0164  03B0-            GRC     BSS 1   DRAW MODE FOR GRAPHICS
-0165  03B1-            GRN     BSS 1   NUMBER OF POINTS TO DRAW
-0166  03B2-            GRINDEX BSS 1   PLOT TEMPORARY
-0167  03B3-            GRCNT   BSS 1   PLOT TEMPORARY
-0168  03B4-            GRMASK  BSS 1   PLOT TEMPORARY
-0169  03B5-            GRYCNT  BSS 1   PLOT TEMPORARY
-0170  03B6-            GRMAP   BSS 2   PLOT MAP OR X INCREMENT
-0171                   GRXINC  EQU GRMAP
-0172  03B8-            GRXLOW  BSS 1
-0173  03B9-            GRYLOW  BSS 1
-0174  03BA-            GRYINC  BSS 2   PLOT Y INCREMENT
-0175                   *
-0176                   *
-0177                   * BUFFERS
-0178                   *********
+0151                   *
+0152  0390-            PFILENO BSS 1
+0153  0391-            PAGING  BSS 1
+0154  0392-            LINE    BSS 1
+0155  0393-            OLDDRV  BSS 1
+0156  0394-            NEWDRV  BSS 1
+0157  0395-            OLDFIL  BSS 1
+0158  0396-            NEWFIL  BSS 1
+0159  0397-            FULLFLG BSS 1
+0160  0398-            NAMEFLG BSS 1
+0161  0399-            DIRCNT  BSS 1
+0162  039A-            DELCNT  BSS 2
+0163  039C-            FILNM2  BSS 17
+0164  03AD-            SUCCESS BSS 1   COUNT SUCCESS (COPY,DELETE)
+0165  03AE-            GRX     BSS 1   X FOR GRAHICSS
+0166  03AF-            GRY     BSS 1   Y FOR GRAPHICS
+0167  03B0-            GRC     BSS 1   DRAW MODE FOR GRAPHICS
+0168  03B1-            GRN     BSS 1   NUMBER OF POINTS TO DRAW
+0169  03B2-            GRINDEX BSS 1   PLOT TEMPORARY
+0170  03B3-            GRCNT   BSS 1   PLOT TEMPORARY
+0171  03B4-            GRMASK  BSS 1   PLOT TEMPORARY
+0172  03B5-            GRYCNT  BSS 1   PLOT TEMPORARY
+0173  03B6-            GRMAP   BSS 2   PLOT MAP OR X INCREMENT
+0174                   GRXINC  EQU GRMAP
+0175  03B8-            GRXLOW  BSS 1
+0176  03B9-            GRYLOW  BSS 1
+0177  03BA-            GRYINC  BSS 2   PLOT Y INCREMENT
+0178                   *
 0179                   *
-0180  03BC-                    ORG $D600
-0181  D600-            DIRBUF  BSS 256         DISK DIRECTORY BUFFER
-0182  D700-            FILBUF  BSS $800        FILE BUFFER, 8
-0183                   *                       OPEN FILES ALLOWED
-0184                   *                       DEFAULT, CAN BE REMOVED
-0185                   COPYBS  EQU $2000       COPY BUFFER
-0186                   COPYBE  EQU $BFFF       END OF COPY BUFFER
-0187                   *
-0188                   *
-0189                   * PAGE 17 DATA AREA
-0190                   *******************
+0180                   * BUFFERS
+0181                   *********
+0182                   *
+0183  03BC-                    ORG $D600
+0184  D600-            DIRBUF  BSS 256         DISK DIRECTORY BUFFER
+0185  D700-            FILBUF  BSS $800        FILE BUFFER, 8
+0186                   *                       OPEN FILES ALLOWED
+0187                   *                       DEFAULT, CAN BE REMOVED
+0188                   COPYBS  EQU $2000       COPY BUFFER
+0189                   COPYBE  EQU $BFFF       END OF COPY BUFFER
+0190                   *
 0191                   *
-0192  DF00-                    ORG $1780
-0193                   *
-0194  1780-            VFLAG   BSS 1
-0195  1781-            SFLAG   BSS 1
-0196                   VMON    EQU $17D5
-0197                   *
-0198                   * INTERFACE ADDRESSES
-0199                   *********************
+0192                   * PAGE 17 DATA AREA
+0193                   *******************
+0194                   *
+0195  DF00-                    ORG $1780
+0196                   *
+0197  1780-            VFLAG   BSS 1
+0198  1781-            SFLAG   BSS 1
+0199                   VMON    EQU $17D5
 0200                   *
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 05
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 05
 
-0201                   PORTB1  EQU $1400       MEMORY WRITE DISABLE
-0202                   EMUCOM  EQU $1430       EMULATOR COMMAND REG
-0203                   EMURES  EQU $1431       EMULATOR RESULT REG
-0204                   FDCOM   EQU $14C0       COMMAND REGISTER
-0205                   FDSTAT  EQU $14C0       STATUS REGISTER
-0206                   FDPARA  EQU $14C1       PARAMETER REGISTER
-0207                   FDRES   EQU $14C1       RESULT REGISTER
-0208                   FDTSTM  EQU $14C2       TEST MODE REGISTER
-0209                   FDDAT   EQU $14C4       DACK ADDRESS
-0210                   RSADAT  EQU $14C8       RS232 DATA REG
-0211                   RSASTA  EQU $14CA       RS232 STATUS REG
-0212                   RSACOM  EQU $14CA       RS232 COMMAND REG
-0213                   MULTX   EQU $14E0       MULTIPLIER X-REGISTER
-0214                   MULTY   EQU $14E1       MULTIPLIER Y-REGISTER
-0215                   MULTR   EQU $14E2       MULTIPLIER DATA REGISTER
-0216                   USPBD   EQU $1702       LED DISPLAY
-0217                   PRIOTB  EQU $179C       PRIORITY IRQ TABLE
-0218                   *
-0219                   *
-0220                   * VECTORS TO EPROMS OF OS
-0221                   *************************
+0201                   * INTERFACE ADDRESSES
+0202                   *********************
+0203                   *
+0204                   PORTB1  EQU $1400       MEMORY WRITE DISABLE
+0205                   EMUCOM  EQU $1430       EMULATOR COMMAND REG
+0206                   EMURES  EQU $1431       EMULATOR RESULT REG
+0207                   FDCOM   EQU $14C0       COMMAND REGISTER
+0208                   FDSTAT  EQU $14C0       STATUS REGISTER
+0209                   FDPARA  EQU $14C1       PARAMETER REGISTER
+0210                   FDRES   EQU $14C1       RESULT REGISTER
+0211                   FDTSTM  EQU $14C2       TEST MODE REGISTER
+0212                   FDDAT   EQU $14C4       DACK ADDRESS
+0213                   RSADAT  EQU $14C8       RS232 DATA REG
+0214                   RSASTA  EQU $14CA       RS232 STATUS REG
+0215                   RSACOM  EQU $14CA       RS232 COMMAND REG
+0216                   MULTX   EQU $14E0       MULTIPLIER X-REGISTER
+0217                   MULTY   EQU $14E1       MULTIPLIER Y-REGISTER
+0218                   MULTR   EQU $14E2       MULTIPLIER DATA REGISTER
+0219                   USPBD   EQU $1702       LED DISPLAY
+0220                   PRIOTB  EQU $179C       PRIORITY IRQ TABLE
+0221                   *
 0222                   *
-0223                   GETCHR  EQU $E003       GET CHAR
-0224                   GETLIN  EQU $E006       GET LINE
-0225                   PRTCHR  EQU $E009       PRINT A CHAR TO CRT
-0226                   ENDLIN  EQU $E024       TEST END OF LINE
-0227                   PRTINF  EQU $E027       PRINT A STRING
-0228                   PRTHEX  EQU $E02A       PRINT HEX CHAR
-0229                   PRTBYT  EQU $E02D       PRINT BYTE IN A
-0230                   PRTAX   EQU $E030       PRINT TWO BYTES
-0231                   RSIRQ   EQU $E92D       *** RS 232 IRQ, NORMAL
-0232                   ESCTST  EQU $E806       TEST ESCAPE FLAG
-0233                   TDIR    EQU $E809       TAPE DIRECTORY
-0234                   DWRFIL  EQU $F000       WRITE DISK FILE
-0235                   TPWAIT  EQU $E80F       READY MESSAGE FOR TAPE
-0236                   TRDREC  EQU $E812       LOAD A RECORD FROM TAPE
-0237                   TWRREC  EQU $E818       WRITE A RECORD TO TAPE
-0238                   SETID   EQU $E82A       SET TAPE ID
-0239                   SETFID  EQU $E81E       SET DATE TO FILE LABEL
-0240                   TAPEON  EQU $E821       START TAPE DRIVE
-0241                   TAPEOF  EQU $E824       STOP TAPE DRIVE
-0242                   TDELAY  EQU $E827       WAIT 1 SEC
-0243                   PRFLAB  EQU $E82D       PRINT FILE LABEL
-0244                   TDRLBR  EQU $E830       READ LABEL RECORD
-0245                   WRFILE  EQU $EB14       *** SPECIAL ENTRY
-0246                   DELETE  EQU $F00C       DELETE ONE FILE
-0247                   OPEN    EQU $F00F       OPENS EQUENTIAL FILE
-0248                   CLOSE   EQU $F012       CLOSE SEQUENTIAL FILE
-0249                   CLOSAL  EQU $F015       CLOSE ALL FILES
-0250                   READCH  EQU $F018       READ ONE CHAR FROM FILE
+0223                   * VECTORS TO EPROMS OF OS
+0224                   *************************
+0225                   *
+0226                   GETCHR  EQU $E003       GET CHAR
+0227                   GETLIN  EQU $E006       GET LINE
+0228                   PRTCHR  EQU $E009       PRINT A CHAR TO CRT
+0229                   ENDLIN  EQU $E024       TEST END OF LINE
+0230                   PRTINF  EQU $E027       PRINT A STRING
+0231                   PRTHEX  EQU $E02A       PRINT HEX CHAR
+0232                   PRTBYT  EQU $E02D       PRINT BYTE IN A
+0233                   PRTAX   EQU $E030       PRINT TWO BYTES
+0234                   RSIRQ   EQU $E92D       *** RS 232 IRQ, NORMAL
+0235                   ESCTST  EQU $E806       TEST ESCAPE FLAG
+0236                   TDIR    EQU $E809       TAPE DIRECTORY
+0237                   DWRFIL  EQU $F000       WRITE DISK FILE
+0238                   TPWAIT  EQU $E80F       READY MESSAGE FOR TAPE
+0239                   TRDREC  EQU $E812       LOAD A RECORD FROM TAPE
+0240                   TWRREC  EQU $E818       WRITE A RECORD TO TAPE
+0241                   SETID   EQU $E82A       SET TAPE ID
+0242                   SETFID  EQU $E81E       SET DATE TO FILE LABEL
+0243                   TAPEON  EQU $E821       START TAPE DRIVE
+0244                   TAPEOF  EQU $E824       STOP TAPE DRIVE
+0245                   TDELAY  EQU $E827       WAIT 1 SEC
+0246                   PRFLAB  EQU $E82D       PRINT FILE LABEL
+0247                   TDRLBR  EQU $E830       READ LABEL RECORD
+0248                   WRFILE  EQU $EB14       *** SPECIAL ENTRY
+0249                   DELETE  EQU $F00C       DELETE ONE FILE
+0250                   OPEN    EQU $F00F       OPENS EQUENTIAL FILE
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 06
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 06
 
-0251                   WRITCH  EQU $F01B       WRITE ONE CHAR TO FILE
-0252                   DRIVE   EQU $F364       *** COMPUTE DRIVE
-0253                   SEEK    EQU $F36D       *** SEEK TRACK
-0254                   WRCOMM  EQU $F3A4       *** WRITE COMMAND
-0255                   WRPARA  EQU $F3AF       *** WRITE PARAMETER
-0256                   RESULT  EQU $F3BC       *** GET RESULT
-0257                   DATREAD EQU $F3F6       *** READ DATA
-0258                   DATWRIT EQU $F3E1       *** WRITE DATA
-0259                   WRITE   EQU $F425       *** WRITE RECORD
-0260                   VERIFY  EQU $F44C       *** VERIFY RECORD
-0261                   READ    EQU $F457       *** READRECORD
-0262                   TRACK0  EQU $F4A0       *** SEEK TO TRACK 0
-0263                   PREPDO  EQU $F4A7       *** PREPARE DISK OP
-0264                   PREPDO1 EQU $F4CC       *** PREPARE DISK OP
-0265                   GETFENT EQU $F4D2       *** GET FILE ENTRY
-0266                   GETFREC EQU $F4ED       *** GET ENTRY RECORD
-0267                   READDS  EQU $F502       *** READ DIR SECTOR
-0268                   WRITDS  EQU $F52A       *** WRITE DIR SECTOR
-0269                   PREPRW  EQU $F548       *** PREPARE WRITE
-0270                   PREPRW1 EQU $F55E       *** PREPARE WRITE
-0271                   PUTFENT EQU $F581       *** PUT FILE ENTRY
-0272                   DISCERR EQU $F5F4       *** DISK ERROR
-0273                   DISCER1 EQU $F5FD       *** DISK ERROR
-0274                   ENDDO   EQU $F625       *** END DISK OPERATION
-0275                   PREPRD  EQU $F62C       *** PREPARE READ
-0276                   PREPWRA EQU $F651       *** PREPARE WRITE
-0277                   DDIR2   EQU $F6B4       *** DISK DIRECTORY
-0278                   DELETE4 EQU $F6F1       *** DELETE THIS ENTRY
-0279                   DRDFIL2 EQU $F76E       *** READ FILE, WITHOUT
-0280                   HEXPZE  EQU $F809       HEX EPRESSION, DEF=0
-0281                   GETNAM  EQU $F815       GET FILE NAME
-0282                   ENDLER  EQU $F9B5       *** ERROR, IF NOT EOL
-0283                   ERROR   EQU $F932       *** ERROR
-0284                   TEST    EQU $F94D       *** TEST STRING
-0285                   INTCOM  EQU $FA06       *** INTERPRET MON COMM
-0286                   BFLOAD0 EQU $FCCA       *** LOAD BLOCK FILE
-0287                   BFSTOR0 EQU $FD60       *** STORE BLOCK FILE
-0288                   HARGUM  EQU $FCF2       *** GET HEX ARGUMENT
-0289                   *
-0290                   *
-0291                           PAG
-
-----------------------------------------------------------------------
-
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 07
-
+0251                   CLOSE   EQU $F012       CLOSE SEQUENTIAL FILE
+0252                   CLOSAL  EQU $F015       CLOSE ALL FILES
+0253                   READCH  EQU $F018       READ ONE CHAR FROM FILE
+0254                   WRITCH  EQU $F01B       WRITE ONE CHAR TO FILE
+0255                   DRIVE   EQU $F364       *** COMPUTE DRIVE
+0256                   SEEK    EQU $F36D       *** SEEK TRACK
+0257                   WRCOMM  EQU $F3A4       *** WRITE COMMAND
+0258                   WRPARA  EQU $F3AF       *** WRITE PARAMETER
+0259                   RESULT  EQU $F3BC       *** GET RESULT
+0260                   DATREAD EQU $F3F6       *** READ DATA
+0261                   DATWRIT EQU $F3E1       *** WRITE DATA
+0262                   WRITE   EQU $F425       *** WRITE RECORD
+0263                   VERIFY  EQU $F44C       *** VERIFY RECORD
+0264                   READ    EQU $F457       *** READRECORD
+0265                   TRACK0  EQU $F4A0       *** SEEK TO TRACK 0
+0266                   PREPDO  EQU $F4A7       *** PREPARE DISK OP
+0267                   PREPDO1 EQU $F4CC       *** PREPARE DISK OP
+0268                   GETFENT EQU $F4D2       *** GET FILE ENTRY
+0269                   GETFREC EQU $F4ED       *** GET ENTRY RECORD
+0270                   READDS  EQU $F502       *** READ DIR SECTOR
+0271                   WRITDS  EQU $F52A       *** WRITE DIR SECTOR
+0272                   PREPRW  EQU $F548       *** PREPARE WRITE
+0273                   PREPRW1 EQU $F55E       *** PREPARE WRITE
+0274                   PUTFENT EQU $F581       *** PUT FILE ENTRY
+0275                   DISCERR EQU $F5F4       *** DISK ERROR
+0276                   DISCER1 EQU $F5FD       *** DISK ERROR
+0277                   ENDDO   EQU $F625       *** END DISK OPERATION
+0278                   PREPRD  EQU $F62C       *** PREPARE READ
+0279                   PREPWRA EQU $F651       *** PREPARE WRITE
+0280                   DDIR2   EQU $F6B4       *** DISK DIRECTORY
+0281                   DELETE4 EQU $F6F1       *** DELETE THIS ENTRY
+0282                   DRDFIL2 EQU $F76E       *** READ FILE, WITHOUT
+0283                   HEXPZE  EQU $F809       HEX EPRESSION, DEF=0
+0284                   GETNAM  EQU $F815       GET FILE NAME
+0285                   ENDLER  EQU $F9B5       *** ERROR, IF NOT EOL
+0286                   ERROR   EQU $F932       *** ERROR
+0287                   TEST    EQU $F94D       *** TEST STRING
+0288                   INTCOM  EQU $FA06       *** INTERPRET MON COMM
+0289                   BFLOAD0 EQU $FCCA       *** LOAD BLOCK FILE
+0290                   BFSTOR0 EQU $FD60       *** STORE BLOCK FILE
+0291                   HARGUM  EQU $FCF2       *** GET HEX ARGUMENT
 0292                   *
-0293  1782-                    ORG PSTART
-0294                   *
-0295                   * COLD START ENTRY POINT
-0296                   *
-0297  C800- 4C 2A C8           JMP START
-0298                   *
-0299                   * VECTOR TABLE FOR CALLING ROUTINES
-0300                   *
-0301  C803- 4C 54 C8   FGETCOM JMP FGETCM0     GO TO EXDOS
-0302  C806- 4C F4 CB           JMP FDIR0       PRINT DIRECTORY
-0303  C809- 4C 43 CD           JMP PACK0       PACK DISK
-0304  C80C- 4C 47 CF           JMP DELETE1     DELETE FILE(S)
-0305  C80F- 4C B2 D0           JMP EDIT        EDIT FILE
-0306  C812- 4C FF D0           JMP NEW0        CREATE NEW FILE
-0307  C815- 4C 3E D1           JMP PLOT        PLOT GRAPHICS DOT
-0308  C818- 4C 91 D1           JMP PLOTCH      PLOT CHARACTER
-0309  C81B- 4C 2E D2           JMP BITMAP      PLOT 4x4 BITS
-0310  C81E- 4C 5C D2           JMP DRAWX       DRAW LINE IN X DIR
-0311  C821- 4C 68 D2           JMP DRAWY       DRAW LINE IN Y DIR
-0312  C824- 4C 74 D2           JMP DRAWXY      DRAW LINE IN BOTH DIR
-0313  C827- 4C DB D0           JMP FLOPPY      CHANGE FLOPPY
-0314                   *
-0315  C82A- 78         START   SEI
-0316  C82B- A9 03              LDA =<FGETCOM
-0317  C82D- A2 C8              LDX =>FGETCOM
-0318  C82F- 8D D5 17           STA VMON
-0319  C832- 8E D6 17           STX VMON+1
-0320  C835- 20 27 E0           JSR PRTINF
-0321  C838- 52 36 35           BYT 'R65 EXDOS VERSION 4.4     ',$A0
-0321  C83B- 20 45 58 
-0321  C83E- 44 4F 53 
-0321  C841- 20 56 45 
-0321  C844- 52 53 49 
-0321  C847- 4F 4E 20 
-0321  C84A- 34 2E 34 
-0321  C84D- 20 20 20 
-0321  C850- 20 20 A0 
-0322  C853- 58                 CLI
-0323  C854- 20 27 E0   FGETCM0 JSR PRTINF      MAIN LOOP
-0324  C857- 0D 0A 45           BYT $D,$A,'E*'+128
-0324  C85A- AA 
-0325  C85B- 20 06 E0           JSR GETLIN
-0326  C85E- 20 64 C8           JSR FINTCOM
-0327  C861- 4C 03 C8           JMP FGETCOM
-0328                   *
-0329  C864- 90 01      FINTCOM BCC *+3         RTS, IF ESC
-0330  C866- 60                 RTS
-0331  C867- 20 24 E0           JSR ENDLIN      OR EMPTY LINE
-0332  C86A- F0 FA              BEQ *-4
+0293                   *
+0294                           PAG
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 08
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 07
 
-0333                   *
-0334  C86C- 20 06 E8           JSR ESCTST      CLEAR ESCAPE FLAG
-0335                   *
-0336  C86F- 20 4D F9           JSR TEST
-0337  C872- 44 46 4F           BYT 'DFORMAT'+128
-0337  C875- 52 4D 41 
-0337  C878- D4 
-0338  C879- B0 11              BCS FINTC1
-0339                   *
-0340  C87B- 20 90 CE           JSR NGETNE
-0341  C87E- 20 F2 FC           JSR HARGUM      *** DFORMAT ***
-0342  C881- 85 DC              STA FILDRV      (DISKNAME,FILDRV)
-0343  C883- 20 B5 F9           JSR ENDLER
-0344  C886- 20 E3 C9           JSR INITDIR
-0345  C889- D0 6D              BNE DERROR
-0346  C88B- 60                 RTS
-0347                   *
-0348  C88C- 20 4D F9   FINTC1  JSR TEST
-0349  C88F- 45 58 50           BYT 'EXPORT'+128
-0349  C892- 4F 52 D4 
-0350  C895- B0 0E              BCS FINTC2
-0351                   *
-0352  C897- 20 90 CE           JSR NGETNE      *** EXPORT ***
-0353  C89A- 20 F2 FC           JSR HARGUM      (FILNAM.CY,DRIVE)
-0354  C89D- 85 DC              STA FILDRV
-0355  C89F- 20 75 D0           JSR EXPORT
-0356  C8A2- D0 54              BNE DERROR
-0357  C8A4- 60                 RTS
-0358                   *
-0359  C8A5- 20 4D F9   FINTC2  JSR TEST
-0360  C8A8- 49 4D 50           BYT 'IMPORT'+128
-0360  C8AB- 4F 52 D4 
-0361  C8AE- B0 0E              BCS FINTC3
-0362                   *
-0363  C8B0- 20 90 CE           JSR NGETNE      *** IMPORT ***
-0364  C8B3- 20 F2 FC           JSR HARGUM      (FILNAM.CY,DRIVE)
-0365  C8B6- 85 DC              STA FILDRV
-0366  C8B8- 20 8F D0           JSR IMPORT
-0367  C8BB- D0 3B              BNE DERROR
-0368  C8BD- 60                 RTS
-0369                   *
-0370  C8BE- 20 4D F9   FINTC3  JSR TEST
-0371  C8C1- 45 44 49           BYT 'EDIT'+128
-0371  C8C4- D4 
-0372  C8C5- B0 0E              BCS FINTC4
-0373                   *
-0374  C8C7- 20 90 CE           JSR NGETNE      *** EDIT ***
-0375  C8CA- 20 F2 FC           JSR HARGUM      (FILNAM.CY,DRIVE)
-0376  C8CD- 85 DC              STA FILDRV
-0377  C8CF- 20 B2 D0           JSR EDIT
-
-----------------------------------------------------------------------
-
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 09
-
-0378  C8D2- D0 24              BNE DERROR
-0379  C8D4- 60                 RTS
-0380                   *
-0381  C8D5- 20 4D F9   FINTC4  JSR TEST
-0382  C8D8- 46 4C 4F           BYT 'FLOPPY'+128
-0382  C8DB- 50 50 D9 
-0383  C8DE- B0 1B              BCS FINTC6
-0384                   *
-0385  C8E0- 20 90 CE           JSR NGETNE      *** FLOPPY ***
-0386  C8E3- 20 F2 FC           JSR HARGUM      (FILNAM.CY,DRIVE)
-0387  C8E6- 85 DC              STA FILDRV
-0388  C8E8- 20 DB D0           JSR FLOPPY
-0389  C8EB- D0 0B              BNE DERROR
-0390  C8ED- A9 00              LDA =0          PRINT DIRECTORY
-0391  C8EF- 8D 97 03           STA FULLFLG
-0392  C8F2- 20 F4 CB           JSR FDIR0
-0393  C8F5- D0 01              BNE DERROR
-0394  C8F7- 60                 RTS
-0395                   *
-0396  C8F8- 4C 32 F9   DERROR  JMP ERROR
-0397                   *
-0398  C8FB- 20 4D F9   FINTC6  JSR TEST
-0399  C8FE- 52 45 56          BYT 'REVIVE'+128
-0399  C901- 49 56 C5 
-0400  C904- B0 06              BCS FINTC7
-0401  C906- 20 6C CA           JSR REVIVE      *** REVIVE ***
-0402  C909- D0 ED              BNE DERROR      (ENTRY,DRIVE)
-0403  C90B- 60                 RTS
-0404                   *
-0405  C90C- 20 4D F9   FINTC7  JSR TEST
-0406  C90F- 52 45 4E           BYT 'RENAME'+128
-0406  C912- 41 4D C5 
-0407  C915- B0 06              BCS FINTC8
-0408  C917- 20 7D CA           JSR RENAME      *** RENAME ***
-0409  C91A- D0 DC      DERROR1 BNE DERROR      (FILNAM.CY,DRIVE)
-0410  C91C- 60                 RTS
-0411                   *
-0412  C91D- 20 4D F9   FINTC8  JSR TEST
-0413  C920- 53 41 56           BYT 'SAVE'+128
-0413  C923- C5 
-0414  C924- B0 06              BCS FINTC9
-0415  C926- 20 32 CB           JSR SAVE        *** SAVE ***
-0416  C929- D0 CD              BNE DERROR      (DRIVE)
-0417  C92B- 60                 RTS
-0418                   *
-0419  C92C- 20 4D F9   FINTC9  JSR TEST
-0420  C92F- 53 57 41           BYT 'SWAP'+128  *** SWAP ***
-0420  C932- D0 
-0421  C933- B0 06              BCS FINTC10     (DRIVE)
-0422  C935- 20 92 CB           JSR SWAP
+0295                   *
+0296  1782-                    ORG PSTART
+0297                   *
+0298                   * COLD START ENTRY POINT
+0299                   *
+0300  C800- 4C 2A C8           JMP START
+0301                   *
+0302                   * VECTOR TABLE FOR CALLING ROUTINES
+0303                   *
+0304  C803- 4C 4F C8   FGETCOM JMP FGETCM0     GO TO EXDOS
+0305  C806- 4C 41 CB           JMP FDIR0       PRINT DIRECTORY
+0306  C809- 4C 90 CC           JMP PACK0       PACK DISK
+0307  C80C- 4C 7F CE           JMP DELETE1     DELETE FILE(S)
+0308  C80F- 4C EA CF           JMP EDIT        EDIT FILE
+0309  C812- 4C 37 D0           JMP NEW0        CREATE NEW FILE
+0310  C815- 4C 76 D0           JMP PLOT        PLOT GRAPHICS DOT
+0311  C818- 4C C9 D0           JMP PLOTCH      PLOT CHARACTER
+0312  C81B- 4C 66 D1           JMP BITMAP      PLOT 4x4 BITS
+0313  C81E- 4C 94 D1           JMP DRAWX       DRAW LINE IN X DIR
+0314  C821- 4C A0 D1           JMP DRAWY       DRAW LINE IN Y DIR
+0315  C824- 4C AC D1           JMP DRAWXY      DRAW LINE IN BOTH DIR
+0316  C827- 4C 13 D0           JMP FLOPPY      CHANGE FLOPPY
+0317                   *
+0318  C82A- 78         START   SEI
+0319  C82B- A9 03              LDA =<FGETCOM
+0320  C82D- A2 C8              LDX =>FGETCOM
+0321  C82F- 8D D5 17           STA VMON
+0322  C832- 8E D6 17           STX VMON+1
+0323  C835- 20 27 E0           JSR PRTINF
+0324  C838- 52 36 35           BYT 'R65 EXDOS VERSION 4.6',$A0
+0324  C83B- 20 45 58 
+0324  C83E- 44 4F 53 
+0324  C841- 20 56 45 
+0324  C844- 52 53 49 
+0324  C847- 4F 4E 20 
+0324  C84A- 34 2E 36 
+0324  C84D- A0 
+0325  C84E- 58                 CLI
+0326  C84F- 20 27 E0   FGETCM0 JSR PRTINF      MAIN LOOP
+0327  C852- 0D 0A 45           BYT $D,$A,'E*'+128
+0327  C855- AA 
+0328  C856- 20 06 E0           JSR GETLIN
+0329  C859- 20 5F C8           JSR FINTCOM
+0330  C85C- 4C 03 C8           JMP FGETCOM
+0331                   *
+0332  C85F- 90 01      FINTCOM BCC *+3         RTS, IF ESC
+0333  C861- 60                 RTS
+0334  C862- 20 24 E0           JSR ENDLIN      OR EMPTY LINE
+0335  C865- F0 FA              BEQ *-4
+0336                   *
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 10
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 08
 
-0423  C938- D0 BE              BNE DERROR
-0424  C93A- 60                 RTS
-0425                   *
-0426  C93B- 20 4D F9   FINTC10 JSR TEST
-0427  C93E- 46 44 49           BYT 'FDIR'+128
-0427  C941- D2 
-0428  C942- B0 0B              BCS FINTC25
-0429  C944- A9 FF              LDA =$FF
-0430  C946- 8D 97 03   FINTC24 STA FULLFLG
-0431  C949- 20 E6 CB           JSR FDIR        *** FDIR ***
-0432  C94C- D0 CC      DERROR2 BNE DERROR1     (DRIVE)
-0433  C94E- 60                 RTS
-0434                   *
-0435  C94F- 20 4D F9   FINTC25 JSR TEST
-0436  C952- 44 49 D2           BYT 'DIR'+128   *** DIR ***
-0437  C955- B0 05              BCS FINTC11     (DRIVE)
-0438  C957- A9 00              LDA =0
-0439  C959- 4C 46 C9           JMP FINTC24
-0440                   *
-0441  C95C- 20 4D F9   FINTC11 JSR TEST
-0442  C95F- 50 41 43           BYT 'PACK'+128  *** PACK ***
-0442  C962- CB 
-0443  C963- B0 06              BCS FINTC12     (DRIVE)
-0444  C965- 20 04 CD           JSR PACK
-0445  C968- D0 E2      DERROR3 BNE DERROR2
-0446  C96A- 60                 RTS
-0447                   *
-0448  C96B- 20 4D F9   FINTC12 JSR TEST
-0449  C96E- 50 52 4F           BYT 'PROTECT'+128
-0449  C971- 54 45 43 
-0449  C974- D4 
-0450  C975- B0 06              BCS FINTC15
-0451  C977- 20 11 CB           JSR PROTECT     *** PROTECT ***
-0452  C97A- D0 D0              BNE DERROR2     (FILNAM.CY,DRIVE)
-0453  C97C- 60                 RTS
-0454                   *
-0455  C97D- 20 4D F9   FINTC15 JSR TEST
-0456  C980- 43 4F 50           BYT 'COPY'+128
-0456  C983- D9 
-0457  C984- B0 06              BCS FINTC17     *** COPY ***
-0458  C986- 20 94 CF           JSR COPY        (FILNAM.CY,DRIVE,DRIVE)
-0459  C989- D0 DD              BNE DERROR3
-0460  C98B- 60                 RTS
-0461                   *
-0462  C98C- 20 4D F9   FINTC17 JSR TEST        *** LOAD ***
-0463  C98F- 4C 4F 41           BYT 'LOAD'+128
-0463  C992- C4 
-0464  C993- B0 06              BCS FINTC18
-0465  C995- 20 90 CE           JSR NGETNE
-0466  C998- 4C CA FC           JMP BFLOAD0
+0337  C867- 20 06 E8           JSR ESCTST      CLEAR ESCAPE FLAG
+0338                   *
+0339  C86A- 20 4D F9           JSR TEST
+0340  C86D- 44 46 4F           BYT 'DFORMAT'+128
+0340  C870- 52 4D 41 
+0340  C873- D4 
+0341  C874- B0 11              BCS FINTC1
+0342                   *
+0343  C876- 20 CB CD           JSR NGETNE
+0344  C879- 20 F2 FC           JSR HARGUM      *** DFORMAT ***
+0345  C87C- 85 DC              STA FILDRV      (DISKNAME,FILDRV)
+0346  C87E- 20 B5 F9           JSR ENDLER
+0347  C881- 20 C0 C9           JSR INITDIR
+0348  C884- D0 6D              BNE DERROR
+0349  C886- 60                 RTS
+0350                   *
+0351  C887- 20 4D F9   FINTC1  JSR TEST
+0352  C88A- 45 58 50           BYT 'EXPORT'+128
+0352  C88D- 4F 52 D4 
+0353  C890- B0 0E              BCS FINTC2
+0354                   *
+0355  C892- 20 CB CD           JSR NGETNE      *** EXPORT ***
+0356  C895- 20 F2 FC           JSR HARGUM      (FILNAM.CY,DRIVE)
+0357  C898- 85 DC              STA FILDRV
+0358  C89A- 20 AD CF           JSR EXPORT
+0359  C89D- D0 54              BNE DERROR
+0360  C89F- 60                 RTS
+0361                   *
+0362  C8A0- 20 4D F9   FINTC2  JSR TEST
+0363  C8A3- 49 4D 50           BYT 'IMPORT'+128
+0363  C8A6- 4F 52 D4 
+0364  C8A9- B0 0E              BCS FINTC3
+0365                   *
+0366  C8AB- 20 CB CD           JSR NGETNE      *** IMPORT ***
+0367  C8AE- 20 F2 FC           JSR HARGUM      (FILNAM.CY,DRIVE)
+0368  C8B1- 85 DC              STA FILDRV
+0369  C8B3- 20 C7 CF           JSR IMPORT
+0370  C8B6- D0 3B              BNE DERROR
+0371  C8B8- 60                 RTS
+0372                   *
+0373  C8B9- 20 4D F9   FINTC3  JSR TEST
+0374  C8BC- 45 44 49           BYT 'EDIT'+128
+0374  C8BF- D4 
+0375  C8C0- B0 0E              BCS FINTC4
+0376                   *
+0377  C8C2- 20 CB CD           JSR NGETNE      *** EDIT ***
+0378  C8C5- 20 F2 FC           JSR HARGUM      (FILNAM.CY,DRIVE)
+0379  C8C8- 85 DC              STA FILDRV
+0380  C8CA- 20 EA CF           JSR EDIT
+0381  C8CD- D0 24              BNE DERROR
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 11
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 09
 
-0467                   *
-0468  C99B- 20 4D F9   FINTC18 JSR TEST        *** STORE ***
-0469  C99E- 53 54 4F           BYT 'STORE'+128
-0469  C9A1- 52 C5 
-0470  C9A3- B0 06              BCS FINTC19
-0471  C9A5- 20 90 CE           JSR NGETNE
-0472  C9A8- 4C 60 FD           JMP BFSTOR0
-0473                   *
-0474  C9AB- 20 4D F9   FINTC19 JSR TEST        *** DELETE ***
-0475  C9AE- 44 45 4C           BYT 'DELETE'+128
-0475  C9B1- 45 54 C5 
-0476  C9B4- B0 06              BCS FINTC20
-0477  C9B6- 20 3C CF           JSR DELETE0
-0478  C9B9- D0 AD              BNE DERROR3
-0479  C9BB- 60                 RTS
-0480                   *
-0481  C9BC- 20 4D F9   FINTC20 JSR TEST        *** VOLUME ***
-0482  C9BF- 56 4F 4C           BYT 'VOLUME'+128  (DRIVE)
-0482  C9C2- 55 4D C5 
-0483  C9C5- B0 0B              BCS FINTC21
-0484  C9C7- 20 F2 FC           JSR HARGUM
-0485  C9CA- 85 DC              STA FILDRV
-0486  C9CC- 20 B5 F9           JSR ENDLER
-0487  C9CF- 4C D6 CE           JMP VOLUME
-0488                   *
-0489  C9D2- 20 4D F9   FINTC21 JSR TEST        *** NEW ***
-0490  C9D5- 4E 45 D7           BYT 'NEW'+128     (FILNAM.CY,DRIVE)
-0491  C9D8- B0 06              BCS FINTC22
-0492  C9DA- 20 F7 D0           JSR NEW
-0493  C9DD- D0 89              BNE DERROR3
-0494  C9DF- 60                 RTS
-0495                   *
-0496  C9E0- 4C 0E FA   FINTC22 JMP INTCOM+8    MUST BE MONITOR COMM
-0497                   *
-0498                   *
-0499                   * SUBROUTINES FOLLOW
-0500                   * ******************
-0501                   *
-0502                   * INITDIR: INITIALIZE DISK DIRECTORY
-0503                   ************************************
+0382  C8CF- 60                 RTS
+0383                   *
+0384  C8D0- 20 4D F9   FINTC4  JSR TEST
+0385  C8D3- 46 4C 4F           BYT 'FLOPPY'+128
+0385  C8D6- 50 50 D9 
+0386  C8D9- B0 1B              BCS FINTC6
+0387                   *
+0388  C8DB- 20 CB CD           JSR NGETNE      *** FLOPPY ***
+0389  C8DE- 20 F2 FC           JSR HARGUM      (FILNAM.CY,DRIVE)
+0390  C8E1- 85 DC              STA FILDRV
+0391  C8E3- 20 13 D0           JSR FLOPPY
+0392  C8E6- D0 0B              BNE DERROR
+0393  C8E8- A9 00              LDA =0          PRINT DIRECTORY
+0394  C8EA- 8D 97 03           STA FULLFLG
+0395  C8ED- 20 41 CB           JSR FDIR0
+0396  C8F0- D0 01              BNE DERROR
+0397  C8F2- 60                 RTS
+0398                   *
+0399  C8F3- 4C 32 F9   DERROR  JMP ERROR
+0400                   *
+0401  C8F6- 20 4D F9   FINTC6  JSR TEST
+0402  C8F9- 52 45 56           BYT 'REVIVE'+128
+0402  C8FC- 49 56 C5 
+0403  C8FF- B0 06             BCS FINTC7
+0404  C901- 20 47 CA           JSR REVIVE      *** REVIVE ***
+0405  C904- D0 ED              BNE DERROR      (ENTRY,DRIVE)
+0406  C906- 60                 RTS
+0407                   *
+0408  C907- 20 4D F9   FINTC7  JSR TEST
+0409  C90A- 52 45 4E           BYT 'RENAME'+128
+0409  C90D- 41 4D C5 
+0410  C910- B0 06              BCS FINTC10
+0411  C912- 20 58 CA           JSR RENAME      *** RENAME ***
+0412  C915- D0 DC      DERROR1 BNE DERROR      (FILNAM.CY,DRIVE)
+0413  C917- 60                 RTS
+0414                   *
+0415  C918- 20 4D F9   FINTC10 JSR TEST
+0416  C91B- 46 44 49           BYT 'FDIR'+128
+0416  C91E- D2 
+0417  C91F- B0 0B              BCS FINTC25
+0418  C921- A9 FF              LDA =$FF
+0419  C923- 8D 97 03   FINTC24 STA FULLFLG
+0420  C926- 20 33 CB           JSR FDIR        *** FDIR ***
+0421  C929- D0 EA      DERROR2 BNE DERROR1     (DRIVE)
+0422  C92B- 60                 RTS
+0423                   *
+0424  C92C- 20 4D F9   FINTC25 JSR TEST
+0425  C92F- 44 49 D2           BYT 'DIR'+128   *** DIR ***
+0426  C932- B0 05              BCS FINTC11     (DRIVE)
+0427  C934- A9 00              LDA =0
+
+----------------------------------------------------------------------
+
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 10
+
+0428  C936- 4C 23 C9           JMP FINTC24
+0429                   *
+0430  C939- 20 4D F9   FINTC11 JSR TEST
+0431  C93C- 50 41 43           BYT 'PACK'+128  *** PACK ***
+0431  C93F- CB 
+0432  C940- B0 06              BCS FINTC12     (DRIVE)
+0433  C942- 20 51 CC           JSR PACK
+0434  C945- D0 E2      DERROR3 BNE DERROR2
+0435  C947- 60                 RTS
+0436                   *
+0437  C948- 20 4D F9   FINTC12 JSR TEST
+0438  C94B- 50 52 4F           BYT 'PROTECT'+128
+0438  C94E- 54 45 43 
+0438  C951- D4 
+0439  C952- B0 06              BCS FINTC15
+0440  C954- 20 EC CA           JSR PROTECT     *** PROTECT ***
+0441  C957- D0 D0              BNE DERROR2     (FILNAM.CY,DRIVE)
+0442  C959- 60                 RTS
+0443                   *
+0444  C95A- 20 4D F9   FINTC15 JSR TEST
+0445  C95D- 43 4F 50           BYT 'COPY'+128
+0445  C960- D9 
+0446  C961- B0 06              BCS FINTC17     *** COPY ***
+0447  C963- 20 CC CE           JSR COPY        (FILNAM.CY,DRIVE,DRIVE)
+0448  C966- D0 DD              BNE DERROR3
+0449  C968- 60                 RTS
+0450                   *
+0451  C969- 20 4D F9   FINTC17 JSR TEST        *** LOAD ***
+0452  C96C- 4C 4F 41           BYT 'LOAD'+128
+0452  C96F- C4 
+0453  C970- B0 06              BCS FINTC18
+0454  C972- 20 CB CD           JSR NGETNE
+0455  C975- 4C CA FC           JMP BFLOAD0
+0456                   *
+0457  C978- 20 4D F9   FINTC18 JSR TEST        *** STORE ***
+0458  C97B- 53 54 4F           BYT 'STORE'+128
+0458  C97E- 52 C5 
+0459  C980- B0 06              BCS FINTC19
+0460  C982- 20 CB CD           JSR NGETNE
+0461  C985- 4C 60 FD           JMP BFSTOR0
+0462                   *
+0463  C988- 20 4D F9   FINTC19 JSR TEST        *** DELETE ***
+0464  C98B- 44 45 4C           BYT 'DELETE'+128
+0464  C98E- 45 54 C5 
+0465  C991- B0 06              BCS FINTC20
+0466  C993- 20 74 CE           JSR DELETE0
+0467  C996- D0 AD              BNE DERROR3
+0468  C998- 60                 RTS
+0469                   *
+0470  C999- 20 4D F9   FINTC20 JSR TEST        *** VOLUME ***
+
+----------------------------------------------------------------------
+
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 11
+
+0471  C99C- 56 4F 4C           BYT 'VOLUME'+128  (DRIVE)
+0471  C99F- 55 4D C5 
+0472  C9A2- B0 0B              BCS FINTC21
+0473  C9A4- 20 F2 FC           JSR HARGUM
+0474  C9A7- 85 DC              STA FILDRV
+0475  C9A9- 20 B5 F9           JSR ENDLER
+0476  C9AC- 4C 11 CE           JMP VOLUME
+0477                   *
+0478  C9AF- 20 4D F9   FINTC21 JSR TEST        *** NEW ***
+0479  C9B2- 4E 45 D7           BYT 'NEW'+128     (FILNAM.CY,DRIVE)
+0480  C9B5- B0 06              BCS FINTC22
+0481  C9B7- 20 2F D0           JSR NEW
+0482  C9BA- D0 89              BNE DERROR3
+0483  C9BC- 60                 RTS
+0484                   *
+0485  C9BD- 4C 0E FA   FINTC22 JMP INTCOM+8    MUST BE MONITOR COMM
+0486                   *
+0487                   *
+0488                   * SUBROUTINES FOLLOW
+0489                   * ******************
+0490                   *
+0491                   * INITDIR: INITIALIZE DISK DIRECTORY
+0492                   ************************************
+0493                   *
+0494  C9C0- 20 3B CA   INITDIR JSR DSKONLY
+0495  C9C3- 20 A7 F4           JSR PREPDO
+0496  C9C6- 20 27 E0           JSR PRTINF
+0497  C9C9- 0D 0A 46           BYT $D,$A,'FORMAT (DATA LOST)? '+128
+0497  C9CC- 4F 52 4D 
+0497  C9CF- 41 54 20 
+0497  C9D2- 28 44 41 
+0497  C9D5- 54 41 20 
+0497  C9D8- 4C 4F 53 
+0497  C9DB- 54 29 3F 
+0497  C9DE- A0 
+0498  C9DF- 20 03 E0           JSR GETCHR
+0499  C9E2- 29 5F              AND =$5F
+0500  C9E4- C9 59              CMP ='Y'
+0501  C9E6- F0 05              BEQ INITD1
+0502  C9E8- A9 03              LDA =3          ESCAPE
+0503  C9EA- 4C FD F5           JMP DISCER1
 0504                   *
-0505  C9E3- 20 60 CA   INITDIR JSR DSKONLY
-0506  C9E6- 20 A7 F4           JSR PREPDO
-0507  C9E9- 20 27 E0           JSR PRTINF
-0508  C9EC- 0D 0A 46          BYT $D,$A,'FORMAT (DATA LOST)? '+128
-0508  C9EF- 4F 52 4D 
-0508  C9F2- 41 54 20 
-0508  C9F5- 28 44 41 
-0508  C9F8- 54 41 20 
-0508  C9FB- 4C 4F 53 
+0505  C9ED- 20 27 E0   INITD1  JSR PRTINF
+0506  C9F0- 0D 8A              BYT $D,$8A
+0507  C9F2- 20 15 F0           JSR CLOSAL
+0508  C9F5- 78                 SEI
+0509                   *
+0510  C9F6- A0 00      INITD2  LDY =0
+0511  C9F8- 98                 TYA             CLEAR BUFFER FIRST
+0512  C9F9- 99 00 D6           STA DIRBUF,Y
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 12
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 12
 
-0508  C9FE- 54 29 3F 
-0508  CA01- A0 
-0509  CA02- 20 03 E0           JSR GETCHR
-0510  CA05- 29 5F              AND =$5F
-0511  CA07- C9 59              CMP ='Y'
-0512  CA09- F0 05              BEQ INITD1
-0513  CA0B- A9 03              LDA =3          ESCAPE
-0514  CA0D- 4C FD F5           JMP DISCER1
-0515                   *
-0516  CA10- 20 27 E0   INITD1  JSR PRTINF
-0517  CA13- 0D 8A              BYT $D,$8A
-0518  CA15- 20 15 F0           JSR CLOSAL
-0519  CA18- 78                 SEI
-0520                   *
-0521  CA19- A0 00      INITD2  LDY =0
-0522  CA1B- 98                 TYA             CLEAR BUFFER FIRST
-0523  CA1C- 99 00 D6           STA DIRBUF,Y
-0524  CA1F- 88                 DEY
-0525  CA20- D0 FA              BNE *-4
-0526  CA22- A2 01              LDX =1          STORE SECTOR 1-9
-0527  CA24- 8E 7A 03           STX BUFSEC
-0528  CA27- 20 2A F5   INITD3  JSR WRITDS
-0529  CA2A- EE 7A 03           INC BUFSEC
-0530  CA2D- AE 7A 03           LDX BUFSEC
-0531  CA30- E0 0A              CPX =10
-0532  CA32- 90 F3              BCC INITD3
-0533  CA34- A2 10              LDX =16         LOAD DISK NAME AND NO
-0534  CA36- BD 20 03   INITD4  LDA FILNM1,X
-0535  CA39- 9D E1 D6           STA DIRBUF+$E1,X
-0536  CA3C- CA                 DEX
-0537  CA3D- 10 F7              BPL INITD4
-0538  CA3F- 20 2A F5           JSR WRITDS      STORE SECTOR 10
-0539  CA42- 4C 56 CE           JMP PACK7       MAKE BACKUP COPY
-0540                   *
-0541                   *
-0542  CA45- 20 09 F8   SETEND1 JSR HEXPZE
-0543  CA48- AA                 TAX
-0544  CA49- CA                 DEX
-0545  CA4A- 8E 8B 03           STX NEWENT      SAVE ENTRY NO
-0546  CA4D- 20 F2 FC           JSR HARGUM
-0547  CA50- 85 DC              STA FILDRV
-0548  CA52- 20 B5 F9           JSR ENDLER
-0549  CA55- 20 CC F4           JSR PREPDO1
-0550  CA58- AE 8B 03           LDX NEWENT
-0551  CA5B- 20 D2 F4           JSR GETFENT
-0552  CA5E- A6 E4              LDX FILCNT
+0513  C9FC- 88                 DEY
+0514  C9FD- D0 FA              BNE *-4
+0515  C9FF- A2 01             LDX =1          STORE SECTORS 1-31
+0516  CA01- 8E 7A 03           STX BUFSEC
+0517  CA04- 20 2A F5   INITD3  JSR WRITDS
+0518  CA07- EE 7A 03           INC BUFSEC
+0519  CA0A- AE 7A 03           LDX BUFSEC
+0520  CA0D- E0 20              CPX =32
+0521  CA0F- 90 F3              BCC INITD3
+0522  CA11- A2 10              LDX =16         LOAD DISK NAME AND NO
+0523  CA13- BD 20 03   INITD4  LDA FILNM1,X
+0524  CA16- 9D E1 D6           STA DIRBUF+$E1,X
+0525  CA19- CA                 DEX
+0526  CA1A- 10 F7              BPL INITD4
+0527  CA1C- 20 2A F5           JSR WRITDS      STORE SECTOR 32
+0528  CA1F- 60                 RTS
+0529                   *
+0530                   *
+0531  CA20- 20 09 F8   SETEND1 JSR HEXPZE
+0532  CA23- AA                 TAX
+0533  CA24- CA                 DEX
+0534  CA25- 8E 8B 03           STX NEWENT      SAVE ENTRY NO
+0535  CA28- 20 F2 FC           JSR HARGUM
+0536  CA2B- 85 DC              STA FILDRV
+0537  CA2D- 20 B5 F9           JSR ENDLER
+0538  CA30- 20 CC F4           JSR PREPDO1
+0539  CA33- AE 8B 03           LDX NEWENT
+0540  CA36- 20 D2 F4           JSR GETFENT
+0541  CA39- A6 E4              LDX FILCNT
+0542                   *
+0543  CA3B- A5 DC      DSKONLY LDA FILDRV
+0544  CA3D- 29 FE              AND =$FE
+0545  CA3F- D0 01              BNE *+3
+0546  CA41- 60                 RTS
+0547                   *
+0548  CA42- A9 62              LDA =$62
+0549  CA44- 4C 32 F9           JMP ERROR
+0550                   *
+0551                   * REVIVE: REVIVE DELETED FILE
+0552                   *****************************
 0553                   *
-0554  CA60- A5 DC      DSKONLY LDA FILDRV
-0555  CA62- 29 FE              AND =$FE
-0556  CA64- D0 01              BNE *+3
+0554  CA47- 20 20 CA   REVIVE  JSR SETEND1
+0555  CA4A- AD 1E 03           LDA FILLNK      CLEAR THE DELETED FLAG
+0556  CA4D- 29 7F              AND =$7F
+0557  CA4F- 8D 1E 03           STA FILLNK
+0558  CA52- 20 81 F5           JSR PUTFENT
+0559  CA55- 4C 25 F6           JMP ENDDO
+0560                   *
+0561                   * RENAME: RENAME FILE
+0562                   *********************
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 13
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 13
 
-0557  CA66- 60                 RTS
-0558                   *
-0559  CA67- A9 62              LDA =$62
-0560  CA69- 4C 32 F9           JMP ERROR
-0561                   *
-0562                   * REVIVE: REVIVE DELETED FILE
-0563                   *****************************
-0564                   *
-0565  CA6C- 20 45 CA   REVIVE  JSR SETEND1
-0566  CA6F- AD 1E 03           LDA FILLNK      CLEAR THE DELETED FLAG
-0567  CA72- 29 7F              AND =$7F
-0568  CA74- 8D 1E 03           STA FILLNK
-0569  CA77- 20 81 F5           JSR PUTFENT
-0570  CA7A- 4C 25 F6           JMP ENDDO
-0571                   *
-0572                   * RENAME: RENAME FILE
-0573                   *********************
-0574                   *
-0575  CA7D- 20 90 CE   RENAME  JSR NGETNE
-0576  CA80- 20 F2 FC           JSR HARGUM
-0577  CA83- 85 DC              STA FILDRV
-0578  CA85- 20 60 CA           JSR DSKONLY
-0579  CA88- 20 B5 F9           JSR ENDLER
-0580  CA8B- 20 2C F6           JSR PREPRD
-0581  CA8E- 20 2D E8           JSR PRFLAB
-0582  CA91- 20 27 E0           JSR PRTINF
-0583  CA94- 0D 0A 46           BYT $D,$A,'FILNAM.CY,SUBTYPE? '+128
-0583  CA97- 49 4C 4E 
-0583  CA9A- 41 4D 2E 
-0583  CA9D- 43 59 2C 
-0583  CAA0- 53 55 42 
-0583  CAA3- 54 59 50 
-0583  CAA6- 45 3F A0 
-0584  CAA9- 20 06 E0           JSR GETLIN
-0585  CAAC- 20 24 E0           JSR ENDLIN
-0586  CAAF- D0 03              BNE *+5
-0587  CAB1- 4C 0B CA           JMP INITD1-5    ESCAPE
-0588                   *
-0589  CAB4- A6 E4              LDX FILCNT
-0590  CAB6- 8E 8B 03           STX NEWENT
-0591  CAB9- 20 90 CE           JSR NGETNE
-0592  CABC- 20 24 E0           JSR ENDLIN
-0593  CABF- F0 2E              BEQ RENAME1
-0594  CAC1- 20 4D F9           JSR TEST
-0595  CAC4- AC                 BYT ','+128
-0596  CAC5- B0 45              BCS SYNERR
-0597  CAC7- 20 4D F9           JSR TEST
-0598  CACA- A1                 BYT '!'+128     PROTECTED?
-0599  CACB- AD 00 03           LDA FILTYP
-0600  CACE- 29 7F              AND =$7F
-
-----------------------------------------------------------------------
-
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 14
-
-0601  CAD0- B0 02              BCS *+4
-0602  CAD2- 09 80              ORA =$80
-0603  CAD4- 8D 00 03           STA FILTYP
-0604  CAD7- B1 E9              LDA (VIDPNT),Y
-0605  CAD9- C8                 INY
-0606  CADA- C9 41              CMP =$41
-0607  CADC- 90 2E              BCC SYNERR
-0608  CADE- C9 5C              CMP =$5C
-0609  CAE0- B0 2A              BCS SYNERR
-0610  CAE2- 8D 12 03           STA FILSTP
-0611  CAE5- 20 24 E0           JSR ENDLIN
-0612  CAE8- F0 05              BEQ RENAME1
-0613  CAEA- A9 15              LDA =$15        END OF LINE EXPECTED
-0614  CAEC- 4C FD F5           JMP DISCER1
-0615                   *
-0616  CAEF- 20 54 F6   RENAME1 JSR PREPWRA+3
-0617  CAF2- 8E 11 03           STX FILCYC
-0618  CAF5- A2 0F              LDX =15
-0619  CAF7- BD 20 03           LDA FILNM1,X
-0620  CAFA- 9D 01 03           STA FILNAM,X
-0621  CAFD- CA                 DEX
-0622  CAFE- 10 F7             BPL *-7
-0623  CB00- AE 8B 03           LDX NEWENT
-0624  CB03- 20 ED F4           JSR GETFREC
-0625  CB06- 20 83 F5           JSR PUTFENT+2
-0626  CB09- 4C 25 F6           JMP ENDDO
-0627                   *
-0628  CB0C- A9 18      SYNERR  LDA =$18
-0629  CB0E- 4C F4 F5           JMP DISCERR
-0630                   *
-0631                   * PROTECT: PROTECT DISK FILE
-0632                   * **************************
-0633                   *
-0634  CB11- 20 90 CE   PROTECT JSR NGETNE
-0635  CB14- 20 F2 FC           JSR HARGUM
-0636  CB17- 85 DC              STA FILDRV
-0637  CB19- 20 60 CA           JSR DSKONLY
-0638  CB1C- 20 B5 F9           JSR ENDLER
-0639  CB1F- 20 2C F6           JSR PREPRD
-0640  CB22- AD 00 03           LDA FILTYP
-0641  CB25- 09 80              ORA =$80
-0642  CB27- 8D 00 03           STA FILTYP
-0643  CB2A- A6 E5              LDX FILCN1
-0644  CB2C- 20 81 F5           JSR PUTFENT
-0645  CB2F- 4C 25 F6           JMP ENDDO
-0646                   *
-0647                   * SAVE: SAVE DISK DIRECTORY
-0648                   ***************************
-0649                   *
-0650  CB32- 20 48 CB   SAVE    JSR SAVE2
+0563                   *
+0564  CA58- 20 CB CD   RENAME  JSR NGETNE
+0565  CA5B- 20 F2 FC           JSR HARGUM
+0566  CA5E- 85 DC              STA FILDRV
+0567  CA60- 20 3B CA           JSR DSKONLY
+0568  CA63- 20 B5 F9           JSR ENDLER
+0569  CA66- 20 2C F6           JSR PREPRD
+0570  CA69- 20 2D E8           JSR PRFLAB
+0571  CA6C- 20 27 E0           JSR PRTINF
+0572  CA6F- 0D 0A 46           BYT $D,$A,'FILNAM.CY,SUBTYPE? '+128
+0572  CA72- 49 4C 4E 
+0572  CA75- 41 4D 2E 
+0572  CA78- 43 59 2C 
+0572  CA7B- 53 55 42 
+0572  CA7E- 54 59 50 
+0572  CA81- 45 3F A0 
+0573  CA84- 20 06 E0           JSR GETLIN
+0574  CA87- 20 24 E0           JSR ENDLIN
+0575  CA8A- D0 03              BNE *+5
+0576  CA8C- 4C E8 C9           JMP INITD1-5    ESCAPE
+0577                   *
+0578  CA8F- A6 E4              LDX FILCNT
+0579  CA91- 8E 8B 03           STX NEWENT
+0580  CA94- 20 CB CD           JSR NGETNE
+0581  CA97- 20 24 E0           JSR ENDLIN
+0582  CA9A- F0 2E              BEQ RENAME1
+0583  CA9C- 20 4D F9           JSR TEST
+0584  CA9F- AC                 BYT ','+128
+0585  CAA0- B0 45              BCS SYNERR
+0586  CAA2- 20 4D F9           JSR TEST
+0587  CAA5- A1                 BYT '!'+128     PROTECTED?
+0588  CAA6- AD 00 03           LDA FILTYP
+0589  CAA9- 29 7F              AND =$7F
+0590  CAAB- B0 02              BCS *+4
+0591  CAAD- 09 80              ORA =$80
+0592  CAAF- 8D 00 03           STA FILTYP
+0593  CAB2- B1 E9              LDA (VIDPNT),Y
+0594  CAB4- C8                 INY
+0595  CAB5- C9 41              CMP =$41
+0596  CAB7- 90 2E              BCC SYNERR
+0597  CAB9- C9 5C              CMP =$5C
+0598  CABB- B0 2A              BCS SYNERR
+0599  CABD- 8D 12 03           STA FILSTP
+0600  CAC0- 20 24 E0           JSR ENDLIN
+0601  CAC3- F0 05              BEQ RENAME1
+0602  CAC5- A9 15              LDA =$15        END OF LINE EXPECTED
+0603  CAC7- 4C FD F5           JMP DISCER1
+0604                   *
+0605  CACA- 20 54 F6   RENAME1 JSR PREPWRA+3
+0606  CACD- 8E 11 03           STX FILCYC
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 15
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 14
 
-0651  CB35- 20 60 CA           JSR DSKONLY
-0652  CB38- 20 15 F0           JSR CLOSAL
-0653  CB3B- A2 01              LDX =1
-0654  CB3D- 20 53 CB           JSR SAVE3
-0655  CB40- A2 06              LDX =6
-0656  CB42- 20 53 CB           JSR SAVE3
-0657  CB45- 4C 25 F6           JMP ENDDO
-0658                   *
-0659  CB48- 20 09 F8   SAVE2   JSR HEXPZE
-0660  CB4B- 85 DC              STA FILDRV
-0661  CB4D- 20 B5 F9           JSR ENDLER
-0662  CB50- 4C A7 F4           JMP PREPDO
-0663                   *
-0664  CB53- 86 DE      SAVE3   STX SECTOR
-0665  CB55- 8E 8C 03           STX NEWREC
-0666  CB58- A9 00              LDA =0
-0667  CB5A- A2 05              LDX =5
-0668  CB5C- 8E 8E 03           STX COUNTER
-0669  CB5F- 85 DD              STA TRACK
-0670  CB61- 85 E0              STA DATA
-0671  CB63- A2 D7              LDX =>FILBUF
-0672  CB65- 86 E1              STX DATA+1
-0673  CB67- 20 57 F4   SAVE4   JSR READ
-0674  CB6A- E6 E1              INC DATA+1
-0675  CB6C- E6 DE              INC SECTOR
-0676  CB6E- CE 8E 03           DEC COUNTER
-0677  CB71- D0 F4              BNE SAVE4
-0678                   *
-0679  CB73- A2 05              LDX =5
-0680  CB75- 8E 8E 03           STX COUNTER
-0681  CB78- A2 D7              LDX =>FILBUF
-0682  CB7A- 86 E1              STX DATA+1
-0683  CB7C- A9 4F              LDA =NTRACK-1
-0684  CB7E- 85 DD              STA TRACK
-0685  CB80- AE 8C 03           LDX NEWREC
-0686  CB83- 86 DE              STX SECTOR
-0687  CB85- 20 25 F4   SAVE5   JSR WRITE
-0688  CB88- E6 E1              INC DATA+1
-0689  CB8A- E6 DE              INC SECTOR
-0690  CB8C- CE 8E 03           DEC COUNTER
-0691  CB8F- D0 F4              BNE SAVE5
-0692  CB91- 60                 RTS
-0693                   *
-0694                   * SWAP: SWAP DISK DIRECTORY
-0695                   ***************************
-0696                   *
-0697  CB92- 20 48 CB   SWAP    JSR SAVE2
-0698  CB95- 20 60 CA           JSR DSKONLY
-0699  CB98- 20 15 F0           JSR CLOSAL
-0700  CB9B- A2 0A              LDX =10
-
-----------------------------------------------------------------------
-
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 16
-
-0701  CB9D- 86 DE              STX SECTOR
-0702  CB9F- 20 02 F5   SWAP1   JSR READDS
-0703  CBA2- A9 4F              LDA =NTRACK-1
-0704  CBA4- 85 DD              STA TRACK
-0705  CBA6- E6 E1              INC DATA+1
-0706  CBA8- 20 57 F4           JSR READ
-0707  CBAB- C6 E1              DEC DATA+1
-0708  CBAD- 20 32 F5           JSR WRITDS+8
-0709  CBB0- E6 E1              INC DATA+1
-0710  CBB2- A9 00              LDA =0
-0711  CBB4- 85 DD              STA TRACK
-0712  CBB6- 20 32 F5           JSR WRITDS+8
-0713  CBB9- C6 DE              DEC SECTOR
-0714  CBBB- D0 E2              BNE SWAP1
-0715  CBBD- 4C 25 F6           JMP ENDDO
-0716                   *
-0717                   * IFNAME: READ FILE NAME, IF THERE
-0718                   **********************************
-0719                   *
-0720  CBC0- A9 00      IFNAME  LDA =0
-0721  CBC2- 8D 98 03           STA NAMEFLG
-0722  CBC5- 20 24 E0           JSR ENDLIN      SKIP BLANKS
-0723  CBC8- F0 1B              BEQ IFNAME1
-0724  CBCA- B1 E9              LDA (VIDPNT),Y
-0725  CBCC- 29 7F              AND =$7F
-0726  CBCE- C9 40              CMP ='@'
-0727  CBD0- 90 13              BCC IFNAME1
-0728  CBD2- C9 5B              CMP ='['
-0729  CBD4- B0 0F              BCS IFNAME1
-0730  CBD6- 20 6A CE           JSR NGETNAM
-0731  CBD9- A9 FF              LDA =$FF
-0732  CBDB- 8D 98 03           STA NAMEFLG
-0733  CBDE- B1 E9              LDA (VIDPNT),Y
-0734  CBE0- C9 2C              CMP =','
-0735  CBE2- D0 01              BNE IFNAME1
-0736  CBE4- C8                 INY
-0737  CBE5- 60         IFNAME1 RTS
-0738                   *
-0739                   * FDIR: PRINT DIRECTORY
-0740                   ***********************
-0741                   *
-0742  CBE6- 20 C0 CB   FDIR    JSR IFNAME
-0743  CBE9- 20 09 F8           JSR HEXPZE
-0744  CBEC- 85 DC              STA FILDRV
-0745  CBEE- 20 60 CA           JSR DSKONLY
-0746  CBF1- 20 B5 F9           JSR ENDLER
-0747  CBF4- A5 DC      FDIR0   LDA FILDRV      ENTRY FOR VECTOR CALL
-0748  CBF6- 29 FE              AND =$FE
-0749  CBF8- F0 03              BEQ *+5
-0750  CBFA- 4C 09 E8           JMP TDIR
+0607  CAD0- A2 0F              LDX =15
+0608  CAD2- BD 20 03           LDA FILNM1,X
+0609  CAD5- 9D 01 03           STA FILNAM,X
+0610  CAD8- CA                 DEX
+0611  CAD9- 10 F7              BPL *-7
+0612  CADB- AE 8B 03           LDX NEWENT
+0613  CADE- 20 ED F4           JSR GETFREC
+0614  CAE1- 20 83 F5           JSR PUTFENT+2
+0615  CAE4- 4C 25 F6           JMP ENDDO
+0616                   *
+0617  CAE7- A9 18      SYNERR  LDA =$18
+0618  CAE9- 4C F4 F5           JMP DISCERR
+0619                   *
+0620                   * PROTECT: PROTECT DISK FILE
+0621                   * **************************
+0622                   *
+0623  CAEC- 20 CB CD   PROTECT JSR NGETNE
+0624  CAEF- 20 F2 FC           JSR HARGUM
+0625  CAF2- 85 DC              STA FILDRV
+0626  CAF4- 20 3B CA           JSR DSKONLY
+0627  CAF7- 20 B5 F9           JSR ENDLER
+0628  CAFA- 20 2C F6           JSR PREPRD
+0629  CAFD- AD 00 03          LDA FILTYP
+0630  CB00- 09 80              ORA =$80
+0631  CB02- 8D 00 03           STA FILTYP
+0632  CB05- A6 E5              LDX FILCN1
+0633  CB07- 20 81 F5           JSR PUTFENT
+0634  CB0A- 4C 25 F6           JMP ENDDO
+0635                   *
+0636                   * IFNAME: READ FILE NAME, IF THERE
+0637                   **********************************
+0638                   *
+0639  CB0D- A9 00      IFNAME  LDA =0
+0640  CB0F- 8D 98 03           STA NAMEFLG
+0641  CB12- 20 24 E0           JSR ENDLIN      SKIP BLANKS
+0642  CB15- F0 1B              BEQ IFNAME1
+0643  CB17- B1 E9              LDA (VIDPNT),Y
+0644  CB19- 29 7F              AND =$7F
+0645  CB1B- C9 40              CMP ='@'
+0646  CB1D- 90 13              BCC IFNAME1
+0647  CB1F- C9 5B              CMP ='['
+0648  CB21- B0 0F              BCS IFNAME1
+0649  CB23- 20 A5 CD           JSR NGETNAM
+0650  CB26- A9 FF              LDA =$FF
+0651  CB28- 8D 98 03           STA NAMEFLG
+0652  CB2B- B1 E9              LDA (VIDPNT),Y
+0653  CB2D- C9 2C              CMP =','
+0654  CB2F- D0 01              BNE IFNAME1
+0655  CB31- C8                 INY
+0656  CB32- 60         IFNAME1 RTS
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 17
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 15
 
-0751                   *
-0752  CBFD- 20 A7 F4          JSR PREPDO
-0753  CC00- A2 4F              LDX =79
-0754  CC02- 20 D2 F4           JSR GETFENT
-0755  CC05- 20 27 E0           JSR PRTINF
-0756  CC08- 0D 0A 20           BYT $D,$A,'      DIRECTORY '
-0756  CC0B- 20 20 20 
-0756  CC0E- 20 20 44 
-0756  CC11- 49 52 45 
-0756  CC14- 43 54 4F 
-0756  CC17- 52 59 20 
-0757  CC1A- 44 49 53           BYT 'DISK '+128
-0757  CC1D- 4B A0 
-0758  CC1F- AD 11 03           LDA FILCYC
-0759  CC22- 20 2D E0           JSR PRTBYT
-0760  CC25- 20 27 E0           JSR PRTINF
-0761  CC28- 3A A0              BYT ': '+128
-0762  CC2A- A2 00              LDX =0
-0763  CC2C- BD 01 03   FDIR0A  LDA FILNAM,X
-0764  CC2F- 20 09 E0           JSR PRTCHR
-0765  CC32- E8                 INX
-0766  CC33- E0 10              CPX =16
-0767  CC35- 90 F5              BCC FDIR0A
-0768                   *
-0769  CC37- A2 02              LDX =2
-0770  CC39- 8E 99 03           STX DIRCNT
-0771  CC3C- A2 00              LDX =0
-0772  CC3E- 8E 9A 03           STX DELCNT
-0773  CC41- 8E 9B 03           STX DELCNT+1
-0774  CC44- AD 98 03   FDIR1   LDA NAMEFLG
-0775  CC47- D0 06              BNE *+8
-0776  CC49- 20 D2 F4           JSR GETFENT
-0777  CC4C- 4C 57 CC           JMP FDIR1A
-0778  CC4F- 20 A5 CE           JSR NEXTENT
-0779  CC52- AE 7C 03           LDX SCYFC
-0780  CC55- 86 E4              STX FILCNT
-0781  CC57- AD 00 03   FDIR1A  LDA FILTYP      0 MEANS END MARK
-0782  CC5A- F0 7A              BEQ FDIR2
-0783  CC5C- 20 06 E8           JSR ESCTST
-0784  CC5F- B0 75              BCS FDIR2
-0785  CC61- AD 99 03           LDA DIRCNT      EVERY 14 LINES
-0786  CC64- 29 0E              AND =$0E
-0787  CC66- D0 0F              BNE FDIR4
-0788  CC68- EE 99 03           INC DIRCNT
-0789  CC6B- EE 99 03           INC DIRCNT
-0790  CC6E- 20 03 E0           JSR GETCHR
-0791  CC71- 20 06 E8           JSR ESCTST      ESCAPE?
-0792  CC74- 90 01              BCC FDIR4
-0793  CC76- 60                 RTS             RETURN TO COMMAND LINE
+0657                   *
+0658                   * FDIR: PRINT DIRECTORY
+0659                   ***********************
+0660                   *
+0661  CB33- 20 0D CB   FDIR    JSR IFNAME
+0662  CB36- 20 09 F8           JSR HEXPZE
+0663  CB39- 85 DC              STA FILDRV
+0664  CB3B- 20 3B CA           JSR DSKONLY
+0665  CB3E- 20 B5 F9           JSR ENDLER
+0666  CB41- A5 DC      FDIR0   LDA FILDRV      ENTRY FOR VECTOR CALL
+0667  CB43- 29 FE              AND =$FE
+0668  CB45- F0 03              BEQ *+5
+0669  CB47- 4C 09 E8           JMP TDIR
+0670                   *
+0671  CB4A- 20 A7 F4           JSR PREPDO
+0672  CB4D- A2 FF              LDX =255
+0673  CB4F- 20 D2 F4           JSR GETFENT
+0674  CB52- 20 27 E0           JSR PRTINF
+0675  CB55- 0D 0A 20           BYT $D,$A,'      DIRECTORY '
+0675  CB58- 20 20 20 
+0675  CB5B- 20 20 44 
+0675  CB5E- 49 52 45 
+0675  CB61- 43 54 4F 
+0675  CB64- 52 59 20 
+0676  CB67- 44 49 53           BYT 'DISK '+128
+0676  CB6A- 4B A0 
+0677  CB6C- AD 11 03           LDA FILCYC
+0678  CB6F- 20 2D E0           JSR PRTBYT
+0679  CB72- 20 27 E0           JSR PRTINF
+0680  CB75- 3A A0              BYT ': '+128
+0681  CB77- A2 00              LDX =0
+0682  CB79- BD 01 03   FDIR0A  LDA FILNAM,X
+0683  CB7C- 20 09 E0           JSR PRTCHR
+0684  CB7F- E8                 INX
+0685  CB80- E0 10              CPX =16
+0686  CB82- 90 F5              BCC FDIR0A
+0687                   *
+0688  CB84- A2 02              LDX =2
+0689  CB86- 8E 99 03           STX DIRCNT
+0690  CB89- A2 00              LDX =0
+0691  CB8B- 8E 9A 03           STX DELCNT
+0692  CB8E- 8E 9B 03           STX DELCNT+1
+0693  CB91- AD 98 03   FDIR1   LDA NAMEFLG
+0694  CB94- D0 06              BNE *+8
+0695  CB96- 20 D2 F4           JSR GETFENT
+0696  CB99- 4C A4 CB           JMP FDIR1A
+0697  CB9C- 20 E0 CD           JSR NEXTENT
+0698  CB9F- AE 7C 03           LDX SCYFC
+0699  CBA2- 86 E4              STX FILCNT
+0700  CBA4- AD 00 03   FDIR1A  LDA FILTYP      0 MEANS END MARK
+
+----------------------------------------------------------------------
+
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 16
+
+0701  CBA7- F0 7A              BEQ FDIR2
+0702  CBA9- 20 06 E8           JSR ESCTST
+0703  CBAC- B0 75              BCS FDIR2
+0704  CBAE- AD 99 03           LDA DIRCNT      EVERY 14 LINES
+0705  CBB1- 29 0E              AND =$0E
+0706  CBB3- D0 0F              BNE FDIR4
+0707  CBB5- EE 99 03           INC DIRCNT
+0708  CBB8- EE 99 03           INC DIRCNT
+0709  CBBB- 20 03 E0           JSR GETCHR
+0710  CBBE- 20 06 E8           JSR ESCTST      ESCAPE?
+0711  CBC1- 90 01              BCC FDIR4
+0712  CBC3- 60                 RTS             RETURN TO COMMAND LINE
+0713                   *
+0714  CBC4- AD 1E 03   FDIR4   LDA FILLNK
+0715  CBC7- 10 0F              BPL FDIR8
+0716  CBC9- AD 9A 03           LDA DELCNT      COUNT DELETED SECTORS
+0717  CBCC- 18                 CLC
+0718  CBCD- 6D 16 03           ADC FILSIZ+1
+0719  CBD0- 8D 9A 03           STA DELCNT
+0720  CBD3- 90 03              BCC FDIR8
+0721  CBD5- EE 9B 03           INC DELCNT+1
+0722                   *
+0723  CBD8- AD 97 03   FDIR8   LDA FULLFLG
+0724  CBDB- F0 6A              BEQ FDIR5
+0725  CBDD- 20 27 E0           JSR PRTINF      PRINT FULL DIRECTORY
+0726  CBE0- 0D 0A 2A           BYT $D,$A,'***** '+128
+0726  CBE3- 2A 2A 2A 
+0726  CBE6- 2A A0 
+0727  CBE8- A6 E4              LDX FILCNT
+0728  CBEA- E8                 INX
+0729  CBEB- 8A                 TXA
+0730  CBEC- 20 2D E0           JSR PRTBYT
+0731  CBEF- 20 27 E0           JSR PRTINF
+0732  CBF2- 2E 20 20           BYT '.  SIZE='+128
+0732  CBF5- 53 49 5A 
+0732  CBF8- 45 BD 
+0733  CBFA- AD 16 03           LDA FILSIZ+1
+0734  CBFD- 20 2D E0          JSR PRTBYT
+0735  CC00- AD 1E 03           LDA FILLNK
+0736  CC03- 10 0D              BPL FDIR3-3
+0737                   *
+0738  CC05- 20 27 E0           JSR PRTINF
+0739  CC08- 20 28 44           BYT ' (DELETED)'+128
+0739  CC0B- 45 4C 45 
+0739  CC0E- 54 45 44 
+0739  CC11- A9 
+0740  CC12- EE 99 03           INC DIRCNT      COUNT FIRST LINE
+0741  CC15- 20 2D E8   FDIR3   JSR PRFLAB
+0742  CC18- B0 09              BCS FDIR2       ESCAPE?
+0743  CC1A- EE 99 03           INC DIRCNT      COUNT SECOND LINE
+
+----------------------------------------------------------------------
+
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 17
+
+0744  CC1D- A6 E4      FDIR6   LDX FILCNT
+0745  CC1F- E8                 INX
+0746  CC20- 4C 91 CB           JMP FDIR1
+0747                   *
+0748  CC23- 20 B4 F6   FDIR2   JSR DDIR2
+0749  CC26- 20 27 E0           JSR PRTINF
+0750  CC29- 44 45 4C           BYT 'DELETED:     '+128
+0750  CC2C- 45 54 45 
+0750  CC2F- 44 3A 20 
+0750  CC32- 20 20 20 
+0750  CC35- A0 
+0751  CC36- AE 9A 03           LDX DELCNT
+0752  CC39- AD 9B 03           LDA DELCNT+1
+0753  CC3C- 20 30 E0           JSR PRTAX
+0754  CC3F- 20 27 E0           JSR PRTINF
+0755  CC42- 0D 8A              BYT $D,$8A
+0756  CC44- A9 00              LDA =0
+0757  CC46- 60                 RTS
+0758                   *
+0759  CC47- AD 1E 03   FDIR5   LDA FILLNK
+0760  CC4A- 30 D1              BMI FDIR6
+0761  CC4C- 10 C7              BPL FDIR3
+0762                   *
+0763  CC4E- 4C 25 F6   PACK9   JMP ENDDO
+0764                   *
+0765                   * PACK: PACK FLOPPY DISK
+0766                   ************************
+0767                   *
+0768  CC51- 20 09 F8   PACK    JSR HEXPZE
+0769  CC54- 85 DC              STA FILDRV
+0770  CC56- 20 B5 F9           JSR ENDLER
+0771  CC59- 20 3B CA           JSR DSKONLY
+0772  CC5C- 20 15 F0           JSR CLOSAL
+0773  CC5F- 20 27 E0           JSR PRTINF
+0774  CC62- 0D 0A              BYT $D,$A
+0775  CC64- 50 41 43           BYT 'PACK (DELETED FILES LOST)? '+128
+0775  CC67- 4B 20 28 
+0775  CC6A- 44 45 4C 
+0775  CC6D- 45 54 45 
+0775  CC70- 44 20 46 
+0775  CC73- 49 4C 45 
+0775  CC76- 53 20 4C 
+0775  CC79- 4F 53 54 
+0775  CC7C- 29 3F A0 
+0776  CC7F- 20 03 E0           JSR GETCHR
+0777  CC82- 29 5F              AND =$5F
+0778  CC84- C9 59              CMP ='Y'
+0779  CC86- F0 03              BEQ *+5
+0780  CC88- 4C E8 C9           JMP INITD1-5    ESCAPE
+0781                   *
+
+----------------------------------------------------------------------
+
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 18
+
+0782  CC8B- 20 27 E0           JSR PRTINF
+0783  CC8E- 0D 8A              BYT $D,$8A
+0784  CC90- 20 A7 F4   PACK0   JSR PREPDO
+0785  CC93- A2 00              LDX =0
+0786  CC95- 20 D2 F4   PACK1   JSR GETFENT     LOOP UNTIL FIRST
+0787  CC98- AD 00 03           LDA FILTYP      EMPTY RECORD FOUND
+0788  CC9B- F0 B1              BEQ PACK9       NO PACK NEEDED
+0789  CC9D- AD 1E 03           LDA FILLNK
+0790  CCA0- 30 05              BMI PACK2       SKIP, IF DELETED
+0791  CCA2- A6 E4              LDX FILCNT      ELSE NEXT ENTRY
+0792  CCA4- E8                 INX
+0793  CCA5- D0 EE              BNE PACK1       ALLWAYS TAKEN
 0794                   *
-
-----------------------------------------------------------------------
-
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 18
-
-0795  CC77- AD 1E 03   FDIR4   LDA FILLNK
-0796  CC7A- 10 0F              BPL FDIR8
-0797  CC7C- AD 9A 03           LDA DELCNT      COUNT DELETED SECTORS
-0798  CC7F- 18                 CLC
-0799  CC80- 6D 16 03           ADC FILSIZ+1
-0800  CC83- 8D 9A 03           STA DELCNT
-0801  CC86- 90 03              BCC FDIR8
-0802  CC88- EE 9B 03           INC DELCNT+1
-0803                   *
-0804  CC8B- AD 97 03   FDIR8   LDA FULLFLG
-0805  CC8E- F0 6A              BEQ FDIR5
-0806  CC90- 20 27 E0           JSR PRTINF      PRINT FULL DIRECTORY
-0807  CC93- 0D 0A 2A           BYT $D,$A,'***** '+128
-0807  CC96- 2A 2A 2A 
-0807  CC99- 2A A0 
-0808  CC9B- A6 E4              LDX FILCNT
-0809  CC9D- E8                 INX
-0810  CC9E- 8A                 TXA
-0811  CC9F- 20 2D E0           JSR PRTBYT
-0812  CCA2- 20 27 E0           JSR PRTINF
-0813  CCA5- 2E 20 20           BYT '.  SIZE='+128
-0813  CCA8- 53 49 5A 
-0813  CCAB- 45 BD 
-0814  CCAD- AD 16 03           LDA FILSIZ+1
-0815  CCB0- 20 2D E0           JSR PRTBYT
-0816  CCB3- AD 1E 03           LDA FILLNK
-0817  CCB6- 10 0D              BPL FDIR3-3
-0818                   *
-0819  CCB8- 20 27 E0           JSR PRTINF
-0820  CCBB- 20 28 44           BYT ' (DELETED)'+128
-0820  CCBE- 45 4C 45 
-0820  CCC1- 54 45 44 
-0820  CCC4- A9 
-0821  CCC5- EE 99 03           INC DIRCNT      COUNT FIRST LINE
-0822  CCC8- 20 2D E8   FDIR3   JSR PRFLAB
-0823  CCCB- B0 09              BCS FDIR2       ESCAPE?
-0824  CCCD- EE 99 03           INC DIRCNT      COUNT SECOND LINE
-0825  CCD0- A6 E4      FDIR6   LDX FILCNT
-0826  CCD2- E8                 INX
-0827  CCD3- 4C 44 CC           JMP FDIR1
+0795  CCA7- A6 E4      PACK2   LDX FILCNT      DELETED FILE FOUND
+0796  CCA9- 8E 8B 03           STX NEWENT
+0797  CCAC- AD 13 03           LDA FILLOC
+0798  CCAF- AE 14 03           LDX FILLOC+1
+0799  CCB2- 8D 8C 03           STA NEWREC
+0800  CCB5- 8E 8D 03           STX NEWREC+1
+0801  CCB8- A6 E4              LDX FILCNT
+0802  CCBA- E8                 INX
+0803  CCBB- 20 D2 F4   PACK3   JSR GETFENT
+0804  CCBE- AD 00 03           LDA FILTYP
+0805  CCC1- D0 03              BNE *+5
+0806  CCC3- 4C 74 CD           JMP PACK8       SKIP, IF END OF DIR.
+0807  CCC6- AD 1E 03           LDA FILLNK
+0808  CCC9- 10 05              BPL PACK4       SKIP, IF NOT DELETED
+0809  CCCB- A6 E4              LDX FILCNT
+0810  CCCD- E8                 INX
+0811  CCCE- D0 EB              BNE PACK3
+0812                   *
+0813  CCD0- AD 13 03   PACK4   LDA FILLOC
+0814  CCD3- AE 14 03           LDX FILLOC+1
+0815  CCD6- 8D 89 03           STA OLDREC
+0816  CCD9- 8E 8A 03           STX OLDREC+1
+0817  CCDC- A5 E4              LDA FILCNT
+0818  CCDE- 8D 88 03           STA OLDENT
+0819  CCE1- AD 8C 03           LDA NEWREC
+0820  CCE4- AE 8D 03           LDX NEWREC+1
+0821  CCE7- 8D 13 03           STA FILLOC
+0822  CCEA- 8E 14 03           STX FILLOC+1
+0823  CCED- AE 8B 03           LDX NEWENT
+0824  CCF0- 20 ED F4           JSR GETFREC
+0825  CCF3- 20 83 F5           JSR PUTFENT+2   MOVE ENTRY
+0826  CCF6- AD 16 03           LDA FILSIZ+1
+0827  CCF9- 8D 8E 03           STA COUNTER
 0828                   *
-0829  CCD6- 20 B4 F6   FDIR2   JSR DDIR2
-0830  CCD9- 20 27 E0           JSR PRTINF
-0831  CCDC- 44 45 4C           BYT 'DELETED:     '+128
-0831  CCDF- 45 54 45 
-0831  CCE2- 44 3A 20 
-0831  CCE5- 20 20 20 
-0831  CCE8- A0 
-0832  CCE9- AE 9A 03           LDX DELCNT
-0833  CCEC- AD 9B 03           LDA DELCNT+1
+0829  CCFC- A9 05      PACK5   LDA =5
+0830  CCFE- CD 8E 03          CMP COUNTER
+0831  CD01- 90 03              BCC *+5
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 19
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 19
 
-0834  CCEF- 20 30 E0           JSR PRTAX
-0835  CCF2- 20 27 E0           JSR PRTINF
-0836  CCF5- 0D 8A              BYT $D,$8A
-0837  CCF7- A9 00              LDA =0
-0838  CCF9- 60                 RTS
-0839                   *
-0840  CCFA- AD 1E 03   FDIR5   LDA FILLNK
-0841  CCFD- 30 D1              BMI FDIR6
-0842  CCFF- 10 C7             BPL FDIR3
-0843                   *
-0844  CD01- 4C 25 F6   PACK9   JMP ENDDO
-0845                   *
-0846                   * PACK: PACK FLOPPY DISK
-0847                   ************************
-0848                   *
-0849  CD04- 20 09 F8   PACK    JSR HEXPZE
-0850  CD07- 85 DC              STA FILDRV
-0851  CD09- 20 B5 F9           JSR ENDLER
-0852  CD0C- 20 60 CA           JSR DSKONLY
-0853  CD0F- 20 15 F0           JSR CLOSAL
-0854  CD12- 20 27 E0           JSR PRTINF
-0855  CD15- 0D 0A              BYT $D,$A
-0856  CD17- 50 41 43           BYT 'PACK (DELETED FILES LOST)? '+128
-0856  CD1A- 4B 20 28 
-0856  CD1D- 44 45 4C 
-0856  CD20- 45 54 45 
-0856  CD23- 44 20 46 
-0856  CD26- 49 4C 45 
-0856  CD29- 53 20 4C 
-0856  CD2C- 4F 53 54 
-0856  CD2F- 29 3F A0 
-0857  CD32- 20 03 E0           JSR GETCHR
-0858  CD35- 29 5F              AND =$5F
-0859  CD37- C9 59              CMP ='Y'
-0860  CD39- F0 03              BEQ *+5
-0861  CD3B- 4C 0B CA           JMP INITD1-5    ESCAPE
-0862                   *
-0863  CD3E- 20 27 E0           JSR PRTINF
-0864  CD41- 0D 8A              BYT $D,$8A
-0865  CD43- 20 A7 F4   PACK0   JSR PREPDO
-0866  CD46- A2 00              LDX =0
-0867  CD48- 20 D2 F4   PACK1   JSR GETFENT     LOOP UNTIL FIRST
-0868  CD4B- AD 00 03           LDA FILTYP      EMPTY RECORD FOUND
-0869  CD4E- F0 B1              BEQ PACK9       NO PACK NEEDED
-0870  CD50- AD 1E 03           LDA FILLNK
-0871  CD53- 30 05              BMI PACK2       SKIP, IF DELETED
-0872  CD55- A6 E4              LDX FILCNT      ELSE NEXT ENTRY
-0873  CD57- E8                 INX
-0874  CD58- D0 EE              BNE PACK1       ALLWAYS TAKEN
+0832  CD03- AD 8E 03           LDA COUNTER
+0833  CD06- 8D 8F 03           STA COUNT2
+0834                   *
+0835  CD09- A9 00              LDA =<FILBUF    MOVE FILE
+0836  CD0B- A2 D7              LDX =>FILBUF
+0837  CD0D- 85 E0              STA DATA
+0838  CD0F- 86 E1              STX DATA+1
+0839  CD11- AD 89 03   PACK5A  LDA OLDREC
+0840  CD14- AE 8A 03           LDX OLDREC+1
+0841  CD17- 85 DE              STA SECTOR
+0842  CD19- 86 DD              STX TRACK
+0843  CD1B- 20 5C F5           JSR PREPRW1-2
+0844  CD1E- 20 57 F4           JSR READ
+0845  CD21- EE 89 03           INC OLDREC
+0846  CD24- D0 03              BNE *+5
+0847  CD26- EE 8A 03           INC OLDREC+1
+0848  CD29- E6 E1              INC DATA+1
+0849  CD2B- CE 8F 03           DEC COUNT2
+0850  CD2E- D0 E1              BNE PACK5A
+0851                   *
+0852  CD30- A9 D7              LDA =>FILBUF
+0853  CD32- 85 E1              STA DATA+1
+0854  CD34- A9 05              LDA =5
+0855  CD36- CD 8E 03           CMP COUNTER
+0856  CD39- 90 03              BCC *+5
+0857  CD3B- AD 8E 03           LDA COUNTER
+0858  CD3E- 8D 8F 03           STA COUNT2
+0859  CD41- AD 8C 03   PACK5B  LDA NEWREC
+0860  CD44- AE 8D 03           LDX NEWREC+1
+0861  CD47- 85 DE              STA SECTOR
+0862  CD49- 86 DD              STX TRACK
+0863  CD4B- 20 5C F5           JSR PREPRW1-2
+0864  CD4E- 20 25 F4           JSR WRITE
+0865  CD51- EE 8C 03           INC NEWREC
+0866  CD54- D0 03              BNE *+5
+0867  CD56- EE 8D 03           INC NEWREC+1
+0868  CD59- E6 E1              INC DATA+1
+0869  CD5B- CE 8E 03           DEC COUNTER
+0870  CD5E- CE 8F 03           DEC COUNT2
+0871  CD61- D0 DE              BNE PACK5B
+0872                   *
+0873  CD63- AD 8E 03           LDA COUNTER
+0874  CD66- D0 94              BNE PACK5
 0875                   *
+0876  CD68- EE 8B 03           INC NEWENT
+0877  CD6B- EE 88 03           INC OLDENT
+0878  CD6E- AE 88 03           LDX OLDENT
+0879  CD71- 4C BB CC           JMP PACK3
+0880                   *
+0881  CD74- A9 00      PACK8   LDA =0          SET END MARK
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 20
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 20
 
-0876  CD5A- A6 E4      PACK2   LDX FILCNT      DELETED FILE FOUND
-0877  CD5C- 8E 8B 03           STX NEWENT
-0878  CD5F- AD 13 03           LDA FILLOC
-0879  CD62- AE 14 03           LDX FILLOC+1
-0880  CD65- 8D 8C 03           STA NEWREC
-0881  CD68- 8E 8D 03           STX NEWREC+1
-0882  CD6B- A6 E4              LDX FILCNT
-0883  CD6D- E8                 INX
-0884  CD6E- 20 D2 F4   PACK3   JSR GETFENT
-0885  CD71- AD 00 03           LDA FILTYP
-0886  CD74- D0 03              BNE *+5
-0887  CD76- 4C 27 CE           JMP PACK8       SKIP, IF END OF DIR.
-0888  CD79- AD 1E 03           LDA FILLNK
-0889  CD7C- 10 05              BPL PACK4       SKIP, IF NOT DELETED
-0890  CD7E- A6 E4              LDX FILCNT
-0891  CD80- E8                 INX
-0892  CD81- D0 EB              BNE PACK3
-0893                   *
-0894  CD83- AD 13 03   PACK4   LDA FILLOC
-0895  CD86- AE 14 03           LDX FILLOC+1
-0896  CD89- 8D 89 03           STA OLDREC
-0897  CD8C- 8E 8A 03           STX OLDREC+1
-0898  CD8F- A5 E4              LDA FILCNT
-0899  CD91- 8D 88 03           STA OLDENT
-0900  CD94- AD 8C 03           LDA NEWREC
-0901  CD97- AE 8D 03           LDX NEWREC+1
-0902  CD9A- 8D 13 03           STA FILLOC
-0903  CD9D- 8E 14 03           STX FILLOC+1
-0904  CDA0- AE 8B 03           LDX NEWENT
-0905  CDA3- 20 ED F4           JSR GETFREC
-0906  CDA6- 20 83 F5           JSR PUTFENT+2   MOVE ENTRY
-0907  CDA9- AD 16 03           LDA FILSIZ+1
-0908  CDAC- 8D 8E 03           STA COUNTER
-0909                   *
-0910  CDAF- A9 05      PACK5   LDA =5
-0911  CDB1- CD 8E 03           CMP COUNTER
-0912  CDB4- 90 03              BCC *+5
-0913  CDB6- AD 8E 03           LDA COUNTER
-0914  CDB9- 8D 8F 03           STA COUNT2
-0915                   *
-0916  CDBC- A9 00              LDA =<FILBUF    MOVE FILE
-0917  CDBE- A2 D7              LDX =>FILBUF
-0918  CDC0- 85 E0              STA DATA
-0919  CDC2- 86 E1              STX DATA+1
-0920  CDC4- AD 89 03   PACK5A  LDA OLDREC
-0921  CDC7- AE 8A 03           LDX OLDREC+1
-0922  CDCA- 85 DE              STA SECTOR
-0923  CDCC- 86 DD              STX TRACK
-0924  CDCE- 20 5C F5           JSR PREPRW1-2
-0925  CDD1- 20 57 F4           JSR READ
+0882  CD76- 8D 00 03           STA FILTYP
+0883  CD79- AD 8C 03           LDA NEWREC
+0884  CD7C- AE 8D 03           LDX NEWREC+1
+0885  CD7F- 8D 13 03           STA FILLOC
+0886  CD82- 8E 14 03           STX FILLOC+1
+0887  CD85- AE 8B 03           LDX NEWENT
+0888  CD88- 20 ED F4           JSR GETFREC
+0889  CD8B- 20 83 F5           JSR PUTFENT+2
+0890  CD8E- 20 27 E0           JSR PRTINF
+0891  CD91- 50 41 43           BYT 'PACKING COMPLETE',' '+128
+0891  CD94- 4B 49 4E 
+0891  CD97- 47 20 43 
+0891  CD9A- 4F 4D 50 
+0891  CD9D- 4C 45 54 
+0891  CDA0- 45 A0 
+0892                   *
+0893  CDA2- 4C 25 F6   PACK7   JMP ENDDO
+0894                   *
+0895                   * NGETNAM: GET FILE NAME AND CYCLUS
+0896                   ***********************************
+0897                   *
+0898  CDA5- 20 15 F8   NGETNAM JSR GETNAM
+0899  CDA8- A2 00              LDX =0
+0900                   *
+0901  CDAA- A2 00      NGETN6  LDX =0
+0902  CDAC- BD 20 03   NGETN7  LDA FILNM1,X
+0903  CDAF- C9 40              CMP ='@'
+0904  CDB1- D0 12              BNE NGETN9
+0905  CDB3- E8                 INX
+0906  CDB4- BD 20 03   NGETN8  LDA FILNM1,X
+0907  CDB7- C9 20              CMP =' '
+0908  CDB9- D0 F1              BNE NGETN7
+0909  CDBB- A9 40              LDA ='@'
+0910  CDBD- 9D 20 03           STA FILNM1,X
+0911  CDC0- E8                 INX
+0912  CDC1- E0 10              CPX =16
+0913  CDC3- 90 EF              BCC NGETN8
+0914                   *
+0915  CDC5- E8         NGETN9  INX
+0916  CDC6- E0 0F              CPX =15
+0917  CDC8- 90 E2              BCC NGETN7
+0918  CDCA- 60         NGETN10 RTS
+0919                   *
+0920                   * NGETNE: GET FILE NAME, NO WILDCARDS
+0921                   *************************************
+0922                   *
+0923  CDCB- 20 A5 CD   NGETNE  JSR NGETNAM
+0924  CDCE- A2 10              LDX =16
+0925  CDD0- BD 21 03   NGETNE1 LDA FILNM1+1,X
+0926  CDD3- C9 40              CMP ='@'
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 21
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 21
 
-0926  CDD4- EE 89 03           INC OLDREC
-0927  CDD7- D0 03              BNE *+5
-0928  CDD9- EE 8A 03           INC OLDREC+1
-0929  CDDC- E6 E1              INC DATA+1
-0930  CDDE- CE 8F 03           DEC COUNT2
-0931  CDE1- D0 E1              BNE PACK5A
-0932                   *
-0933  CDE3- A9 D7              LDA =>FILBUF
-0934  CDE5- 85 E1              STA DATA+1
-0935  CDE7- A9 05              LDA =5
-0936  CDE9- CD 8E 03           CMP COUNTER
-0937  CDEC- 90 03              BCC *+5
-0938  CDEE- AD 8E 03           LDA COUNTER
-0939  CDF1- 8D 8F 03           STA COUNT2
-0940  CDF4- AD 8C 03   PACK5B  LDA NEWREC
-0941  CDF7- AE 8D 03           LDX NEWREC+1
-0942  CDFA- 85 DE              STA SECTOR
-0943  CDFC- 86 DD              STX TRACK
-0944  CDFE- 20 5C F5          JSR PREPRW1-2
-0945  CE01- 20 25 F4           JSR WRITE
-0946  CE04- EE 8C 03           INC NEWREC
-0947  CE07- D0 03              BNE *+5
-0948  CE09- EE 8D 03           INC NEWREC+1
-0949  CE0C- E6 E1              INC DATA+1
-0950  CE0E- CE 8E 03           DEC COUNTER
-0951  CE11- CE 8F 03           DEC COUNT2
-0952  CE14- D0 DE              BNE PACK5B
-0953                   *
-0954  CE16- AD 8E 03           LDA COUNTER
-0955  CE19- D0 94              BNE PACK5
-0956                   *
-0957  CE1B- EE 8B 03           INC NEWENT
-0958  CE1E- EE 88 03           INC OLDENT
-0959  CE21- AE 88 03           LDX OLDENT
-0960  CE24- 4C 6E CD           JMP PACK3
+0927  CDD5- F0 04              BEQ NGETNE2
+0928  CDD7- CA                 DEX
+0929  CDD8- D0 F6              BNE NGETNE1
+0930  CDDA- 60                 RTS
+0931                   *
+0932  CDDB- A9 61      NGETNE2 LDA =$61        NO WILD CARD
+0933  CDDD- 4C 32 F9           JMP ERROR
+0934                   *
+0935                   * NEXTENTRY
+0936                   ***********
+0937                   * INPUT: X=FIRST ENTRY TO CHECK
+0938                   * OUTPUT: SCYFC: FOUND ENTRY,Z=1 IF END MARK
+0939                   *
+0940  CDE0- 8E 7C 03   NEXTENT STX SCYFC
+0941  CDE3- 20 D2 F4   NEXTE5  JSR GETFENT
+0942  CDE6- AD 00 03           LDA FILTYP
+0943  CDE9- D0 01              BNE *+3         END MARK?
+0944  CDEB- 60                 RTS
+0945                   *
+0946  CDEC- AD 30 03           LDA FILCY1      IF FILCYC=0
+0947  CDEF- F0 05              BEQ NEXTE10     DO NOT CHECK
+0948  CDF1- CD 11 03           CMP FILCYC
+0949  CDF4- D0 12              BNE NEXTE30
+0950                   *
+0951  CDF6- A2 0F      NEXTE10 LDX =15
+0952  CDF8- BD 20 03           LDA FILNM1,X
+0953  CDFB- C9 40              CMP ='@'
+0954  CDFD- F0 05              BEQ NEXTE20
+0955  CDFF- DD 01 03          CMP FILNAM,X
+0956  CE02- D0 04              BNE NEXTE30
+0957                   *
+0958  CE04- CA         NEXTE20 DEX
+0959  CE05- 10 F1              BPL NEXTE10+2
+0960  CE07- 60                 RTS             FOUND
 0961                   *
-0962  CE27- A9 00      PACK8   LDA =0          SET END MARK
-0963  CE29- 8D 00 03           STA FILTYP
-0964  CE2C- AD 8C 03           LDA NEWREC
-0965  CE2F- AE 8D 03           LDX NEWREC+1
-0966  CE32- 8D 13 03           STA FILLOC
-0967  CE35- 8E 14 03           STX FILLOC+1
-0968  CE38- AE 8B 03           LDX NEWENT
-0969  CE3B- 20 ED F4           JSR GETFREC
-0970  CE3E- 20 83 F5           JSR PUTFENT+2
-0971  CE41- 20 27 E0           JSR PRTINF
-0972  CE44- 50 41 43           BYT 'PACKING FINISHED, '+128
-0972  CE47- 4B 49 4E 
-0972  CE4A- 47 20 46 
-0972  CE4D- 49 4E 49 
+0962  CE08- EE 7C 03   NEXTE30 INC SCYFC
+0963  CE0B- AE 7C 03           LDX SCYFC
+0964  CE0E- 4C E3 CD           JMP NEXTE5
+0965                   *
+0966                   * VOLUME: CHANGE VOLUME NAME
+0967                   ****************************
+0968                   *
+0969  CE11- 20 3B CA   VOLUME  JSR DSKONLY
+0970  CE14- 20 A7 F4           JSR PREPDO
+0971  CE17- A2 FF              LDX =255
+0972  CE19- 20 D2 F4           JSR GETFENT
+0973  CE1C- 20 27 E0           JSR PRTINF
+0974  CE1F- 0D 0A 4F           BYT $D,$A,'OLD VOLUME: '+128
+0974  CE22- 4C 44 20 
+0974  CE25- 56 4F 4C 
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 22
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 22
 
-0972  CE50- 53 48 45 
-0972  CE53- 44 2C A0 
-0973                   *
-0974  CE56- 20 27 E0   PACK7   JSR PRTINF
-0975  CE59- 44 49 52           BYT 'DIRECTORY COPY'+128
-0975  CE5C- 45 43 54 
-0975  CE5F- 4F 52 59 
-0975  CE62- 20 43 4F 
-0975  CE65- 50 D9 
-0976  CE67- 4C 35 CB           JMP SAVE+3
-0977                   *
-0978                   * NGETNAM: GET FILE NAME AND CYCLUS
-0979                   ***********************************
-0980                   *
-0981  CE6A- 20 15 F8   NGETNAM JSR GETNAM
-0982  CE6D- A2 00              LDX =0
-0983                   *
-0984  CE6F- A2 00      NGETN6  LDX =0
-0985  CE71- BD 20 03   NGETN7  LDA FILNM1,X
-0986  CE74- C9 40              CMP ='@'
-0987  CE76- D0 12              BNE NGETN9
-0988  CE78- E8                 INX
-0989  CE79- BD 20 03   NGETN8  LDA FILNM1,X
-0990  CE7C- C9 20              CMP =' '
-0991  CE7E- D0 F1              BNE NGETN7
-0992  CE80- A9 40              LDA ='@'
-0993  CE82- 9D 20 03           STA FILNM1,X
-0994  CE85- E8                 INX
-0995  CE86- E0 10              CPX =16
-0996  CE88- 90 EF              BCC NGETN8
-0997                   *
-0998  CE8A- E8         NGETN9  INX
-0999  CE8B- E0 0F              CPX =15
-1000  CE8D- 90 E2              BCC NGETN7
-1001  CE8F- 60         NGETN10 RTS
-1002                   *
-1003                   * NGETNE: GET FILE NAME, NO WILDCARDS
-1004                   *************************************
-1005                   *
-1006  CE90- 20 6A CE   NGETNE  JSR NGETNAM
-1007  CE93- A2 10              LDX =16
-1008  CE95- BD 21 03   NGETNE1 LDA FILNM1+1,X
-1009  CE98- C9 40              CMP ='@'
-1010  CE9A- F0 04              BEQ NGETNE2
-1011  CE9C- CA                 DEX
-1012  CE9D- D0 F6              BNE NGETNE1
-1013  CE9F- 60                 RTS
-1014                   *
-1015  CEA0- A9 61      NGETNE2 LDA =$61        NO WILD CARD
-1016  CEA2- 4C 32 F9           JMP ERROR
-
-----------------------------------------------------------------------
-
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 23
-
+0974  CE28- 55 4D 45 
+0974  CE2B- 3A A0 
+0975  CE2D- A2 00              LDX =0
+0976  CE2F- BD 01 03   VOL10   LDA FILNAM,X
+0977  CE32- 20 09 E0           JSR PRTCHR
+0978  CE35- E8                 INX
+0979  CE36- E0 10              CPX =16
+0980  CE38- 90 F5              BCC VOL10
+0981  CE3A- 20 27 E0           JSR PRTINF
+0982  CE3D- AE                 BYT '.'+128
+0983  CE3E- AD 11 03           LDA FILCYC
+0984  CE41- 20 2D E0           JSR PRTBYT
+0985  CE44- 20 27 E0           JSR PRTINF
+0986  CE47- 0D 0A 4E           BYT $D,$A,'NEW VOLUME: '+128
+0986  CE4A- 45 57 20 
+0986  CE4D- 56 4F 4C 
+0986  CE50- 55 4D 45 
+0986  CE53- 3A A0 
+0987  CE55- 20 06 E0           JSR GETLIN
+0988  CE58- 20 24 E0           JSR ENDLIN
+0989  CE5B- D0 01              BNE *+3
+0990  CE5D- 60                 RTS             NO CHANGE, RETURN
+0991  CE5E- 20 CB CD           JSR NGETNE
+0992  CE61- A2 10              LDX =16
+0993  CE63- BD 20 03   VOL20   LDA FILNM1,X
+0994  CE66- 9D E1 D6           STA DIRBUF+$E1,X
+0995  CE69- CA                 DEX
+0996  CE6A- 10 F7              BPL VOL20
+0997  CE6C- A9 20              LDA =$20        Last directory entry
+0998  CE6E- 8D 7A 03           STA BUFSEC
+0999  CE71- 4C 2A F5           JMP WRITDS
+1000                   *
+1001                   * DELETE: DELETE ONE OR SEVERAL FILES
+1002                   *************************************
+1003                   *
+1004  CE74- 20 A5 CD   DELETE0 JSR NGETNAM
+1005  CE77- 20 F2 FC           JSR HARGUM
+1006  CE7A- 85 DC              STA FILDRV
+1007  CE7C- 20 3B CA           JSR DSKONLY
+1008  CE7F- A2 10      DELETE1 LDX =16         WILD CARDS?
+1009  CE81- BD 1F 03   DEL1    LDA FILNM1-1,X
+1010  CE84- C9 40              CMP ='@'
+1011  CE86- F0 06              BEQ DEL2        SKIP, IF YES
+1012  CE88- CA                 DEX
+1013  CE89- D0 F6              BNE DEL1
+1014  CE8B- 4C 0C F0           JMP DELETE      DELETE ONE FILE
+1015                   *
+1016  CE8E- 20 A7 F4   DEL2    JSR PREPDO
 1017                   *
-1018                   * NEXTENTRY
-1019                   ***********
-1020                   * INPUT: X=FIRST ENTRY TO CHECK
-1021                   * OUTPUT: SCYFC: FOUND ENTRY,Z=1 IF END MARK
-1022                   *
-1023  CEA5- 8E 7C 03   NEXTENT STX SCYFC
-1024  CEA8- 20 D2 F4   NEXTE5  JSR GETFENT
-1025  CEAB- AD 00 03           LDA FILTYP
-1026  CEAE- D0 01              BNE *+3         END MARK?
-1027  CEB0- 60                 RTS
+1018  CE91- A2 00              LDX =0
+
+----------------------------------------------------------------------
+
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 23
+
+1019  CE93- 8E AD 03           STX SUCCESS     RESET SUCCESS CNT
+1020  CE96- 20 E0 CD   DEL3    JSR NEXTENT
+1021  CE99- AD 00 03           LDA FILTYP
+1022  CE9C- D0 17              BNE DEL4
+1023  CE9E- AE AD 03           LDX SUCCESS     ANYTHING DONE?
+1024  CEA1- D0 0F              BNE DEL6
+1025                   *
+1026  CEA3- 20 27 E0   NOSUCC  JSR PRTINF
+1027  CEA6- 0D 0A 4E           BYT $D,$A,'NO MATCH',$D,$8A
+1027  CEA9- 4F 20 4D 
+1027  CEAC- 41 54 43 
+1027  CEAF- 48 0D 8A 
 1028                   *
-1029  CEB1- AD 30 03           LDA FILCY1      IF FILCYC=0
-1030  CEB4- F0 05              BEQ NEXTE10     DO NOT CHECK
-1031  CEB6- CD 11 03           CMP FILCYC
-1032  CEB9- D0 12              BNE NEXTE30
-1033                   *
-1034  CEBB- A2 0F      NEXTE10 LDX =15
-1035  CEBD- BD 20 03           LDA FILNM1,X
-1036  CEC0- C9 40              CMP ='@'
-1037  CEC2- F0 05              BEQ NEXTE20
-1038  CEC4- DD 01 03           CMP FILNAM,X
-1039  CEC7- D0 04              BNE NEXTE30
-1040                   *
-1041  CEC9- CA         NEXTE20 DEX
-1042  CECA- 10 F1              BPL NEXTE10+2
-1043  CECC- 60                 RTS             FOUND
-1044                   *
-1045  CECD- EE 7C 03   NEXTE30 INC SCYFC
-1046  CED0- AE 7C 03           LDX SCYFC
-1047  CED3- 4C A8 CE           JMP NEXTE5
-1048                   *
-1049                   * VOLUME: CHANGE VOLUME NAME
-1050                   ****************************
-1051                   *
-1052  CED6- 20 60 CA   VOLUME  JSR DSKONLY
-1053  CED9- 20 A7 F4           JSR PREPDO
-1054  CEDC- A2 4F              LDX =79
-1055  CEDE- 20 D2 F4           JSR GETFENT
-1056  CEE1- 20 27 E0           JSR PRTINF
-1057  CEE4- 0D 0A 4F           BYT $D,$A,'OLD VOLUME: '+128
-1057  CEE7- 4C 44 20 
-1057  CEEA- 56 4F 4C 
-1057  CEED- 55 4D 45 
-1057  CEF0- 3A A0 
-1058  CEF2- A2 00              LDX =0
-1059  CEF4- BD 01 03   VOL10   LDA FILNAM,X
-1060  CEF7- 20 09 E0           JSR PRTCHR
-1061  CEFA- E8                 INX
-1062  CEFB- E0 10              CPX =16
+1029  CEB2- 4C 25 F6   DEL6    JMP ENDDO       END MARKFOUND
+1030                   *
+1031  CEB5- AD 1E 03   DEL4    LDA FILLNK
+1032  CEB8- 30 09              BMI DEL5
+1033  CEBA- 20 2D E8           JSR PRFLAB
+1034  CEBD- 20 F1 F6           JSR DELETE4
+1035  CEC0- EE AD 03           INC SUCCESS     COUNT SUCCESS
+1036  CEC3- EE 7C 03   DEL5    INC SCYFC
+1037  CEC6- AE 7C 03           LDX SCYFC
+1038  CEC9- 4C 96 CE           JMP DEL3
+1039                   *
+1040                   * COPY: COPY FILE(S) TO NEW DRIVE
+1041                   *********************************
+1042                   *
+1043  CECC- 20 0D CB   COPY    JSR IFNAME
+1044  CECF- 20 15 F0           JSR CLOSAL
+1045  CED2- 20 09 F8           JSR HEXPZE      GET OLD DRIVE
+1046  CED5- 8D 93 03           STA OLDDRV
+1047  CED8- 20 3D CA           JSR DSKONLY+2
+1048  CEDB- 20 F2 FC           JSR HARGUM      GET NEW DRIVE
+1049  CEDE- 8D 94 03           STA NEWDRV
+1050  CEE1- 20 3D CA           JSR DSKONLY+2
+1051  CEE4- AD 94 03   COPY0   LDA NEWDRV      DIFFERENT DRIVE?
+1052  CEE7- CD 93 03           CMP OLDDRV
+1053  CEEA- D0 05              BNE COPY1
+1054                   *
+1055  CEEC- A9 63              LDA =$63        IDENTICAL DRIVE
+1056  CEEE- 85 DB              STA FILERR
+1057  CEF0- 60                 RTS
+1058                   *
+1059  CEF1- A2 10      COPY1   LDX =16
+1060  CEF3- BD 20 03   COPYL   LDA FILNM1,X
+1061  CEF6- 9D 9C 03           STA FILNM2,X
+1062  CEF9- CA                 DEX
+1063  CEFA- 10 F7              BPL COPYL
+1064                   *
+1065  CEFC- A2 00              LDX =0
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 24
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 24
 
-1063  CEFD- 90 F5              BCC VOL10
-1064  CEFF- 20 27 E0          JSR PRTINF
-1065  CF02- AE                 BYT '.'+128
-1066  CF03- AD 11 03           LDA FILCYC
-1067  CF06- 20 2D E0           JSR PRTBYT
-1068  CF09- 20 27 E0           JSR PRTINF
-1069  CF0C- 0D 0A 4E           BYT $D,$A,'NEW VOLUME: '+128
-1069  CF0F- 45 57 20 
-1069  CF12- 56 4F 4C 
-1069  CF15- 55 4D 45 
-1069  CF18- 3A A0 
-1070  CF1A- 20 06 E0           JSR GETLIN
-1071  CF1D- 20 24 E0           JSR ENDLIN
-1072  CF20- D0 01              BNE *+3
-1073  CF22- 60                 RTS             NO CHANGE, RETURN
-1074  CF23- 20 90 CE           JSR NGETNE
-1075  CF26- A2 10              LDX =16
-1076  CF28- BD 20 03   VOL20   LDA FILNM1,X
-1077  CF2B- 9D E1 D6           STA DIRBUF+$E1,X
-1078  CF2E- CA                 DEX
-1079  CF2F- 10 F7              BPL VOL20
-1080  CF31- A9 0A              LDA =10
-1081  CF33- 8D 7A 03           STA BUFSEC
-1082  CF36- 20 2A F5           JSR WRITDS
-1083  CF39- 4C 35 CB           JMP SAVE+3
-1084                   *
-1085                   * DELETE: DELETE ONE OR SEVERAL FILES
-1086                   *************************************
-1087                   *
-1088  CF3C- 20 6A CE   DELETE0 JSR NGETNAM
-1089  CF3F- 20 F2 FC           JSR HARGUM
-1090  CF42- 85 DC              STA FILDRV
-1091  CF44- 20 60 CA           JSR DSKONLY
-1092  CF47- A2 10      DELETE1 LDX =16         WILD CARDS?
-1093  CF49- BD 1F 03   DEL1    LDA FILNM1-1,X
-1094  CF4C- C9 40              CMP ='@'
-1095  CF4E- F0 06              BEQ DEL2        SKIP, IF YES
-1096  CF50- CA                 DEX
-1097  CF51- D0 F6              BNE DEL1
-1098  CF53- 4C 0C F0           JMP DELETE      DELETE ONE FILE
-1099                   *
-1100  CF56- 20 A7 F4   DEL2    JSR PREPDO
-1101                   *
-1102  CF59- A2 00              LDX =0
-1103  CF5B- 8E AD 03           STX SUCCESS     RESET SUCCESS CNT
-1104  CF5E- 20 A5 CE   DEL3    JSR NEXTENT
-1105  CF61- AD 00 03           LDA FILTYP
-1106  CF64- D0 17              BNE DEL4
-1107  CF66- AE AD 03           LDX SUCCESS     ANYTHING DONE?
-1108  CF69- D0 0F              BNE DEL6
+1066  CEFE- 8E AD 03          STX SUCCESS     RESET SUCCESS CNT
+1067  CF01- 8E 88 03   LOOP    STX OLDENT      LOOP THROUGH FILES
+1068  CF04- AD 93 03           LDA OLDDRV
+1069  CF07- 85 DC              STA FILDRV
+1070  CF09- A9 00              LDA =0
+1071  CF0B- 85 DA              STA FILFLG
+1072  CF0D- 20 A7 F4           JSR PREPDO
+1073  CF10- AE 88 03           LDX OLDENT
+1074  CF13- AD 98 03           LDA NAMEFLG
+1075  CF16- D0 06              BNE *+8
+1076  CF18- 20 D2 F4           JSR GETFENT
+1077  CF1B- 4C 27 CF           JMP LOOP1
+1078                   *
+1079  CF1E- 20 E0 CD           JSR NEXTENT
+1080  CF21- AE 7C 03           LDX SCYFC
+1081  CF24- 8E 88 03           STX OLDENT
+1082                   *
+1083  CF27- AD 00 03   LOOP1   LDA FILTYP
+1084  CF2A- D0 0B              BNE NOTEND
+1085  CF2C- AD AD 03           LDA SUCCESS     ANYTHING DONE?
+1086  CF2F- D0 03              BNE *+5
+1087  CF31- 4C A3 CE           JMP NOSUCC
+1088  CF34- 4C 25 F6           JMP ENDDO       COMPLETE
+1089                   *
+1090  CF37- AD 1E 03   NOTEND  LDA FILLNK      SKIP DELETED FILES
+1091  CF3A- 10 03              BPL *+5
+1092  CF3C- 4C 8B CF           JMP NEXTF
+1093  CF3F- A2 10              LDX =16
+1094  CF41- BD 01 03   NOTE1   LDA FILNAM,X
+1095  CF44- 9D 20 03           STA FILNM1,X
+1096  CF47- CA                 DEX
+1097  CF48- 10 F7              BPL NOTE1
+1098                   *
+1099  CF4A- 20 2D E8   COPYF   JSR PRFLAB
+1100  CF4D- EE AD 03           INC SUCCESS
+1101  CF50- A9 00              LDA =<COPYBS    PREPARE ADDRESS
+1102  CF52- A2 20              LDX =>COPYBS
+1103  CF54- 20 4E F5           JSR PREPRW+6    AND POINTERS
+1104                   *
+1105  CF57- 38                 SEC
+1106  CF58- A9 BF              LDA =>COPYBE    CHECK SIZE OF COPY
+1107  CF5A- E9 20              SBC =>COPYBS    BUFFER
+1108  CF5C- E5 E5              SBC FILCN1
+1109  CF5E- B0 05              BCS COPYF1
+1110  CF60- A9 64              LDA =$64        FILE TOO LARGE
+1111  CF62- 85 DB              STA FILERR
+1112  CF64- 60                 RTS
+1113                   *
+1114  CF65- 20 6E F7   COPYF1  JSR DRDFIL2
+1115  CF68- AD 94 03           LDA NEWDRV
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 25
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 25
 
-1109                   *
-1110  CF6B- 20 27 E0   NOSUCC  JSR PRTINF
-1111  CF6E- 0D 0A 4E           BYT $D,$A,'NO MATCH',$D,$8A
-1111  CF71- 4F 20 4D 
-1111  CF74- 41 54 43 
-1111  CF77- 48 0D 8A 
-1112                   *
-1113  CF7A- 4C 25 F6   DEL6    JMP ENDDO       END MARKFOUND
-1114                   *
-1115  CF7D- AD 1E 03   DEL4    LDA FILLNK
-1116  CF80- 30 09              BMI DEL5
-1117  CF82- 20 2D E8           JSR PRFLAB
-1118  CF85- 20 F1 F6           JSR DELETE4
-1119  CF88- EE AD 03           INC SUCCESS     COUNT SUCCESS
-1120  CF8B- EE 7C 03   DEL5    INC SCYFC
-1121  CF8E- AE 7C 03           LDX SCYFC
-1122  CF91- 4C 5E CF           JMP DEL3
-1123                   *
-1124                   * COPY: COPY FILE(S) TO NEW DRIVE
-1125                   *********************************
-1126                   *
-1127  CF94- 20 C0 CB   COPY    JSR IFNAME
-1128  CF97- 20 15 F0           JSR CLOSAL
-1129  CF9A- 20 09 F8           JSR HEXPZE      GET OLD DRIVE
-1130  CF9D- 8D 93 03           STA OLDDRV
-1131  CFA0- 20 62 CA           JSR DSKONLY+2
-1132  CFA3- 20 F2 FC           JSR HARGUM      GET NEW DRIVE
-1133  CFA6- 8D 94 03           STA NEWDRV
-1134  CFA9- 20 62 CA           JSR DSKONLY+2
-1135  CFAC- AD 94 03   COPY0   LDA NEWDRV      DIFFERENT DRIVE?
-1136  CFAF- CD 93 03           CMP OLDDRV
-1137  CFB2- D0 05              BNE COPY1
-1138                   *
-1139  CFB4- A9 63              LDA =$63        IDENTICAL DRIVE
-1140  CFB6- 85 DB              STA FILERR
-1141  CFB8- 60                 RTS
-1142                   *
-1143  CFB9- A2 10      COPY1   LDX =16
-1144  CFBB- BD 20 03   COPYL   LDA FILNM1,X
-1145  CFBE- 9D 9C 03           STA FILNM2,X
-1146  CFC1- CA                 DEX
-1147  CFC2- 10 F7              BPL COPYL
+1116  CF6B- 85 DC              STA FILDRV
+1117  CF6D- A9 60              LDA =$60
+1118  CF6F- 85 DA              STA FILFLG
+1119  CF71- AD 11 03           LDA FILCYC
+1120  CF74- 8D 30 03           STA FILCY1
+1121  CF77- A9 00              LDA =<COPYBS
+1122  CF79- A2 20              LDX =>COPYBS
+1123  CF7B- 8D 31 03           STA FILSA1
+1124  CF7E- 8E 32 03           STX FILSA1+1
+1125  CF81- 20 2C EB           JSR WRFILE+24   DO NOT OVERWRITE
+1126  CF84- F0 05              BEQ NEXTF       FILTYP,DATE
+1127  CF86- A9 01              LDA =1
+1128  CF88- 85 DB              STA FILERR      WRITE ERROR
+1129  CF8A- 60                 RTS
+1130                   *
+1131  CF8B- A2 10      NEXTF   LDX =16
+1132  CF8D- BD 9C 03   NEXTF1  LDA FILNM2,X    RESTORE FILNM1,FILCY1
+1133  CF90- 9D 20 03           STA FILNM1,X
+1134  CF93- CA                 DEX
+1135  CF94- 10 F7              BPL NEXTF1
+1136  CF96- AE 88 03           LDX OLDENT
+1137  CF99- E8                 INX
+1138  CF9A- 20 06 E8           JSR ESCTST
+1139  CF9D- B0 03              BCS *+5
+1140  CF9F- 4C 01 CF           JMP LOOP
+1141                   *
+1142  CFA2- AD AD 03           LDA SUCCESS     ANYTHING DONE?
+1143  CFA5- D0 03              BNE *+5
+1144  CFA7- 4C A3 CE           JMP NOSUCC
+1145                   *
+1146  CFAA- 4C 25 F6           JMP ENDDO       FINISHED
+1147                   *
 1148                   *
-1149  CFC4- A2 00              LDX =0
-1150  CFC6- 8E AD 03           STX SUCCESS     RESET SUCCESS CNT
-1151  CFC9- 8E 88 03   LOOP    STX OLDENT      LOOP THROUGH FILES
-1152  CFCC- AD 93 03           LDA OLDDRV
-1153  CFCF- 85 DC              STA FILDRV
-1154  CFD1- A9 00              LDA =0
-1155  CFD3- 85 DA              STA FILFLG
+1149                   * EXPORT: EXPORT A SEQUENTIAL FILE
+1150                   **********************************
+1151                   *
+1152  CFAD- 20 3B CA   EXPORT  JSR DSKONLY
+1153  CFB0- 20 B5 F9           JSR ENDLER
+1154  CFB3- 20 2C F6           JSR PREPRD
+1155  CFB6- 20 2D E8           JSR PRFLAB
+1156                   *
+1157  CFB9- A9 01              LDA =1          COMMAND 1: EXPORT
+1158  CFBB- 8D 30 14           STA EMUCOM      EXECUTE LINUX CMD
+1159  CFBE- 20 25 F6           JSR ENDDO
+1160  CFC1- AD 31 14           LDA EMURES      GET RESULT
+1161  CFC4- 85 DB              STA FILERR
+1162  CFC6- 60                 RTS
+1163                   *
+1164                   *
+1165                   * IMPORT: IMPORT A SEQUENTIAL FILE
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 26
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 26
 
-1156  CFD5- 20 A7 F4           JSR PREPDO
-1157  CFD8- AE 88 03           LDX OLDENT
-1158  CFDB- AD 98 03           LDA NAMEFLG
-1159  CFDE- D0 06              BNE *+8
-1160  CFE0- 20 D2 F4           JSR GETFENT
-1161  CFE3- 4C EF CF           JMP LOOP1
-1162                   *
-1163  CFE6- 20 A5 CE           JSR NEXTENT
-1164  CFE9- AE 7C 03           LDX SCYFC
-1165  CFEC- 8E 88 03           STX OLDENT
-1166                   *
-1167  CFEF- AD 00 03   LOOP1   LDA FILTYP
-1168  CFF2- D0 0B              BNE NOTEND
-1169  CFF4- AD AD 03           LDA SUCCESS     ANYTHING DONE?
-1170  CFF7- D0 03              BNE *+5
-1171  CFF9- 4C 6B CF           JMP NOSUCC
-1172  CFFC- 4C 25 F6           JMP ENDDO       COMPLETE
-1173                   *
-1174  CFFF- AD 1E 03  NOTEND  LDA FILLNK      SKIP DELETED FILES
-1175  D002- 10 03              BPL *+5
-1176  D004- 4C 53 D0           JMP NEXTF
-1177  D007- A2 10              LDX =16
-1178  D009- BD 01 03   NOTE1   LDA FILNAM,X
-1179  D00C- 9D 20 03           STA FILNM1,X
-1180  D00F- CA                 DEX
-1181  D010- 10 F7              BPL NOTE1
-1182                   *
-1183  D012- 20 2D E8   COPYF   JSR PRFLAB
-1184  D015- EE AD 03           INC SUCCESS
-1185  D018- A9 00              LDA =<COPYBS    PREPARE ADDRESS
-1186  D01A- A2 20              LDX =>COPYBS
-1187  D01C- 20 4E F5           JSR PREPRW+6    AND POINTERS
+1166                   **********************************
+1167                   *
+1168  CFC7- 20 3B CA   IMPORT  JSR DSKONLY
+1169  CFCA- 20 B5 F9           JSR ENDLER
+1170                   *
+1171  CFCD- A2 10      IMPORT1 LDX =16
+1172  CFCF- BD 20 03           LDA FILNM1,X
+1173  CFD2- 9D 01 03           STA FILNAM,X
+1174  CFD5- CA                 DEX
+1175  CFD6- 10 F7              BPL *-7
+1176                   *
+1177  CFD8- A9 02              LDA =2          COMMAND 2: IMPORT
+1178  CFDA- 8D 30 14           STA EMUCOM      EXECUTE LINUX CMD
+1179  CFDD- AD 31 14           LDA EMURES      GET RESULT
+1180  CFE0- D0 05              BNE IMPORTE
+1181  CFE2- 20 2D E8           JSR PRFLAB
+1182  CFE5- A9 00              LDA =0          NO ERROR
+1183  CFE7- 85 DB      IMPORTE STA FILERR
+1184  CFE9- 60                 RTS
+1185                   *
+1186                   * EDIT: EDIT USING LEAFPAD
+1187                   **************************
 1188                   *
-1189  D01F- 38                 SEC
-1190  D020- A9 BF              LDA =>COPYBE    CHECK SIZE OF COPY
-1191  D022- E9 20              SBC =>COPYBS    BUFFER
-1192  D024- E5 E5              SBC FILCN1
-1193  D026- B0 05              BCS COPYF1
-1194  D028- A9 64              LDA =$64        FILE TOO LARGE
-1195  D02A- 85 DB              STA FILERR
-1196  D02C- 60                 RTS
+1189  CFEA- 20 AD CF   EDIT    JSR EXPORT
+1190  CFED- D0 21              BNE EDITR
+1191  CFEF- 20 27 E8           JSR TDELAY      ALLOW SCREEN UPDATE
+1192  CFF2- 20 FD CF           JSR EDIT0
+1193  CFF5- D0 19              BNE EDITR
+1194  CFF7- 20 CD CF           JSR IMPORT1
+1195  CFFA- D0 14              BNE EDITR
+1196  CFFC- 60                 RTS
 1197                   *
-1198  D02D- 20 6E F7   COPYF1  JSR DRDFIL2
-1199  D030- AD 94 03           LDA NEWDRV
-1200  D033- 85 DC              STA FILDRV
-1201  D035- A9 60              LDA =$60
-1202  D037- 85 DA              STA FILFLG
-1203  D039- AD 11 03           LDA FILCYC
-1204  D03C- 8D 30 03           STA FILCY1
-1205  D03F- A9 00              LDA =<COPYBS
+1198  CFFD- A2 10      EDIT0   LDX =16
+1199  CFFF- BD 20 03          LDA FILNM1,X
+1200  D002- 9D 01 03           STA FILNAM,X
+1201  D005- CA                 DEX
+1202  D006- 10 F7              BPL *-7
+1203                   *
+1204  D008- A9 03              LDA =3          COMMAND 3: EDIT
+1205  D00A- 8D 30 14           STA EMUCOM      EXECUTE LINUX CMD
+1206  D00D- AD 31 14           LDA EMURES      GET RESULT
+1207  D010- 85 DB      EDITR   STA FILERR
+1208  D012- 60                 RTS
+1209                   *
+1210                   * FLOPPY: CHANGE FLOPPY DISK
+1211                   ****************************
+1212                   *
+1213  D013- 20 3B CA   FLOPPY  JSR DSKONLY
+1214  D016- 20 B5 F9           JSR ENDLER
+1215                   *
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 27
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 27
 
-1206  D041- A2 20              LDX =>COPYBS
-1207  D043- 8D 31 03           STA FILSA1
-1208  D046- 8E 32 03           STX FILSA1+1
-1209  D049- 20 2C EB           JSR WRFILE+24   DO NOT OVERWRITE
-1210  D04C- F0 05              BEQ NEXTF       FILTYP,DATE
-1211  D04E- A9 01              LDA =1
-1212  D050- 85 DB              STA FILERR      WRITE ERROR
-1213  D052- 60                 RTS
-1214                   *
-1215  D053- A2 10      NEXTF   LDX =16
-1216  D055- BD 9C 03   NEXTF1  LDA FILNM2,X    RESTORE FILNM1,FILCY1
-1217  D058- 9D 20 03           STA FILNM1,X
-1218  D05B- CA                 DEX
-1219  D05C- 10 F7              BPL NEXTF1
-1220  D05E- AE 88 03           LDX OLDENT
-1221  D061- E8                 INX
-1222  D062- 20 06 E8           JSR ESCTST
-1223  D065- B0 03              BCS *+5
-1224  D067- 4C C9 CF           JMP LOOP
-1225                   *
-1226  D06A- AD AD 03           LDA SUCCESS     ANYTHING DONE?
-1227  D06D- D0 03              BNE *+5
-1228  D06F- 4C 6B CF           JMP NOSUCC
-1229                   *
-1230  D072- 4C 25 F6           JMP ENDDO       FINISHED
-1231                   *
-1232                   *
-1233                   * EXPORT: EXPORT A SEQUENTIAL FILE
-1234                   **********************************
-1235                   *
-1236  D075- 20 60 CA   EXPORT  JSR DSKONLY
-1237  D078- 20 B5 F9           JSR ENDLER
-1238  D07B- 20 2C F6           JSR PREPRD
-1239  D07E- 20 2D E8           JSR PRFLAB
-1240                   *
-1241  D081- A9 01              LDA =1          COMMAND 1: EXPORT
-1242  D083- 8D 30 14           STA EMUCOM      EXECUTE LINUX CMD
-1243  D086- 20 25 F6           JSR ENDDO
-1244  D089- AD 31 14           LDA EMURES      GET RESULT
-1245  D08C- 85 DB              STA FILERR
-1246  D08E- 60                 RTS
+1216  D019- A2 10              LDX =16
+1217  D01B- BD 20 03           LDA FILNM1,X
+1218  D01E- 9D 01 03           STA FILNAM,X
+1219  D021- CA                 DEX
+1220  D022- 10 F7              BPL *-7
+1221                   *
+1222  D024- A9 04              LDA =4          COMMAND 4: FLOPPY
+1223  D026- 8D 30 14           STA EMUCOM      EXECUTE LINUX CMD
+1224  D029- AD 31 14           LDA EMURES      GET RESULT
+1225  D02C- 85 DB              STA FILERR
+1226  D02E- 60                 RTS
+1227                   *
+1228                   * NEW: CREATE AN NEW SEQUENTIAL FILE
+1229                   ************************************
+1230                   *
+1231  D02F- 20 CB CD   NEW     JSR NGETNE
+1232  D032- 20 F2 FC           JSR HARGUM
+1233  D035- 85 DC              STA FILDRV
+1234  D037- A9 42      NEW0    LDA ='B'        DEFAULT SUBTYPE
+1235  D039- 8D 12 03           STA FILSTP
+1236                   *
+1237  D03C- A2 0E              LDX =14         FIND TYPE
+1238  D03E- BD 20 03   NEW1    LDA FILNM1,X
+1239  D041- C9 3A              CMP =':'
+1240  D043- F0 05              BEQ NEW2
+1241  D045- CA                 DEX
+1242  D046- D0 F6              BNE NEW1
+1243  D048- F0 06              BEQ NEW3
+1244                   *
+1245  D04A- BD 21 03   NEW2    LDA FILNM1+1,X
+1246  D04D- 8D 12 03           STA FILSTP      STORE SUBTYPE
 1247                   *
-1248                   *
-1249                   * IMPORT: IMPORT A SEQUENTIAL FILE
-1250                   **********************************
-1251                   *
-1252  D08F- 20 60 CA   IMPORT  JSR DSKONLY
-1253  D092- 20 B5 F9           JSR ENDLER
-1254                   *
-1255  D095- A2 10      IMPORT1 LDX =16
+1248  D050- A9 20      NEW3    LDA =$20        WRITE
+1249  D052- 85 DA              STA FILFLG
+1250  D054- A9 01              LDA =1
+1251  D056- 8D 37 03           STA MAXSIZ      SIZE 1 SECTOR
+1252  D059- 20 0F F0           JSR OPEN
+1253  D05C- F0 01              BEQ NEW4
+1254  D05E- 60         NEWERR  RTS
+1255                   *
+1256  D05F- 8C 96 03   NEW4    STY NEWFIL      SAVE FILE NO
+1257  D062- 20 2D E8           JSR PRFLAB
+1258  D065- A9 20              LDA =' '
+1259  D067- AE 96 03           LDX NEWFIL
+1260  D06A- 20 1B F0           JSR WRITCH      WRITE ONE BLANK
+1261  D06D- D0 EF              BNE NEWERR
+1262  D06F- AE 96 03           LDX NEWFIL
+1263  D072- 20 12 F0           JSR CLOSE       CLOSE FILE
+1264  D075- 60                 RTS
+1265                   *
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 28
+EXTENDED DISK OPERATING SYSTEM     16/10/23   R65 ASSEMBLER  PAGE 28
 
-1256  D097- BD 20 03           LDA FILNM1,X
-1257  D09A- 9D 01 03           STA FILNAM,X
-1258  D09D- CA                 DEX
-1259  D09E- 10 F7              BPL *-7
-1260                   *
-1261  D0A0- A9 02              LDA =2          COMMAND 2: IMPORT
-1262  D0A2- 8D 30 14           STA EMUCOM      EXECUTE LINUX CMD
-1263  D0A5- AD 31 14           LDA EMURES      GET RESULT
-1264  D0A8- D0 05              BNE IMPORTE
-1265  D0AA- 20 2D E8           JSR PRFLAB
-1266  D0AD- A9 00              LDA =0          NO ERROR
-1267  D0AF- 85 DB      IMPORTE STA FILERR
-1268  D0B1- 60                 RTS
-1269                   *
-1270                   * EDIT: EDIT USING LEAFPAD
-1271                   **************************
-1272                   *
-1273  D0B2- 20 75 D0   EDIT    JSR EXPORT
-1274  D0B5- D0 21              BNE EDITR
-1275  D0B7- 20 27 E8           JSR TDELAY      ALLOW SCREEN UPDATE
-1276  D0BA- 20 C5 D0           JSR EDIT0
-1277  D0BD- D0 19              BNE EDITR
-1278  D0BF- 20 95 D0           JSR IMPORT1
-1279  D0C2- D0 14              BNE EDITR
-1280  D0C4- 60                 RTS
-1281                   *
-1282  D0C5- A2 10      EDIT0   LDX =16
-1283  D0C7- BD 20 03           LDA FILNM1,X
-1284  D0CA- 9D 01 03           STA FILNAM,X
-1285  D0CD- CA                 DEX
-1286  D0CE- 10 F7              BPL *-7
-1287                   *
-1288  D0D0- A9 03              LDA =3          COMMAND 3: EDIT
-1289  D0D2- 8D 30 14           STA EMUCOM      EXECUTE LINUX CMD
-1290  D0D5- AD 31 14           LDA EMURES      GET RESULT
-1291  D0D8- 85 DB      EDITR   STA FILERR
-1292  D0DA- 60                 RTS
-1293                   *
-1294                   * FLOPPY: CHANGE FLOPPY DISK
-1295                   ****************************
-1296                   *
-1297  D0DB- 20 60 CA   FLOPPY  JSR DSKONLY
-1298  D0DE- 20 B5 F9           JSR ENDLER
-1299                   *
-1300  D0E1- A2 10              LDX =16
-1301  D0E3- BD 20 03           LDA FILNM1,X
-1302  D0E6- 9D 01 03           STA FILNAM,X
-1303  D0E9- CA                 DEX
-1304  D0EA- 10 F7              BPL *-7
-1305                   *
+1266                           TIT GRAPHICS SUBROUTINES
+1267                           PAG
 
 ----------------------------------------------------------------------
 
-EXTENDED DISK OPERATING SYSTEM     15/10/23   R65 ASSEMBLER  PAGE 29
+GRAPHICS SUBROUTINES               16/10/23   R65 ASSEMBLER  PAGE 29
 
-1306  D0EC- A9 04              LDA =4          COMMAND 4: FLOPPY
-1307  D0EE- 8D 30 14           STA EMUCOM      EXECUTE LINUX CMD
-1308  D0F1- AD 31 14           LDA EMURES      GET RESULT
-1309  D0F4- 85 DB              STA FILERR
-1310  D0F6- 60                 RTS
-1311                   *
-1312                   * NEW: CREATE AN NEW SEQUENTIAL FILE
-1313                   ************************************
-1314                   *
-1315  D0F7- 20 90 CE   NEW     JSR NGETNE
-1316  D0FA- 20 F2 FC           JSR HARGUM
-1317  D0FD- 85 DC              STA FILDRV
-1318  D0FF- A9 42     NEW0    LDA ='B'        DEFAULT SUBTYPE
-1319  D101- 8D 12 03           STA FILSTP
-1320                   *
-1321  D104- A2 0E              LDX =14         FIND TYPE
-1322  D106- BD 20 03   NEW1    LDA FILNM1,X
-1323  D109- C9 3A              CMP =':'
-1324  D10B- F0 05              BEQ NEW2
-1325  D10D- CA                 DEX
-1326  D10E- D0 F6              BNE NEW1
-1327  D110- F0 06              BEQ NEW3
-1328                   *
-1329  D112- BD 21 03   NEW2    LDA FILNM1+1,X
-1330  D115- 8D 12 03           STA FILSTP      STORE SUBTYPE
-1331                   *
-1332  D118- A9 20      NEW3    LDA =$20        WRITE
-1333  D11A- 85 DA              STA FILFLG
-1334  D11C- A9 01              LDA =1
-1335  D11E- 8D 37 03           STA MAXSIZ      SIZE 1 SECTOR
-1336  D121- 20 0F F0           JSR OPEN
-1337  D124- F0 01              BEQ NEW4
-1338  D126- 60         NEWERR  RTS
-1339                   *
-1340  D127- 8C 96 03   NEW4    STY NEWFIL      SAVE FILE NO
-1341  D12A- 20 2D E8           JSR PRFLAB
-1342  D12D- A9 20              LDA =' '
-1343  D12F- AE 96 03           LDX NEWFIL
-1344  D132- 20 1B F0           JSR WRITCH      WRITE ONE BLANK
-1345  D135- D0 EF              BNE NEWERR
-1346  D137- AE 96 03           LDX NEWFIL
-1347  D13A- 20 12 F0           JSR CLOSE       CLOSE FILE
-1348  D13D- 60                 RTS
-1349                   *
-1350                           TIT GRAPHICS SUBROUTINES
-1351                           PAG
-
-----------------------------------------------------------------------
-
-GRAPHICS SUBROUTINES               15/10/23   R65 ASSEMBLER  PAGE 30
-
-1352                   *
-1353                   * SUBROUTINES FOR GRAPHICS
-1354                   **************************
-1355                   *
-1356                   * PLOT (GRX,GRY,GRC)
-1357                   ********************
-1358                   * USER MUST CHECK VFOR VALID VALUES!
-1359                   *
-1360  D13E- AD AE 03   PLOT    LDA GRX
-1361  D141- 4A                 LSR A
-1362  D142- 4A                 LSR A
-1363  D143- 4A                 LSR A
-1364  D144- AA                 TAX             X=GRX/8
-1365  D145- A9 1C              LDA =28
-1366  D147- 78                 SEI
-1367  D148- 8D E0 14           STA MULTX       MULTX=28
-1368  D14B- AD AF 03           LDA GRY
-1369  D14E- 8D E1 14           STA MULTY       MULTY=GRY
-1370  D151- AC E3 14           LDY MULTR+1     Y=HIGH(MULTR)
-1371  D154- 58                 CLI
-1372  D155- 8A                 TXA             A=GRX/8
-1373  D156- 18                 CLC
-1374  D157- 6D E2 14           ADC MULTR
-1375  D15A- 90 01              BCC PLOT1
-1376  D15C- C8                 INY
-1377  D15D- 85 E0      PLOT1   STA DATA        A,Y=GRX/8+28*GRY
-1378  D15F- 98                 TYA
-1379  D160- 18                 CLC
-1380  D161- 69 07              ADC =7
-1381  D163- 85 E1              STA DATA+1      DATA=GRX/8+28*GRY+$700
-1382                   *
-1383  D165- AD AE 03           LDA GRX
-1384  D168- 29 07              AND =7          A=GRX AND 7
-1385  D16A- A8                 TAY             Y=GRX AND Y
-1386  D16B- B9 89 D1           LDA MASKTB,Y    A=MASKTB[GRX AND 7]
-1387  D16E- A0 00              LDY =0
-1388  D170- AE B0 03           LDX GRC         X=GRC
-1389  D173- F0 0F              BEQ PLOR
-1390  D175- CA                 DEX
-1391  D176- F0 07              BEQ PLEOR
-1392                   *
-1393  D178- 49 FF      PLAND   EOR =$FF        NOT MASK
-1394  D17A- 31 E0              AND (DATA),Y    A=[DATA] AND NOT MASK
-1395  D17C- 91 E0              STA (DATA),Y
-1396  D17E- 60                 RTS
-1397                   *
-1398  D17F- 51 E0      PLEOR   EOR (DATA),Y    A=[DATA] EOR MASK
-1399  D181- 91 E0              STA (DATA),Y
-1400  D183- 60                 RTS
-1401                   *
+1268                   *
+1269                   * SUBROUTINES FOR GRAPHICS
+1270                   **************************
+1271                   *
+1272                   * PLOT (GRX,GRY,GRC)
+1273                   ********************
+1274                   * USER MUST CHECK VFOR VALID VALUES!
+1275                   *
+1276  D076- AD AE 03   PLOT    LDA GRX
+1277  D079- 4A                 LSR A
+1278  D07A- 4A                 LSR A
+1279  D07B- 4A                 LSR A
+1280  D07C- AA                 TAX             X=GRX/8
+1281  D07D- A9 1C              LDA =28
+1282  D07F- 78                 SEI
+1283  D080- 8D E0 14           STA MULTX       MULTX=28
+1284  D083- AD AF 03           LDA GRY
+1285  D086- 8D E1 14           STA MULTY       MULTY=GRY
+1286  D089- AC E3 14           LDY MULTR+1     Y=HIGH(MULTR)
+1287  D08C- 58                 CLI
+1288  D08D- 8A                 TXA             A=GRX/8
+1289  D08E- 18                 CLC
+1290  D08F- 6D E2 14           ADC MULTR
+1291  D092- 90 01              BCC PLOT1
+1292  D094- C8                 INY
+1293  D095- 85 E0      PLOT1   STA DATA        A,Y=GRX/8+28*GRY
+1294  D097- 98                 TYA
+1295  D098- 18                 CLC
+1296  D099- 69 07              ADC =7
+1297  D09B- 85 E1              STA DATA+1      DATA=GRX/8+28*GRY+$700
+1298                   *
+1299  D09D- AD AE 03           LDA GRX
+1300  D0A0- 29 07              AND =7          A=GRX AND 7
+1301  D0A2- A8                 TAY             Y=GRX AND Y
+1302  D0A3- B9 C1 D0           LDA MASKTB,Y    A=MASKTB[GRX AND 7]
+1303  D0A6- A0 00              LDY =0
+1304  D0A8- AE B0 03           LDX GRC         X=GRC
+1305  D0AB- F0 0F              BEQ PLOR
+1306  D0AD- CA                 DEX
+1307  D0AE- F0 07              BEQ PLEOR
+1308                   *
+1309  D0B0- 49 FF      PLAND   EOR =$FF        NOT MASK
+1310  D0B2- 31 E0              AND (DATA),Y    A=[DATA] AND NOT MASK
+1311  D0B4- 91 E0              STA (DATA),Y
+1312  D0B6- 60                 RTS
+1313                   *
+1314  D0B7- 51 E0      PLEOR   EOR (DATA),Y    A=[DATA] EOR MASK
+1315  D0B9- 91 E0              STA (DATA),Y
+1316  D0BB- 60                 RTS
+1317                   *
 
 ----------------------------------------------------------------------
 
-GRAPHICS SUBROUTINES               15/10/23   R65 ASSEMBLER  PAGE 31
+GRAPHICS SUBROUTINES               16/10/23   R65 ASSEMBLER  PAGE 30
 
-1402  D184- 11 E0      PLOR    ORA (DATA),Y    A=[DATA] OR MASK
-1403  D186- 91 E0              STA (DATA),Y
-1404  D188- 60                 RTS
-1405                   *
-1406  D189- 80 40 20   MASKTB  BYT $80,$40,$20,$10
-1406  D18C- 10 
-1407  D18D- 08 04 02           BYT $08,$04,$02,$01
-1407  D190- 01 
-1408                   *
+1318  D0BC- 11 E0      PLOR    ORA (DATA),Y    A=[DATA] OR MASK
+1319  D0BE- 91 E0              STA (DATA),Y
+1320  D0C0- 60                 RTS
+1321                   *
+1322  D0C1- 80 40 20   MASKTB  BYT $80,$40,$20,$10
+1322  D0C4- 10 
+1323  D0C5- 08 04 02           BYT $08,$04,$02,$01
+1323  D0C8- 01 
+1324                   *
+1325                   *
+1326                   * PLOTCH (GRX,GRY,GRC)
+1327                   **********************
+1328                   * USER MUST CHECK FOR VALID VALUES OF
+1329                   * X AND Y
+1330                   *
+1331  D0C9- A9 08      PLOTCH  LDA =8          8 BYTES OF MAP
+1332  D0CB- 8D B5 03           STA GRYCNT
+1333  D0CE- A9 00              LDA =0          MEANS 8 BITS IN ROW
+1334  D0D0- 8D B9 03           STA GRYLOW
+1335  D0D3- AD AF 03           LDA GRY
+1336  D0D6- 18                 CLC
+1337  D0D7- 69 07              ADC =7
+1338  D0D9- 8D AF 03           STA GRY         START WITH TOP
+1339  D0DC- AD B0 03           LDA GRC
+1340  D0DF- 29 7F              AND =$7F
+1341  D0E1- 38                 SEC
+1342  D0E2- E9 20              SBC =$20        RETURN IF CTRL CHAR
+1343  D0E4- 10 01              BPL PLOTCH1
+1344  D0E6- 60                 RTS
+1345                   *
+1346  D0E7- 38         PLOTCH1 SEC
+1347  D0E8- C9 40              CMP =$40        CONVERT TO UPPER CASE
+1348  D0EA- 90 02              BCC PLOTCH2
+1349  D0EC- E9 20              SBC =$20
+1350                   *
+1351  D0EE- A2 D4      PLOTCH2 LDX =>FONTTB
+1352  D0F0- 86 E3              STX DOSPNT+1    A=CODE NOW $00-$3F
+1353  D0F2- 0A                 ASL A
+1354  D0F3- 0A                 ASL A
+1355  D0F4- 0A                 ASL A
+1356  D0F5- 90 02              BCC *+4
+1357  D0F7- E6 E3              INC DOSPNT+1
+1358  D0F9- 8D B2 03           STA GRINDEX     8 * CODE
+1359  D0FC- A2 00              LDX =0
+1360  D0FE- 8E B3 03          STX GRCNT       GRCNT COUNTS MAP BYTES
+1361  D101- 18                 CLC             DOSPNT=FONTTB+8*CODE
+1362  D102- 69 00              ADC =<FONTTB
+1363  D104- 85 E2              STA DOSPNT
+1364  D106- 90 02              BCC PLOTCH3
+1365  D108- E6 E3              INC DOSPNT+1
+
+----------------------------------------------------------------------
+
+GRAPHICS SUBROUTINES               16/10/23   R65 ASSEMBLER  PAGE 31
+
+1366                   *
+1367  D10A- A9 80      PLOTCH3 LDA =$80
+1368  D10C- 8D B4 03           STA GRMASK
+1369  D10F- AD AE 03           LDA GRX
+1370  D112- 8D B8 03           STA GRXLOW      SAVE GRX FOR NEXT ROW
+1371  D115- AC B3 03   PLOTCH4 LDY GRCNT       COUNTS FROM 0 TO GRYCNT-
+1372  D118- AD B4 03           LDA GRMASK
+1373  D11B- 31 E2              AND (DOSPNT),Y  GET A CHARACTER BIT MAP
+1374  D11D- F0 08              BEQ PLOTCH5
+1375  D11F- A2 00              LDX =0          WHITE
+1376  D121- 8E B0 03           STX GRC
+1377  D124- 4C 2C D1           JMP PLOTCH6
+1378  D127- A2 02      PLOTCH5 LDX =2          BLACK
+1379  D129- 8E B0 03           STX GRC
+1380  D12C- 20 76 D0   PLOTCH6 JSR PLOT        PLOT THE DOT
+1381  D12F- EE AE 03           INC GRX         INCREMENT X FOR NEXT DOT
+1382  D132- AD B4 03           LDA GRMASK
+1383  D135- C9 01              CMP =$01        LAST BIT DONE?
+1384  D137- F0 15              BEQ PLOTCH8
+1385  D139- 4A                 LSR A           SHIFT MASK
+1386  D13A- 8D B4 03           STA GRMASK
+1387  D13D- CD B9 03           CMP GRYLOW      ONE ROW DONE?
+1388  D140- D0 D3              BNE PLOTCH4     NEXT BIT
+1389  D142- AD B8 03   PLOTCH7 LDA GRXLOW      RESTORE STARTING GRX
+1390  D145- 8D AE 03           STA GRX
+1391  D148- CE AF 03           DEC GRY
+1392  D14B- 4C 15 D1           JMP PLOTCH4
+1393                   *
+1394  D14E- EE B3 03   PLOTCH8 INC GRCNT       NEXT MAP BYTE
+1395  D151- AD B3 03           LDA GRCNT
+1396  D154- CD B5 03           CMP GRYCNT
+1397  D157- F0 0C              BEQ PLOTCH9
+1398  D159- AD B8 03           LDA GRXLOW      RESTORE STARTING GRX
+1399  D15C- 8D AE 03           STA GRX
+1400  D15F- CE AF 03           DEC GRY
+1401  D162- 4C 0A D1           JMP PLOTCH3
+1402                   *
+1403  D165- 60         PLOTCH9 RTS             DONE
+1404                   *
+1405                   * BITMAP (GRX,GRY,GRMAP)
+1406                   ************************
+1407                   * USER MUST CHECK FOR VALID VALUES OF
+1408                   * X AND Y
 1409                   *
-1410                   * PLOTCH (GRX,GRY,GRC)
-1411                   **********************
-1412                   * USER MUST CHECK FOR VALID VALUES OF
-1413                   * X AND Y
-1414                   *
-1415  D191- A9 08      PLOTCH  LDA =8          8 BYTES OF MAP
-1416  D193- 8D B5 03           STA GRYCNT
-1417  D196- A9 00              LDA =0          MEANS 8 BITS IN ROW
-1418  D198- 8D B9 03           STA GRYLOW
-1419  D19B- AD AF 03           LDA GRY
-1420  D19E- 18                 CLC
-1421  D19F- 69 07              ADC =7
-1422  D1A1- 8D AF 03           STA GRY         START WITH TOP
-1423  D1A4- AD B0 03           LDA GRC
-1424  D1A7- 29 7F              AND =$7F
-1425  D1A9- 38                 SEC
-1426  D1AA- E9 20              SBC =$20        RETURN IF CTRL CHAR
-1427  D1AC- 10 01              BPL PLOTCH1
-1428  D1AE- 60                 RTS
-1429                   *
-1430  D1AF- 38         PLOTCH1 SEC
-1431  D1B0- C9 40              CMP =$40        CONVERT TO UPPER CASE
-1432  D1B2- 90 02              BCC PLOTCH2
-1433  D1B4- E9 20              SBC =$20
-1434                   *
-1435  D1B6- A2 D4      PLOTCH2 LDX =>FONTTB
-1436  D1B8- 86 E3              STX DOSPNT+1    A=CODE NOW $00-$3F
-1437  D1BA- 0A                 ASL A
-1438  D1BB- 0A                 ASL A
-1439  D1BC- 0A                 ASL A
-1440  D1BD- 90 02              BCC *+4
-1441  D1BF- E6 E3              INC DOSPNT+1
-1442  D1C1- 8D B2 03           STA GRINDEX     8 * CODE
-1443  D1C4- A2 00              LDX =0
-1444  D1C6- 8E B3 03           STX GRCNT       GRCNT COUNTS MAP BYTES
-1445  D1C9- 18                 CLC             DOSPNT=FONTTB+8*CODE
-1446  D1CA- 69 00              ADC =<FONTTB
-1447  D1CC- 85 E2              STA DOSPNT
-1448  D1CE- 90 02              BCC PLOTCH3
-1449  D1D0- E6 E3              INC DOSPNT+1
+1410  D166- AD B6 03   BITMAP  LDA GRMAP       EXCHANGE BYTES
+1411  D169- AE B7 03           LDX GRMAP+1
+1412  D16C- 8D B7 03           STA GRMAP+1
+1413  D16F- 8E B6 03           STX GRMAP
+1414  D172- AD AF 03           LDA GRY         START ON TOP
+1415  D175- 69 03              ADC =3
 
 ----------------------------------------------------------------------
 
-GRAPHICS SUBROUTINES               15/10/23   R65 ASSEMBLER  PAGE 32
+GRAPHICS SUBROUTINES               16/10/23   R65 ASSEMBLER  PAGE 32
 
+1416  D177- 8D AF 03           STA GRY
+1417  D17A- A9 02              LDA =2          2 BYTES OF MAP
+1418  D17C- 8D B5 03           STA GRYCNT
+1419  D17F- A9 08              LDA =8          MEANS 4 BITS IN ROW
+1420  D181- 8D B9 03           STA GRYLOW
+1421  D184- A2 00              LDX =0
+1422  D186- 8E B3 03           STX GRCNT       COUNTS MAP BYTES
+1423  D189- A9 03              LDA =>GRMAP     SET MAP ADDRESS
+1424  D18B- 85 E3              STA DOSPNT+1
+1425  D18D- A9 B6              LDA =<GRMAP
+1426  D18F- 85 E2              STA DOSPNT
+1427  D191- 4C 0A D1           JMP PLOTCH3
+1428                   *
+1429                   * DRAWX (GRX,GRY,GRC,GRN)
+1430                   *************************
+1431                   * USER MUST CHECK FOR VALID VALUES OF
+1432                   * X AND Y AND N
+1433                   *
+1434  D194- 20 76 D0   DRAWX   JSR PLOT        PLOT A DOT
+1435  D197- EE AE 03           INC GRX
+1436  D19A- CE B1 03           DEC GRN
+1437  D19D- D0 F5              BNE DRAWX       KEEP DRAWING
+1438  D19F- 60                 RTS
+1439                   *
+1440                   * DRAWY (GRX,GRY,GRC,GRN)
+1441                   *************************
+1442                   * USER MUST CHECK FOR VALID VALUES OF
+1443                   * X AND Y AND N
+1444                   *
+1445  D1A0- 20 76 D0   DRAWY   JSR PLOT        PLOT A DOT
+1446  D1A3- EE AF 03           INC GRY
+1447  D1A6- CE B1 03           DEC GRN
+1448  D1A9- D0 F5              BNE DRAWY       KEEP DRAWING
+1449  D1AB- 60                 RTS
 1450                   *
-1451  D1D2- A9 80      PLOTCH3 LDA =$80
-1452  D1D4- 8D B4 03           STA GRMASK
-1453  D1D7- AD AE 03           LDA GRX
-1454  D1DA- 8D B8 03           STA GRXLOW      SAVE GRX FOR NEXT ROW
-1455  D1DD- AC B3 03   PLOTCH4 LDY GRCNT       COUNTS FROM 0 TO GRYCNT-
-1456  D1E0- AD B4 03           LDA GRMASK
-1457  D1E3- 31 E2              AND (DOSPNT),Y  GET A CHARACTER BIT MAP
-1458  D1E5- F0 08              BEQ PLOTCH5
-1459  D1E7- A2 00              LDX =0          WHITE
-1460  D1E9- 8E B0 03           STX GRC
-1461  D1EC- 4C F4 D1           JMP PLOTCH6
-1462  D1EF- A2 02      PLOTCH5 LDX =2          BLACK
-1463  D1F1- 8E B0 03           STX GRC
-1464  D1F4- 20 3E D1   PLOTCH6 JSR PLOT        PLOT THE DOT
-1465  D1F7- EE AE 03           INC GRX         INCREMENT X FOR NEXT DOT
-1466  D1FA- AD B4 03           LDA GRMASK
-1467  D1FD- C9 01              CMP =$01        LAST BIT DONE?
-1468  D1FF- F0 15             BEQ PLOTCH8
-1469  D201- 4A                 LSR A           SHIFT MASK
-1470  D202- 8D B4 03           STA GRMASK
-1471  D205- CD B9 03           CMP GRYLOW      ONE ROW DONE?
-1472  D208- D0 D3              BNE PLOTCH4     NEXT BIT
-1473  D20A- AD B8 03   PLOTCH7 LDA GRXLOW      RESTORE STARTING GRX
-1474  D20D- 8D AE 03           STA GRX
-1475  D210- CE AF 03           DEC GRY
-1476  D213- 4C DD D1           JMP PLOTCH4
-1477                   *
-1478  D216- EE B3 03   PLOTCH8 INC GRCNT       NEXT MAP BYTE
-1479  D219- AD B3 03           LDA GRCNT
-1480  D21C- CD B5 03           CMP GRYCNT
-1481  D21F- F0 0C              BEQ PLOTCH9
-1482  D221- AD B8 03           LDA GRXLOW      RESTORE STARTING GRX
-1483  D224- 8D AE 03           STA GRX
-1484  D227- CE AF 03           DEC GRY
-1485  D22A- 4C D2 D1           JMP PLOTCH3
+1451                   * DRAWXY (GRX,GRY,GRC,GRN,XINC,YINC)
+1452                   ************************************
+1453                   * USER MUST CHECK FOR VALID VALUES
+1454                   *
+1455  D1AC- A9 00      DRAWXY  LDA =0
+1456  D1AE- 8D B8 03           STA GRXLOW
+1457  D1B1- 8D B9 03           STA GRYLOW
+1458  D1B4- 20 76 D0   DRAWXY1 JSR PLOT        PLOT A DOT
+1459  D1B7- 18                 CLC             CALCULATE NEXT GRX
+1460  D1B8- AD B8 03           LDA GRXLOW
+1461  D1BB- 6D B6 03           ADC GRXINC
+1462  D1BE- 8D B8 03           STA GRXLOW
+1463  D1C1- AD AE 03           LDA GRX
+1464  D1C4- 6D B7 03           ADC GRXINC+1
+1465  D1C7- 8D AE 03           STA GRX
+
+----------------------------------------------------------------------
+
+GRAPHICS SUBROUTINES               16/10/23   R65 ASSEMBLER  PAGE 33
+
+1466                   *
+1467  D1CA- 18                 CLC             CALCULATE NEXT GRY
+1468  D1CB- AD B9 03           LDA GRYLOW
+1469  D1CE- 6D BA 03           ADC GRYINC
+1470  D1D1- 8D B9 03           STA GRYLOW
+1471  D1D4- AD AF 03           LDA GRY
+1472  D1D7- 6D BB 03           ADC GRYINC+1
+1473  D1DA- 8D AF 03           STA GRY
+1474                   *
+1475  D1DD- CE B1 03           DEC GRN
+1476  D1E0- D0 D2              BNE DRAWXY1     KEEP DRAWING
+1477  D1E2- 60                 RTS
+1478                   *
+1479                   *
+1480                   * 8x8 BIT CHARACTER TABLE
+1481                   *************************
+1482                   * FOR CHARACTER DISPLAY IN GRAPHICS MODE
+1483                   *
+1484                   *
+1485  D1E3-                    ORG $D400
 1486                   *
-1487  D22D- 60         PLOTCH9 RTS             DONE
-1488                   *
-1489                   * BITMAP (GRX,GRY,GRMAP)
-1490                   ************************
-1491                   * USER MUST CHECK FOR VALID VALUES OF
-1492                   * X AND Y
-1493                   *
-1494  D22E- AD B6 03   BITMAP  LDA GRMAP       EXCHANGE BYTES
-1495  D231- AE B7 03           LDX GRMAP+1
-1496  D234- 8D B7 03           STA GRMAP+1
-1497  D237- 8E B6 03           STX GRMAP
-1498  D23A- AD AF 03           LDA GRY         START ON TOP
-1499  D23D- 69 03              ADC =3
+1487  D400- 00 00 00   FONTTB  BYT $00,$00,$00
+1488  D403- 00 00 00           BYT $00,$00,$00
+1489  D406- 00 00              BYT $00,$00
+1490  D408- 04 04 04           BYT $04,$04,$04         !
+1491  D40B- 04 04 00           BYT $04,$04,$00
+1492  D40E- 04 00              BYT $04,$00
+1493  D410- 0A 0A 0A           BYT $0A,$0A,$0A         "
+1494  D413- 00 00 00           BYT $00,$00,$00
+1495  D416- 00 00              BYT $00,$00
+1496  D418- 0A 0A 1F           BYT $0A,$0A,$1F         #
+1497  D41B- 0A 1F 0A           BYT $0A,$1F,$0A
+1498  D41E- 0A 00              BYT $0A,$00
+1499  D420- 04 0F 14           BYT $04,$0F,$14         $
+1500  D423- 0E 05 1E           BYT $0E,$05,$1E
+1501  D426- 04 00              BYT $04,$00
+1502  D428- 19 19 02           BYT $19,$19,$02         %
+1503  D42B- 04 08 13           BYT $04,$08,$13
+1504  D42E- 13 00              BYT $13,$00
+1505  D430- 04 0A 0A           BYT $04,$0A,$0A         &
+1506  D433- 0C 15 12           BYT $0C,$15,$12
+1507  D436- 0D 00              BYT $0D,$00
+1508  D438- 04 08 10           BYT $04,$08,$10         '
+1509  D43B- 00 00 00           BYT $00,$00,$00
+1510  D43E- 00 00              BYT $00,$00
+1511  D440- 02 04 08           BYT $02,$04,$08         (
+1512  D443- 08 08 04           BYT $08,$08,$04
+1513  D446- 02 00              BYT $02,$00
+1514  D448- 08 04 02           BYT $08,$04,$02         )
+1515  D44B- 02 02 04           BYT $02,$02,$04
 
 ----------------------------------------------------------------------
 
-GRAPHICS SUBROUTINES               15/10/23   R65 ASSEMBLER  PAGE 33
+GRAPHICS SUBROUTINES               16/10/23   R65 ASSEMBLER  PAGE 34
 
-1500  D23F- 8D AF 03           STA GRY
-1501  D242- A9 02              LDA =2          2 BYTES OF MAP
-1502  D244- 8D B5 03           STA GRYCNT
-1503  D247- A9 08              LDA =8          MEANS 4 BITS IN ROW
-1504  D249- 8D B9 03           STA GRYLOW
-1505  D24C- A2 00              LDX =0
-1506  D24E- 8E B3 03           STX GRCNT       COUNTS MAP BYTES
-1507  D251- A9 03              LDA =>GRMAP     SET MAP ADDRESS
-1508  D253- 85 E3              STA DOSPNT+1
-1509  D255- A9 B6              LDA =<GRMAP
-1510  D257- 85 E2              STA DOSPNT
-1511  D259- 4C D2 D1           JMP PLOTCH3
-1512                   *
-1513                   * DRAWX (GRX,GRY,GRC,GRN)
-1514                   *************************
-1515                   * USER MUST CHECK FOR VALID VALUES OF
-1516                   * X AND Y AND N
-1517                   *
-1518  D25C- 20 3E D1   DRAWX   JSR PLOT        PLOT A DOT
-1519  D25F- EE AE 03           INC GRX
-1520  D262- CE B1 03           DEC GRN
-1521  D265- D0 F5              BNE DRAWX       KEEP DRAWING
-1522  D267- 60                 RTS
-1523                   *
-1524                   * DRAWY (GRX,GRY,GRC,GRN)
-1525                   *************************
-1526                   * USER MUST CHECK FOR VALID VALUES OF
-1527                   * X AND Y AND N
-1528                   *
-1529  D268- 20 3E D1   DRAWY   JSR PLOT        PLOT A DOT
-1530  D26B- EE AF 03           INC GRY
-1531  D26E- CE B1 03           DEC GRN
-1532  D271- D0 F5              BNE DRAWY       KEEP DRAWING
-1533  D273- 60                 RTS
-1534                   *
-1535                   * DRAWXY (GRX,GRY,GRC,GRN,XINC,YINC)
-1536                   ************************************
-1537                   * USER MUST CHECK FOR VALID VALUES
-1538                   *
-1539  D274- A9 00      DRAWXY  LDA =0
-1540  D276- 8D B8 03           STA GRXLOW
-1541  D279- 8D B9 03           STA GRYLOW
-1542  D27C- 20 3E D1   DRAWXY1 JSR PLOT        PLOT A DOT
-1543  D27F- 18                 CLC             CALCULATE NEXT GRX
-1544  D280- AD B8 03           LDA GRXLOW
-1545  D283- 6D B6 03           ADC GRXINC
-1546  D286- 8D B8 03           STA GRXLOW
-1547  D289- AD AE 03           LDA GRX
-1548  D28C- 6D B7 03           ADC GRXINC+1
-1549  D28F- 8D AE 03           STA GRX
-
-----------------------------------------------------------------------
-
-GRAPHICS SUBROUTINES               15/10/23   R65 ASSEMBLER  PAGE 34
-
-1550                   *
-1551  D292- 18                 CLC             CALCULATE NEXT GRY
-1552  D293- AD B9 03           LDA GRYLOW
-1553  D296- 6D BA 03           ADC GRYINC
-1554  D299- 8D B9 03           STA GRYLOW
-1555  D29C- AD AF 03           LDA GRY
-1556  D29F- 6D BB 03           ADC GRYINC+1
-1557  D2A2- 8D AF 03           STA GRY
-1558                   *
-1559  D2A5- CE B1 03           DEC GRN
-1560  D2A8- D0 D2              BNE DRAWXY1     KEEP DRAWING
-1561  D2AA- 60                 RTS
-1562                   *
-1563                   *
-1564                   * 8x8 BIT CHARACTER TABLE
-1565                   *************************
-1566                   * FOR CHARACTER DISPLAY IN GRAPHICS MODE
-1567                   *
-1568                   *
-1569  D2AB-                    ORG $D400
-1570                   *
-1571  D400- 00 00 00   FONTTB  BYT $00,$00,$00
-1572  D403- 00 00 00           BYT $00,$00,$00
-1573  D406- 00 00              BYT $00,$00
-1574  D408- 04 04 04           BYT $04,$04,$04         !
-1575  D40B- 04 04 00           BYT $04,$04,$00
-1576  D40E- 04 00              BYT $04,$00
-1577  D410- 0A 0A 0A           BYT $0A,$0A,$0A         "
-1578  D413- 00 00 00           BYT $00,$00,$00
-1579  D416- 00 00              BYT $00,$00
-1580  D418- 0A 0A 1F           BYT $0A,$0A,$1F         #
-1581  D41B- 0A 1F 0A           BYT $0A,$1F,$0A
-1582  D41E- 0A 00              BYT $0A,$00
-1583  D420- 04 0F 14           BYT $04,$0F,$14         $
-1584  D423- 0E 05 1E           BYT $0E,$05,$1E
-1585  D426- 04 00              BYT $04,$00
-1586  D428- 19 19 02           BYT $19,$19,$02         %
-1587  D42B- 04 08 13           BYT $04,$08,$13
-1588  D42E- 13 00              BYT $13,$00
-1589  D430- 04 0A 0A           BYT $04,$0A,$0A         &
-1590  D433- 0C 15 12           BYT $0C,$15,$12
-1591  D436- 0D 00              BYT $0D,$00
-1592  D438- 04 08 10           BYT $04,$08,$10         '
-1593  D43B- 00 00 00           BYT $00,$00,$00
-1594  D43E- 00 00              BYT $00,$00
-1595  D440- 02 04 08           BYT $02,$04,$08         (
-1596  D443- 08 08 04           BYT $08,$08,$04
-1597  D446- 02 00              BYT $02,$00
-1598  D448- 08 04 02           BYT $08,$04,$02         )
-1599  D44B- 02 02 04           BYT $02,$02,$04
+1516  D44E- 08 00              BYT $08,$00
+1517  D450- 00 04 15           BYT $00,$04,$15         *
+1518  D453- 0E 15 04           BYT $0E,$15,$04
+1519  D456- 00 00              BYT $00,$00
+1520  D458- 00 04 04           BYT $00,$04,$04         +
+1521  D45B- 1F 04 04           BYT $1F,$04,$04
+1522  D45E- 00 00              BYT $00,$00
+1523  D460- 00 00 00           BYT $00,$00,$00         ,
+1524  D463- 00 00 08           BYT $00,$00,$08
+1525  D466- 08 10              BYT $08,$10
+1526  D468- 00 00 00           BYT $00,$00,$00         -
+1527  D46B- 1F 00 00           BYT $1F,$00,$00
+1528  D46E- 00 00              BYT $00,$00
+1529  D470- 00 00 00           BYT $00,$00,$00         .
+1530  D473- 00 00 00           BYT $00,$00,$00
+1531  D476- 10 00              BYT $10,$00
+1532  D478- 01 01 02           BYT $01,$01,$02         /
+1533  D47B- 04 08 10           BYT $04,$08,$10
+1534  D47E- 10 00              BYT $10,$00
+1535  D480- 0E 11 13           BYT $0E,$11,$13         0
+1536  D483- 15 19 11           BYT $15,$19,$11
+1537  D486- 0E 00              BYT $0E,$00
+1538  D488- 04 0C 14           BYT $04,$0C,$14         1
+1539  D48B- 04 04 04           BYT $04,$04,$04
+1540  D48E- 0E 00              BYT $0E,$00
+1541  D490- 0E 11 01           BYT $0E,$11,$01         2
+1542  D493- 02 0C 10           BYT $02,$0C,$10
+1543  D496- 1F 00              BYT $1F,$00
+1544  D498- 1E 01 02           BYT $1E,$01,$02         3
+1545  D49B- 04 02 01           BYT $04,$02,$01
+1546  D49E- 1E 00              BYT $1E,$00
+1547  D4A0- 02 06 0A           BYT $02,$06,$0A         4
+1548  D4A3- 12 1F 02           BYT $12,$1F,$02
+1549  D4A6- 02 00              BYT $02,$00
+1550  D4A8- 1F 10 1E           BYT $1F,$10,$1E         5
+1551  D4AB- 01 01 11           BYT $01,$01,$11
+1552  D4AE- 0E 00              BYT $0E,$00
+1553  D4B0- 07 08 10           BYT $07,$08,$10         6
+1554  D4B3- 1E 11 11           BYT $1E,$11,$11
+1555  D4B6- 0E 00              BYT $0E,$00
+1556  D4B8- 1F 01 02           BYT $1F,$01,$02         7
+1557  D4BB- 04 08 08           BYT $04,$08,$08
+1558  D4BE- 08 00              BYT $08,$00
+1559  D4C0- 0E 11 11           BYT $0E,$11,$11         8
+1560  D4C3- 0E 11 11           BYT $0E,$11,$11
+1561  D4C6- 0E 00              BYT $0E,$00
+1562  D4C8- 0E 11 11           BYT $0E,$11,$11         9
+1563  D4CB- 0F 01 02           BYT $0F,$01,$02
+1564  D4CE- 1C 00              BYT $1C,$00
+1565  D4D0- 00 00 00           BYT $00,$00,$00         10
 
 ----------------------------------------------------------------------
 
-GRAPHICS SUBROUTINES               15/10/23   R65 ASSEMBLER  PAGE 35
+GRAPHICS SUBROUTINES               16/10/23   R65 ASSEMBLER  PAGE 35
 
-1600  D44E- 08 00              BYT $08,$00
-1601  D450- 00 04 15           BYT $00,$04,$15         *
-1602  D453- 0E 15 04           BYT $0E,$15,$04
-1603  D456- 00 00              BYT $00,$00
-1604  D458- 00 04 04           BYT $00,$04,$04         +
-1605  D45B- 1F 04 04           BYT $1F,$04,$04
-1606  D45E- 00 00              BYT $00,$00
-1607  D460- 00 00 00           BYT $00,$00,$00         ,
-1608  D463- 00 00 08           BYT $00,$00,$08
-1609  D466- 08 10              BYT $08,$10
-1610  D468- 00 00 00           BYT $00,$00,$00         -
-1611  D46B- 1F 00 00           BYT $1F,$00,$00
-1612  D46E- 00 00              BYT $00,$00
-1613  D470- 00 00 00           BYT $00,$00,$00         .
-1614  D473- 00 00 00           BYT $00,$00,$00
-1615  D476- 10 00              BYT $10,$00
-1616  D478- 01 01 02           BYT $01,$01,$02         /
-1617  D47B- 04 08 10           BYT $04,$08,$10
-1618  D47E- 10 00              BYT $10,$00
-1619  D480- 0E 11 13           BYT $0E,$11,$13         0
-1620  D483- 15 19 11           BYT $15,$19,$11
-1621  D486- 0E 00              BYT $0E,$00
-1622  D488- 04 0C 14           BYT $04,$0C,$14         1
-1623  D48B- 04 04 04           BYT $04,$04,$04
-1624  D48E- 0E 00              BYT $0E,$00
-1625  D490- 0E 11 01           BYT $0E,$11,$01         2
-1626  D493- 02 0C 10           BYT $02,$0C,$10
-1627  D496- 1F 00              BYT $1F,$00
-1628  D498- 1E 01 02           BYT $1E,$01,$02         3
-1629  D49B- 04 02 01           BYT $04,$02,$01
-1630  D49E- 1E 00              BYT $1E,$00
-1631  D4A0- 02 06 0A           BYT $02,$06,$0A         4
-1632  D4A3- 12 1F 02           BYT $12,$1F,$02
-1633  D4A6- 02 00              BYT $02,$00
-1634  D4A8- 1F 10 1E           BYT $1F,$10,$1E         5
-1635  D4AB- 01 01 11           BYT $01,$01,$11
-1636  D4AE- 0E 00              BYT $0E,$00
-1637  D4B0- 07 08 10           BYT $07,$08,$10         6
-1638  D4B3- 1E 11 11           BYT $1E,$11,$11
-1639  D4B6- 0E 00              BYT $0E,$00
-1640  D4B8- 1F 01 02           BYT $1F,$01,$02         7
-1641  D4BB- 04 08 08           BYT $04,$08,$08
-1642  D4BE- 08 00              BYT $08,$00
-1643  D4C0- 0E 11 11           BYT $0E,$11,$11         8
-1644  D4C3- 0E 11 11           BYT $0E,$11,$11
-1645  D4C6- 0E 00              BYT $0E,$00
-1646  D4C8- 0E 11 11           BYT $0E,$11,$11         9
-1647  D4CB- 0F 01 02           BYT $0F,$01,$02
-1648  D4CE- 1C 00              BYT $1C,$00
-1649  D4D0- 00 00 00           BYT $00,$00,$00         10
-
-----------------------------------------------------------------------
-
-GRAPHICS SUBROUTINES               15/10/23   R65 ASSEMBLER  PAGE 36
-
-1650  D4D3- 04 00 00           BYT $04,$00,$00
-1651  D4D6- 04 00              BYT $04,$00
-1652  D4D8- 00 00 00           BYT $00,$00,$00         :
-1653  D4DB- 08 00 08           BYT $08,$00,$08
-1654  D4DE- 08 10              BYT $08,$10
-1655  D4E0- 03 04 08           BYT $03,$04,$08         <
-1656  D4E3- 10 08 04           BYT $10,$08,$04
-1657  D4E6- 03 00              BYT $03,$00
-1658  D4E8- 00 00 1F           BYT $00,$00,$1F         =
-1659  D4EB- 00 1F 00           BYT $00,$1F,$00
-1660  D4EE- 00 00              BYT $00,$00
-1661  D4F0- 18 04 02           BYT $18,$04,$02         >
-1662  D4F3- 01 02 04           BYT $01,$02,$04
-1663  D4F6- 18 00              BYT $18,$00
-1664  D4F8- 1E 11 01           BYT $1E,$11,$01         ?
-1665  D4FB- 02 04 00           BYT $02,$04,$00
-1666  D4FE- 04 00             BYT $04,$00
-1667  D500- 0E 11 17           BYT $0E,$11,$17         @
-1668  D503- 15 17 10           BYT $15,$17,$10
-1669  D506- 0E 00              BYT $0E,$00
-1670  D508- 0E 11 11           BYT $0E,$11,$11         A
-1671  D50B- 1F 11 11           BYT $1F,$11,$11
-1672  D50E- 11 00              BYT $11,$00
-1673  D510- 1E 11 11           BYT $1E,$11,$11         B
-1674  D513- 1E 11 11           BYT $1E,$11,$11
-1675  D516- 1E 00              BYT $1E,$00
-1676  D518- 0E 11 10           BYT $0E,$11,$10         C
-1677  D51B- 10 10 11           BYT $10,$10,$11
-1678  D51E- 0E 00              BYT $0E,$00
-1679  D520- 1C 12 11           BYT $1C,$12,$11         D
-1680  D523- 11 11 12           BYT $11,$11,$12
-1681  D526- 1C 00              BYT $1C,$00
-1682  D528- 1F 10 10           BYT $1F,$10,$10         E
-1683  D52B- 1E 10 10           BYT $1E,$10,$10
-1684  D52E- 1F 00              BYT $1F,$00
-1685  D530- 1F 10 10           BYT $1F,$10,$10         F
-1686  D533- 1E 10 10           BYT $1E,$10,$10
-1687  D536- 10 00              BYT $10,$00
-1688  D538- 0E 11 10           BYT $0E,$11,$10         G
-1689  D53B- 13 11 11           BYT $13,$11,$11
-1690  D53E- 0F 00              BYT $0F,$00
-1691  D540- 11 11 11           BYT $11,$11,$11         H
-1692  D543- 1F 11 11           BYT $1F,$11,$11
-1693  D546- 11 00              BYT $11,$00
-1694  D548- 0E 04 04           BYT $0E,$04,$04         I
-1695  D54B- 04 04 04           BYT $04,$04,$04
-1696  D54E- 0E 00              BYT $0E,$00
-1697  D550- 07 02 02           BYT $07,$02,$02         J
-1698  D553- 02 12 12           BYT $02,$12,$12
-1699  D556- 0C 00              BYT $0C,$00
+1566  D4D3- 04 00 00           BYT $04,$00,$00
+1567  D4D6- 04 00              BYT $04,$00
+1568  D4D8- 00 00 00           BYT $00,$00,$00         :
+1569  D4DB- 08 00 08           BYT $08,$00,$08
+1570  D4DE- 08 10              BYT $08,$10
+1571  D4E0- 03 04 08           BYT $03,$04,$08         <
+1572  D4E3- 10 08 04           BYT $10,$08,$04
+1573  D4E6- 03 00              BYT $03,$00
+1574  D4E8- 00 00 1F           BYT $00,$00,$1F         =
+1575  D4EB- 00 1F 00           BYT $00,$1F,$00
+1576  D4EE- 00 00              BYT $00,$00
+1577  D4F0- 18 04 02           BYT $18,$04,$02         >
+1578  D4F3- 01 02 04           BYT $01,$02,$04
+1579  D4F6- 18 00              BYT $18,$00
+1580  D4F8- 1E 11 01           BYT $1E,$11,$01         ?
+1581  D4FB- 02 04 00           BYT $02,$04,$00
+1582  D4FE- 04 00             BYT $04,$00
+1583  D500- 0E 11 17           BYT $0E,$11,$17         @
+1584  D503- 15 17 10           BYT $15,$17,$10
+1585  D506- 0E 00              BYT $0E,$00
+1586  D508- 0E 11 11           BYT $0E,$11,$11         A
+1587  D50B- 1F 11 11           BYT $1F,$11,$11
+1588  D50E- 11 00              BYT $11,$00
+1589  D510- 1E 11 11           BYT $1E,$11,$11         B
+1590  D513- 1E 11 11           BYT $1E,$11,$11
+1591  D516- 1E 00              BYT $1E,$00
+1592  D518- 0E 11 10           BYT $0E,$11,$10         C
+1593  D51B- 10 10 11           BYT $10,$10,$11
+1594  D51E- 0E 00              BYT $0E,$00
+1595  D520- 1C 12 11           BYT $1C,$12,$11         D
+1596  D523- 11 11 12           BYT $11,$11,$12
+1597  D526- 1C 00              BYT $1C,$00
+1598  D528- 1F 10 10           BYT $1F,$10,$10         E
+1599  D52B- 1E 10 10           BYT $1E,$10,$10
+1600  D52E- 1F 00              BYT $1F,$00
+1601  D530- 1F 10 10           BYT $1F,$10,$10         F
+1602  D533- 1E 10 10           BYT $1E,$10,$10
+1603  D536- 10 00              BYT $10,$00
+1604  D538- 0E 11 10           BYT $0E,$11,$10         G
+1605  D53B- 13 11 11           BYT $13,$11,$11
+1606  D53E- 0F 00              BYT $0F,$00
+1607  D540- 11 11 11           BYT $11,$11,$11         H
+1608  D543- 1F 11 11           BYT $1F,$11,$11
+1609  D546- 11 00              BYT $11,$00
+1610  D548- 0E 04 04           BYT $0E,$04,$04         I
+1611  D54B- 04 04 04           BYT $04,$04,$04
+1612  D54E- 0E 00              BYT $0E,$00
+1613  D550- 07 02 02           BYT $07,$02,$02         J
+1614  D553- 02 12 12           BYT $02,$12,$12
+1615  D556- 0C 00              BYT $0C,$00
 
 ----------------------------------------------------------------------
 
-GRAPHICS SUBROUTINES               15/10/23   R65 ASSEMBLER  PAGE 37
+GRAPHICS SUBROUTINES               16/10/23   R65 ASSEMBLER  PAGE 36
 
-1700  D558- 11 12 14           BYT $11,$12,$14         K
-1701  D55B- 18 14 12           BYT $18,$14,$12
-1702  D55E- 11 00              BYT $11,$00
-1703  D560- 10 10 10           BYT $10,$10,$10         L
-1704  D563- 10 10 10           BYT $10,$10,$10
-1705  D566- 1F 00              BYT $1F,$00
-1706  D568- 11 1B 15           BYT $11,$1B,$15         M
-1707  D56B- 15 11 11           BYT $15,$11,$11
-1708  D56E- 11 00              BYT $11,$00
-1709  D570- 11 19 19           BYT $11,$19,$19         N
-1710  D573- 15 13 13           BYT $15,$13,$13
-1711  D576- 11 00              BYT $11,$00
-1712  D578- 0E 11 11           BYT $0E,$11,$11         O
-1713  D57B- 11 11 11           BYT $11,$11,$11
-1714  D57E- 0E 00              BYT $0E,$00
-1715  D580- 1E 11 11           BYT $1E,$11,$11         P
-1716  D583- 1E 10 10           BYT $1E,$10,$10
-1717  D586- 10 00              BYT $10,$00
-1718  D588- 0E 11 11           BYT $0E,$11,$11         Q
-1719  D58B- 11 15 13           BYT $11,$15,$13
-1720  D58E- 0D 00              BYT $0D,$00
-1721  D590- 1E 11 11           BYT $1E,$11,$11         R
-1722  D593- 1E 14 12           BYT $1E,$14,$12
-1723  D596- 11 00              BYT $11,$00
-1724  D598- 0F 10 10           BYT $0F,$10,$10         S
-1725  D59B- 0E 01 01           BYT $0E,$01,$01
-1726  D59E- 1E 00              BYT $1E,$00
-1727  D5A0- 1F 04 04           BYT $1F,$04,$04         T
-1728  D5A3- 04 04 04           BYT $04,$04,$04
-1729  D5A6- 04 00              BYT $04,$00
-1730  D5A8- 11 11 11           BYT $11,$11,$11         U
-1731  D5AB- 11 11 11           BYT $11,$11,$11
-1732  D5AE- 0E 00              BYT $0E,$00
-1733  D5B0- 11 11 11           BYT $11,$11,$11         V
-1734  D5B3- 0A 0A 04           BYT $0A,$0A,$04
-1735  D5B6- 04 00              BYT $04,$00
-1736  D5B8- 11 11 11           BYT $11,$11,$11         W
-1737  D5BB- 15 15 1B           BYT $15,$15,$1B
-1738  D5BE- 11 00              BYT $11,$00
-1739  D5C0- 11 11 0A           BYT $11,$11,$0A         X
-1740  D5C3- 04 0A 11           BYT $04,$0A,$11
-1741  D5C6- 11 00              BYT $11,$00
-1742  D5C8- 11 11 11           BYT $11,$11,$11         Y
-1743  D5CB- 0E 04 04           BYT $0E,$04,$04
-1744  D5CE- 04 00              BYT $04,$00
-1745  D5D0- 1F 01 02           BYT $1F,$01,$02         Z
-1746  D5D3- 04 08 10           BYT $04,$08,$10
-1747  D5D6- 1F 00              BYT $1F,$00
-1748  D5D8- 1C 10 10           BYT $1C,$10,$10         [
-1749  D5DB- 10 10 10           BYT $10,$10,$10
+1616  D558- 11 12 14           BYT $11,$12,$14         K
+1617  D55B- 18 14 12           BYT $18,$14,$12
+1618  D55E- 11 00              BYT $11,$00
+1619  D560- 10 10 10           BYT $10,$10,$10         L
+1620  D563- 10 10 10           BYT $10,$10,$10
+1621  D566- 1F 00              BYT $1F,$00
+1622  D568- 11 1B 15           BYT $11,$1B,$15         M
+1623  D56B- 15 11 11           BYT $15,$11,$11
+1624  D56E- 11 00              BYT $11,$00
+1625  D570- 11 19 19           BYT $11,$19,$19         N
+1626  D573- 15 13 13           BYT $15,$13,$13
+1627  D576- 11 00              BYT $11,$00
+1628  D578- 0E 11 11           BYT $0E,$11,$11         O
+1629  D57B- 11 11 11           BYT $11,$11,$11
+1630  D57E- 0E 00              BYT $0E,$00
+1631  D580- 1E 11 11           BYT $1E,$11,$11         P
+1632  D583- 1E 10 10           BYT $1E,$10,$10
+1633  D586- 10 00              BYT $10,$00
+1634  D588- 0E 11 11           BYT $0E,$11,$11         Q
+1635  D58B- 11 15 13           BYT $11,$15,$13
+1636  D58E- 0D 00              BYT $0D,$00
+1637  D590- 1E 11 11           BYT $1E,$11,$11         R
+1638  D593- 1E 14 12           BYT $1E,$14,$12
+1639  D596- 11 00              BYT $11,$00
+1640  D598- 0F 10 10           BYT $0F,$10,$10         S
+1641  D59B- 0E 01 01           BYT $0E,$01,$01
+1642  D59E- 1E 00              BYT $1E,$00
+1643  D5A0- 1F 04 04           BYT $1F,$04,$04         T
+1644  D5A3- 04 04 04           BYT $04,$04,$04
+1645  D5A6- 04 00              BYT $04,$00
+1646  D5A8- 11 11 11           BYT $11,$11,$11         U
+1647  D5AB- 11 11 11           BYT $11,$11,$11
+1648  D5AE- 0E 00              BYT $0E,$00
+1649  D5B0- 11 11 11           BYT $11,$11,$11         V
+1650  D5B3- 0A 0A 04           BYT $0A,$0A,$04
+1651  D5B6- 04 00              BYT $04,$00
+1652  D5B8- 11 11 11           BYT $11,$11,$11         W
+1653  D5BB- 15 15 1B           BYT $15,$15,$1B
+1654  D5BE- 11 00              BYT $11,$00
+1655  D5C0- 11 11 0A           BYT $11,$11,$0A         X
+1656  D5C3- 04 0A 11           BYT $04,$0A,$11
+1657  D5C6- 11 00              BYT $11,$00
+1658  D5C8- 11 11 11           BYT $11,$11,$11         Y
+1659  D5CB- 0E 04 04           BYT $0E,$04,$04
+1660  D5CE- 04 00              BYT $04,$00
+1661  D5D0- 1F 01 02           BYT $1F,$01,$02         Z
+1662  D5D3- 04 08 10           BYT $04,$08,$10
+1663  D5D6- 1F 00              BYT $1F,$00
+1664  D5D8- 1C 10 10           BYT $1C,$10,$10         [
+1665  D5DB- 10 10 10           BYT $10,$10,$10
 
 ----------------------------------------------------------------------
 
-GRAPHICS SUBROUTINES               15/10/23   R65 ASSEMBLER  PAGE 38
+GRAPHICS SUBROUTINES               16/10/23   R65 ASSEMBLER  PAGE 37
 
-1750  D5DE- 1C 00              BYT $1C,$00
-1751  D5E0- FF FF FF           BYT $FF,$FF,$FF
-1752  D5E3- FF FF FF           BYT $FF,$FF,$FF
-1753  D5E6- FF FF              BYT $FF,$FF
-1754  D5E8- 07 01 01           BYT $07,$01,$01         ]
-1755  D5EB- 01 01 01           BYT $01,$01,$01
-1756  D5EE- 07 00              BYT $07,$00
-1757  D5F0- 04 0E 15           BYT $04,$0E,$15         ^
-1758  D5F3- 04 04 04           BYT $04,$04,$04
-1759  D5F6- 04 00              BYT $04,$00
-1760  D5F8- 00 00 00           BYT $00,$00,$00         _
-1761  D5FB- 00 00 00           BYT $00,$00,$00
-1762  D5FE- 00 1F             BYT $00,$1F
-1763                   *
-1764                           TIT EXTENDED DISK OPERATING SYSTEM
-1765                   *
-1766                   * DISK AND EXDOS ARE USING BUFFER AREA
-1767                   * AT $D600 - $DFFF. DO NOT USE OTHERWISE
-1768                   *
-1769  D600-                    END
-LABELS=0140
+1666  D5DE- 1C 00              BYT $1C,$00
+1667  D5E0- FF FF FF           BYT $FF,$FF,$FF
+1668  D5E3- FF FF FF           BYT $FF,$FF,$FF
+1669  D5E6- FF FF              BYT $FF,$FF
+1670  D5E8- 07 01 01           BYT $07,$01,$01         ]
+1671  D5EB- 01 01 01           BYT $01,$01,$01
+1672  D5EE- 07 00              BYT $07,$00
+1673  D5F0- 04 0E 15           BYT $04,$0E,$15         ^
+1674  D5F3- 04 04 04           BYT $04,$04,$04
+1675  D5F6- 04 00              BYT $04,$00
+1676  D5F8- 00 00 00           BYT $00,$00,$00         _
+1677  D5FB- 00 00 00           BYT $00,$00,$00
+1678  D5FE- 00 1F             BYT $00,$1F
+1679                   *
+1680                           TIT EXTENDED DISK OPERATING SYSTEM
+1681                   *
+1682                   * DISK AND EXDOS ARE USING BUFFER AREA
+1683                   * AT $D600 - $DFFF. DO NOT USE OTHERWISE
+1684                   *
+1685  D600-                    END
+LABELS=0139
 ERRORS=00
-RECORDS=6F
+RECORDS=6B

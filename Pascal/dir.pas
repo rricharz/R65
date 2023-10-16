@@ -31,7 +31,7 @@ const aprepdo =$f4a7;
       agetentx=$f63a;
       aenddo  =$f625;
  
-      tsectors = 780;
+      tsectors = 2560;
  
 mem   filtyp  =$0300: char&;
       filcyc  =$0311: integer&;
@@ -81,7 +81,7 @@ begin
   call(aprepdo);
   checkfilerr;
  
-  scyfc:=79; { write disk name }
+  scyfc:=255; { write disk name }
   call(agetentx);
   checkfilerr;
  
@@ -121,7 +121,7 @@ begin
     end else {end mark}
       sfree:=tsectors-filloc;
     index:=index+1
-  until (index>=79) or (filtyp=chr(0));
+  until (index>=255) or (filtyp=chr(0));
   call(aenddo);
  
   nument:=ti-1;
@@ -152,4 +152,4 @@ begin
     trunc(100.0*fdel+0.5),'%),',
     'files:',index-1);
 end.
- 
+ 

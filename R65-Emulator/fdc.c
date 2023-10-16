@@ -36,11 +36,11 @@
 //
 // cc 2018 rricharz
 //
-// the following configuration is hard coded
+// FLOPPY CONFIGURATION:
 //   2 drives
 //   256 byte sectors
-//   10 sectors per track
-//   80 tracks
+#define RPERTR 16  // number of sectors per track
+#define NTRACKS 160 // number of tracks
 
 #include <stdio.h>
 #include <stdint.h>
@@ -48,6 +48,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <unistd.h>
 
 #include "time.h"
 #include "main.h"
@@ -112,6 +113,46 @@ void fdc_quit()
     }
 }
 
+/******************/
+void convertFloppy()
+/******************/
+{
+    char s[48];
+    int i, sector;
+    uint8_t buffer[256];
+    printf("Converting disk to new format (32 directory sectors, 160*16 sectors total\n");
+    // expand disk size from 800 sector to 2560 sectors
+    // initialize buffer to 0
+    for (i = 0; i < 256; i++)
+        buffer[i] = 0;
+    // enlarge file
+    fseek(floppy[FDC.drive].file, 0, SEEK_END);
+    for (i = 0; i < 2560-800; i++)
+        fwrite(buffer, sizeof(buffer), 1, floppy[FDC.drive].file);
+        
+    // move data
+    for (sector = 800; sector >= 11; sector--) {
+        fseek(floppy[FDC.drive].file, (sector-1) * 256, SEEK_SET);
+        fread(buffer, sizeof(buffer), 1, floppy[FDC.drive].file);
+        fseek(floppy[FDC.drive].file, (sector -1 + 22) * 256, SEEK_SET);
+        fwrite(buffer, sizeof(buffer), 1, floppy[FDC.drive].file);
+    }
+    // move last entry of directory
+    int entry = 79;
+    fseek(floppy[FDC.drive].file, entry * 32, SEEK_SET);
+    fread(buffer, 32, 1, floppy[FDC.drive].file);
+    entry = 255;
+    fseek(floppy[FDC.drive].file, entry * 32, SEEK_SET);
+    fwrite(buffer, 32, 1, floppy[FDC.drive].file);
+    // clear new sectors of directory
+    for (i = 0; i < 32; i++)
+        buffer[i] = 0;
+    for (entry = 80; entry < 32; entry++) {
+        fseek(floppy[FDC.drive].file, entry * 32, SEEK_SET);
+        fwrite(buffer, 32, 1, floppy[FDC.drive].file);
+    }       
+}
+
 
 /*****************/
 void openDiskFile()
@@ -123,17 +164,26 @@ void openDiskFile()
     sprintf(s,"Disks/%s.disk", floppy[FDC.drive].name);
     if (debug) printf("FDC%d Opening disk %s\n", FDC.drive, s);
     floppy[FDC.drive].file = fopen(s,"r+");
-    if (floppy[FDC.drive].file == NULL)
+    if (floppy[FDC.drive].file == NULL) {
         printf("FDC%d Cannot open disk %s\n",FDC.drive, s);
+        return;
+    }
     else
         if (debug) printf("FDC%d (%s) opened\n", FDC.drive, s);
+    fseek(floppy[FDC.drive].file, 0, SEEK_END);
+    long size = ftell(floppy[FDC.drive].file);  // file size in bytes
+    // printf("Disk opened, size = %ld\n", size);
+    if (size < 205000) {
+       printf("Old has old format\n", size);
+       convertFloppy();
+    }
 }
 
 /************/
 int doSector()
 /************/
 {
-    int sectorNumber = floppy[FDC.drive].track * 10 + floppy[FDC.drive].sector;
+    int sectorNumber = floppy[FDC.drive].track * RPERTR + floppy[FDC.drive].sector;
     
     if (floppy[FDC.drive].file == NULL) {
         printf("***** drive file not open\n");
@@ -144,19 +194,19 @@ int doSector()
         FDC.fdstat = 0x88;  // fdc ready to provide data
         if (debug) printf("FDC%d Read sector %2d, track %2d, loc %04X\n",
             FDC.drive, floppy[FDC.drive].sector, floppy[FDC.drive].track,
-            10 * floppy[FDC.drive].track + floppy[FDC.drive].sector - 1);
+            RPERTR * floppy[FDC.drive].track + floppy[FDC.drive].sector - 1);
     }
     else if (FDC.command == 0x0B) {
         FDC.fdstat = 0x84;  // fdc ready to receive data
         if (debug) printf("FDC%d Write sector %2d, track %2d, loc %04X\n",
             FDC.drive, floppy[FDC.drive].sector, floppy[FDC.drive].track,
-            10 * floppy[FDC.drive].track + floppy[FDC.drive].sector - 1);
+            RPERTR * floppy[FDC.drive].track + floppy[FDC.drive].sector - 1);
     }
     else if (FDC.command == 0x1F) {        
         FDC.fdstat = 0x10; 
         if (debug) if (debug) printf("FDC%d Verify sector %2d, track %2d, loc %04X\n",
             FDC.drive, floppy[FDC.drive].sector, floppy[FDC.drive].track,
-            10 * floppy[FDC.drive].track + floppy[FDC.drive].sector - 1);
+            RPERTR * floppy[FDC.drive].track + floppy[FDC.drive].sector - 1);
     }
     FDC.bytecounter = 255;
     return(0);      // good completion
@@ -189,7 +239,7 @@ int fdc_read(uint16_t address)
         if (FDC.bytecounter == 255) {
 
             // seek
-            long asector = 10 * floppy[FDC.drive].track + floppy[FDC.drive].sector;
+            long asector = RPERTR * floppy[FDC.drive].track + floppy[FDC.drive].sector;
             if (debug) printf("FDC%d Seek to block %04X\n", FDC.drive, asector);
             if (fseek(floppy[FDC.drive].file, 256 * (asector - 1), SEEK_SET)) {
                 printf("****** seek error\n");
@@ -401,7 +451,7 @@ void fdc_write(uint16_t address, uint8_t value)
         }
         
         if (FDC.bytecounter == 255) {
-            long asector = 10 * floppy[FDC.drive].track + floppy[FDC.drive].sector;
+            long asector = RPERTR * floppy[FDC.drive].track + floppy[FDC.drive].sector;
             
             // seek
             if (debug) printf("seek to start of sector %02X\n", asector);
@@ -530,7 +580,7 @@ int export_file()
         return (7);
     }
     
-    dataPnt = 256 * (long int) (sectorPointer + 10);
+    dataPnt = 256 * (long int) (sectorPointer + 32);
     int res = fseek(floppy[drive].file, dataPnt, SEEK_SET);     // skip directory track and go to start of data
     if (res != 0) {
         printf("Export: Seek failed\n");

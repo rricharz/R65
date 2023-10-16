@@ -19,8 +19,8 @@ var   cyclus,drive,entry: integer;
  
 proc findond(nm:array[15] of char; d:integer);
 {********************************************}
-const numentries = 79;
-      prflab     = $ece3;
+
+const  prflab     = $ece3;
  
 var first: boolean;
     i: integer;
@@ -64,4 +64,4 @@ begin
   findond('SOURCEPASCAL    ',0);
   findond('PASCAL          ',0);
 end.
- 
+ 

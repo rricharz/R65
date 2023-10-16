@@ -7,7 +7,7 @@ library wildlib;
   2023 rricharz                       }
  
 const namesize=15;
-      numentries=79;
+      numentries=255;
  
 mem filnam=$0301: array[namesize] of char&;
  
@@ -123,4 +123,4 @@ end;
  
 begin
 end.
- 
+ 

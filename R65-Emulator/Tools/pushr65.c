@@ -385,7 +385,7 @@ int main(int argc, char *argv[])
     }
     while ((dirEntry.filtyp != 0) && (dirIndex++ < 79));
     
-    if (dirIndex >= 78) {
+    if (dirIndex >= 255) {
         printf("***** Directory full\n");
         closeAndExit();
     }
@@ -401,11 +401,11 @@ int main(int argc, char *argv[])
     
     // Store the data
     
-    maxBytes = (((77 * 10) - startSector) * 256);
+    maxBytes = (((159 * 16) - startSector) * 256);
     if (debug) printf("Space for maximal %d bytes\n", maxBytes);
     if (debug) printf("Start of data sector %04X\n", startSector + 10);
-    long int dataPnt = 256 * (long int) (startSector + 10);
-    int res = fseek(foutput, dataPnt, SEEK_SET);     // skip directory track and go to start of data
+    long int dataPnt = 256 * (long int) (startSector + 32);
+    int res = fseek(foutput, dataPnt, SEEK_SET);     // skip directory tracks and go to start of data
     if (res != 0) {
         printf("***** Seek failed\n");
         closeAndExit();

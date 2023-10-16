@@ -105,7 +105,7 @@ void checkInfoBarButtons()
         }
     
         // check for Stop button
-        if ((x >= STOP_HPOS) && (x <= QUIT_HPOS + QUIT_HSIZE)
+        if ((x >= STOP_HPOS) && (x <= STOP_HPOS + QUIT_HSIZE)
            && (y <= QUIT_HPOS) && (y >= QUIT_VPOS - QUIT_VSIZE)) {        
             printf("Executing NMI\n");
             pendingNMI = 1;
