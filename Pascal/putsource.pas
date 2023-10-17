@@ -107,7 +107,6 @@ end;
 begin
   ok:=true;
   filerr:=0;
- 
   { get the argument (file name) }
   cyclus:=0; drive:=0;
   agetstring(fname,default,cyclus,drive);
@@ -115,31 +114,20 @@ begin
     writeln('Usage: putsource filename')
   else begin
     setsubtype('P');
- 
-    { find out to which disk to copy }
-    if contains('COMPILE ') or
-              contains('LIB     ') then
-      dname:='SOURCECOMPIL    '
-    else
-      dname:='SOURCEPASCAL    ';
- 
+      dname:='PSOURCE         ';
     { make sure that WORK is on drive 1 }
     writeln('Putting disk WORK in drive 1');
     cyclus:=0; drive:=1;
-    asetfile('WORK            ',
-                      cyclus,drive,' ');
+    asetfile('WORK            ',cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
- 
     { make sure that dname is on drive 0 }
-    write('Putting disk ');
-    writename(dname);
+    write('Putting disk ');  writename(dname);
     writeln(' in drive 0');
     cyclus:=0; drive:=0;
     asetfile(dname,cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
- 
     { clean WORK }
     writeln('Calling CLEAN 1');
     setargi(1,0);
@@ -149,7 +137,6 @@ begin
     writeln;
     if (filerr<>0) or (runerr<>0) then
       ok:=false;
- 
     { copy the source file }
     write('Calling COPY ');
     writename(fname);
@@ -169,7 +156,6 @@ begin
       else
         writeln(invvid,'Copy failed',norvid);
     end else begin {if successfull}
- 
       { delete the source file }
       setargi(filcyc,8);
       writeln('Deleting the original file');
@@ -181,7 +167,6 @@ begin
         writeln(invvid,
           'Deleting original failed',norvid);
       end;
- 
       { clean the destination drive }
       writeln('Calling CLEAN 0');
       setargi(0,0);
@@ -191,7 +176,6 @@ begin
       writeln;
       if (filerr<>0) or (runerr<>0) then
          ok:=false;
- 
       { pack the destination drive }
       writeln('Calling PACK 0');
       setargi(0,0);
@@ -202,19 +186,16 @@ begin
       if (filerr<>0) or (runerr<>0) then
          ok:=false;
     end;
- 
     { make sure that PASCAL is on drive 0 }
     writeln('Putting disk PASCAL in drive 0');
     cyclus:=0; drive:=0;
-    asetfile('PASCAL          ',
-                      cyclus,drive,' ');
+    asetfile('PASCAL          ',cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
- 
   end;
- 
-  if (not ok) or (runerr<>0) then begin
+  if not ok then begin
     writeln(invvid,'Putsource failed',norvid);
     filerr:=0; runerr:=0;
   end;
 end.
+ 

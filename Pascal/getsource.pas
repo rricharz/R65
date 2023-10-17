@@ -103,7 +103,6 @@ end;
 begin
   ok:=true;
   filerr:=0;
- 
   { get the argument (file name) }
   cyclus:=0; drive:=0;
   agetstring(fname,default,cyclus,drive);
@@ -111,31 +110,20 @@ begin
     writeln('Usage: getsource filename')
   else begin
     setsubtype('P');
- 
-    { find out from which disk to copy }
-    if contains('COMPILE ') or
-              contains('LIB     ') then
-      dname:='SOURCECOMPIL    '
-    else
-      dname:='SOURCEPASCAL    ';
- 
+    dname:='PSOURCE         ';
     { make sure that WORK is on drive 1 }
     writeln('Putting disk WORK in drive 1');
     cyclus:=0; drive:=1;
-    asetfile('WORK            ',
-                      cyclus,drive,' ');
+    asetfile('WORK            ',cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
- 
     { make sure that dname is on drive 0 }
-    write('Putting disk ');
-    writename(dname);
+    write('Putting disk ');  writename(dname);
     writeln(' in drive 0');
     cyclus:=0; drive:=0;
     asetfile(dname,cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
- 
     { copy the source file }
     write('Calling COPY ');
     writename(fname);
@@ -154,12 +142,10 @@ begin
       else writeln(invvid,
         'Copy failed',norvid);
     end;
- 
     { make sure that PASCAL is on drive 0 }
     writeln('Putting disk PASCAL in drive 0');
     cyclus:=0; drive:=0;
-    asetfile('PASCAL          ',
-                      cyclus,drive,' ');
+    asetfile('PASCAL          ',cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
   end;
@@ -168,3 +154,4 @@ begin
     filerr:=0; runerr:=0;
   end;
 end.
+ 

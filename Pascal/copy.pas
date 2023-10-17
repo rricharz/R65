@@ -4,22 +4,22 @@
 * Copy(filename,source,destination) *
 *                                   *
 *************************************
- 
+
   2019 rricharz
   2023 Added wildcard handling
- 
+
 }
- 
+
 program copy;
 uses syslib,arglib,wildlib;
- 
+
 const maxlines = 13;
       rdfile=$e815;
       wrfile=$eb2c; {keep date}
-      sblock=$5000;
+      sblock=$6000;
       eblock=topmem;
 
- 
+
 mem   endstk=$e: integer;
       filflg=$da: char&;
       filerr=$db: integer&;
@@ -27,7 +27,7 @@ mem   endstk=$e: integer;
       filea=$031c,
       filsa1=$0331: integer;
       filtyp=$0300: char&;
- 
+
 var name,savename: array[15] of char;
     i,fcount:integer;
     fno,ofno: file;
@@ -36,31 +36,32 @@ var name,savename: array[15] of char;
     ch,k: char;
     entry: integer;
     last, found: boolean;
+
 { * isblockf * }
- 
+
 func isblockf(nm: array[15] of char): boolean;
 var j: integer;
 begin
   j:=0;
-  while (name[j]<>':') and (j<14) do j:=j+1;
-  if name[j]=':' then
+  while (nm[j]<>':') and (j<14) do j:=j+1;
+  if nm[j]=':' then
     begin
-      if name[j+1]='R' then isblockf:=true
+      if nm[j+1]='R' then isblockf:=true
       else isblockf:=false
     end
   else
     begin
-      writeln('Cannot copy this file type');
+      writeln('Cannot copy file type',nm[j+1]);
       abort;
     end;
 end;
- 
+
 { * blockload * }
- 
+
 proc blockload(lowlim: integer);
- 
+
 var i: integer;
- 
+
 begin
   asetfile(name,cyclus,drive,' ');
   filflg:=chr(0);
@@ -70,14 +71,14 @@ begin
   filerr:=0;
   call(rdfile);
 end {blockload};
- 
- 
+
+
 { * blocksave * }
- 
+
 proc blocksave(lowlim,highlim: integer);
- 
+
 var i: integer;
- 
+
 begin
   asetfile(name,cyclus,ddrive,' ');
   filflg:=chr(0);
@@ -88,28 +89,27 @@ begin
   filerr:=0;
   call(wrfile);
 end {blocksave};
- 
+
 { * error * }
- 
+
 proc error(x:integer);
- 
+
 mem runerr=$0c: integer&;
- 
+
 begin
   writeln;
   writeln('File error ',
     (x shr 4),(x and 15));
 end {error};
- 
+
 { * copyfile * }
- 
+
 proc copyfile;
 begin
   if isblockf(name) then
     begin
       endstk:=sblock-144; {reserve memory}
       blockload(sblock);
-      writeln;
       if ord(filerr)<>0 then
         begin
           error(filerr);
@@ -129,14 +129,13 @@ begin
           error(filerr);
       endstk:=topmem-144; {release memory}
     end
- 
+
   else
     begin
       asetfile(name,cyclus,drive,' ');
       openr(fno);
       filcy1:=filcyc;
       fildrv:=ddrive;
-      writeln;
       openw(ofno);
       repeat
         read(@fno,ch);
@@ -146,10 +145,9 @@ begin
       write(@ofno,eof);
       close(ofno);
       close(fno);
-      writeln;
     end;
 end;
- 
+
 func haswildcard(nm1:array[15] of char): boolean;
 var k:integer;
 begin
@@ -160,7 +158,7 @@ begin
 end;
 {
  * main * }
- 
+
 begin
   cyclus:=0;
   agetstring(name,default,cyclus,drive);
@@ -170,7 +168,7 @@ begin
       writeln('Specify source drive (0 or 1)');
       abort;
     end;
- 
+
   agetval(ddrive,default); {destination drive}
   if default then
     begin
@@ -189,7 +187,7 @@ begin
        ' drives must be different');
       abort;
     end;
- 
+
   if haswildcard(name) then begin
     fcount:=0; last:=false; entry:= 0;
     while (entry<numentries) and not last do begin
@@ -208,7 +206,7 @@ begin
       end;
     end;
       if fcount=0 then writeln('no files found')
-      else writeln(fcount, ' files copied');
+      else writeln(fcount, ' files to copy');
   end else
     copyfile;
 end.

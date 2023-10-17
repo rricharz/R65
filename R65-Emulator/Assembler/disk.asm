@@ -1311,7 +1311,7 @@ PREPWRC LDA SCY
 PREPWRB LDA =0
         STA FILLNK
         LDX SLAST
-        CPX =79         MAX 79 FILE ENTRIES
+        CPX =255         MAX 255 FILE ENTRIES
         BNE *+7
         LDA =8          DIRECTORY FULL
         JMP DISCER1

@@ -166,6 +166,7 @@ void openDiskFile()
     floppy[FDC.drive].file = fopen(s,"r+");
     if (floppy[FDC.drive].file == NULL) {
         printf("FDC%d Cannot open disk %s\n",FDC.drive, s);
+        floppy[FDC.drive].name[0]=0; // clear name, if floppy does not exist
         return;
     }
     else
