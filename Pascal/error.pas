@@ -36,6 +36,7 @@ begin
     27: writeln('Random access index out of range');
     28: writeln('Illegal drive');
     29: writeln('Random access file not open');
+    62: writeln('Not allowed for tape drive');
     81: writeln('Division by zero');
     82: writeln('Stack overflow');
     83: writeln('Index out of bounds');
@@ -48,4 +49,4 @@ begin
   write(norvid);
  
 end.
-
+ 

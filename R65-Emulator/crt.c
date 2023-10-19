@@ -318,7 +318,7 @@ void crtUpdate()
                             s, "7:12 Serif", csize, 0, 0);
                     else
                         Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset + coffset,
-                            s, "Monospace", csize, 0, 1);
+                            s, "Monospace", csize, 0, 0);
                 }
             }
         
