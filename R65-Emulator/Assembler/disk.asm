@@ -252,7 +252,7 @@ OPEN2   LDA =0
         LDA FILDRV
         STA FIDVTB,Y    SET DRIVE NUMBER
 *
-        AND =4          TEST DRIVE TYPE
+        AND =2  TEST    DRIVE TYPE
         BEQ DOPEN       OPEN A DISK FILE
 *
 TOPEN   LDX MAXSEQ      TEST: ONLY ONE OPEN
@@ -485,7 +485,7 @@ PREPSR  JSR CPOINT
         STA TRECID+1
         LDA FIDVTB,X
         STA FILDRV
-        AND =4          TEST DISK OR TAPE
+        AND =2          Z=1, IF DISK
         RTS
 *
 * ENDSR: END OF SEQUENTIAL RECORD R/W
@@ -716,12 +716,10 @@ INITD3  RTS
 * SELECTED DRIVE IN FILDRV, OUTPUT IN A
 *
 DRIVE   LDA FILDRV
-        ASL A
-        ASL A
-        ASL A
-        ASL A
-        ASL A
-        ASL A
+        LSR A
+        LDA =$80
+        BCS *+3
+        LSR A
         RTS
 *
 * SEEK COMMAND

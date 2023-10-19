@@ -76,7 +76,7 @@ struct Fdc {
     int bytecounter;
 } FDC;
 
-struct Ddrive floppy[NUM_DRIVES];
+struct Ddrive floppy[2];
 
 
 /*************/
@@ -85,7 +85,7 @@ void fdc_init()
 {
     FDC.fdstat = 0;
     FDC.drive = 0;
-    for (int drv = 0; drv < NUM_DRIVES; drv++) {
+    for (int drv = 0; drv < 2; drv++) {
         floppy[drv].motor = 0;
         floppy[drv].track = 0;
         floppy[drv].sector = 0;
@@ -108,7 +108,7 @@ void closeDiskFile(int drv)
 void fdc_quit()
 /*************/
 {
-    for (int i = 0; i < NUM_DRIVES; i++) {
+    for (int i = 0; i < 1; i++) {
         closeDiskFile(i);
     }
 }
@@ -175,7 +175,7 @@ void openDiskFile()
     long size = ftell(floppy[FDC.drive].file);  // file size in bytes
     // printf("Disk opened, size = %ld\n", size);
     if (size < 205000) {
-       printf("Disk has old format\n", size);
+       printf("Old has old format\n", size);
        convertFloppy();
     }
 }
@@ -285,7 +285,7 @@ void checkMotorTurnoff(int tics)
 /******************************/
 {
     int drv;
-    for (drv = 0; drv < NUM_DRIVES; drv++) {
+    for (drv = 0; drv < 2; drv++) {
         if ((floppy[drv].motor > 0) && (floppy[drv].motor != 32000)) {
             // if (debug) printf("FDC%d Motor turnoff countdown %d\n", drv, floppy[drv].motor);
             floppy[drv].motor -= tics;
@@ -312,7 +312,12 @@ void fdc_write(uint16_t address, uint8_t value)
     if (address == R8_FDCOM) {
         FDC.param = 0xFF;         // will be changed if parameter is set
         FDC.special = 0;
-        FDC.drive = (value & 0xC0) >> 6;
+        if (value & 0x40)
+            FDC.drive = 0;
+        else if (value & 0x80)
+            FDC.drive = 1;
+        else
+            if ((value & 0x3F) != 0x35) printf("FDC Drive not specified in command %02X\n", value & 0x3F);
         FDC.command = value & 0x3F;
         if (debug) printf("  Command = %02X, drive = %d\n", FDC.command, FDC.drive);
         if (FDC.command == 0x2C) {
@@ -710,10 +715,10 @@ int change_floppy()
     char *extension;
     char s[24];
     
-    if (debug) printf("Change floppy called\n");
+    // printf("Floppy called\n");
     
     drive = memory[M8_FILDRV];
-    if (debug) printf("Drive = %d\n", drive);
+    // printf("Drive = %d\n", drive);
     
     i = 11;
     while ((memory[M8_FILNAM+i] == ' ') && (i > 0) )    // find end of file name
@@ -727,20 +732,19 @@ int change_floppy()
     closeDiskFile(drive);   // close file to avoid problems when pushr65 writes to it
     setLed(drive, 0);
     
-    if (debug) printf("New file name = %s\n", s);
+    // printf("New file name = %s\n", s);
     
-    for (otherdrive = 0; otherdrive < NUM_DRIVES; otherdrive++) {
-        if (drive != otherdrive) {
-            if (strcmp(floppy[otherdrive].name, s) == 0) {
-                printf("Trying to load same floppy in two drives\n");
-                return (7);
-            }
-        }
+    if (drive == 0)
+        otherdrive = 1;
+    else
+        otherdrive = 0;
+       
+    if (strcmp(floppy[otherdrive].name, s) == 0) {
+        printf("Trying to load same floppy in both drives\n");
+        return (7);
     }
     
     strcpy(floppy[drive].name, s);
-    
-    if (debug) printf("Change floppy complete without error\n");
     
     return 0;
     

@@ -177,13 +177,13 @@ void infoPanel()
             SETLEDOFFCOLOR;
         Circle(LED_HPOS + LED_SIZE / 2, LED_VPOS  + i * LED_VDIST - LED_SIZE / 2, LED_SIZE);
     }
-    if (exDisplay) {            // 2 hardware leds, not NUM_DRIVES
+    if (exDisplay) {
         setDriveLed(0, led[0]);
         setDriveLed(1, led[1]);
     }
     
     // show disk names
-    for (int drive = 0; drive < NUM_DRIVES; drive++) {
+    for (int drive = 0; drive <2; drive++) {
         Stroke(210,210,210); Fill(0, 0, 0, 0);
         Rect(LED_HPOS + 25 * panelScale, LED_VPOS  + drive * LED_VDIST + 5 * panelScale,
             132 * panelScale, 22 * panelScale);

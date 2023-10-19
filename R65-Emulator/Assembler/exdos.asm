@@ -541,7 +541,7 @@ SETEND1 JSR HEXPZE
         LDX FILCNT
 *
 DSKONLY LDA FILDRV
-        AND =$FC
+        AND =$FE
         BNE *+3
         RTS
 *
@@ -664,7 +664,7 @@ FDIR    JSR IFNAME
         JSR DSKONLY
         JSR ENDLER
 FDIR0   LDA FILDRV      ENTRY FOR VECTOR CALL
-        AND =$FC
+        AND =$FE
         BEQ *+5
         JMP TDIR
 *

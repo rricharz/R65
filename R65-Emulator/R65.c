@@ -785,8 +785,7 @@ int r65Setup()
     FILE *confFile;
     char name[24];
     
-    printf("R65 6502 emulator Version 2.0\n");
-    printf("with 4 disk drives and 2560 sectors per drive\n");
+    printf("R65 6502 emulator\n");
     
     void reset6502();
     memset(memory, 0, 65536);
@@ -816,14 +815,12 @@ int r65Setup()
         strcpy(floppy[1].name,"WORK");
     }
     else {
-        for (int drive = 0; drive < NUM_DRIVES; drive++) {
+        for (int drive = 0; drive < 2; drive++) {
             if (fscanf(confFile, "disk=%16s\n", &name) != 1) {
                 if (drive == 0)
                     strcpy(name,"PASCAL");
-                else if (drive == 1 )
-                    strcpy(name,"WORK");
                 else
-                    name[0] = 0;
+                    strcpy(name,"WORK");
             }
             // printf("disk%d=%s\n", drive+1, name);
             strcpy(floppy[drive].name, name);
@@ -842,7 +839,7 @@ int r65Setup()
 int r65Loop()
 /***********/
 {
-    printf("\nStart executing 6502 code\n");
+    printf("\nStart executing 6502 code:\n");
     
     clearClicks();
     
@@ -900,7 +897,7 @@ int r65Quit()
     if (printFile == NULL)
         printf("Cannot save configuration in %s\n",s);
     else {
-        for (int drive = 0; drive < NUM_DRIVES; drive++)
+        for (int drive = 0; drive < 2; drive++)
             fprintf(confFile, "disk=%s\n", floppy[drive].name);
         fclose(confFile);
     }

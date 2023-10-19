@@ -27,6 +27,4 @@ struct Ddrive {
     char name[18];
 };
 
-#define NUM_DRIVES   4   // Number of disk drives supported by the emulator
-
-extern struct Ddrive floppy[NUM_DRIVES];
+extern struct Ddrive floppy[2];
