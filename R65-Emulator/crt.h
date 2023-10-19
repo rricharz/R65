@@ -24,11 +24,11 @@
 #define SDOWN_HSIZE (63 * panelScale)
 
 
-#define NUM_LEDS    2   // Number of leds
-#define LED_VPOS   (245 * panelScale)
-#define LED_HPOS   (panelOffset + 5 * panelScale)
-#define LED_SIZE   (13 * panelScale)
-#define LED_VDIST  (50 * panelScale)
+#define NUM_LEDS    NUM_DRIVES   // Number of leds
+#define LED_VPOS    (250 * panelScale)
+#define LED_HPOS    (panelOffset + 5 * panelScale)
+#define LED_SIZE    (13 * panelScale)
+#define LED_VDIST   (45 * panelScale)
 
 #define MIN_WINDOW_WIDTH    800   // proposed minimal width of main window
 #define MIN_WINDOW_HEIGHT   480   // proposed minimal height of main window

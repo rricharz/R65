@@ -25,6 +25,7 @@ begin
  
   write(invvid);
   case err of
+    01: writeln('Read/Wite error');
     05: writeln('File type error');
     06: writeln('File not found');
     07: writeln('Disk not ready');
@@ -36,6 +37,14 @@ begin
     27: writeln('Random access index out of range');
     28: writeln('Illegal drive');
     29: writeln('Random access file not open');
+    61: writeln('Wild card not allowed here');
+    62: writeln('Not a disk drive');
+    63: writeln('Copy not possible here');
+    64: writeln('File too large');
+    65: writeln('Write error');
+    66: writeln('Import error');
+    67: writeln('Emulator: unknown emu command');
+    68: writeln('Unable to run mousepad');
     81: writeln('Division by zero');
     82: writeln('Stack overflow');
     83: writeln('Index out of bounds');
@@ -48,4 +57,4 @@ begin
   write(norvid);
  
 end.
-
+ 
