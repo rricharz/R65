@@ -672,9 +672,9 @@ FDIR0   LDA FILDRV      ENTRY FOR VECTOR CALL
         LDX =255
         JSR GETFENT
         JSR PRTINF
-        BYT $D,$A,'      DIRECTORY '
+        BYT 'DIRECTORY '
         BYT 'DISK '+128
-        LDA FILCYC
+        LDA FILDRV
         JSR PRTBYT
         JSR PRTINF
         BYT ': '+128
