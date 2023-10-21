@@ -17,6 +17,7 @@ program putsource;
 uses syslib,arglib;
  
 const afloppy=$c827; { exdos vector }
+      aexport=$c82a; { exdos vector }
  
 mem filerr=$db: integer&;
  
@@ -156,9 +157,13 @@ begin
       else
         writeln(invvid,'Copy failed',norvid);
     end else begin {if successfull}
-      { delete the source file }
       setargi(filcyc,8);
-      writeln('Deleting the original file');
+ 
+      { export the source file }
+      writeln('Exporting the source file');
+      call(aexport);
+      { delete the source file }
+      writeln('Deleting the source file');
       drive:=0; filerr:=0;
       runprog('DELETE:R        ',cyclus,drive);
       writeln;
@@ -198,4 +203,4 @@ begin
     filerr:=0; runerr:=0;
   end;
 end.
- 
+ 

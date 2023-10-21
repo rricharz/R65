@@ -4,26 +4,26 @@
          *   putobject   *
          *               *
          *****************
-
+ 
     move a object file from
     the WORK disk on the disk PASCAL
-
+ 
     usage: putobject filename
-
+ 
     2019 rricharz (r77@bluewin.ch)
 }
-
+ 
 program putobject;
 uses syslib,arglib;
-
+ 
 const afloppy=$c827; { exdos vector }
-
+ 
 mem filerr=$db: integer&;
-
+ 
 var cyclus,drive,k: integer;
     fname,dname: array[15] of char;
     default,ok,libflag: boolean;
-
+ 
 func contains(t:array[7] of char):boolean;
 { check for substring in fname }
 { the substring must end with a blank }
@@ -46,7 +46,7 @@ begin
   until found or (i>15);
   contains:=found;
 end;
-
+ 
 proc runprog
   (name: array[15] of char;
    cyc: integer; drv: integer);
@@ -56,7 +56,7 @@ begin
   filcy1:=cyc; fildrv:=drv; filflg:=$40;
   run
 end;
-
+ 
 proc writename(text: array[15] of char);
 { write name without blanks }
 var i: integer;
@@ -64,7 +64,7 @@ begin
   for i:=0 to 15 do
     if text[i]<>' ' then write(text[i]);
 end;
-
+ 
 proc setsubtype(subtype:char);
 var i:integer;
 begin
@@ -76,12 +76,12 @@ begin
   fname[i]:=':';
   fname[i+1]:=subtype;
 end;
-
+ 
 func letter(ch:char):boolean;
 begin
   letter:=(ch>='A') and (ch<='Z');
 end;
-
+ 
 proc setargs(name:array[15] of char;
   carg,cyc,drv:integer);
 var k:integer;
@@ -96,13 +96,13 @@ begin
     argtype[carg+9]:='i';
     arglist[carg+9]:=drv;
 end;
-
+ 
 proc setargi(val,carg:integer);
 begin
   argtype[carg]:='i';
   arglist[carg]:=val;
 end;
-
+ 
 begin
   ok:=true;
   filerr:=0;
@@ -164,6 +164,7 @@ begin
     end else begin {if successfull}
       { delete the original file }
       setargi(filcyc,8);
+      writeln;
       writeln('Deleting the original file(s)');
       drive:=0; filerr:=0;
       runprog('DELETE:R        ',cyclus,drive);
@@ -203,4 +204,4 @@ begin
     filerr:=0; runerr:=0;
   end;
 end.
- 
+ 
