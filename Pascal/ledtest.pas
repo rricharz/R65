@@ -1,14 +1,14 @@
 {
    ledtest.pas - test program for ledlib
 }
-
+ 
 program ledtest;
 uses syslib,ledlib;
-
+ 
 mem keypressed=$1785: char&;
-
+ 
 var mask,j: integer;
-
+ 
 proc delay10msec(time:integer);
 {*****************************}
 { delay10msec: delay 10 msec }
@@ -19,7 +19,7 @@ begin
   for i:=1 to time do
     emucom:=6;
 end;
-
+ 
 begin
   writeln('LEDTEST: Test led library');
   writeln('Displaying text PASCAL');
@@ -42,24 +42,12 @@ begin
     end;
   delay10msec(100);
   writeln('Type any key to quit');
-  mask:=$0001;
   repeat
-    for j:=1 to 8 do
-      begin
-        delay10msec(5);
-        ledbyte(mask);
-        mask:=mask shl 1;
-      end;
-    for j:=1 to 7 do
-      begin
-        delay10msec(5);
-        mask:=mask shr 1;
-        ledbyte(mask);
-      end;
-    mask:=mask shr 1;
+    delay10msec(random div 2);
+    ledbyte(random);
     until keypressed<>chr(0);
     keypressed:=chr(0);
   ledstop;
 end.
-
+ 
  
