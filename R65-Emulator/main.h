@@ -27,7 +27,7 @@ extern double panelScale;
 
 extern int global_char;
 extern int exDisplay;
-extern int pixelated;
+extern int fullscreen,pixelated;
 
 // wrapper for inputs
 void clearClicks(void);

@@ -311,11 +311,11 @@ void crtUpdate()
                         SETNORMALTEXTCOLOR;
                     s[0] = s[0] & 0x7F;
                     int coffset;
-                    if (s[0] == '*') coffset = csize/5;
+                    if ((!pixelated) && (s[0] == '*')) coffset = csize/5;
                     else coffset = 0;
                     if (pixelated)
                         Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset + coffset,
-                            s, "7:12 Serif", csize, 0, 0);
+                            s, "basis33", csize, 0, 0);
                     else
                         Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset + coffset,
                             s, "Monospace", csize, 0, 0);
