@@ -7,7 +7,7 @@ uses syslib,ledlib;
  
 mem keypressed=$1785: char&;
  
-var mask,j: integer;
+var mask,j,h: integer;
  
 proc delay10msec(time:integer);
 {*****************************}
@@ -27,11 +27,13 @@ begin
   delay10msec(100);
   ledstring('        ');
   writeln('Displaying hex numbers');
+  h := 0;
   for j:=0 to 255 do
     begin
-      ledhex(255*j,0,4);
-      ledhex(j,5,2);
+      ledhex(h,0,4);
+      ledhex(255-j,5,2);
       delay10msec(1);
+      h := h + 256;
     end;
   delay10msec(100);
   writeln('Displaying binary numbers');
@@ -41,9 +43,9 @@ begin
       delay10msec(1);
     end;
   delay10msec(100);
-  writeln('Type any key to quit');
+  writeln('Type any key (except <ESC>) to quit');
   repeat
-    delay10msec(random div 2);
+    delay10msec(random div 4);
     ledbyte(random);
     until keypressed<>chr(0);
     keypressed:=chr(0);

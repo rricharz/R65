@@ -501,13 +501,11 @@ void write6502(uint16_t address, uint8_t value)
         }
         else if (value == 6) {              // wait 10 msec
             if (global_pendingCrtUpdate)
-               crtUpdate();                 // update screen instead of waiting
-            else {
-                checkPendingEvents();
-                usleep(10000);              // avoid 100% cpu usage during wait
-                checkMotorTurnoff(1);
-                checkMinTimeout();
-            }
+               crtUpdate();                 // update screen if necessary
+            checkPendingEvents();
+            usleep(10000);              // avoid 100% cpu usage during wait
+            checkMotorTurnoff(2);
+            checkMinTimeout();
             memory[R8_EMURES] = 0;
             memory[R8_EMUCOM] = 0;
         }

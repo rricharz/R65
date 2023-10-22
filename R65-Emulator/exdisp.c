@@ -65,7 +65,7 @@ int segments(char ch)
     case 'I': return(0b00000110); break;
     case 'J': return(0b00111000); break;
     case 'L': return(0b00001110); break;
-    case 'O': return(0b01111110); break;
+    case 'O': return(0b00011101); break;
     case 'P': return(0b01100111); break;
     case 'S': return(0b01011011); break;
     case 'T': return(0b00001111); break;
