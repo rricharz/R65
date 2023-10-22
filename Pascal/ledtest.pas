@@ -29,7 +29,7 @@ begin
   writeln('Displaying hex numbers');
   for j:=0 to 255 do
     begin
-      ledhex(100*j,0,4);
+      ledhex(255*j,0,4);
       ledhex(j,5,2);
       delay10msec(1);
     end;
@@ -50,4 +50,4 @@ begin
   ledstop;
 end.
  
- 
+ 
