@@ -1757,8 +1757,11 @@ EXEC3   STA STPROG
         TAX             PASCAL RUNTIME ERROR
         JMP PERROR
 *
-EXEC2   JSR PRTINF
-        BYT $D,$8A
+EXEC2   NOP
+        NOP
+        NOP
+        NOP
+        NOP
         LDA FILSTP
         CMP ='R'        MUST BE PASCAL
         BEQ RUN           RUNTIME CODE

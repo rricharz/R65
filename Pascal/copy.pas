@@ -205,8 +205,8 @@ begin
           name[i]:=savename[i];
       end;
     end;
-      if fcount=0 then writeln('no files found')
-      else writeln(fcount, ' files to copy');
+      if fcount=0 then write('no files found')
+      else write(fcount, ' files to copy');
   end else
     copyfile;
 end.
