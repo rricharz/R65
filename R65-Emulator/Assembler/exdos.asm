@@ -673,6 +673,7 @@ FDIR0   LDA FILDRV      ENTRY FOR VECTOR CALL
         LDX =255
         JSR GETFENT
         JSR PRTINF
+        BYT $D,$A
         BYT 'DIRECTORY '
         BYT 'DISK '+128
         LDA FILDRV
@@ -752,8 +753,6 @@ FDIR2   JSR DDIR2
         LDX DELCNT
         LDA DELCNT+1
         JSR PRTAX
-        JSR PRTINF
-        BYT $D,$8A
         LDA =0
         RTS
 *
@@ -780,8 +779,6 @@ PACK    JSR HEXPZE
         BEQ *+5
         JMP INITD1-5    ESCAPE
 *
-        JSR PRTINF
-        BYT $D,$8A
 PACK0   JSR PREPDO
         LDX =0
 PACK1   JSR GETFENT     LOOP UNTIL FIRST

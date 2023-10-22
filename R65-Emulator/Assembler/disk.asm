@@ -1350,8 +1350,9 @@ DDIR1   JSR GETFENT
         INX
         BNE DDIR1       ALLWAYS TAKEN
 *
-DDIR2   JSR PRTINF
-        BYT $D,$A,$A
+DDIR2   NOP
+                JSR PRTINF
+        BYT $D,$A
         BYT 'SECTORS FREE:'+128
         JSR EMPTSIZ
         TYA
