@@ -4,22 +4,22 @@
          *  clean drive  *
          *               *
          *****************
-
+ 
     2018 rricharz (r77@bluewin.ch)
-
+ 
 Clean disk. Only the latest cyclus of
 each file is kept. Uses EPROM (disk.asm)
 calls to get info from disk directory
 and EXDOS delete.
-
+ 
 Written 2018 to test the R65 emulator and
 to demonstrate the power of Tiny Pascal.
-
+ 
 Usage:  clean drive                   }
-
+ 
 program clean;
 uses syslib,arglib;
-
+ 
 {R65 disk eprom calls and params: }
 const aprepdo =$f4a7;
       agetentx=$f63a;
@@ -33,7 +33,7 @@ mem   filtyp  =$0300: char&;
       fillnk  =$031e: integer;
       scyfc   =$037c: integer&;
       filerr  =$db: integer&;
-
+ 
 var default: boolean;
     drive,index,i,ti,maxlen,nument,sfree,
     sdel,sfound : integer;
@@ -44,14 +44,14 @@ var default: boolean;
     foundtab    : array[80] of boolean;
     sizetab     : array[80] of integer;
     name        : array[15] of char;
-
+ 
 proc bcderror(e:integer);
 begin
-  write('*** ERROR ');
+  write(invvid,'*** ERROR ');
   write((e shr 4) and 15);
-  writeln(e and 15);
+  writeln(e and 15,norvid);
 end;
-
+ 
 func hex(d:integer):char;
 { convert hex digit to hex char }
 begin
@@ -61,7 +61,7 @@ begin
     hex:=chr(d+ord('A')-10)
   else hex:='?';
 end;
-
+ 
 proc mark(i3: integer);
 {mark entry for delete}
 var j: integer;
@@ -74,7 +74,7 @@ begin
           hex(cyctab[i3] and 15));
   foundtab[i3]:=true
 end;
-
+ 
 proc check(i1,i2: integer);
 {check and mark entries for delete}
 var j: integer;
@@ -90,8 +90,8 @@ begin
     if j>maxlen then mark(i1)
   end
 end;
-
-begin
+ 
+begin { mani }
   drive:=0; {default drive}
   agetval(drive,default);
   if (drive<0) or (drive>1) then begin
@@ -100,15 +100,15 @@ begin
   end;
   fildrv:=drive;
   call(aprepdo);
-
+ 
   scyfc:=255; { write disk name }
   call(agetentx);
-  write(tab8,'Cleaning drive ',
+  write('Cleaning drive ',
       drive,': ');
   for i:=0 to 15 do
     write(filnam[i]);
-  writeln; writeln;
-
+  writeln;
+ 
   index:=0; ti:=0; maxlen:=0;
   sdel:=0; sfound:=0;
   repeat
@@ -143,7 +143,7 @@ begin
   until (index>=255) or (filtyp=chr(0));
   call(aenddo);
   nument:=ti;
-
+ 
   for ti:=0 to nument-1 do begin
     if foundtab[ti] then begin
       for i:=0 to 15 do
@@ -156,13 +156,9 @@ begin
       sfound:=sfound+sizetab[ti];
     end
   end;
-
-  writeln('Sectors free: ',sfree,
-                ', found: ',sfound,
-                ', now deleted: ',
-                sdel+sfound);
-  if (sdel+sfound)>0 then
-    writeln('Use pack ',drive,
-        ' to recover the deleted sectors');
-
-end.  
+ 
+  writeln('Free: ',sfree,', found: ',sfound,
+    ', now deleted: ',sdel+sfound);
+ 
+end.
+ 

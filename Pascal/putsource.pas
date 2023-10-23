@@ -130,25 +130,24 @@ begin
     call(afloppy);
     if (filerr<>0) then ok:=false;
     { clean WORK }
-    writeln('Calling CLEAN 1');
     setargi(1,0);
     argtype[1]:=chr(0);
     cyclus:=0; drive:=0; filerr:=0;
     runprog('CLEAN:R         ',cyclus,drive);
-    writeln;
     if (filerr<>0) or (runerr<>0) then
       ok:=false;
     { copy the source file }
-    write('Calling COPY ');
-    writename(fname);
-    writeln(',1,0');
-    setargs(fname,0,0,1);
-    argtype[10]:='i';
-    arglist[10]:=0; {copy to drive 0}
-    argtype[11]:=chr(0);
-    cyclus:=0; drive:=0; filerr:=0;
-    runprog('COPY:R          ',cyclus,drive);
-    writeln;
+    if ok then begin
+      write('Copying ');
+      writename(fname);
+      writeln(',1,0');
+      setargs(fname,0,0,1);
+      argtype[10]:='i';
+      arglist[10]:=0; {copy to drive 0}
+      argtype[11]:=chr(0);
+      cyclus:=0; drive:=0; filerr:=0;
+      runprog('COPY:R          ',cyclus,drive);
+    end;
     if (filerr<>0) or (runerr<>0) then begin
       ok:=false;
       if filerr=6 then
@@ -160,37 +159,39 @@ begin
       setargi(filcyc,8);
  
       { export the source file }
-      writeln('Exporting the source file');
+      write('Exporting the source file');
+      fildrv:=1;
       call(aexport);
+      writeln;
+ 
       { delete the source file }
       writeln('Deleting the source file');
       drive:=0; filerr:=0;
       runprog('DELETE:R        ',cyclus,drive);
-      writeln;
       if (filerr<>0) or (runerr<>0) then  begin
         ok:=false;
         writeln(invvid,
           'Deleting original failed',norvid);
       end;
+ 
       { clean the destination drive }
-      writeln('Calling CLEAN 0');
       setargi(0,0);
       argtype[1]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
       runprog('CLEAN:R         ',cyclus,drive);
-      writeln;
       if (filerr<>0) or (runerr<>0) then
          ok:=false;
+ 
       { pack the destination drive }
-      writeln('Calling PACK 0');
+      writeln('Packing PSOURCE');
       setargi(0,0);
       argtype[1]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
       runprog('PACK:R          ',cyclus,drive);
-      writeln;
       if (filerr<>0) or (runerr<>0) then
          ok:=false;
     end;
+ 
     { make sure that PASCAL is on drive 0 }
     writeln('Putting disk PASCAL in drive 0');
     cyclus:=0; drive:=0;

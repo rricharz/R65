@@ -4,42 +4,42 @@
          *    delete     *
          *               *
          *****************
-
+ 
     2018 rricharz (r77@bluewin.ch)
     2023 added wildcards
-
+ 
 Delete a file.
-
+ 
 Written 2018 to test the R65 emulator and
 to demonstrate the power of Tiny Pascal.
-
+ 
 Usage:  delete filnam[:x][.cy][,drive]
-
+ 
   [:X]:    type of file,     default :P
   [drive]: disk drive (0,1), default 1
-
+ 
 Wild cards * and ? are allowed
 }
-
+ 
 program delete;
 uses syslib,arglib,wildlib;
-
+ 
 const adelete=$c80c; { exdos vector }
       prflab     = $ece3;
-
+ 
 mem filerr=$db: integer&;
-
+ 
 var cyclus,scyclus,drive,entry,fcount,i: integer;
     name,savename: array[15] of char;
     default,found,last: boolean;
-
+ 
 proc bcderror(e:integer);
 begin
-  write('ERROR ');
+  write(invvid,'ERROR ');
   write((e shr 4) and 15);
-  writeln(e and 15);
+  writeln(e and 15,norvid);
 end;
-
+ 
 begin
   cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
@@ -66,7 +66,9 @@ begin
         name[i]:=savename[i];
     end;
   end;
-  if fcount=0 then write('no files found')
-  else write(fcount, ' files deleted');
+  if fcount=0 then
+    writeln(invvid,'No files found',norvid)
+  else
+    writeln(fcount, ' files deleted');
 end.
- 
+ 

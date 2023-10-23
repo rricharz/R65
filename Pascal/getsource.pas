@@ -125,7 +125,7 @@ begin
     call(afloppy);
     if (filerr<>0) then ok:=false;
     { copy the source file }
-    write('Calling COPY ');
+    write('Copying ');
     writename(fname);
     writeln(',0,1');
     setargs(fname,0,0,0);
@@ -134,7 +134,6 @@ begin
     cyclus:=0; drive:=0;
     filerr:=0;
     runprog('COPY:R          ',cyclus,drive);
-    writeln;
     if (filerr<>0) or (runerr<>0) then begin
       ok:=false;
       if filerr=6 then writeln(invvid,
@@ -154,4 +153,4 @@ begin
     filerr:=0; runerr:=0;
   end;
 end.
- 
+ 

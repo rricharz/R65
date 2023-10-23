@@ -161,12 +161,11 @@ end;
 begin {main}
   maxseq:=mmaxseq-1;
   for i:=0 to mmaxseq-1 do fidrtb[i]:=0;
-  clearinput;
-  write('R65 Pascal System (22/10/23)');
+  clearinput; writeln;
+  writeln('R65 Pascal (23/10/23)');
   ok:=true;
 
   repeat {main loop (endless)}
-    writeln;
     write('P*');
     next;
     while (ch=' ') or (ch=chr(13)) do next;
@@ -175,7 +174,6 @@ begin {main}
     getfname(runname,'R',ok,drive1,cyclus1);
     for i:=0 to 31 do argtype[i]:=chr(0);
     if ok then begin
-
       numarg:=0; n:=0; synerr:=0;
       if ch=' ' then begin  {arguments}
         repeat
@@ -228,7 +226,7 @@ begin {main}
 
     if synerr<>0 then begin
       writeln;
-      write('Syntax error ', synerr);
+      writeln(invvid,'Syntax error ', synerr,norvid);
       clearinput;
     end
     else begin
@@ -239,9 +237,9 @@ begin {main}
       iocheck:=true;
       if runerr<>0 then begin
         writeln;
-        write('Program aborted');
+        writeln(invvid,'Program aborted',norvid);
       end
     end
   until false;
 end.
- 
+ 

@@ -1,9 +1,9 @@
 {
-         *******************
-         *                 *
-         *   dir <drive>   *
-         *                 *
-         *******************
+         **********************
+         *                    *
+         *   dir <drive>, S   *
+         *                    *
+         **********************
  
     2018,2019 rricharz (r77@bluewin.ch)
     2023 removed inverse video display
@@ -21,7 +21,10 @@ longest name is. Then computes the number
 of columns which can be displayed and
 displays the directory.
  
-Usage:  dir drive                   }
+Usage:  dir drive <s>
+ 
+where the optional argument 's' sorts the
+file names                              }
  
 program dir;
 uses syslib,arglib;
@@ -49,7 +52,9 @@ var default: boolean;
     ffree,fdel  : real;
     { 1280 = 80 names of 20 chars }
     nametab     : array[1600] of char;
-    filstptab   : array[80] of char;
+    filstptab   : array[256] of char;
+    request     : array[15] of char;
+    dosort      : boolean;
  
 func hex(d:integer):char;
 { convert hex digit to hex char }
@@ -69,7 +74,7 @@ begin
   end;
 end;
  
-begin
+begin { main }
   drive:=1; {default drive}
   filerr:=0;
   agetval(drive,default);
@@ -77,6 +82,17 @@ begin
     writeln('Drive must be 0 or 1');
     abort
   end;
+  
+  agetstring(request,default,dummy,dummy);
+  dosort:=false;
+  if not default then
+    for i:=0 to 2 do
+      case request[i] of
+        'S': dosort:=true;
+        ' ': begin end
+        else argerror(101)
+      end; {case}
+  
   fildrv:=drive;
   call(aprepdo);
   checkfilerr;
@@ -85,11 +101,10 @@ begin
   call(agetentx);
   checkfilerr;
  
-  write(tab8,'Directory drive ',
-      drive,': ');
+  write(invvid,'Directory drive ',drive,': ');
   for i:=0 to 15 do
     write(filnam[i]);
-  writeln;
+  writeln(norvid);
  
   index:=0; ti:=0; maxlen:=0;
   sdel:=0;
@@ -146,10 +161,10 @@ begin
   end;
   ffree:=conv(sfree)/conv(tsectors);
   fdel:=conv(sdel)/conv(tsectors);
-  write('Sectors free:',sfree,'(',
+  writeln('Free:',sfree,'(',
     trunc(100.0*ffree+0.5),
     '%),deleted:',sdel,'(',
     trunc(100.0*fdel+0.5),'%),',
     'files:',index-1);
 end.
- 
+ 

@@ -452,6 +452,7 @@ begin
 end;
  
 begin {main}
+  startheap(56);
   patchesc:=$eaea; {patch twice nop}
   mark:=0; nmark:=0; savecx:=1;
   readinput; fs[0]:=chr(0);

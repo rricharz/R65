@@ -195,6 +195,11 @@ void infoPanel()
         SETBACKGROUNDCOLOR;
         Text(LED_HPOS + 26 * panelScale, LED_VPOS + drive * LED_VDIST,
             floppy[drive].name, "Led Panel Station On", 18 * panelScale, 0, 1);
+        SETBUTTONCOLOR;
+        char s[16];
+        sprintf(s,"Floppy disk %d",drive);
+        Text(LED_HPOS, LED_VPOS + drive * LED_VDIST + 16 * panelScale,
+          s, "Monospace", 10 * panelScale, 0, 0);
     }
     
     // show 7 segment displays
