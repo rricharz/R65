@@ -356,6 +356,7 @@ FINTC1  JSR TEST
         JSR NGETNE      *** EXPORT ***
         JSR HARGUM      (FILNAM.CY,DRIVE)
         STA FILDRV
+        JSR ENDLER
         JSR EXPORT
         BNE DERROR
         RTS
@@ -1148,7 +1149,6 @@ NEXTF1  LDA FILNM2,X    RESTORE FILNM1,FILCY1
 **********************************
 *
 EXPORT  JSR DSKONLY
-        JSR ENDLER
         JSR PREPRD
         JSR PRFLAB
 *
