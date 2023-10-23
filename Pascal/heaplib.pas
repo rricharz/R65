@@ -23,10 +23,6 @@ begin
   if relpnt<maxlines-1 then begin
     relpnt:=relpnt+1; new:=linepnt[relpnt];
   end else begin
-    if endstk < sp + 512 + xmax then begin
-      runerr := $88;
-      call(stopcode);
-    end;
     endstk:=endstk-xmax;
     new:=endstk+144;
   end;

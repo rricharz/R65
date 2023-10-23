@@ -1,9 +1,9 @@
 {
-         **********************
-         *                    *
-         *   dir <drive>, S   *
-         *                    *
-         **********************
+         *******************
+         *                 *
+         *   dir <drive>   *
+         *                 *
+         *******************
  
     2018,2019 rricharz (r77@bluewin.ch)
     2023 removed inverse video display
@@ -21,19 +21,15 @@ longest name is. Then computes the number
 of columns which can be displayed and
 displays the directory.
  
-Usage:  dir drive <s>
- 
-where the optional argument 's' sorts the
-file names                              }
+Usage:  dir drive                   }
  
 program dir;
-uses syslib,arglib;
+uses syslib,arglib,heaplib;
  
 {R65 disk eprom calls and params: }
 const aprepdo =$f4a7;
       agetentx=$f63a;
       aenddo  =$f625;
- 
       tsectors = 2560;
  
 mem   filtyp  =$0300: char&;
@@ -44,17 +40,14 @@ mem   filtyp  =$0300: char&;
       fillnk  =$031e: integer;
       scyfc   =$037c: integer&;
       filerr=$db: integer&;
+      memory=$0000: array[32767] of char&;
  
 var default: boolean;
     drive,index,i,ti,maxlen,nument,col,
     ncol,row,nspaces,sfree,sdel,
     lines       : integer;
     ffree,fdel  : real;
-    { 1280 = 80 names of 20 chars }
-    nametab     : array[1600] of char;
-    filstptab   : array[256] of char;
-    request     : array[15] of char;
-    dosort      : boolean;
+    filstptab   : array[80] of char;
  
 func hex(d:integer):char;
 { convert hex digit to hex char }
@@ -70,11 +63,34 @@ proc checkfilerr;
 begin
   if filerr<>0 then begin
     writeln('Cannot read directory');
+    endheap;
     abort;
   end;
 end;
  
-begin { main }
+func smaller(pnt1,pnt2:integer):boolean;
+var k:integer;
+begin
+  k:=0;
+  while (memory[pnt2+k]=memory[pnt1+k]) and (k<15) do
+    k:=k+1;
+  smaller:=(memory[pnt2+k]<memory[pnt1+k]);
+end;
+ 
+proc sort;
+var i,j,savepnt:integer;
+begin
+  for i:=0 to nument-1 do
+     for j:=nument-1 downto i do
+       if smaller(linepnt[j],linepnt[j+1]) then begin
+          savepnt:=linepnt[j];
+          linepnt[j]:=linepnt[j+1];
+          linepnt[j+1]:=savepnt;
+       end;
+end;
+ 
+begin {main}
+  startheap(21);
   drive:=1; {default drive}
   filerr:=0;
   agetval(drive,default);
@@ -82,17 +98,6 @@ begin { main }
     writeln('Drive must be 0 or 1');
     abort
   end;
-  
-  agetstring(request,default,dummy,dummy);
-  dosort:=false;
-  if not default then
-    for i:=0 to 2 do
-      case request[i] of
-        'S': dosort:=true;
-        ' ': begin end
-        else argerror(101)
-      end; {case}
-  
   fildrv:=drive;
   call(aprepdo);
   checkfilerr;
@@ -116,18 +121,19 @@ begin { main }
     if filtyp<>chr(0) then begin
       { check for deleted flag }
       if (fillnk and 255)<128 then begin
-        for i:=0 to 19 do
-          nametab[20*ti+i]:=' ';
+        linepnt[ti]:=new;
         for i:=0 to 15 do
-          nametab[20*ti+i]:=filnam[i];
+          memory[linepnt[ti]+i]:=filnam[i];
+        for i:=16 to 20 do
+          memory[linepnt[ti]+i]:=' ';
         i:=20;
         repeat
           i:=i-1;
         until (i=0) or
-          (nametab[20*ti+i]<>' ');
-        nametab[20*ti+i+1]:='.';
-        nametab[20*ti+i+2]:=hex(filcyc shr 4);
-        nametab[20*ti+i+3]:=hex(filcyc and 15);
+          (memory[linepnt[ti]+i]<>' ');
+        memory[linepnt[ti]+i+1]:='.';
+        memory[linepnt[ti]+i+2]:=hex(filcyc shr 4);
+        memory[linepnt[ti]+i+3]:=hex(filcyc and 15);
         if maxlen<i+3 then maxlen:=i+3;
         filstptab[ti]:=filstp;
         ti:=ti+1
@@ -140,6 +146,7 @@ begin { main }
   call(aenddo);
  
   nument:=ti-1;
+  sort;
   ncol:=48 div (maxlen+2);
   if nument<8 then ncol:=2
   else if nument<8 then ncol:=1;
@@ -152,7 +159,7 @@ begin { main }
       ti:=col+(lines+1)*row;
       if (ti<=nument) then begin
         for i:=0 to maxlen do
-          write(nametab[20*ti+i]);
+          write(memory[linepnt[ti]+i]);
         if row<(ncol-1) then
           for i:=1 to nspaces do write(' ')
       end
@@ -166,5 +173,6 @@ begin { main }
     '%),deleted:',sdel,'(',
     trunc(100.0*fdel+0.5),'%),',
     'files:',index-1);
+  endheap;
 end.
  

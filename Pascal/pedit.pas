@@ -486,4 +486,4 @@ begin {main}
   writeln(hom, clrscr, 'closing...');
   endheap;  patchesc:=$27b0; {restore original}
 end.
- 
+ 
