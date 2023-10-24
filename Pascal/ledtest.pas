@@ -1,4 +1,4 @@
-{
+ {
    ledtest.pas - test program for ledlib
 }
  
@@ -43,7 +43,7 @@ begin
       delay10msec(1);
     end;
   delay10msec(100);
-  writeln('Type any key (except <ESC>) to quit');
+  writeln('Type any key to quit');
   repeat
     delay10msec(random div 4);
     ledbyte(random);
@@ -52,4 +52,3 @@ begin
   ledstop;
 end.
  
- 
