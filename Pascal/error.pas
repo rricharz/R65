@@ -45,8 +45,8 @@ begin
     86: writeln('Escape during execution');
     87: writeln('No loader file made');
     88: writeln('Heap overflow')
+    else writeln('Undefined error')
     end;
   write(norvid);
- 
 end.
  

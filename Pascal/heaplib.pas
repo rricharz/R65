@@ -22,7 +22,12 @@ mem   endstk = $000e: integer;
 begin
   if relpnt<maxlines-1 then begin
     relpnt:=relpnt+1; new:=linepnt[relpnt];
-  end else begin
+  end else begin {assign new memory}
+    if (endstk-sp) < (xmax+512) then begin
+      writeln('HEAP OVERFLOW');
+      runerr:=$88;
+      call(stopcode);
+    end;
     endstk:=endstk-xmax;
     new:=endstk+144;
   end;

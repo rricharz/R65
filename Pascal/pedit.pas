@@ -1,10 +1,10 @@
 program pedit;
- 
+
 { Pascal editor, original 1980 RR
   rewritten 2023 RR for R65 system }
- 
+
 uses syslib, arglib, heaplib;
- 
+
 const
     scrlins = 16; maxfs = 20; line1x = 20;
     eol    = chr($00); esc    = chr($00);
@@ -14,34 +14,33 @@ const
     cup    = chr($1a); cleft  = chr($03);
     inschr = chr($15); delchr = chr($19);
     rubout = chr($5f); cright = chr($16);
- 
+
 mem memory = 0: array[32767] of char&;
     curlin = $ed: integer&;
     curpos = $ee: integer&;
     video  = $400: array[768] of char&;
-    patchesc=$230c:integer; {patch interpreter!}
- 
+
 var line, nlines, topline: integer;
     name: array[15] of char;
     fno: file;
     chi : char;
     cyclus,drive,mark,nmark,savecx: integer;
     default, iseof, exit: boolean;
- 
+
     fs: array[maxfs] of char;
- 
+
 proc setnumlin(l,c:integer);
 mem numlin=$1789: integer&;
     numchr=$178a: integer&;
 begin
   numlin:=l; numchr:=c;
 end;
- 
+
 func column:integer;
 begin
   column:=line-topline+1;
 end;
- 
+
 func readline(fin: file; pnt: integer): boolean;
 const alteof=chr(127);
 var ch1: char;
@@ -57,14 +56,14 @@ begin
   end;
   readline:=(ch1=eof) or (ch1=alteof);
 end;
- 
+
 proc goto(xpos, ypos: integer);
 begin
   curlin:=ypos; { top on line 2 }
   if curlin>15 then curlin:=15;
   curpos:=xpos-1;
 end;
- 
+
 proc showline(pnt,y: integer);
 var lstart,pos: integer;
 begin
@@ -72,13 +71,13 @@ begin
   for pos:=0 to xmax-1 do
     video[lstart+pos]:=memory[pnt+pos]
 end;
- 
+
 proc showtop;
 begin
   goto(1,0); write(invvid,clrlin);
   write('line ', line, ' of ',nlines-1,norvid);
 end;
- 
+
 proc showerror(s:array[15] of char);
 var i: integer;
     ch: char;
@@ -88,7 +87,7 @@ begin
   read(@input,ch);
   goto(line1x,0); write(norvid,clrlin);
 end;
- 
+
 proc showall;
 var y,i,l,lstart: integer;
 begin
@@ -102,14 +101,14 @@ begin
         video[lstart+i]:=' ';
   end;
 end;
- 
+
 proc updline(pnt,lstart: integer);
 var pos: integer;
 begin
   for pos:=0 to xmax-1 do
     memory[pnt+pos]:=video[lstart+pos];
 end;
- 
+
 func lastpos(l:integer):integer;
 var endpos:integer;
 begin
@@ -119,13 +118,13 @@ begin
     and (endpos>0) do endpos:=endpos-1;
   lastpos:=endpos;
 end;
- 
+
 proc chkline;
 begin
   if line<1 then line:=1
   else if line>nlines-1 then line:=nlines-1;
 end;
- 
+
 proc chktop(show: boolean);
 var savetop,bottom:integer;
 begin
@@ -135,7 +134,7 @@ begin
     topline:=line-scrlins+2;
   if show and (savetop<>topline) then showall;
 end;
- 
+
 proc delline;
 var i,savpnt:integer;
 begin
@@ -148,7 +147,7 @@ begin
   chkline; chktop(false);
   line:=line-1; savecx:=1;
 end;
- 
+
 proc join;
 var p,p1,p2,pm:integer;
 begin
@@ -168,7 +167,7 @@ begin
   end;
   savecx:=p1+2; chkline; chktop(false); showall;
 end;
- 
+
 func edlin(pnt: integer): char;
 const key    = @1;
 var   ch1: char;
@@ -205,7 +204,7 @@ begin
   if (ch1<>delchr) and (ch1<>rubout) then
     savecx:=curpos+1;
 end;
- 
+
 proc readinput;
 begin
   cyclus:=0; drive:=1;
@@ -221,10 +220,10 @@ begin
     until iseof or (nlines >= maxlines-1);
     if nlines >= maxlines-1 then
       showerror('too many lines  ');
- 
+
   close(fno);
 end;
- 
+
 proc writeoutput;
 var pos,endpos,saveline:integer;
 begin
@@ -243,7 +242,7 @@ begin
   end;
   close(fno); line:=nlines-1;
 end;
- 
+
 proc clrmarks;
 var savel,x:integer;
 begin
@@ -256,12 +255,12 @@ begin
     end;
   line:=savel; mark:=0; nmark:=0;
 end;
- 
+
 proc find(again:boolean);
 var pos,x,i:integer;
     ch:char;
     found:boolean;
- 
+
   proc checkrest;
   var failed:boolean;
       x1:integer;
@@ -276,7 +275,7 @@ var pos,x,i:integer;
      if (failed=false) and (fs[pos]=cr)
       then found:=true;
   end;
- 
+
 begin
   pos:=0;
   if not again then begin
@@ -316,7 +315,7 @@ begin
     end
   end
 end;
- 
+
 proc insertline;
 var i:integer;
 begin
@@ -339,7 +338,7 @@ begin
     savecx:=1; chkline; chktop(false); showall;
   end;
 end;
- 
+
 proc paste;
 var l,i:integer;
 begin
@@ -355,7 +354,7 @@ begin
   end;
   showall;
 end;
- 
+
 proc move;
 var i,j,savepnt,saveline: integer;
 begin
@@ -380,7 +379,7 @@ begin
   end else showerror('move inside move');
  mark:=saveline; line:=saveline; showall;
 end;
- 
+
 func doesc: boolean;
 var ch:char;
     i,n,savl:integer;
@@ -418,9 +417,9 @@ begin
          end;
     'p': begin {paste marked lines}
            if mark=0 then showerror('nothing marked  ')
- 
+
            else begin
- 
+
              if nlines+nmark>=maxlines then
                showerror('too many lines  ')
              else paste;
@@ -428,9 +427,9 @@ begin
          end;
     'm': begin {move marked lines }
            if mark=0 then showerror('nothing marked  ')
- 
+
            else move;
- 
+
          end;
     'd': begin {delete n lines}
            if n<1 then n:=1;
@@ -450,10 +449,9 @@ begin
   end {case};
   goto(line1x,0); write(norvid,clrlin);
 end;
- 
+
 begin {main}
   startheap(56);
-  patchesc:=$eaea; {patch twice nop}
   mark:=0; nmark:=0; savecx:=1;
   readinput; fs[0]:=chr(0);
   topline:= 1; line:=1; showall; exit:=false;
@@ -484,6 +482,5 @@ begin {main}
     until exit;
   setnumlin($29,$2f);
   writeln(hom, clrscr, 'closing...');
-  endheap;  patchesc:=$27b0; {restore original}
+  endheap;
 end.
- 

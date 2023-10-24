@@ -79,6 +79,7 @@ GRC     EQU $03B0
 SFLAG   EQU $1781
 NUMCHR  EQU $178A
 VMON    EQU $17D5
+SAVS    EQU $17FF
 *
 APLOTCH EQU $C818
 GETKEY  EQU $E000
@@ -154,6 +155,8 @@ STOP1   SEC             YES, COMPUTE OLD SP
         JSR GETBACK
         STA ACCU
         STX ACCU+1
+        LDX SAVS        RESTORE STACK POINTER
+        TXS
         JMP LOOP
 *
 *
@@ -621,7 +624,6 @@ CALA1   JMP (ACCU)
 *****************
 *
 RLIN    JSR GETLIN
-        BCS RLINESC     IF ESC
         LDX =0
         LDA (VIDPNT),Y
         AND =$7F
@@ -643,8 +645,6 @@ RLIN    JSR GETLIN
         JSR PRTINF
         BYT $D,$8A
         RTS
-*
-RLINESC JMP STOP        ESCAPE
 *
 * P-CODE 1B: GETC
 *****************
@@ -1194,11 +1194,7 @@ PSEC    JSR PREPSEC
         JSR WRITE
         JMP ENDDO
 *
-PREPSEC NOP             ########
-        NOP
-        NOP
-        NOP
-        LDA ACCU
+PREPSEC LDA ACCU
         LDX ACCU+1
         STA DATA
         STX DATA+1
@@ -1714,6 +1710,8 @@ PERROR1 JMP STOP
 WARMST  LDA SFLAG       SET PASCAL RUNTIME BIT
         ORA =$01        IN SFLAG
         STA SFLAG
+        TSX
+        STX SAVS	SAVE STACK POINTER
         LDX =0
         STX PC+1
         STX DEVICE
@@ -1732,8 +1730,6 @@ EXEC    LDY =0
         BCC EXEC+2
         LDA =0
         STA FILCY1
-*           LDA =1     LOAD SYSTEM:R     FROM
-*           STA FILDRV SAME DRIVE AS PASCAL
 *
 EXECUTE LDA =0
         STA FILFLG
@@ -1757,12 +1753,7 @@ EXEC3   STA STPROG
         TAX             PASCAL RUNTIME ERROR
         JMP PERROR
 *
-EXEC2   NOP
-        NOP
-        NOP
-        NOP
-        NOP
-        LDA FILSTP
+EXEC2   LDA FILSTP
         CMP ='R'        MUST BE PASCAL
         BEQ RUN           RUNTIME CODE
         LDX =$84        PASCAL RUNTIME ERROR
@@ -1798,7 +1789,9 @@ RUN     LDY =0          READ END ADDRESS
         STX PC+1
         LDA =0
         STA RUNERR
-LOOP    JSR EXCODE
+LOOP    LDX SAVS        RESTORE STACK POINTER
+        TXS
+	JSR EXCODE
         LDA SFLAG
         BMI ESCERR
         JMP LOOP
