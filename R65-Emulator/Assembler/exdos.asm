@@ -392,10 +392,6 @@ FINTC4  JSR TEST
         STA FILDRV
         JSR FLOPPY
         BNE DERROR
-        LDA =0          PRINT DIRECTORY
-        STA FULLFLG
-        JSR FDIR0
-        BNE DERROR
         RTS
 *
 DERROR  JMP ERROR
@@ -779,6 +775,8 @@ PACK    JSR HEXPZE
         CMP ='Y'
         BEQ *+5
         JMP INITD1-5    ESCAPE
+        JSR PRTINF
+        BYT $D,$8A
 *
 PACK0   JSR PREPDO
         LDX =0
