@@ -127,7 +127,7 @@ STOP    LDA STPROG      IS ANOTHER PROGRAM
         BNE STOP1
 *
         JSR PRTINF      NO, STOP PASCAL
-        BYT $D,$A,'Quit Pascal',$D,$8A
+        BYT 'Quit Pascal'+$80
         LDA SFLAG
         AND =$FE        CLEAR PASCAL RUNTIME BIT
         STA SFLAG       IN SFLAG
@@ -1711,7 +1711,7 @@ WARMST  LDA SFLAG       SET PASCAL RUNTIME BIT
         ORA =$01        IN SFLAG
         STA SFLAG
         TSX
-        STX SAVS	SAVE STACK POINTER
+        STX SAVS        SAVE STACK POINTER
         LDX =0
         STX PC+1
         STX DEVICE
@@ -1791,7 +1791,7 @@ RUN     LDY =0          READ END ADDRESS
         STA RUNERR
 LOOP    LDX SAVS        RESTORE STACK POINTER
         TXS
-	JSR EXCODE
+        JSR EXCODE
         LDA SFLAG
         BMI ESCERR
         JMP LOOP
