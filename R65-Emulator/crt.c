@@ -212,14 +212,14 @@ void infoPanel()
         struct tm * now_tm;
         now = time(NULL);
         now_tm = localtime(&now);
-        sprintf(s1," %02d.%02d", now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec);
+        sprintf(s1," %02d-%02d", now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec);
     }
     sprintf(s2,"%04X  %02X",pc, spMin);
     sprintf(s3,"%05d %02X", (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),
         pascalMinFree >> 8);
         
     if ((memory[M8_SFLAG] & 1) == 0)
-        s3[0] = 0;
+        sprintf(s3,"%05d %02X",0,0);
     
     if (read6502_8(RS8_LED)) {
         s = s1;
