@@ -1,4 +1,4 @@
-* 18/11/81
+* 18/11/81,25/10/23
 **********************************
 * R65 COMPUTER SYSTEM: ASSEMBLER *
 **********************************
@@ -30,6 +30,7 @@
 *       S       SECOND PASS
 *       C       CONTINUE SAME PASS
 *       R       REFERENCE MAP
+*       <return> QUIT ASSEMBLER
 *
 *
 * SOURCE LINE FORMAT [] MEANS OPTIONAL
@@ -157,6 +158,7 @@ FIRCTB  EQU $0351       ROCORD COUNTER
 VFLAG   EQU $1780       VIDEO FLAG REGISTER
 SFLAG   EQU $1781       SYSTEM FLAG REGISTER
 NUMLIN  EQU $1789       VIDEO LINES
+VMON    EQU $17D5       ADDRESS OF MONITOR START
 MNEMR   EQU $E7C0       MNEMONIC TABLE
 MNEML   EQU $E780
 DISMOD  EQU $E722       ADDRESSING MODE TABLE 1
@@ -1399,15 +1401,7 @@ NEWL10  JSR CRLF
         JSR CRLF
 CRLF    JSR PRTINF
         BYT $0D,$8A
-*       LDX =16         (16 LOADING BLANKS)
-*       TXA             *** REMOVED ***
-*       PHA             *** REMOVED ***
-*       LDA =$20        *** REMOVED ***
-*       JSR VAUTOP      *** REMOVED ***
-*       PLA             *** REMOVED ***
-*       TAX             *** REMOVED ***
-*       DEX             *** REMOVED ***
-*       BNE *-10        *** REMOVED ***
+*
 CRLF1   RTS
 *
 *
@@ -1747,7 +1741,7 @@ WARMST  JSR PRTINF
         STX LABCNT+1
         LDA =0
         STA PASSFL
-        STA PRTFLG
+        STA PRTFLG      PRINTING OFF
 PASS    LDA TABLE+5     BOTH PASSES
         STA PAGELN
         LDA =0
@@ -1772,9 +1766,6 @@ PASS    LDA TABLE+5     BOTH PASSES
         BPL *-3
         LDA =$80
         STA OUTREC
-        JSR PRTINF      ** AUTOPRINT ON
-        BYT $92         **
-        JSR NEWLIN      ** DELETE THIS
 *
 LINE    JSR PRTINF      AUTOPRINT OFF
         BYT $94
@@ -1818,11 +1809,13 @@ WARM10  CMP =$53        S=SECOND PASS
         STA PRTFLG      PRINTING ON
         JSR PRCON
         JSR CLRRFL      CLEAR R-FLAG
+        JSR PRTINF      PRINT EMPTY LINE TO
+        BYT $0D,$8D       START HEADER
         JMP PASS
 *
-WARM20  CMP =$43        C=CONTINUE
+WARM20  CMP =$0D        <return>?
         BNE WARM30
-        JMP LINE        HANDLE LINES
+        JMP (VMON)      RETURN TO MONITOR
 *
 WARM30  CMP =$52        R=REFERENCE TABLE
         BEQ MAP
@@ -1952,6 +1945,8 @@ CROSS7  LDY =7
 END     LDA =0
         STA PCNEW
         STA PCNEW+1
+        LDA PASSFL      ONLY IN SECOND PASS
+        BEQ END0-3
         JSR PRTINF      AUTOPRINT ON
         BYT $92
         JSR PRTLIN
