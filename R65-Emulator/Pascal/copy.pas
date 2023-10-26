@@ -4,22 +4,22 @@
 * Copy(filename,source,destination) *
 *                                   *
 *************************************
- 
+
   2019 rricharz
   2023 Added wildcard handling
- 
+
 }
- 
+
 program copy;
 uses syslib,arglib,wildlib;
- 
+
 const maxlines = 13;
       rdfile=$e815;
       wrfile=$eb2c; {keep date}
       sblock=$6000;
       eblock=topmem;
       cup=chr($1a);
- 
+
 mem   endstk=$e: integer;
       filflg=$da: char&;
       filerr=$db: integer&;
@@ -27,7 +27,7 @@ mem   endstk=$e: integer;
       filea=$031c,
       filsa1=$0331: integer;
       filtyp=$0300: char&;
- 
+
 var name,savename: array[15] of char;
     i,fcount:integer;
     fno,ofno: file;
@@ -36,9 +36,9 @@ var name,savename: array[15] of char;
     ch,k: char;
     entry: integer;
     last, found: boolean;
- 
+
 { * isblockf * }
- 
+
 func isblockf(nm: array[15] of char): boolean;
 var j: integer;
 begin
@@ -55,9 +55,9 @@ begin
       abort;
     end;
 end;
- 
+
 { * blockload * }
- 
+
 proc blockload(lowlim: integer);
 var i: integer;
 begin
@@ -69,9 +69,9 @@ begin
   filerr:=0;
   call(rdfile);
 end {blockload};
- 
+
 { * blocksave * }
- 
+
 proc blocksave(lowlim,highlim: integer);
 var i: integer;
 begin
@@ -84,9 +84,9 @@ begin
   filerr:=0;
   call(wrfile);
 end {blocksave};
- 
+
 { * error * }
- 
+
 proc error(x:integer);
 mem runerr=$0c: integer&;
 begin
@@ -94,9 +94,9 @@ begin
   writeln(invvid,'File error ',
     (x shr 4),(x and 15),norvid);
 end {error};
- 
+
 { * copyfile * }
- 
+
 proc copyfile;
 begin
   if isblockf(name) then
@@ -122,8 +122,9 @@ begin
       if ord(filerr)<>0 then
           error(filerr);
       endstk:=topmem-144; {release memory}
+      writeln;
     end
- 
+
   else
     begin
       write(cup); { hack to avoid empty line }
@@ -144,7 +145,7 @@ begin
       writeln;
     end;
 end;
- 
+
 func haswildcard(nm1:array[15] of char): boolean;
 var k:integer;
 begin
@@ -155,7 +156,7 @@ begin
 end;
 {
  * main * }
- 
+
 begin
   cyclus:=0;
   agetstring(name,default,cyclus,drive);
@@ -166,7 +167,7 @@ begin
         'Specify source drive (0 or 1)',norvid);
       abort;
     end;
- 
+
   agetval(ddrive,default); {destination drive}
   if default then
     begin
@@ -188,7 +189,7 @@ begin
        ' drives must be different',norvid);
       abort;
     end;
- 
+
   if haswildcard(name) then begin
     fcount:=0; last:=false; entry:= 0;
     while (entry<numentries) and not last do begin

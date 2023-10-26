@@ -127,7 +127,7 @@ STOP    LDA STPROG      IS ANOTHER PROGRAM
         BNE STOP1
 *
         JSR PRTINF      NO, STOP PASCAL
-        BYT 'Quit Pascal'+$80
+        BYT $0D,$0A,'Quit Pascal'+$80
         LDA SFLAG
         AND =$FE        CLEAR PASCAL RUNTIME BIT
         STA SFLAG       IN SFLAG
@@ -1749,15 +1749,14 @@ EXEC3   STA STPROG
         STA FILSA1
         STX FILSA1+1
         JSR RDFILE      READ FILE TO EXECUTE
-        BEQ EXEC2
-        TAX             PASCAL RUNTIME ERROR
-        JMP PERROR
+        BNE EXECE       PROGRAM NOT LOOADED?
 *
-EXEC2   LDA FILSTP
-        CMP ='R'        MUST BE PASCAL
-        BEQ RUN           RUNTIME CODE
-        LDX =$84        PASCAL RUNTIME ERROR
-        JMP PERROR      WRONG FILEtYPE
+        LDA FILSTP
+        CMP ='R'        IS PASCAL PROGRAM?
+        BEQ RUN
+EXECE   LDA =$84        PASCAL RUNPROG ERROR
+	STA RUNERR
+        JMP STOP        SILENT ERROR
 *
 RUN     LDY =0          READ END ADDRESS
         LDA (STPROG),Y  FROM FILE
