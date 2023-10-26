@@ -1,21 +1,21 @@
 {
-
+ 
                 REVERSI
-
+ 
 Pascal Program for Tiny Pascal
 Adapted from Byte 4,11 (1979)
 Original Basic version by Peter B. Maggs
-
+ 
 Last change 06/02/80 rricharz
-Recovered 2018 by rricharz               }
-
+Recovered 2018-2023 by rricharz               }
+ 
 program reversi;
 uses syslib;
-
+ 
 const tab8=chr($09);
       hom=chr($01);
       csc=chr($11);
-
+ 
 var f {value for opponent's best reply
        to computer's best best play},
     g {value for opponent's best reply
@@ -30,33 +30,33 @@ var f {value for opponent's best reply
     u {counter},
     v,w {to save play},
     z {counter}
-
+ 
         : integer;
-
+ 
     us {user colour},
     nextplay
-
+ 
         : char;
-
+ 
     b {board},
     e {value for board squares}
-
+ 
         : array[100] of integer;
-
+ 
     d {distance to next squares}
-
+ 
         : array[8] of integer;
-
+ 
     endplay {end of game flag}
         : boolean;
-
+ 
 proc init; {initialize the game}
 var n1,n2: integer;
 begin
   writeln(hom,csc,tab8,'The game of Reversi');
   writeln(tab8,'*******************');
   writeln;
-
+ 
   e[11]:=0; e[12]:= 64; e[13]:=-30;
             e[14]:= 10; e[15]:=  5;
   e[21]:=0; e[22]:=-30; e[23]:=-40;
@@ -65,30 +65,30 @@ begin
             e[34]:=  5; e[35]:=  1;
   e[41]:=0; e[42]:=  5; e[43]:=  2;
             e[44]:=  1; e[45]:=  1;
-
+ 
   for n1:=1 to 4 do {horizontal axis}
     for n2:=1 to 5 do
       e[10*n1+11-n2]:=e[10*n1+n2];
-
+ 
   for n2:=1 to 10 do {vertical axis}
     for n1:=1 to 4 do
       e[90-10*n1+n2]:=e[10*n1+n2];
-
+ 
   for n1:=1 to 100 do b[n1]:=0;
   for n1:=1 to 10 do begin
     b[n1]:=3; b[90+n1]:=3; b[10*n1-9]:=3;
     b[10*n1]:=3
   end;
   b[45]:=2; b[46]:=2; b[55]:=2; b[56]:=2;
-
+ 
   u:=5; q:=1; p:=1; m1:=0; t3:=0;
   endplay:=false;
-
-  write('Would you linke to be');
+ 
+  write('Would you like to be');
   write(' Black or White?');
   read(us);
 end {init};
-
+ 
 proc display; {display the board}
 var mm,x,y: integer;
 begin
@@ -100,7 +100,7 @@ begin
       if mm=m1 then write(invvid);
       case b[mm] of
          1: write('W');
-        -1: write('S')
+        -1: write('B')
         else write('-')
       end {case};
       write(norvid);
@@ -109,7 +109,7 @@ begin
   end {for};
   writeln('        1  2  3  4  5  6  7  8');
 end;
-
+ 
 proc adjust; {adjust corner values}
 begin
   case m of
@@ -119,7 +119,7 @@ begin
     89: begin e[77]:=5; e[78]:=5; e[88]:=5 end
   end {case}
 end;
-
+ 
 proc evaluate;
 var stop: boolean;
 begin
@@ -134,7 +134,7 @@ begin
     end
   end
 end;
-
+ 
 proc makeplay; {make a play}
 var j,n,k: integer;
 begin
@@ -157,7 +157,7 @@ begin
     end {while}
   end {if}
 end {makeplay};
-
+ 
 proc checkop; {check opponent's replies}
 var z: integer;
     stop: boolean;
@@ -182,7 +182,7 @@ begin
   m:=v;
   p:=-p
 end {checkop};
-
+ 
 proc checkco; {check computer's play}
 var c: array[100] of integer;
 begin
@@ -207,7 +207,7 @@ begin
   m:=w;
   writeln
 end {checkco};
-
+ 
 proc checkplay; {check for legal play}
 var stop: boolean;
 begin
@@ -234,7 +234,7 @@ begin
   end {while};
   writeln
 end {checkplay};
-
+ 
 proc getplay;
 var x,y: integer;
 begin
@@ -251,7 +251,7 @@ begin
       m:=x+1+10*y;
   end
 end {getplay};
-
+ 
 begin {main}
   d[1]:=1; d[2]:=11; d[3]:=10 d[4]:=9;
   d[5]:=-1; d[6]:=-11; d[7]:=-10; d[8]:=-9;
@@ -320,13 +320,4 @@ begin {main}
     read(nextplay);
   until nextplay<>'Y'
 end.
-
-
-
-
-
-
-
-
-
-
+ 
