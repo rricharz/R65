@@ -394,7 +394,7 @@ void QuitProgram(int shutDownFlag)
 static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 ///////////////////////////////////////////////////////////////////////////////////
 {
-    // printf("key pressed, state =%04X, keyval=%04X\n", event->state, event->keyval);
+    printf("key pressed, state =%04X, keyval=%04X\n", event->state, event->keyval);
     
     // ignore option key event, required if vnc client is used on mac
     // the keyval is already adjusted accordingly
@@ -432,13 +432,19 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
             return;
         }
         else if (global_char == 0xFEE7)  {    // <shift> ALT: execute QUIT and SHUTDOWN
-            QuitProgram(1);      
+            QuitProgram(1);
+            system("sudo shutdown -h now");     
             return;
         }
         else global_char = event->keyval & 0x1F;
     }
                 
     // normal keys
+    else if (event->keyval == 0x1008ff2f) {
+        QuitProgram(1);
+        system("sudo shutdown -h now");    
+        return;     
+    }
     else {
         if ((event->keyval == 0xFFE1) || (event->keyval == 0xFFE3)) return;
         global_char = event->keyval;

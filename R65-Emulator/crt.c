@@ -167,7 +167,7 @@ void infoPanel()
     Rect(SDOWN_HPOS, QUIT_VPOS, SDOWN_HSIZE, QUIT_VSIZE);
     Text(SDOWN_HPOS + (PANEL_FONTSIZE / 3), QUIT_VPOS - (PANEL_FONTSIZE / 3),
       "SHUTDOWN", "Monospace", PANEL_FONTSIZE, 0, 0);
-    
+      
     // show leds
     SETLEDBORDERCOLOR;
     for (int i = 0; i < NUM_LEDS; i++) {
