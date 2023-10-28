@@ -30,7 +30,8 @@
 *       S       SECOND PASS
 *       C       CONTINUE SAME PASS
 *       R       REFERENCE MAP
-*       <return> QUIT ASSEMBLER
+*       <CR>    EXIT ASSEMBLER
+*       <ESC>   EXIT ASSEMBLER
 *
 *
 * SOURCE LINE FORMAT [] MEANS OPTIONAL
@@ -1742,9 +1743,9 @@ WARMST  JSR PRTINF
         LDA =0
         STA PASSFL
         STA PRTFLG      PRINTING OFF
-PASS    LDA TABLE+5     BOTH PASSES
+        LDA TABLE+5
         STA PAGELN
-        LDA =0
+PASS    LDA =0
         STA FILCNT      START WITH FIRST FILE
         JSR BACKNM
 *
@@ -1809,15 +1810,28 @@ WARM10  CMP =$53        S=SECOND PASS
         STA PRTFLG      PRINTING ON
         JSR PRCON
         JSR CLRRFL      CLEAR R-FLAG
-        JSR PRTINF      PRINT EMPTY LINE TO
-        BYT $0D,$8D       START HEADER
+        LDA TABLE+5
+        STA PAGELN
+        LDA =0
+        STA PAGECN
+        JSR PRTINF
+        BYT $92         AUTOPRINT ON
+        JSR NEWLIN
+        JSR PRTINF
+        BYT $94		AUTOPRINT OFF
         JMP PASS
 *
-WARM20  CMP =$0D        <return>?
+WARM20  CMP =$0D        <CR>?
         BNE WARM30
-        JMP (VMON)      RETURN TO MONITOR
 *
-WARM30  CMP =$52        R=REFERENCE TABLE
+EXIT    JSR PRTINF
+        BYT $D,$A,'EXIT ASSEMBLER'+128
+        JMP (VMON)      GO TO MONITOR
+*
+WARM30  CMP =$00         <ESC>
+        BEQ EXIT
+*
+        CMP =$52        R=REFERENCE TABLE
         BEQ MAP
         JSR PRTINF
         BYT $87         BELL

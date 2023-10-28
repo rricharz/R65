@@ -394,7 +394,7 @@ void QuitProgram(int shutDownFlag)
 static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 ///////////////////////////////////////////////////////////////////////////////////
 {
-    printf("key pressed, state =%04X, keyval=%04X\n", event->state, event->keyval);
+    // printf("key pressed, state =%04X, keyval=%04X\n", event->state, event->keyval);
     
     // ignore option key event, required if vnc client is used on mac
     // the keyval is already adjusted accordingly

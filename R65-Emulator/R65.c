@@ -665,14 +665,14 @@ int catchSubroutine(uint16_t ea)
                 fprintf(printFile,"#####");
                 return 1;
             }
-            if (a == 0x0C) {                   // new page:.txt files have no page break
+            if (a == 0x0C) {                   // new page: simulate page break
                 fprintf(printFile, "\n-----------------------------------");
                 fprintf(printFile, "-----------------------------------\n");
                 return 1;
             }
             if (a == 0x0A) {                   // new line
                 fprintf(printFile, "%c", a);
-                fflush(printFile);                  // required if emulator is not properly terminated
+                fflush(printFile);             // required if emulator is not properly terminated
                 colNumber = 0;
                 return 1;
             }
