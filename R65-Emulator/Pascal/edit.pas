@@ -31,7 +31,8 @@ var cyclus,drive: integer;
 
 proc bcderror(e:integer);
 begin
-  write(invvid,'*** ERROR ');
+  writeln;
+  write(invvid,'ERROR ');
   write((e shr 4) and 15);
   write(e and 15,norvid);
 end;

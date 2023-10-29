@@ -245,7 +245,7 @@ begin
         end;
       rf:=conv(iv);
     end
-  else
+  else if ch<>chr(0) then
     begin
       if ch<>cr then
         begin

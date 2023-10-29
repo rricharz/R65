@@ -713,7 +713,7 @@ int change_floppy()
 {
     int   i, drive, end, otherdrive;
     char *extension;
-    char s[24];
+    char s[32];
     
     // printf("Floppy called\n");
     
@@ -745,6 +745,19 @@ int change_floppy()
     }
     
     strcpy(floppy[drive].name, s);
+    
+    // check whether file exists
+    
+    sprintf(s,"Disks/%s.disk", floppy[drive].name);
+    if (debug) printf("Checking for disk %s\n", s);
+    floppy[drive].file = fopen(s,"r+");
+    if (floppy[drive].file == NULL) {
+        printf("Cannot open disk %s\n",s);
+        floppy[drive].name[0]=0; // clear name, if floppy does not exist
+        return 7;
+    }
+    fclose(floppy[drive].file);
+    floppy[drive].file=0;
     
     return 0;
     

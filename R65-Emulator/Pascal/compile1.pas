@@ -1,4 +1,3 @@
-
 {   ********************************
     *                              *
     *  R65 "Tiny" Pascal Compiler  *
@@ -66,7 +65,7 @@ space. An array of packed chars would require
 more coding and slow the scanner module of the
 compiler down.                               }
 
-    nresw=60;   {number of res. words, max 64}
+    nresw=61;   {number of res. words, max 64}
     symbsize=256;     {id table entries}
     reswtabpos=$c600; { up to $c7ff }
     idtabpos=$be00;   { up to $c5ff }
@@ -119,6 +118,7 @@ var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
 
          Low letter:
          i:integer, c:char, p:packed char,
+         q:cpoint (pointer to char),
          r:real(array multiple of two),
          f:file, b:boolean, u:undefined  }
 
@@ -187,7 +187,7 @@ begin
     11: write('Declaration');
     12: write('Constant');
     13: write('Forward reference: ',code);
-    14: write('Type mismatch');
+    14: write('Type mismatch: ',code);
     15: write('Array size');
     16: write('Array (8-bit)');
     17: write('Real');
@@ -212,7 +212,7 @@ end {merror};
 proc error(x: integer);
 
 begin
-  merror(x,'  ')
+  merror(x,'##')
 end;
 
 {       * push & pop *  (global) }
@@ -629,7 +629,7 @@ proc testtype(ttype: char);
 begin
   if restype<>ttype then
     if (restype<>'u') and (ttype<>'u') then
-      error(14);
+      merror(14,packed(ttype,restype));
 end;
 
 { * find ident *    (of block) }
@@ -764,6 +764,11 @@ begin
           end;
     'tr': begin val:=1; restype:='b' end;
     'fa': begin val:=0; restype:='b' end;
+    'cp': begin
+            writeln(invvid,'cp',norvid); {debug}
+            scan; val:=getcon;
+            testtype('i'); restype:='q';
+          end;
     ' @': begin scan; val:=getcon;
             testtype('i'); restype:='f'
           end
@@ -844,6 +849,7 @@ begin
     'bo': typ2:='b';
     'rl': begin typ2:='r'; aflag:=true;
             n:=prec(2*succ(n)) end;
+    'cp': typ2:='q';
     'fl': typ2:='f'
     else begin error(11); typ2:='i';end
   end {case}
@@ -1508,6 +1514,13 @@ begin { *** body of factor *** }
     'pc': begin
             argument('u'); code1($15)
           end;
+    'cp': begin
+            argument('i'); restype:='q';
+          end;
+    'ni': begin
+            writeln(invvid,'nil',norvid); {debug}
+            code3(34,0); scan; restype:='q';
+          end;
     'ox': begin
             argument('u');
             restype:='i'
@@ -1622,7 +1635,7 @@ begin { *** body of simexp *** }
     end {case};
     if opcode>1 then begin {if 1}
       if (restype='r') and (arsize1=1)
-        then begin {if 2}
+        then begin {real}
         scan; term(arsize1);
         if (restype<>'r') or (arsize1<>1) then
           error(17);
@@ -1631,22 +1644,22 @@ begin { *** body of simexp *** }
           4:  code1($43)
           else error(17)
         end {case}
-      end {if2}
-      else begin {else2}
+      end {real}
+      else begin {not real}
         if (arsize1<>0) then error(15);
         if (restype='b') and (opcode>=14)
-          then begin {if 3}
+          then begin {boolean}
           scan; term(arsize1);
           if arsize1<>0 then error(15);
           testtype('b'); code1(opcode)
-        end {if3}
-        else begin {else3}
+        end {boolean}
+        else begin {not boolean}
           testtype('i'); scan;
           term(arsize1);
           if arsize1<>0 then error(15);
-          testtype('i'); code1(opcode)
-        end {else 3}
-      end {else 2}
+          testtype('i'); code1(opcode);
+        end {not boolean}
+      end {not real}
     end {if 1}
     else if opcode=1 then begin {else 1}
       sign:=restype;
