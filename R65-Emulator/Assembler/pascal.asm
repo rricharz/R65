@@ -1607,29 +1607,13 @@ SWA3    LDA (SP),Y
         STA (SP),Y
         RTS
 *
-* P-CODE 54: LDXI       LOAD CPNT INDEXED
+* P-CODE 54: LDXI	PREPARE LOAD CPNT
 *****************
 *
-LDXI    JSR FETCH
-        TAX
-        JSR FETCH
-        ASL ACCU
-        ROL ACCU+1
-        CLC
-        ADC ACCU
-        STA ARG1
-        PHP
-        JSR FETCH
-        PLP
-        ADC ACCU+1
-        STA ARG1+1
-        JSR FBASE3
-        JSR INDI
-        LDY =128
-        LDA (ABASE),Y
+LDXI    LDY =0		INDIRECTION
+        LDA (ACCU),Y
         STA ACCU
-        LDA =0
-        STA ACCU+1
+        STY ACCU+1
         RTS
 *
 INDI    LDY =129        INDIRECTION
@@ -1641,29 +1625,31 @@ INDI    LDY =129        INDIRECTION
         STX ABASE+1
         RTS
 *
-* P-CODE 54: STXI       STORE CPNT INDEXED
+* P-CODE 55: STXI       STORE CPNT INDEXED
 *****************
 *
 STXI    JSR FETCH
         TAX
         LDY =126
         LDA (SP),Y
-        ASL A
-        STA ARG1
+        STA ARG2
         INY
         LDA (SP),Y
-        ROL A
-        STA ARG1+1
+        STA ARG2+1      ARG2 IS INDEX
         JSR FETCH
-        CLC
-        ADC ARG1
         STA ARG1
         JSR FETCH
-        ADC ARG1+1
-        STA ARG1+1
+        STA ARG1+1      ARG1 IS ADDRESS
         JSR DECS2
         JSR FBASE3
         JSR INDI        INDIRECTION
+        CLC
+        LDA ABASE
+        ADC ARG2        ADD INDIRECTION
+        STA ABASE
+        LDA ABASE+1
+        ADC ARG2+1
+        STA ABASE+1
         LDY =0
         LDA ACCU
         STA (ABASE),Y   ONLY BYTE

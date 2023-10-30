@@ -1087,7 +1087,7 @@ begin {gpval}
           code1(3); code1($3d+d) end
   else begin
     if typ='q' then begin
-      code4($54+d,level-t1[idpnt],2*t2[idpnt]);
+      code4($55,level-t1[idpnt],2*t2[idpnt]);
     end else
       code4($27+2*d+relad,level-t1[idpnt],
         2*t2[idpnt]);
@@ -1349,10 +1349,20 @@ begin { *** body of factor *** }
             restype:=low(t0[idpnt]);
             case high(t0[idpnt]) of
               'v','w','d':
-                    begin code4(39,
-                        level-t1[idpnt],
-                        2*t2[idpnt]);
-                      scan
+                    begin
+                      scan;
+                      if (restype='q') and (token=' [')
+                      then begin
+                        code4(39,level-t1[idpnt],
+                          2*t2[idpnt]);
+                        index(true);
+                        code1($03);
+                        code1($54);
+                        restype:='c';
+                      end
+                      else
+                        code4(39,level-t1[idpnt],
+                          2*t2[idpnt]);
                     end;
               'h':  begin code3($22,t2[idpnt]);
                       code1($17); scan end;
