@@ -1130,7 +1130,8 @@ begin
   vartyp2:=high(t0[idpnt]);
   vartype:=low(t0[idpnt]);
   scan;
-  if (vartype='q') and (token=' [') then begin
+  if (vartype='q') and (token=' [') and
+    (vartyp2='v') then begin
     vartyp2:='q'; vartype:='c';
   end;
   case vartyp2 of
