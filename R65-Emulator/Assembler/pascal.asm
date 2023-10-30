@@ -1607,6 +1607,69 @@ SWA3    LDA (SP),Y
         STA (SP),Y
         RTS
 *
+* P-CODE 54: LDXI       LOAD CPNT INDEXED
+*****************
+*
+LDXI    JSR FETCH
+        TAX
+        JSR FETCH
+        ASL ACCU
+        ROL ACCU+1
+        CLC
+        ADC ACCU
+        STA ARG1
+        PHP
+        JSR FETCH
+        PLP
+        ADC ACCU+1
+        STA ARG1+1
+        JSR FBASE3
+        JSR INDI
+        LDY =128
+        LDA (ABASE),Y
+        STA ACCU
+        LDA =0
+        STA ACCU+1
+        RTS
+*
+INDI    LDY =129        INDIRECTION
+        LDA (ABASE),Y
+        TAX
+        DEY
+        LDA (ABASE),Y   POINTER IS IN A,X
+        STA ABASE
+        STX ABASE+1
+        RTS
+*
+* P-CODE 54: STXI       STORE CPNT INDEXED
+*****************
+*
+STXI    JSR FETCH
+        TAX
+        LDY =126
+        LDA (SP),Y
+        ASL A
+        STA ARG1
+        INY
+        LDA (SP),Y
+        ROL A
+        STA ARG1+1
+        JSR FETCH
+        CLC
+        ADC ARG1
+        STA ARG1
+        JSR FETCH
+        ADC ARG1+1
+        STA ARG1+1
+        JSR DECS2
+        JSR FBASE3
+        JSR INDI        INDIRECTION
+        LDY =0
+        LDA ACCU
+        STA (ABASE),Y   ONLY BYTE
+        JMP GETS2
+*
+*
 * GETCHR0: GET A CHAR FROM SPECIFIED FILE
 *****************************************
 *
@@ -1755,7 +1818,7 @@ EXEC3   STA STPROG
         CMP ='R'        IS PASCAL PROGRAM?
         BEQ RUN
 EXECE   LDA =$84        PASCAL RUNPROG ERROR
-	STA RUNERR
+        STA RUNERR
         JMP STOP        SILENT ERROR
 *
 RUN     LDY =0          READ END ADDRESS
@@ -1798,7 +1861,7 @@ LOOP    LDX SAVS        RESTORE STACK POINTER
 *
 EXCODE  JSR FETCH
         STA =$F1
-        CMP =$54        TEST CODENUMBER
+        CMP =$56        TEST CODENUMBER
         BCC *+7
 ILLC    LDA =$85        PASCAL RUNTIME ERROR
         JMP PERROR      ILLEGAL P-CODE
@@ -1833,6 +1896,7 @@ TABLE   WRD STOP,RETN,NEGA,ADDA,SUBA,MULA
         WRD ADDF,SUBF,MULF,DIVF,FLOF,FIXF
         WRD FEQU,FNEQ,FLES,FGRE,FGRT,FLEE
         WRD FCOM,TFER,OPRA,GETR,PUTR,SWA2
+        WRD LDXI,STXI
 *
 * COLDSTART
 ***********

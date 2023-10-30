@@ -111,6 +111,7 @@ var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
          m:16-bit memory variable,
          n:16-bit array memory variable,
          p:procedure,
+         q:indexed cpnt,
          r,t:function result,
          s,u:array function result,
          v:variable, w:variable parameter,
@@ -639,7 +640,6 @@ func findid; {search in table for id }
 
 var k,i: integer;
     id1: char;
-    debugch: char;
 
 begin
 
@@ -765,7 +765,6 @@ begin
     'tr': begin val:=1; restype:='b' end;
     'fa': begin val:=0; restype:='b' end;
     'cp': begin
-            writeln(invvid,'cp',norvid); {debug}
             scan; val:=getcon;
             testtype('i'); restype:='q';
           end;
@@ -1076,17 +1075,23 @@ begin {gpval}
           code1($17+d) end;
   'm':  begin code3($22,t2[idpnt]);
           code1($3d+d) end;
-  'i':  begin if dir then code1($3f);
+  'i':  begin
+          if dir then code1($3f);
           code3($22,t2[idpnt]);
-          code1(3); if dir then code1($3f);
+          code1(3);
+          if dir then code1($3f);
           code1($17+d) end;
   'n':  begin if dir then code1($3f);
           code3($22,1); code1($12);
           code3($22,t2[idpnt]);
           code1(3); code1($3d+d) end
-  else
-    code4($27+2*d+relad,level-t1[idpnt],
-      2*t2[idpnt])
+  else begin
+    if typ='q' then begin
+      code4($54+d,level-t1[idpnt],2*t2[idpnt]);
+    end else
+      code4($27+2*d+relad,level-t1[idpnt],
+        2*t2[idpnt]);
+    end
   end {case}
 end;
 
@@ -1124,9 +1129,13 @@ proc getvar;
 begin
   vartyp2:=high(t0[idpnt]);
   vartype:=low(t0[idpnt]);
+  scan;
+  if (vartype='q') and (token=' [') then begin
+    vartyp2:='q'; vartype:='c';
+  end;
   case vartyp2 of
-  'a','x','s','i','n':
-      begin scan;
+  'a','x','s','i','n','q':
+      begin
         if token=' [' then begin
           scan; express; relad:=1;
           if vartyp2='r' then begin
@@ -1134,13 +1143,11 @@ begin
             code3($22,1); code1($12)
           end;
           checkindex(0,t3[idpnt]);
-          testtype('i'); testto(' ]'); scan
+          testtype('i'); testto(' ]'); scan;
         end else relad:=2;
       end;
-  'v','w','r','h','m':
-      begin relad:=0; scan end;
-  'c','d','e','t','u':
-      error(6)
+  'v','w','r','h','m': relad:=0;
+  'c','d','e','t','u': error(6)
   else error(1)
   end {case}
 end {getvar};
@@ -1518,7 +1525,6 @@ begin { *** body of factor *** }
             argument('i'); restype:='q';
           end;
     'ni': begin
-            writeln(invvid,'nil',norvid); {debug}
             code3(34,0); scan; restype:='q';
           end;
     'ox': begin
@@ -1722,7 +1728,7 @@ begin {assign}
     if relad<2 then begin
       assign1; testtype(vartype)
     end else begin
-      if vartyp2='i' then error(16);
+      if vartyp2='i' then error(16); {8-bit mem}
       testto(':='); scan;
       if relad=3 then begin
         arrayexp(1,vartype); relad:=1;
