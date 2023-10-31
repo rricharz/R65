@@ -37,7 +37,7 @@ the Pascal loader (compile2).
 usage:
  compile1 name[.cy[,drv]] [xxx]
   where x:       l: do hard copy print
-                 r: index bound checking
+                 i: index bound checking
                  n: no loader file
   [] means not required                     }
 
@@ -192,7 +192,8 @@ begin
     15: write('Array size');
     16: write('Array (8-bit)');
     17: write('Real');
-    18: write('File table overflow')
+    18: write('File table overflow');
+    19: write('Parameter')
   end {case};
   writeln;
   write('Continue?');
@@ -336,8 +337,8 @@ begin {init}
   close(fno);
 
   writeln;
-  writeln(tab8,'-- R65 Pascal Compiler --');
-  writeln(tab8,'   Pass 1  Version 3.7');
+  writeln('R65 Pascal Compiler');
+  writeln('Pass 1  Version 4.0');
 
   sdrive:=1; {default drive for source }
   scyclus:=0;
@@ -346,15 +347,19 @@ begin {init}
   agetstring(request,default,dummy,dummy);
   icheck:=false;
   prt:=false; ofno:=yesoutput;
-  if not default then
-    for i:=0 to 2 do
+  if not default then begin
+    if request[0]<>'/' then argerror(103);
+    for i:=1 to 8 do
       case request[i] of
         'L': prt:=true;
+        'P': prt:=true;
+        'I': icheck:=true;
         'R': icheck:=true;
         'N': ofno:=nooutput;
         ' ': begin end
-        else argerror(101)
+        else argerror(104)
       end; {case}
+  end;
 
   asetfile(pname,scyclus,sdrive,'P');
   openr(fno);
@@ -1143,7 +1148,10 @@ begin
             relad:=3;
             code3($22,1); code1($12)
           end;
-          checkindex(0,t3[idpnt]);
+          if vartyp2='q' then
+            checkindex(0,63)
+          else
+            checkindex(0,t3[idpnt]);
           testtype('i'); testto(' ]'); scan;
         end else relad:=2;
       end;
@@ -1327,16 +1335,19 @@ var i, idpnt: integer;
 proc index(chk: boolean);
 
 var savtype: char;
-    max: integer;
 
 begin {index}
-  if chk then max:=t3[idpnt];
   scan; savtype:=restype;
   express; testtype('i'); testto(' ]');
   if savtype='r' then begin
     code3($22,1); code1($12);
   end;
-  if chk then checkindex(0,max);
+  if chk then begin
+    if savtype='q' then
+      checkindex(0,63)
+    else
+      checkindex(0,t3[idpnt])
+  end;
   restype:=savtype; scan
 end;
 

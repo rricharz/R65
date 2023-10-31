@@ -1607,22 +1607,15 @@ SWA3    LDA (SP),Y
         STA (SP),Y
         RTS
 *
-* P-CODE 54: LDXI	PREPARE LOAD CPNT
+* P-CODE 54: LDXI       PREPARE LOAD CPNT
 *****************
 *
-LDXI    LDY =0		INDIRECTION
+LDXI    LDY =0          INDIRECTION
+	LDA ACCU+1
+	BEQ NILERR
         LDA (ACCU),Y
         STA ACCU
         STY ACCU+1
-        RTS
-*
-INDI    LDY =129        INDIRECTION
-        LDA (ABASE),Y
-        TAX
-        DEY
-        LDA (ABASE),Y   POINTER IS IN A,X
-        STA ABASE
-        STX ABASE+1
         RTS
 *
 * P-CODE 55: STXI       STORE CPNT INDEXED
@@ -1640,12 +1633,12 @@ STXI    JSR FETCH
         STA ARG1
         JSR FETCH
         STA ARG1+1      ARG1 IS ADDRESS
-        JSR DECS2
+        JSR DECS2       OF VARIABLE
         JSR FBASE3
         JSR INDI        INDIRECTION
         CLC
         LDA ABASE
-        ADC ARG2        ADD INDIRECTION
+        ADC ARG2        ADD INDEX
         STA ABASE
         LDA ABASE+1
         ADC ARG2+1
@@ -1655,6 +1648,18 @@ STXI    JSR FETCH
         STA (ABASE),Y   ONLY BYTE
         JMP GETS2
 *
+NILERR  LDX =$89        CPNT IS NIL
+        JMP PERROR
+*
+INDI    LDY =129        INDIRECTION
+        LDA (ABASE),Y
+        BEQ NILERR      NIL STRING
+        TAX
+        DEY
+        LDA (ABASE),Y   POINTER IS IN A,X
+        STA ABASE
+        STX ABASE+1
+        RTS
 *
 * GETCHR0: GET A CHAR FROM SPECIFIED FILE
 *****************************************

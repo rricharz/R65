@@ -59,7 +59,7 @@ begin
          begin
            default:=true;
          end
-    else argerror(2)
+    else argerror(102)
   end {case}
 end;
 
@@ -89,7 +89,7 @@ begin
            string:='                ';
            default:=true;
          end
-    else argerror(1)
+    else argerror(101)
   end {case}
   agetval(cyclus,dummy);
   agetval(drive,dummy);

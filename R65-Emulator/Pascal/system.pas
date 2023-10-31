@@ -123,7 +123,7 @@ var i, j: integer;
 
 begin
   ok:=((ch>='A') and (ch<='Z'))
-    or (ch='*') or (ch='?');
+    or (ch='*') or (ch='?') or (ch='/');
   i:=0;
   repeat
     name[i]:=ch; i:=succ(i);
@@ -193,7 +193,8 @@ begin {main}
             argtype[n]:='i';
           end {number}
           else if ((ch>='A') and (ch<='Z'))
-            or (ch='*') or (ch='?') then begin {letter}
+            or (ch='*') or (ch='?') or (ch='/')
+              then begin {letter}
               { default for arg is drive 1 }
               drive2:=255; cyclus2:=0;
               getfname(aname,' ',ok,
