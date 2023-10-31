@@ -271,7 +271,6 @@ proc getchr;
 
 begin
   read(@fno,ch);
-  if ch='{' then write(invvid);
   if ch=cr then begin
     crlf;
     writenum(line); write(' (');
@@ -284,7 +283,6 @@ begin
     abort
   end {else if}
   else write(ch)
-  if ch='}' then write(norvid);
 end {getchr};
 
 {       * splitconv *   (global) }
@@ -738,7 +736,7 @@ end;
 
 func getcon;
 
-var idpnt,val: integer;
+var idpnt,val,ii: integer;
     rval: real;
     sign: char;
 begin
@@ -755,12 +753,12 @@ begin
     'st': if value[0]=1 then begin
             restype:='c';
             val:=ord(ident[1])
-          end else begin
+          end else if value[0]=2 then begin
             val:=(ord(ident[1]) shl 8) +
               ord(ident[2]);
-            if value[0]<>2 then error(12);
-            restype:='p';
-          end;
+              restype:='p';
+          end
+          else error(15);
     'cr': begin parse(' ('); scan; val:=getcon;
             if (val>127) or (val<0) then
               error(12);
@@ -1103,7 +1101,7 @@ end;
 { FORWARD decl. of mainexp (of statement) }
 
 proc mainexp(reqtype: char;
-  var asize: integer); forward;
+  var arsize: integer); forward;
 
 { * express *           ( of statement ) }
 
@@ -1482,11 +1480,18 @@ begin { *** body of factor *** }
               case reqtype of
                 'c','u','n':
                     begin
-                      arsize3:=prec(value[0]);
-                      restype:='c';
-                      code2(57,value[0]);
+                      if vartype='q' then begin
+                        arsize3:=0;
+                        restype:='q';
+                        code2($56,value[0]);
+                      end else begin
+                        arsize3:=prec(value[0]);
+                        restype:='c';
+                        code2($39,value[0]);
+                      end;
                       for i:=1 to value[0] do
-                        code1(ord(ident[i]))
+                        code1(ord(ident[i]));
+                      if vartype='q' then code1(0);
                     end;
                 'p': begin
                       if odd(value[0]) then

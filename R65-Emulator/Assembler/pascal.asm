@@ -1611,8 +1611,8 @@ SWA3    LDA (SP),Y
 *****************
 *
 LDXI    LDY =0          INDIRECTION
-	LDA ACCU+1
-	BEQ NILERR
+        LDA ACCU+1
+        BEQ NILERR
         LDA (ACCU),Y
         STA ACCU
         STY ACCU+1
@@ -1659,6 +1659,24 @@ INDI    LDY =129        INDIRECTION
         LDA (ABASE),Y   POINTER IS IN A,X
         STA ABASE
         STX ABASE+1
+        RTS
+*
+* P-CODE 56: CPNT       CPNT CONSTANT
+*****************
+*
+CPNT    JSR COPY
+        JSR FETCH       STRING SIZE IN A
+        TAX
+        INX
+        LDA PC          PC IS POINTER
+        STA ACCU        TO RETURN
+        LDA PC+1
+        STA ACCU+1
+        TXA
+        ADC PC          ADVANCE PC
+        STA PC
+        BCC *+4
+        INC PC+1
         RTS
 *
 * GETCHR0: GET A CHAR FROM SPECIFIED FILE
@@ -1852,9 +1870,9 @@ LOOP    LDX SAVS        RESTORE STACK POINTER
 *
 EXCODE  JSR FETCH
         STA =$F1
-        CMP =$56        TEST CODENUMBER
+        CMP =$57        TEST CODENUMBER
         BCC *+7
-ILLC    LDA =$85        PASCAL RUNTIME ERROR
+ILLC    LDX =$85        PASCAL RUNTIME ERROR
         JMP PERROR      ILLEGAL P-CODE
 *
         ASL A
@@ -1887,7 +1905,7 @@ TABLE   WRD STOP,RETN,NEGA,ADDA,SUBA,MULA
         WRD ADDF,SUBF,MULF,DIVF,FLOF,FIXF
         WRD FEQU,FNEQ,FLES,FGRE,FGRT,FLEE
         WRD FCOM,TFER,OPRA,GETR,PUTR,SWA2
-        WRD LDXI,STXI
+        WRD LDXI,STXI,CPNT
 *
 * COLDSTART
 ***********
