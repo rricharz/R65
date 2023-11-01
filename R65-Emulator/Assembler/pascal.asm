@@ -1642,10 +1642,16 @@ STXI    JSR FETCH
         LDA ABASE+1
         ADC ARG2+1
         STA ABASE+1
-        LDY =0
+        CMP EOPROG+1    DO NOT ALLOW WRITING
+        BCC PRGERR      INTO PROGRAM SPACE
+        BEQ PRGERR      CHECK ONLY HIGH BYTE
+        LDY =0          MUST BE LARGER
         LDA ACCU
-        STA (ABASE),Y   ONLY BYTE
+        STA (ABASE),Y   ONLY ONE BYTE
         JMP GETS2
+*
+PRGERR  LDX =$90
+        JMP PERROR
 *
 NILERR  LDX =$89        CPNT IS NIL
         JMP PERROR
@@ -1689,7 +1695,7 @@ WRCP    LDY =0
         INY
         CPY =63
         BNE WRCP+2
-WRCP2   RTS
+WRCP2   JMP GETS2
 *
 * GETCHR0: GET A CHAR FROM SPECIFIED FILE
 *****************************************

@@ -46,6 +46,7 @@ begin
     87: writeln('No loader file made');
     88: writeln('Heap overflow');
     89: writeln('Pointer not allocated (nil)');
+    90: writeln('Writing to constant string');
     101: writeln('Argument is not string or default');
     102: writeln('Argument is not number or default');
     103: writeln('Argument is not starting with /');
