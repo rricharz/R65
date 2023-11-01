@@ -1673,6 +1673,7 @@ CPNT    JSR COPY
         LDA PC+1
         STA ACCU+1
         TXA
+        CLC	
         ADC PC          ADVANCE PC
         STA PC
         BCC *+4

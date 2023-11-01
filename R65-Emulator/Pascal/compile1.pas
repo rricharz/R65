@@ -6,9 +6,10 @@
     ********************************
 
 First version 1978 by rricharz
-Current version 3.7 (20K)  01/08/82 rricharz
+Original version 3.7 (20K)  01/08/82 rricharz
 
 Recovered 2018 by rricharz (r77@bluewin.ch)
+Extended 2018-2023 by rricharz
 
 Original derived from the publication by
 Kin-Man Chung and Herbert Yen in
@@ -1134,7 +1135,7 @@ begin
   vartype:=low(t0[idpnt]);
   scan;
   if (vartype='q') and (token=' [') and
-    (vartyp2='v') then begin
+    ((vartyp2='v') or (vartyp2='d')) then begin
     vartyp2:='q'; vartype:='c';
   end;
   case vartyp2 of
