@@ -4,14 +4,13 @@
 *       **********************
 *
 * VERSION 5.3 01/06/82 RRICHARZ,RBAUMANN
-* Modified 22/09/19 RRICHARZ
-* Graphics text devices added
+* IMPROVED 2019-2023 RRICHARZ
 *
         TIT R65 PASCAL RUNTIME
 *
 * INCLUDES RANDOM ACCESS FILE HANDLING,
 * FLOATING POINT MATH, FILE HANDLING ERROR
-* TESTING (OPTIONAL)
+* TESTING (OPTIONAL) AND CPNT POINTERS
 *
         ORG 0
 *
@@ -1673,12 +1672,24 @@ CPNT    JSR COPY
         LDA PC+1
         STA ACCU+1
         TXA
-        CLC	
+        CLC
         ADC PC          ADVANCE PC
         STA PC
         BCC *+4
         INC PC+1
         RTS
+*
+* P-CODE 57: WRCP       WRITE CPNT
+*****************
+*
+WRCP    LDY =0
+        LDA (ACCU),Y
+        BEQ WRCP2
+        JSR PRTCHR0     END MARK
+        INY
+        CPY =63
+        BNE WRCP+2
+WRCP2   RTS
 *
 * GETCHR0: GET A CHAR FROM SPECIFIED FILE
 *****************************************
@@ -1871,9 +1882,9 @@ LOOP    LDX SAVS        RESTORE STACK POINTER
 *
 EXCODE  JSR FETCH
         STA =$F1
-        CMP =$57        TEST CODENUMBER
+        CMP =$58        TEST CODENUMBER
         BCC *+7
-ILLC    LDX =$85        PASCAL RUNTIME ERROR
+ILLC    LDX =$86        PASCAL RUNTIME ERROR
         JMP PERROR      ILLEGAL P-CODE
 *
         ASL A
@@ -1906,7 +1917,7 @@ TABLE   WRD STOP,RETN,NEGA,ADDA,SUBA,MULA
         WRD ADDF,SUBF,MULF,DIVF,FLOF,FIXF
         WRD FEQU,FNEQ,FLES,FGRE,FGRT,FLEE
         WRD FCOM,TFER,OPRA,GETR,PUTR,SWA2
-        WRD LDXI,STXI,CPNT
+        WRD LDXI,STXI,CPNT,WRCP
 *
 * COLDSTART
 ***********

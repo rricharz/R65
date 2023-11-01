@@ -1963,6 +1963,7 @@ begin {body of statement }
                   case restype of
                     'i':  code1(30);
                     'c':  code1(29);
+                    'q':  code1($57);
                     'p':  begin
                             code1(22);
                             code1(51);

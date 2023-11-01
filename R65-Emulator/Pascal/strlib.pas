@@ -45,17 +45,6 @@ begin
   strlen:=i;
 end;
 
-{ ***** strwrite: write cpnt string ***** }
-
-proc strwrite(f:file; pnt:cpnt);
-var i:integer;
-begin
-  i:=0;
-  while (pnt[i]<>endmark) and (i<strsize) do begin
-    write(@f,pnt[i]); i:=succ(i);
-  end;
-end;
-
 { ***** strcopy: copy cpnt string ***** }
 
 proc strcpy(strin, strout:cpnt);
