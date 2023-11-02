@@ -1,0 +1,2508 @@
+
+R65 Pascal program COMPILE1        2/11/23     page 1
+
+
+                   1 (    4) {   ********************************
+                   2 (    4)     *                              *
+                   3 (    4)     *  R65 "Tiny" Pascal Compiler  *
+                   4 (    4)     *            Pass 1            *
+                   5 (    4)     *                              *
+                   6 (    4)     ********************************
+                   7 (    4) 
+                   8 (    4) First version 1978 by rricharz
+                   9 (    4) Original version 3.7 (20K)  01/08/82 rricharz
+                  10 (    4) 
+                  11 (    4) Recovered 2018 by rricharz (r77@bluewin.ch)
+                  12 (    4) Improved 2018-2023 by rricharz
+                  13 (    4) 
+                  14 (    4) Original derived from the publication by
+                  15 (    4) Kin-Man Chung and Herbert Yen in
+                  16 (    4) Byte, Volume 3, Number 9 and Number 10, 1978
+                  17 (    4) 
+                  18 (    4) Adapted for the R65 computer system and
+                  19 (    4) substantially enhanced by rricharz 1978-1982
+                  20 (    4) 
+                  21 (    4) This is a Pascal derivative optimized for 8-bit
+                  22 (    4) microprocessors (integer type is 16 bit) with
+                  23 (    4) additional features (mem) to interact directly
+                  24 (    4) with the microprocessor hardware. Only one
+                  25 (    4) dimensional arrays and no records or user
+                  26 (    4) defined types. Floating point numbers (real)
+                  27 (    4) and file io to floppy disks are supported.
+                  28 (    4) 
+                  29 (    4) Precompiled libraries are merged in the loader.
+                  30 (    4) 
+                  31 (    4) The table of reserved words and the library
+                  32 (    4) tables are loaded from the same drive as
+                  33 (    4) the compiler.
+                  34 (    4) 
+                  35 (    4) The output of the program is a loader file for
+                  36 (    4) the Pascal loader (compile2).
+                  37 (    4) 
+                  38 (    4) usage:
+                  39 (    4)  compile1 name[.cy[,drv]] [xxx]
+                  40 (    4)   where x:       l,p: no hard copy print
+                  41 (    4)                  i,r: index bound checking
+                  42 (    4)                  n: no loader file
+                  43 (    4)   [] means not required                     }
+                  44 (    4) 
+                  45 (    4) program compile1;
+                  46 (    4) 
+                  47 (    4) uses syslib, arglib;
+                  48 ( 1093) 
+                  49 ( 1093) const table     =$97ff; {user ident table -1}
+                  50 ( 1096)       idtab     =$95ff; {resword table -1}
+                  51 ( 1096)       idlength  =64;    {max. length of ident}
+                  52 ( 1096)       stacksize =256;   {stack size}
+                  53 ( 1096)       pagelenght=60;    {no of lines per page}
+                  54 ( 1096)       nooutput  =@0;
+                  55 ( 1096)       maxfi     =3;     {max number of ins fls}
+                  56 ( 1096) 
+                  57 ( 1096) {
+                  58 ( 1096) The compiler uses 2 fixed memory areas to store
+                  59 ( 1096) the table of reserved words and the table of
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 2
+
+                  60 ( 1096) idents. The top of the Pascal stack (endstk) is
+                  61 ( 1096) adjusted accordingly. The reason for this hack
+                  62 ( 1096) is speed and convenience. A normal Pascal array
+                  63 ( 1096) of chars would store the chars as 16 bit
+                  64 ( 1096) numers and would therefore require twice the
+                  65 ( 1096) space. An array of packed chars would require
+                  66 ( 1096) more coding and slow the scanner module of the
+                  67 ( 1096) compiler down.                               }
+                  68 ( 1096) 
+                  69 ( 1096)     nresw=61;   {number of res. words, max 64}
+                  70 ( 1096)     symbsize=256;     {id table entries}
+                  71 ( 1096)     reswtabpos=$c600; { up to $c7ff }
+                  72 ( 1096)     idtabpos=$be00;   { up to $c5ff }
+                  73 ( 1096) 
+                  74 ( 1096)     yesoutput=@255;
+                  75 ( 1096) 
+                  76 ( 1096) mem endstk  =$000e: integer;
+                  77 ( 1096)     reswtab =reswtabpos: array[$200] of char&;
+                  78 ( 1096)     idtab   =idtabpos: array[$800] of char&;
+                  79 ( 1096) 
+                  80 ( 1096) var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
+                  81 ( 1096)     npara,i,stackpnt,stackmax,spntmax,numerr
+                  82 ( 1096)                               :integer;
+                  83 ( 1096) 
+                  84 ( 1096)     scyclus,sdrive,cdrive: integer;
+                  85 ( 1096) 
+                  86 ( 1096)     pname: array[15] of char;
+                  87 ( 1096) 
+                  88 ( 1096)     value: array[1] of integer;
+                  89 ( 1096) 
+                  90 ( 1096)     ch,restype,vartype:char;
+                  91 ( 1096) 
+                  92 ( 1096)     token: packed char;
+                  93 ( 1096) 
+                  94 ( 1096)     prt,libflg,icheck: boolean;
+                  95 ( 1096) 
+                  96 ( 1096)     fno,ofno: file;
+                  97 ( 1096) 
+                  98 ( 1096)     filstk: array[maxfi] of file;
+                  99 ( 1096) 
+                 100 ( 1096)     ident: array[idlength] of char;
+                 101 ( 1096)     { Only the first 8 characters are
+                 102 ( 1096)       used to find and differentiate ids }
+                 103 ( 1096) 
+                 104 ( 1096)     t0: array[symbsize] of packed char;
+                 105 ( 1096)            {type of symbol}
+                 106 ( 1096) 
+                 107 ( 1096)         {High letter:
+                 108 ( 1096)          a:array, c:constant, d;const parameter.
+                 109 ( 1096)          e:constant array parameter, f:function,
+                 110 ( 1096)          g:array function, h;8-bit memory var,
+                 111 ( 1096)          i:8-bit array memory variable,
+                 112 ( 1096)          m:16-bit memory variable,
+                 113 ( 1096)          n:16-bit array memory variable,
+                 114 ( 1096)          p:procedure,
+                 115 ( 1096)          q:indexed cpnt,
+                 116 ( 1096)          r,t:function result,
+                 117 ( 1096)          s,u:array function result,
+                 118 ( 1096)          v:variable, w:variable parameter,
+                 119 ( 1096)          x:variable array parameter
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 3
+
+                 120 ( 1096) 
+                 121 ( 1096)          Low letter:
+                 122 ( 1096)          i:integer, c:char, p:packed char,
+                 123 ( 1096)          q:cpoint (pointer to char),
+                 124 ( 1096)          r:real(array multiple of two),
+                 125 ( 1096)          f:file, b:boolean, u:undefined  }
+                 126 ( 1096) 
+                 127 ( 1096)     t1: array[symbsize] of integer;
+                 128 ( 1096)          {level}
+                 129 ( 1096)     t2: array[symbsize] of integer;
+                 130 ( 1096)          {val,dis,addr}
+                 131 ( 1096)     t3: array[symbsize] of integer;
+                 132 ( 1096)          {stack pointer,size of array}
+                 133 ( 1096) 
+                 134 ( 1096)     reswcod:array[nresw] of packed char;
+                 135 ( 1096) 
+                 136 ( 1096)     stack: array[stacksize] of integer;
+                 137 ( 1096) 
+                 138 ( 1096) 
+                 139 ( 1096) {       * savebyte *    (global)        }
+                 140 ( 1096) 
+                 141 ( 1096) proc savebyte(x: integer);
+                 142 ( 1096) 
+                 143 ( 1096) begin
+                 144 ( 1096)     if ofno<>nooutput then begin
+                 145 ( 1108)       write(@ofno,
+                 146 ( 1111)         chr(((x and 255) shr 4)+ord('0')));
+                 147 ( 1132)       write(@ofno,chr((x and 15)+ord('0')))
+                 148 ( 1147)     end
+                 149 ( 1150) end {savebyte};
+                 150 ( 1150) 
+                 151 ( 1151) {       * crlf *        (global)        }
+                 152 ( 1151) 
+                 153 ( 1151) proc newpage; forward;
+                 154 ( 1154) 
+                 155 ( 1154) proc crlf;
+                 156 ( 1154)   var i: integer;
+                 157 ( 1157) begin
+                 158 ( 1157)   writeln;
+                 159 ( 1159)   line:=succ(line);
+                 160 ( 1169)   if (line div pagelenght)*pagelength=line
+                 161 ( 1184)     then newpage;
+                 162 ( 1196)   if prt then
+                 163 ( 1196)     for i:=1 to 16 do write(@printer,' ')
+                 164 ( 1225) end {crlf};
+                 165 ( 1240) 
+                 166 ( 1241) {       error message   (global)        }
+                 167 ( 1241) 
+                 168 ( 1241) proc merror(x: integer; code: packed char);
+                 169 ( 1241) 
+                 170 ( 1241) var i: integer;
+                 171 ( 1244)     answer: char;
+                 172 ( 1244) 
+                 173 ( 1244) begin
+                 174 ( 1244)   crlf; numerr:=succ(numerr);
+                 175 ( 1254)   for i:=2 to tpos do write(' ');
+                 176 ( 1280)   write('^'); crlf;
+                 177 ( 1300)   write('*** (',numerr,',',pc,')   ');
+                 178 ( 1323)   case x of
+                 179 ( 1323)     01: write('Ident');
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 4
+
+                 180 ( 1340)     02: write('Ident ',code,' expected');
+                 181 ( 1376)     03: write('Var declaration');
+                 182 ( 1402)     04: write('Const expected');
+                 183 ( 1427)     05: write('Ident unknown');
+                 184 ( 1451)     06: write('Cannot be assigned');
+                 185 ( 1480)     07: write('Symbol table overflow');
+                 186 ( 1512)     08: write('Stack overflow');
+                 187 ( 1537)     09: write('Expression');
+                 188 ( 1558)     10: write('Statement');
+                 189 ( 1578)     11: write('Declaration');
+                 190 ( 1600)     12: write('Constant');
+                 191 ( 1619)     13: write('Forward reference: ',code);
+                 192 ( 1658)     14: write('Type mismatch: ',code);
+                 193 ( 1693)     15: write('Array size');
+                 194 ( 1714)     16: write('Array (8-bit)');
+                 195 ( 1738)     17: write('Real');
+                 196 ( 1753)     18: write('File table overflow');
+                 197 ( 1783)     19: write('Parameter')
+                 198 ( 1803)   end {case};
+                 199 ( 1805)   writeln;
+                 200 ( 1805)   write('Continue?');
+                 201 ( 1821)   read(@key,answer);
+                 202 ( 1829)   if answer<>'Y' then begin
+                 203 ( 1837)     crlf; write(prtoff); setemucom(9); close(fno);
+                 204 ( 1861)     if (ofno<>nooutput) and (ofno<>yesoutput)
+                 205 ( 1874)       then close(ofno);
+                 206 ( 1885)     writeln('Aborting compile1 on request');
+                 207 ( 1920)     abort
+                 208 ( 1920)   end
+                 209 ( 1924)   else crlf;
+                 210 ( 1931)   if (ofno<>nooutput) and (ofno<>yesoutput)
+                 211 ( 1944)     then close(ofno);
+                 212 ( 1955)   ofno:=nooutput;
+                 213 ( 1957) end {merror};
+                 214 ( 1961) 
+                 215 ( 1962) proc error(x: integer);
+                 216 ( 1962) 
+                 217 ( 1962) begin
+                 218 ( 1962)   merror(x,'##')
+                 219 ( 1974) end;
+                 220 ( 1980) 
+                 221 ( 1981) {       * push & pop *  (global) }
+                 222 ( 1981) 
+                 223 ( 1981) proc push(x: %integer);
+                 224 ( 1981) 
+                 225 ( 1981) begin
+                 226 ( 1981)   if stackpnt>=stacksize then error(8)
+                 227 ( 1999)   else stackpnt:=succ(stackpnt);
+                 228 ( 2012)   if stackpnt>stackmax then stackmax:=stackpnt;
+                 229 ( 2029)   stack[stackpnt]:=x;
+                 230 ( 2041) end {push};
+                 231 ( 2049) 
+                 232 ( 2050) func pop: integer;
+                 233 ( 2050) 
+                 234 ( 2050) begin
+                 235 ( 2050)   pop:=stack[stackpnt];
+                 236 ( 2059)   stackpnt:=prec(stackpnt)
+                 237 ( 2067) end {pop};
+                 238 ( 2076) 
+                 239 ( 2077) {       * newpage *     (global) }
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 5
+
+                 240 ( 2077) 
+                 241 ( 2077) proc newpage;
+                 242 ( 2077) 
+                 243 ( 2077) var i: integer;
+                 244 ( 2080) 
+                 245 ( 2080) begin
+                 246 ( 2080)   if (line<>0) and prt then
+                 247 ( 2089)     write(@printer,formfeed);
+                 248 ( 2104)   writeln; { Do not count this line}
+                 249 ( 2110)   if pname[0]<>'x' then begin
+                 250 ( 2119)     write('R65 Pascal ');
+                 251 ( 2134)     if libflg then write('library ')
+                 252 ( 2150)     else write('program ');
+                 253 ( 2162)     prtext16(output,pname);
+                 254 ( 2176)   end;
+                 255 ( 2176)   tab(34);
+                 256 ( 2184)   prtdate(output); write('     ');
+                 257 ( 2198)   writeln('page ',(line div pagelenght)+1);
+                 258 ( 2221)   writeln;
+                 259 ( 2221) end {newpage};
+                 260 ( 2227) 
+                 261 ( 2228) {       * getchr *      (global) }
+                 262 ( 2228) 
+                 263 ( 2228) proc getchr;
+                 264 ( 2228) 
+                 265 ( 2228)   proc writenum(i: integer);
+                 266 ( 2231)   begin
+                 267 ( 2231)     if i<=999 then write(' ');
+                 268 ( 2249)     if i<=99 then write(' ');
+                 269 ( 2261)     if i<=9 then write(' ');
+                 270 ( 2273)     write(i);
+                 271 ( 2278)   end;
+                 272 ( 2278) 
+                 273 ( 2279) begin
+                 274 ( 2279)   read(@fno,ch);
+                 275 ( 2291)   if ch=cr then begin
+                 276 ( 2299)     crlf;
+                 277 ( 2306)     writenum(line); write(' (');
+                 278 ( 2319)     if (pc+2)<9999 then write(' ');
+                 279 ( 2335)     writenum(pc+2); write(') ');
+                 280 ( 2351)     ch:=' '
+                 281 ( 2351)   end {if}
+                 282 ( 2357)   else if ch=eof then begin
+                 283 ( 2367)     writeln('Illegal eof');
+                 284 ( 2388)     abort
+                 285 ( 2388)   end {else if}
+                 286 ( 2392)   else write(ch)
+                 287 ( 2395) end {getchr};
+                 288 ( 2400) 
+                 289 ( 2401) {       * splitconv *   (global) }
+                 290 ( 2401) 
+                 291 ( 2401) proc splitconv(a: array[1] of %integer;
+                 292 ( 2401)   var b:array[1] of %integer);
+                 293 ( 2401) 
+                 294 ( 2401) begin
+                 295 ( 2401)   b:=a;
+                 296 ( 2406) end;
+                 297 ( 2418) 
+                 298 ( 2419) {       * init *        (global) }
+                 299 ( 2419) 
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 6
+
+                 300 ( 2419) proc init;
+                 301 ( 2419) 
+                 302 ( 2419) const char96=chr(20);
+                 303 ( 2422) 
+                 304 ( 2422) var i,j,dummy: integer;
+                 305 ( 2422)     dch: char;
+                 306 ( 2422)     pch: packed char;
+                 307 ( 2422)     request: array[15] of char;
+                 308 ( 2422)     default: boolean;
+                 309 ( 2422) 
+                 310 ( 2422) begin {init}
+                 311 ( 2422)   cdrive:=fildrv; { drive of compile program }
+                 312 ( 2431)   fipnt:=-1;
+                 313 ( 2433)   endstk:=idtabpos-144;
+                 314 ( 2443)   pc:=2; dpnt:=0; spnt:=0; offset:=2;
+                 315 ( 2467)   npara:=0; level:=0;
+                 316 ( 2479)   stackpnt:=0; libflg:=false;
+                 317 ( 2491)   stackmax:=0;spntmax:=0; numerr:=0;
+                 318 ( 2509)   t0[0]:='vi'; t1[0]:=0; t2[0]:=0; t3[0]:=0;
+                 319 ( 2542)   { prepare resword table }
+                 320 ( 2546)   asetfile('RESWORDS:W      ',0,cdrive,'W');
+                 321 ( 2578)   openr(fno);
+                 322 ( 2584)   for i:=0 to nresw do begin
+                 323 ( 2601)     read(@fno,pch,dch);
+                 324 ( 2618)     reswcod[i]:=pch;
+                 325 ( 2623)     for j:=0 to 7 do reswtab[8*i+j]:=' ';
+                 326 ( 2662)     j:=0;
+                 327 ( 2685)     while (j<8) and (dch<>cr) do begin
+                 328 ( 2707)       read(@fno,dch);
+                 329 ( 2717)       if (dch<>cr) then
+                 330 ( 2725)         reswtab[8*i+j]:=dch;
+                 331 ( 2740)       j:=succ(j)
+                 332 ( 2751)     end;
+                 333 ( 2760)     while (dch<>cr) and (dch<>eof) do
+                 334 ( 2777)       read(@fno,dch)
+                 335 ( 2786)   end;
+                 336 ( 2795)   close(fno);
+                 337 ( 2815) 
+                 338 ( 2815)   writeln;
+                 339 ( 2815)   writeln('R65 Pascal Compiler');
+                 340 ( 2847)   writeln('Pass 1  Version 4.0');
+                 341 ( 2873) 
+                 342 ( 2873)   sdrive:=1; {default drive for source }
+                 343 ( 2879)   scyclus:=0;
+                 344 ( 2881)   agetstring(pname,default,scyclus,sdrive);
+                 345 ( 2925) 
+                 346 ( 2925)   agetstring(request,default,dummy,dummy);
+                 347 ( 2965)   icheck:=false;
+                 348 ( 2967)   prt:=true; ofno:=yesoutput;
+                 349 ( 2979)   if not default then begin
+                 350 ( 2988)     if request[0]<>'/' then argerror(103);
+                 351 ( 3011)     for i:=1 to 8 do
+                 352 ( 3019)       case request[i] of
+                 353 ( 3032)         'P','L': prt:=false;
+                 354 ( 3052)         'I','R': icheck:=true;
+                 355 ( 3075)         'N': ofno:=nooutput;
+                 356 ( 3091)         ' ': begin end
+                 357 ( 3105)         else argerror(104)
+                 358 ( 3110)       end; {case}
+                 359 ( 3132)   end;
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 7
+
+                 360 ( 3132) 
+                 361 ( 3132)   asetfile(pname,scyclus,sdrive,'P');
+                 362 ( 3154)   openr(fno);
+                 363 ( 3160)   scyclus:=filcyc; { may have changed }
+                 364 ( 3168) 
+                 365 ( 3168)   {save cyclus and drive for compile2}
+                 366 ( 3168)   arglist[8]:=scyclus;
+                 367 ( 3170)   arglist[9]:=sdrive;
+                 368 ( 3184)   numarg:=1;
+                 369 ( 3198) 
+                 370 ( 3202)   if prt then begin
+                 371 ( 3206)     write(prton);
+                 372 ( 3212)     setemucom(8);
+                 373 ( 3220)   end
+                 374 ( 3220) 
+                 375 ( 3220)   line:=0; newpage; crlf; line:=1;
+                 376 ( 3236)   write('   1 (    4) '); getchr
+                 377 ( 3254) end {init};
+                 378 ( 3258) 
+                 379 ( 3259) 
+                 380 ( 3259) { ############################# }
+                 381 ( 3259) {       *scan*              (global)    }
+                 382 ( 3259) { ############################# }
+                 383 ( 3259) { scan input and make tokens }
+                 384 ( 3259) 
+                 385 ( 3259) proc scan;
+                 386 ( 3259) 
+                 387 ( 3259) var count,ll,hh,i,i1,co: integer;
+                 388 ( 3262)     name: array[7] of char;
+                 389 ( 3262) 
+                 390 ( 3262) {       * compresw*     (of scan)       }
+                 391 ( 3262) 
+                 392 ( 3262) func compresw(index: integer);
+                 393 ( 3262) 
+                 394 ( 3262) var addr,ci,i: integer;
+                 395 ( 3265) 
+                 396 ( 3265) begin
+                 397 ( 3265)   addr:=8*index; i:=0;
+                 398 ( 3280)   repeat
+                 399 ( 3284)     ci:=ord(ident[i+1])-ord(reswtab[addr+i]);
+                 400 ( 3309)     i:=succ(i)
+                 401 ( 3314)   until (ci<>0) or (i>=8);
+                 402 ( 3337)   compresw:=ci
+                 403 ( 3341) end {compresw};
+                 404 ( 3349) 
+                 405 ( 3350) {       * clear *       (of scan)              }
+                 406 ( 3350) 
+                 407 ( 3350) proc clear; {clears 8 chars of identifier}
+                 408 ( 3350) 
+                 409 ( 3350) var i: integer;
+                 410 ( 3353) 
+                 411 ( 3353) begin
+                 412 ( 3353)   for i:=1 to 8 do ident[i]:=' '
+                 413 ( 3376) end;
+                 414 ( 3396) 
+                 415 ( 3397) {       * pack *        (of scan)              }
+                 416 ( 3397) 
+                 417 ( 3397) proc pack;  {packs token and ch to token }
+                 418 ( 3397) 
+                 419 ( 3397) begin
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 8
+
+                 420 ( 3397)   token:=packed(low(token),ch); getchr
+                 421 ( 3416) end;
+                 422 ( 3420) 
+                 423 ( 3421) {       * setval *      (of scan)              }
+                 424 ( 3421) 
+                 425 ( 3421) proc setval;
+                 426 ( 3421) 
+                 427 ( 3421) var r: real;
+                 428 ( 3424)     n,n1: integer;
+                 429 ( 3424)     ems: boolean;
+                 430 ( 3424) 
+                 431 ( 3424)   func times10(r:real):real;
+                 432 ( 3424)   { slightly more accurate than 10.0*r }
+                 433 ( 3424)   var r2,r4:real;
+                 434 ( 3427)   begin
+                 435 ( 3427)     r2:=r+r;
+                 436 ( 3435)     r4:=r2+r2;
+                 437 ( 3454)     times10:=r2+r4+r4;
+                 438 ( 3480)   end;
+                 439 ( 3493) 
+                 440 ( 3494) begin
+                 441 ( 3494)   r:=0.0;
+                 442 ( 3502)   repeat
+                 443 ( 3508)     r:=times10(r)+conv(ord(ch)-ord('0'));
+                 444 ( 3529)     getchr;
+                 445 ( 3541)   until (ch<'0') or (ch>'9');
+                 446 ( 3555)   if ch<>'.' then begin {numeric integer}
+                 447 ( 3569)     token:='nu';
+                 448 ( 3572)     value[0]:=trunc(r+0.5);
+                 449 ( 3591)   end
+                 450 ( 3596)   else begin {numeric real}
+                 451 ( 3599)     n:=0; getchr;
+                 452 ( 3609)     while (ch<='9') and (ch>='0') do begin
+                 453 ( 3627)       r:=times10(r)+conv(ord(ch)-ord('0'));
+                 454 ( 3648)       n:=prec(n); getchr
+                 455 ( 3665)     end;
+                 456 ( 3669)     if ch='e' then begin
+                 457 ( 3679)       ems:=false; getchr;
+                 458 ( 3692)       case ch of
+                 459 ( 3692)         '+': getchr;
+                 460 ( 3707)         '-': begin ems:=true; getchr end
+                 461 ( 3727)       end;
+                 462 ( 3729)       if (ch>'9') or (ch<'0') then error(17)
+                 463 ( 3749)       else begin
+                 464 ( 3758)         n1:=ord(ch)-ord('0');
+                 465 ( 3764)         getchr;
+                 466 ( 3773)         if (ch<='9') and (ch>='0') then begin
+                 467 ( 3788)           n1:=10*n1+ord(ch)-ord('0');
+                 468 ( 3805)           getchr
+                 469 ( 3810)         end;
+                 470 ( 3814)         if ems then n:=n-n1 else n:=n+n1
+                 471 ( 3841)       end
+                 472 ( 3841)     end;
+                 473 ( 3850)     while n>0 do begin
+                 474 ( 3860)       n:=prec(n);
+                 475 ( 3864)       r:=times10(r);
+                 476 ( 3883)     end;
+                 477 ( 3889)     while n<0 do begin
+                 478 ( 3902)       n:=succ(n); r:=0.1*r;
+                 479 ( 3917)     end;
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 9
+
+                 480 ( 3930)     splitconv(r,value);
+                 481 ( 3957)     token:='ru'
+                 482 ( 3957)   end
+                 483 ( 3960) end {setval};
+                 484 ( 3964) 
+                 485 ( 3965) {       * setid *       (of scan)              }
+                 486 ( 3965) 
+                 487 ( 3965) proc setid; {sets one char to ident}
+                 488 ( 3965) 
+                 489 ( 3965) begin
+                 490 ( 3965)   if count<=idlength then begin
+                 491 ( 3977)     ident[count]:=ch; count:=succ(count)
+                 492 ( 3992)   end;
+                 493 ( 4001)   getchr;
+                 494 ( 4005) end {setid};
+                 495 ( 4005) 
+                 496 ( 4006) begin { ***** body of scan ***** }
+                 497 ( 4006)   count:=1; while ch=' ' do getchr;
+                 498 ( 4028)   tpos:=curpos;
+                 499 ( 4034) 
+                 500 ( 4038)   if (ch<'a') or (ch>'z') then begin {main if}
+                 501 ( 4056)     if (ch<'0') or (ch>'9') then begin {symb}
+                 502 ( 4074)       token:=packed(' ',ch); getchr;
+                 503 ( 4089)       case low(token) of
+                 504 ( 4093)         '<': if (ch='=') or (ch='>') then pack;
+                 505 ( 4123)         '>',':': if (ch='=') then pack;
+                 506 ( 4154)         '{': begin repeat
+                 507 ( 4164)                getchr until ch='}'; getchr; scan
+                 508 ( 4182)              end;
+                 509 ( 4186)         '$': begin {hex constant}
+                 510 ( 4196)                token:='nu'; value[0]:=0;
+                 511 ( 4207)                while ((ch>='0')and(ch<='9'))
+                 512 ( 4225)                      or((ch>='a')and(ch<='f'))
+                 513 ( 4240)                      do begin
+                 514 ( 4245)                  if ch>'9' then
+                 515 ( 4251)                    value[0]:=(value[0] shl 4)
+                 516 ( 4265)                      +ord(ch)-ord('a')+10
+                 517 ( 4274)                  else
+                 518 ( 4276)                    value[0]:=(value[0] shl 4)
+                 519 ( 4294)                      +ord(ch)-ord('0');
+                 520 ( 4302)                  getchr
+                 521 ( 4307)                end {do}
+                 522 ( 4311)              end; {hex constant}
+                 523 ( 4317)         chr(39): begin {string}
+                 524 ( 4324)                token:='st';
+                 525 ( 4327)                repeat setid until ch=chr(39);
+                 526 ( 4341)                value[0]:=prec(count); getchr
+                 527 ( 4357)               end
+                 528 ( 4361)       end {case of token}
+                 529 ( 4363)     end {special symbols}
+                 530 ( 4363)     else setval {numeric value}
+                 531 ( 4370)   end {main if}
+                 532 ( 4370)   else begin {ident}
+                 533 ( 4373)     clear;
+                 534 ( 4377)     repeat
+                 535 ( 4377)       setid
+                 536 ( 4377)       until (ch<'0') or (ch>'z') or
+                 537 ( 4395)         ((ch>'9') and (ch<'A')) or
+                 538 ( 4411)         ((ch>'Z') and (ch<'a'));
+                 539 ( 4427)     ll:=0; hh:=nresw; {look up in resword table}
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 10
+
+                 540 ( 4443)     repeat
+                 541 ( 4443)       i:=(ll+hh) shr 1; co:=compresw(i);
+                 542 ( 4471)       if (co<0) then hh:=prec(i)
+                 543 ( 4485)       else ll:=succ(i);
+                 544 ( 4501)       until (co=0) or (ll>hh);
+                 545 ( 4522)     if (co=0) then
+                 546 ( 4533)       token:=reswcod[i] {reserved word found}
+                 547 ( 4540)     else token:='id' {ident}
+                 548 ( 4554)   end {odent}
+                 549 ( 4558) end {scan};
+                 550 ( 4558) 
+                 551 ( 4559) { * testto/parse * }
+                 552 ( 4559) 
+                 553 ( 4559) { parce source for specific token; else error }
+                 554 ( 4559) 
+                 555 ( 4559) proc testto(x: packed char); { current token }
+                 556 ( 4559) begin
+                 557 ( 4559)   if token<>x then merror(2,x)
+                 558 ( 4578) end;
+                 559 ( 4588) 
+                 560 ( 4589) proc parse(x: packed char); { next token }
+                 561 ( 4589) begin
+                 562 ( 4589)   scan; testto(x);
+                 563 ( 4608) end;
+                 564 ( 4608) 
+                 565 ( 4609) { * getlib * }
+                 566 ( 4609) 
+                 567 ( 4609) proc getlib;  { read library data }
+                 568 ( 4609) 
+                 569 ( 4609) var i,j,nent,addr,size,num,x,base: integer;
+                 570 ( 4612)     libfil: file;
+                 571 ( 4612)     ch,ltyp2,dummy: char;
+                 572 ( 4612)     name: array[7] of char;
+                 573 ( 4612) 
+                 574 ( 4612) begin
+                 575 ( 4612)   scan; if token=' ,' then scan;
+                 576 ( 4633)   testto('id');
+                 577 ( 4642)   base:=pc-2;
+                 578 ( 4648)   if (ofno<>nooutput) then write(@ofno,'L');
+                 579 ( 4671)   for i:=0 to 7 do begin
+                 580 ( 4688)     name[i]:=ident[succ(i)];
+                 581 ( 4697)     if ofno<>nooutput then
+                 582 ( 4711)       write(@ofno,ident[succ(i)])
+                 583 ( 4725)   end;
+                 584 ( 4731)   write(prtoff);
+                 585 ( 4748)   asetfile(name&'        ',0,cdrive,'L');
+                 586 ( 4778)   openr(libfil);  { get table file }
+                 587 ( 4784)   read(@libfil,nent,size);
+                 588 ( 4799)   {including cr,lf}
+                 589 ( 4800)   for i:=succ(spnt) to spnt+nent do begin
+                 590 ( 4827)     if spnt>symbsize then error(7);
+                 591 ( 4846)     spnt:=succ(spnt); addr:=8*i+1;
+                 592 ( 4864)     for j:=0 to 7 do begin
+                 593 ( 4886)       read(@libfil,ch);
+                 594 ( 4896)       idtab[addr+j]:=ch
+                 595 ( 4906)     end;
+                 596 ( 4917)     read(@libfil,ch);
+                 597 ( 4941)     read(@libfil,t0[i],dummy,t1[i],t2[i],t3[i]);
+                 598 ( 4990)     t1[i]:=t1[i]+level;
+                 599 ( 5003)     ltyp2:=high(t0[i]);
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 11
+
+                 600 ( 5020)     if (ltyp2='p')or(ltyp2='f')
+                 601 ( 5038)       or(ltyp2='g') then begin
+                 602 ( 5048)       t2[i]:=t2[i]+base;
+                 603 ( 5063)       if t3[i]<>0 then begin {stack data}
+                 604 ( 5086)         read(@libfil,num);
+                 605 ( 5096)         push(num); t3[i]:=stackpnt;
+                 606 ( 5111)         for j:=1 to num do begin
+                 607 ( 5138)           read(@libfil,x);
+                 608 ( 5148)           push(x);
+                 609 ( 5159)         end {for j};
+                 610 ( 5159)       end {stack data}
+                 611 ( 5173)     end {if ltyp2}
+                 612 ( 5173)   end {for i}
+                 613 ( 5173)   level:=succ(level); pc:=pc+size; offset:=pc;
+                 614 ( 5209)   close(libfil);
+                 615 ( 5223)   if spnt>spntmax then spntmax:=spnt;
+                 616 ( 5235)   if stackpnt>stackmax then stackmax:=stackpnt;
+                 617 ( 5255)   if prt then write(prton);
+                 618 ( 5273) end {getlib};
+                 619 ( 5273) 
+                 620 ( 5274) 
+                 621 ( 5274) { #################################### }
+                 622 ( 5274) {       * block * (global): handle one block }
+                 623 ( 5274) { #################################### }
+                 624 ( 5274) 
+                 625 ( 5274) 
+                 626 ( 5274) proc block(bottom: integer);
+                 627 ( 5274) 
+                 628 ( 5274) var l,f9,i,n,stackpn1,forwpn,find,cproc,
+                 629 ( 5277)     spnt1,dpnt1,parlevel: integer;
+                 630 ( 5277)     fortab: array[8] of integer;
+                 631 ( 5277) 
+                 632 ( 5277) { * testtype *      (of block) }
+                 633 ( 5277) 
+                 634 ( 5277) proc testtype(ttype: char);
+                 635 ( 5277) 
+                 636 ( 5277) begin
+                 637 ( 5277)   if restype<>ttype then
+                 638 ( 5286)     if (restype<>'u') and (ttype<>'u') then
+                 639 ( 5308)       merror(14,packed(ttype,restype));
+                 640 ( 5329) end;
+                 641 ( 5329) 
+                 642 ( 5330) { * find ident *    (of block) }
+                 643 ( 5330) { this is a fast version for compiler speed }
+                 644 ( 5330) 
+                 645 ( 5330) func findid; {search in table for id }
+                 646 ( 5330) 
+                 647 ( 5330) var k,i: integer;
+                 648 ( 5333)     id1: char;
+                 649 ( 5333) 
+                 650 ( 5333) begin
+                 651 ( 5333) 
+                 652 ( 5333)   i:=1; k:=8*spnt+9; id1:=ident[1];
+                 653 ( 5357) 
+                 654 ( 5365)   repeat
+                 655 ( 5365)     k:=k-8;
+                 656 ( 5371)     while (idtab[k]<>id1) and (k>0) do k:=k-8;
+                 657 ( 5407)     if k>0 then begin
+                 658 ( 5422)        i:=1;
+                 659 ( 5427)        repeat i:=succ(i)
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 12
+
+                 660 ( 5431)          until (i>8) or
+                 661 ( 5447)              (idtab[k+i-1]<>ident[i]);
+                 662 ( 5473)     end;
+                 663 ( 5477)     until (i>8) or (k<=0);
+                 664 ( 5491)   if k<=0 then begin
+                 665 ( 5502)     findid:=0;
+                 666 ( 5507)   end
+                 667 ( 5511)   else
+                 668 ( 5511)     findid:=(k-1) shr 3;
+                 669 ( 5523) end;
+                 670 ( 5528) 
+                 671 ( 5529) { * code1 *      (of block) }
+                 672 ( 5529) 
+                 673 ( 5529) proc code1(x: %integer);  {set one byte p-code}
+                 674 ( 5529) begin
+                 675 ( 5529)   savebyte(x); pc:=succ(pc)
+                 676 ( 5544) end;
+                 677 ( 5553) 
+                 678 ( 5554) { * code2 *    (of block) }
+                 679 ( 5554) 
+                 680 ( 5554) proc code2(x,y: integer);
+                 681 ( 5554) begin
+                 682 ( 5554)   code1(x); code1(y);
+                 683 ( 5579) end;
+                 684 ( 5579) 
+                 685 ( 5580) { * code3 *    (of block) }
+                 686 ( 5580) 
+                 687 ( 5580) proc code3(x: integer; y1: %integer);
+                 688 ( 5580) 
+                 689 ( 5580) var y: integer;
+                 690 ( 5583) 
+                 691 ( 5583) begin {code3}
+                 692 ( 5583)   y:=y1;
+                 693 ( 5585)   if (x=34) and (y>=0) and (y<256) then
+                 694 ( 5616)     code2(32,y)
+                 695 ( 5622)   else begin
+                 696 ( 5635)     if (x=35) and (y>-128) and (y<=127) then
+                 697 ( 5658)       begin
+                 698 ( 5659)         if (y<0) then y:=y+256;
+                 699 ( 5679)         code2(33,y);
+                 700 ( 5696)       end
+                 701 ( 5696)     else begin
+                 702 ( 5699)       if (x>=36) and (x<=38) then y:=y-pc-1;
+                 703 ( 5728)       code1(x); code1(y and 255);
+                 704 ( 5756)       code1(y shr 8);
+                 705 ( 5769)     end
+                 706 ( 5769)   end
+                 707 ( 5769) end {code3};
+                 708 ( 5769) 
+                 709 ( 5770) { * putsym *   (of block) }
+                 710 ( 5770) 
+                 711 ( 5770) proc putsym(ltyp1,ltyp2: char);
+                 712 ( 5770) 
+                 713 ( 5770) var i,addr: integer;
+                 714 ( 5773) begin
+                 715 ( 5773)   if spnt>symbsize then error(7)
+                 716 ( 5788)   else spnt:=succ(spnt);
+                 717 ( 5801)   if spnt>spntmax then spntmax:=spnt;
+                 718 ( 5818)   t0[spnt]:=packed(ltyp1,ltyp2);
+                 719 ( 5839)   t3[spnt]:=0;
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 13
+
+                 720 ( 5849)   addr:=8*spnt;
+                 721 ( 5855)   for i:=1 to 8 do idtab[addr+i]:=ident[i];
+                 722 ( 5894)   if ltyp1='v' then begin
+                 723 ( 5926)     t2[spnt]:=dpnt; dpnt:=succ(dpnt);
+                 724 ( 5945)   end;
+                 725 ( 5950)   t1[spnt]:=level
+                 726 ( 5954) end {putsym};
+                 727 ( 5962) 
+                 728 ( 5963) { * checkindex *  (of block) }
+                 729 ( 5963) 
+                 730 ( 5963) proc checkindex(lowlim,highlim: integer);
+                 731 ( 5963) begin
+                 732 ( 5963)   if icheck then begin
+                 733 ( 5972)     code3($40,lowlim-1);
+                 734 ( 5990)     code2(highlim and 255, highlim shr 8)
+                 735 ( 6003)   end
+                 736 ( 6010) end;
+                 737 ( 6010) 
+                 738 ( 6011) { * getcon *      (of block) }
+                 739 ( 6011) 
+                 740 ( 6011) func getcon;
+                 741 ( 6011) 
+                 742 ( 6011) var idpnt,val,ii: integer;
+                 743 ( 6014)     rval: real;
+                 744 ( 6014)     sign: char;
+                 745 ( 6014) begin
+                 746 ( 6014)   restype:='i';
+                 747 ( 6018)   if token=' -' then begin
+                 748 ( 6030)     sign:='-'; scan
+                 749 ( 6039)   end else begin
+                 750 ( 6046)     sign:='+'; if token=' +' then scan
+                 751 ( 6060)   end;
+                 752 ( 6067)   case token of
+                 753 ( 6067)     'nu': val:=value[0];
+                 754 ( 6081)     'ru': begin val:=value[0];
+                 755 ( 6102)             restype:='r' end;
+                 756 ( 6116)     'st': if value[0]=1 then begin
+                 757 ( 6136)             restype:='c';
+                 758 ( 6141)             val:=ord(ident[1])
+                 759 ( 6147)           end else if value[0]=2 then begin
+                 760 ( 6167)             val:=(ord(ident[1]) shl 8) +
+                 761 ( 6179)               ord(ident[2]);
+                 762 ( 6185)               restype:='p';
+                 763 ( 6192)           end
+                 764 ( 6196)           else error(15);
+                 765 ( 6207)     'cr': begin parse(' ('); scan; val:=getcon;
+                 766 ( 6237)             if (val>127) or (val<0) then
+                 767 ( 6255)               error(12);
+                 768 ( 6267)             testtype('i');
+                 769 ( 6275)             restype:='c'; parse(' )');
+                 770 ( 6290)           end;
+                 771 ( 6290)     'tr': begin val:=1; restype:='b' end;
+                 772 ( 6313)     'fa': begin val:=0; restype:='b' end;
+                 773 ( 6336)     'cp': begin
+                 774 ( 6347)             scan; val:=getcon;
+                 775 ( 6357)             testtype('i'); restype:='q';
+                 776 ( 6371)           end;
+                 777 ( 6375)     ' @': begin scan; val:=getcon;
+                 778 ( 6396)             testtype('i'); restype:='f'
+                 779 ( 6408)           end
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 14
+
+                 780 ( 6410)     else begin
+                 781 ( 6417)       testto('id'); idpnt:=findid;
+                 782 ( 6432)       if (idpnt>0) and (high(t0[idpnt])='c')
+                 783 ( 6454)       then begin
+                 784 ( 6456)         val:=t2[idpnt];
+                 785 ( 6463)         restype:=low(t0[idpnt]);
+                 786 ( 6479)         if restype='r' then
+                 787 ( 6490)           value[1]:=t3[idpnt];
+                 788 ( 6500)       end
+                 789 ( 6508)       else begin error(4); val:=0;
+                 790 ( 6521)         restype:='i'
+                 791 ( 6525)       end
+                 792 ( 6527)     end
+                 793 ( 6531)   end {case};
+                 794 ( 6533)   if sign='-' then
+                 795 ( 6539)     case restype of
+                 796 ( 6543)       'i': getcon:=-val;
+                 797 ( 6554)       'r': begin value[0]:=val;
+                 798 ( 6575)              splitconv(value,rval);
+                 799 ( 6607)              splitconv(-rval,value);
+                 800 ( 6632)              getcon:=value[0]
+                 801 ( 6634)            end
+                 802 ( 6634)       else error(12)
+                 803 ( 6647)     end {case}
+                 804 ( 6655)   else getcon:=val;
+                 805 ( 6658) end {getcon};
+                 806 ( 6666) 
+                 807 ( 6667) { * deccon *         ( of block ) }
+                 808 ( 6667) 
+                 809 ( 6667) proc deccon;    { declare constant }
+                 810 ( 6667) begin
+                 811 ( 6667)   if token=' ;' then scan;
+                 812 ( 6687)   testto('id');
+                 813 ( 6696)   putsym('c','i');
+                 814 ( 6706)   parse(' ='); scan;
+                 815 ( 6719)   t2[spnt]:=getcon;
+                 816 ( 6729)   if (restype='r') then t3[spnt]:=value[1];
+                 817 ( 6749)   if restype<>'i' then
+                 818 ( 6763)     t0[spnt]:=packed('c',restype);
+                 819 ( 6778)   scan
+                 820 ( 6782) end {deccon};
+                 821 ( 6786) 
+                 822 ( 6787) { * decvar *          ( of block ) }
+                 823 ( 6787) 
+                 824 ( 6787) proc decvar(typ1,typ2: char);
+                 825 ( 6787) begin
+                 826 ( 6787)   if token=' ,' then scan;
+                 827 ( 6807)   testto('id');
+                 828 ( 6816)   putsym(typ1,typ2);
+                 829 ( 6830)   scan;
+                 830 ( 6834) end {decvar};
+                 831 ( 6834) 
+                 832 ( 6835) { * gettype *         ( of block ) }
+                 833 ( 6835) 
+                 834 ( 6835) proc gettype(var typ2: char;
+                 835 ( 6835)   var aflag,uflag: boolean; var n: integer);
+                 836 ( 6835) 
+                 837 ( 6835) begin
+                 838 ( 6835)   aflag:=false; n:=0; uflag:=false;
+                 839 ( 6854)   scan;
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 15
+
+                 840 ( 6862)   if token='ar' then begin
+                 841 ( 6870)     parse(' ['); scan;
+                 842 ( 6886)     n:=getcon; testtype('i');
+                 843 ( 6904)     if (n<1) then begin error(15); n:=1 end;
+                 844 ( 6928)     parse(' ]'); parse('of'); scan;
+                 845 ( 6950)     aflag:=true
+                 846 ( 6950)   end;
+                 847 ( 6956)   if token=' %' then begin
+                 848 ( 6964)     scan; uflag:=true
+                 849 ( 6971)   end;
+                 850 ( 6977)   case token of
+                 851 ( 6977)     'in': typ2:='i';
+                 852 ( 6991)     'ch': typ2:='c';
+                 853 ( 7008)     'pa': begin parse ('ch'); typ2:='p' end;
+                 854 ( 7038)     'bo': typ2:='b';
+                 855 ( 7051)     'rl': begin typ2:='r'; aflag:=true;
+                 856 ( 7074)             n:=prec(2*succ(n)) end;
+                 857 ( 7091)     'cp': typ2:='q';
+                 858 ( 7104)     'fl': typ2:='f'
+                 859 ( 7119)     else begin error(11); typ2:='i';end
+                 860 ( 7142)   end {case}
+                 861 ( 7144) end {gettype};
+                 862 ( 7144) 
+                 863 ( 7145) { * variable *        ( of block) }
+                 864 ( 7145) 
+                 865 ( 7145) proc variable;  { variable declarations }
+                 866 ( 7145) 
+                 867 ( 7145) var typ1,typ2: char;
+                 868 ( 7148)     i,l: integer;
+                 869 ( 7148)     aflag,uflag: boolean;
+                 870 ( 7148) 
+                 871 ( 7148) begin
+                 872 ( 7148)   scan;
+                 873 ( 7154)   repeat {main loop}
+                 874 ( 7154)     l:=0;
+                 875 ( 7156)     repeat decvar('v','i'); l:=succ(l);
+                 876 ( 7174)     until token<> ' ,';
+                 877 ( 7186)     testto(' :');
+                 878 ( 7199)     gettype(typ2,aflag,uflag,n);
+                 879 ( 7235)     if uflag then error(11);
+                 880 ( 7250)     if aflag then typ1:='a' else typ1:='v';
+                 881 ( 7268)     if typ1='a' then begin {array}
+                 882 ( 7282)        dpnt:=dpnt-l; {variable has been assumed}
+                 883 ( 7295)        for i:=succ(spnt-l) to spnt do begin
+                 884 ( 7322)          t2[i]:=dpnt; t3[i]:=n;
+                 885 ( 7338)          dpnt:=succ(dpnt+n);
+                 886 ( 7355)       end
+                 887 ( 7360)     end {array};
+                 888 ( 7374)     for i:=succ(spnt-l) to spnt do
+                 889 ( 7388)       t0[i]:=packed(typ1,typ2);
+                 890 ( 7414)     parse(' ;');scan
+                 891 ( 7441)   until token<>'id' {end main loop}
+                 892 ( 7452) end {variable};
+                 893 ( 7456) 
+                 894 ( 7457) { * fixup *           ( of block ) }
+                 895 ( 7457) 
+                 896 ( 7457) proc fixup(x: integer);
+                 897 ( 7457) begin
+                 898 ( 7457)   if ofno<>nooutput then begin
+                 899 ( 7469)     write(@ofno,'F');
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 16
+
+                 900 ( 7480)     savebyte(succ(x-offset) and 255);
+                 901 ( 7499)     savebyte(succ(x-offset) shr 8);
+                 902 ( 7518)     savebyte((pc-x-1) and 255);
+                 903 ( 7539)     savebyte((pc-x-1) shr 8);
+                 904 ( 7560)   end;
+                 905 ( 7560) end;
+                 906 ( 7560) 
+                 907 ( 7561) { * function *        ( of block ) }
+                 908 ( 7561) 
+                 909 ( 7561) proc function;
+                 910 ( 7561) 
+                 911 ( 7561) var n: integer;
+                 912 ( 7564)     typ1,typ2: char;
+                 913 ( 7564)     aflag,uflag: boolean;
+                 914 ( 7564) begin
+                 915 ( 7564)   if token<>' :' then begin
+                 916 ( 7574)     aflag:=false; uflag:=false; typ2:='i' end
+                 917 ( 7591)   else begin
+                 918 ( 7598)     gettype(typ2,aflag,uflag,n);
+                 919 ( 7634)     scan
+                 920 ( 7634)   end;
+                 921 ( 7638)   if aflag then begin
+                 922 ( 7642)     typ1:='s'; t3[succ(cproc)]:=n;
+                 923 ( 7656)     t2[succ(cproc)]:=t2[succ(cproc)]-n
+                 924 ( 7678)   end
+                 925 ( 7678)   else typ1:='r';
+                 926 ( 7692)   t0[succ(cproc)]:=packed(typ1,typ2);
+                 927 ( 7710)   if uflag then typ2:='u';
+                 928 ( 7723)   if aflag then typ1:='g'
+                 929 ( 7734)   else typ1:='f';
+                 930 ( 7745)   t0[cproc]:=packed(typ1,typ2);
+                 931 ( 7762) end {function};
+                 932 ( 7766) 
+                 933 ( 7767) { * parameter *       ( of block ) }
+                 934 ( 7767) 
+                 935 ( 7767) proc parameter;
+                 936 ( 7767) 
+                 937 ( 7767) var counter1,counter2,i,n,bs: integer;
+                 938 ( 7770)     aflag,uflag: boolean;
+                 939 ( 7770)     vtype1,vtype2: char;
+                 940 ( 7770)     vtype: packed char;
+                 941 ( 7770) 
+                 942 ( 7770) begin
+                 943 ( 7770)   push(0); { dummy size, fixed later }
+                 944 ( 7780)   if find=0 then t3[spnt-npara]:=stackpnt
+                 945 ( 7799)   else bs:=stackpnt;
+                 946 ( 7810)   counter1:=0
+                 947 ( 7818)   repeat {main loop}
+                 948 ( 7824)     counter2:=0;
+                 949 ( 7826)     vtype1:='d'; vtype2:='i';
+                 950 ( 7838)     scan;
+                 951 ( 7846)     if token='co' then scan
+                 952 ( 7854)     else if token='va' then begin
+                 953 ( 7872)       scan; vtype1:='w' end; {variable param}
+                 954 ( 7885)     end;
+                 955 ( 7885)     repeat {inner loop}
+                 956 ( 7885)       decvar(vtype1,vtype2);
+                 957 ( 7899)       t2[spnt]:=parlevel;
+                 958 ( 7903)       parlevel:=succ(parlevel);
+                 959 ( 7915)       npara:=succ(npara);
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 17
+
+                 960 ( 7924)       counter2:=succ(counter2);
+                 961 ( 7933)       until token<>' ,';
+                 962 ( 7945)     uflag:=false;aflag:=false; n:=0;
+                 963 ( 7963)     if token<>' :' then
+                 964 ( 7974)       vtype2:='i' {assume integer }
+                 965 ( 7980)     else begin
+                 966 ( 7987)       gettype(vtype2,aflag,uflag,n);
+                 967 ( 8023)       if n>63 then error(15);
+                 968 ( 8041)       scan
+                 969 ( 8041)     end;
+                 970 ( 8045)     if aflag then begin
+                 971 ( 8049)       vtype1:=succ(vtype1);
+                 972 ( 8056)       parlevel:=parlevel-counter2;
+                 973 ( 8065)     end;
+                 974 ( 8074)     vtype:=packed(vtype1,vtype2);
+                 975 ( 8083)     for i:=1 to counter2 do begin
+                 976 ( 8106)       if uflag then push(packed(vtype1,'u'))
+                 977 ( 8120)       else push(vtype);
+                 978 ( 8139)       if aflag then begin
+                 979 ( 8143)         push(n); t3[spnt-counter2+i]:=n;
+                 980 ( 8170)         t2[spnt-counter2+i]:=parlevel;
+                 981 ( 8192)         parlevel:=succ(parlevel)+n;
+                 982 ( 8205)       end {then};
+                 983 ( 8214)       t0[spnt-counter2+i]:=vtype;
+                 984 ( 8228)     end {for};
+                 985 ( 8236)     if aflag then counter2:=2*counter2;
+                 986 ( 8259)     counter1:=counter1+counter2;
+                 987 ( 8272)     until token<>' ;'; {outer loop}
+                 988 ( 8292)   testto(' )'); scan;
+                 989 ( 8305)   if find=0 then
+                 990 ( 8311)     stack[t3[spnt-npara]]:=counter1
+                 991 ( 8328)   else begin {information is allready there}
+                 992 ( 8339)     stack[bs]:=counter1;
+                 993 ( 8343)     n:=t3[fortab[find]]; {existing stack data}
+                 994 ( 8367)     for i:=0 to stackpnt-bs do
+                 995 ( 8377)       if stack[bs+1]<>stack[n+1]
+                 996 ( 8408)         then merror(13,'pa'); {parameter wrong}
+                 997 ( 8442)     stackpnt:=prec(bs) {clear the new info}
+                 998 ( 8446)   end  {else}
+                 999 ( 8451) end {parameter};
+                1000 ( 8451) 
+                1001 ( 8452) { * memory *              ( of block) }
+                1002 ( 8452) 
+                1003 ( 8452) proc memory;
+                1004 ( 8452) 
+                1005 ( 8452) var typ1,typ2:char;
+                1006 ( 8455)     i,l,n: integer;
+                1007 ( 8455)     aflag,uflag: boolean;
+                1008 ( 8455) 
+                1009 ( 8455) begin
+                1010 ( 8455)   scan;
+                1011 ( 8461)   repeat {main loop}
+                1012 ( 8461)     l:=0;
+                1013 ( 8463)     repeat
+                1014 ( 8467)       decvar('m','i');
+                1015 ( 8477)       l:=succ(l); testto(' ='); scan;
+                1016 ( 8499)       n:=getcon; testtype('i');
+                1017 ( 8517)       scan; t2[spnt]:=n;
+                1018 ( 8525)     until token<>' ,';
+                1019 ( 8540)     testto(' :');
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 18
+
+                1020 ( 8553)     gettype(typ2,aflag,uflag,n);
+                1021 ( 8589)     if uflag then error(11);
+                1022 ( 8604)     scan;
+                1023 ( 8608)     if token=' &' then begin {8-bit}
+                1024 ( 8619)       typ1:='h'; scan
+                1025 ( 8625)     end
+                1026 ( 8629)     else typ1:='m';
+                1027 ( 8634)     if aflag then typ1:=succ(typ1);
+                1028 ( 8649)     for i:=succ(spnt-l) to spnt do begin
+                1029 ( 8681)       t0[i]:=packed(typ1,typ2);
+                1030 ( 8694)       t3[i]:=n;
+                1031 ( 8702)     end;
+                1032 ( 8710)     testto(' ;'); scan;
+                1033 ( 8737)   until token<>'id';
+                1034 ( 8744) end {memory};
+                1035 ( 8748) 
+                1036 ( 8749) 
+                1037 ( 8749) {######################################}
+                1038 ( 8749) { * statement *           ( of block ) }
+                1039 ( 8749) {######################################}
+                1040 ( 8749) 
+                1041 ( 8749) proc statmnt;
+                1042 ( 8749) 
+                1043 ( 8749) var idpnt,relad,k2,savpc,bottom1: integer;
+                1044 ( 8752)     device,wln: boolean;
+                1045 ( 8752)     savtp1,vartyp2: char;
+                1046 ( 8752)     wl: boolean;
+                1047 ( 8752) 
+                1048 ( 8752) { * code4 *               ( of statement ) }
+                1049 ( 8752) 
+                1050 ( 8752) proc code4(x,y1,z1: integer); {set 4-byte code}
+                1051 ( 8752) 
+                1052 ( 8752) var y,z: integer;
+                1053 ( 8755) 
+                1054 ( 8755) begin
+                1055 ( 8755)   y:=y1; z:=z1;
+                1056 ( 8765)   if y<0 then y:=y+256;
+                1057 ( 8790)   if x=43 then z:=z-pc-2;
+                1058 ( 8816)   code1(x);code1(y);code1(z and 255);
+                1059 ( 8854)   code1(z shr 8)
+                1060 ( 8860) end {code4};
+                1061 ( 8867) 
+                1062 ( 8868) { * testferror *         ( of statement) ) }
+                1063 ( 8868) 
+                1064 ( 8868) proc testferror;
+                1065 ( 8868) begin
+                1066 ( 8868)   code1($4f);
+                1067 ( 8881) end;
+                1068 ( 8881) 
+                1069 ( 8882) { * gpval *              ( of statement ) }
+                1070 ( 8882) 
+                1071 ( 8882) proc gpval(idpnt: integer;
+                1072 ( 8882)   dir: boolean; typ: char);
+                1073 ( 8882) 
+                1074 ( 8882) var d: integer;
+                1075 ( 8885) 
+                1076 ( 8885) begin {gpval}
+                1077 ( 8885)   if dir then d:=1 else d:=0;
+                1078 ( 8905)   case typ of
+                1079 ( 8909)   'h':  begin code3($22,t2[idpnt]);
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 19
+
+                1080 ( 8936)           if dir then code1($3f);
+                1081 ( 8951)           code1($17+d) end;
+                1082 ( 8964)   'm':  begin code3($22,t2[idpnt]);
+                1083 ( 8990)           code1($3d+d) end;
+                1084 ( 9003)   'i':  begin
+                1085 ( 9013)           if dir then code1($3f);
+                1086 ( 9028)           code3($22,t2[idpnt]);
+                1087 ( 9044)           code1(3);
+                1088 ( 9052)           if dir then code1($3f);
+                1089 ( 9067)           code1($17+d) end;
+                1090 ( 9080)   'n':  begin if dir then code1($3f);
+                1091 ( 9105)           code3($22,1); code1($12);
+                1092 ( 9123)           code3($22,t2[idpnt]);
+                1093 ( 9139)           code1(3); code1($3d+d) end
+                1094 ( 9160)   else begin
+                1095 ( 9163)     if typ='q' then begin
+                1096 ( 9170)       code4($55,level-t1[idpnt],2*t2[idpnt]);
+                1097 ( 9205)     end else
+                1098 ( 9205)       code4($27+2*d+relad,level-t1[idpnt],
+                1099 ( 9231)         2*t2[idpnt]);
+                1100 ( 9253)     end
+                1101 ( 9253)   end {case}
+                1102 ( 9255) end;
+                1103 ( 9255) 
+                1104 ( 9256) { FORWARD decl. of mainexp (of statement) }
+                1105 ( 9256) 
+                1106 ( 9256) proc mainexp(reqtype: char;
+                1107 ( 9256)   var arsize: integer); forward;
+                1108 ( 9259) 
+                1109 ( 9259) { * express *           ( of statement ) }
+                1110 ( 9259) 
+                1111 ( 9259) proc express; {requests a normal 16-bit result }
+                1112 ( 9259) 
+                1113 ( 9259) var resultsize: integer;
+                1114 ( 9262) 
+                1115 ( 9262) begin {express}
+                1116 ( 9262)   mainexp('n',resultsize);
+                1117 ( 9280)   if resultsize<>0 then error(15)
+                1118 ( 9292) end {express};
+                1119 ( 9298) 
+                1120 ( 9299) { * arrayexp *          ( of mainexp) }
+                1121 ( 9299) 
+                1122 ( 9299) proc arrayexp(size: integer; eltype: char);
+                1123 ( 9299) 
+                1124 ( 9299) var resultsize: integer;
+                1125 ( 9302) 
+                1126 ( 9302) begin
+                1127 ( 9302)   mainexp(eltype,resultsize);
+                1128 ( 9322)   if resultsize<>size then error(15);
+                1129 ( 9342)   testtype(eltype);
+                1130 ( 9352) end;
+                1131 ( 9352) 
+                1132 ( 9353) { * getvar *            ( of statement ) }
+                1133 ( 9353) 
+                1134 ( 9353) proc getvar;
+                1135 ( 9353) begin
+                1136 ( 9353)   vartyp2:=high(t0[idpnt]);
+                1137 ( 9366)   vartype:=low(t0[idpnt]);
+                1138 ( 9379)   scan;
+                1139 ( 9388)   if (vartype='q') and (token=' [') and
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 20
+
+                1140 ( 9403)     ((vartyp2='v') or (vartyp2='d')) then begin
+                1141 ( 9420)     vartyp2:='q'; vartype:='c';
+                1142 ( 9431)   end;
+                1143 ( 9435)   case vartyp2 of
+                1144 ( 9435)   'a','x','s','i','n','q':
+                1145 ( 9478)       begin
+                1146 ( 9481)         if token=' [' then begin
+                1147 ( 9489)           scan; express; relad:=1;
+                1148 ( 9502)           if vartyp2='r' then begin
+                1149 ( 9513)             relad:=3;
+                1150 ( 9518)             code3($22,1); code1($12)
+                1151 ( 9534)           end;
+                1152 ( 9540)           if t3[idpnt]<63 then { don't know which}
+                1153 ( 9551)             checkindex(0,63)
+                1154 ( 9558)           else
+                1155 ( 9564)             checkindex(0,t3[idpnt]);
+                1156 ( 9583)           testtype('i'); testto(' ]'); scan;
+                1157 ( 9604)         end else relad:=2;
+                1158 ( 9609)       end;
+                1159 ( 9613)   'v','w','r','h','m': relad:=0;
+                1160 ( 9653)   'c','d','e','t','u': error(6)
+                1161 ( 9697)   else error(1)
+                1162 ( 9708)   end {case}
+                1163 ( 9716) end {getvar};
+                1164 ( 9716) 
+                1165 ( 9717) { * prcall *            ( of statement ) }
+                1166 ( 9717) 
+                1167 ( 9717) proc prcall (idpn1: integer);
+                1168 ( 9717) 
+                1169 ( 9717) var bstack,numpar,i,n,n2: integer;
+                1170 ( 9720) 
+                1171 ( 9720) { body of prcall follows later }
+                1172 ( 9720) 
+                1173 ( 9720) { * prcall1 *           ( of prcall ) }
+                1174 ( 9720) 
+                1175 ( 9720) proc prcall1;
+                1176 ( 9720) 
+                1177 ( 9720)   proc prcall3;
+                1178 ( 9723)   begin {prcall3}
+                1179 ( 9726)     testto('id');
+                1180 ( 9737)     idpnt:=findid;
+                1181 ( 9743)     if idpnt=0 then error(5);
+                1182 ( 9765)     getvar;
+                1183 ( 9769)     if chr(stack[i] and 255)<>vartype then
+                1184 ( 9781)       if chr(stack[i] and 255)<>'u' then
+                1185 ( 9803)         error(14);
+                1186 ( 9815)       push(idpnt);
+                1187 ( 9825)   end {prcall3};
+                1188 ( 9825) 
+                1189 ( 9826) begin {prcall1}
+                1190 ( 9826)   case chr(stack[i] shr 8) of
+                1191 ( 9839)     'd':  begin express;
+                1192 ( 9851)             if chr(stack[i] and 255)<>'u' then
+                1193 ( 9865)               testtype(chr(stack[i] and 255));
+                1194 ( 9887)           end;
+                1195 ( 9887)     'e':  begin
+                1196 ( 9897)             arrayexp(stack[succ(i)],
+                1197 ( 9902)               chr(stack[i]));
+                1198 ( 9921)             i:=succ(i);
+                1199 ( 9925)           end;
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 21
+
+                1200 ( 9930)     'w':  begin
+                1201 ( 9940)             prcall3;
+                1202 ( 9944)             if relad<>0 then error(14);
+                1203 ( 9962)             gpval(idpnt,false,vartyp2);
+                1204 ( 9978)           end;
+                1205 ( 9978)     'x':  begin
+                1206 ( 9988)             prcall3;
+                1207 ( 9992)             if relad<>2 then error(14);
+                1208 (10010)             if vartyp2='i' then error(16);
+                1209 (10028)             i:=succ(i);
+                1210 (10032)             if stack[i]<>t3[idpnt] then
+                1211 (10049)               error(15);
+                1212 (10065)             if vartyp2='n' then begin
+                1213 (10072)               code3($22,t2[idpnt]);
+                1214 (10091)               code1($3d);
+                1215 (10099)             end else code4($27,level-t1[idpnt],
+                1216 (10112)               2*t2[idpnt]);
+                1217 (10134)             code2($3b,stack[i]);
+                1218 (10150)           end
+                1219 (10150)     else error(14)
+                1220 (10155)   end {case}
+                1221 (10163) end {prcall1};
+                1222 (10163) 
+                1223 (10164) proc prcall2;
+                1224 (10164) begin
+                1225 (10164)   if n>0 then code3(35,-2*n);
+                1226 (10195)   n:=0
+                1227 (10195) end {prcall2};
+                1228 (10201) 
+                1229 (10202) begin {body of prcall}
+                1230 (10202)   if t3[idpn1]<>0 then begin
+                1231 (10215)     bstack:=t3[idpn1];
+                1232 (10222)     numpar:=stack[bstack];
+                1233 (10234)     parse(' ('); scan;
+                1234 (10255)     for i:=succ(bstack) to bstack+numpar do
+                1235 (10268)     begin
+                1236 (10282)       prcall1;
+                1237 (10286)       if i<bstack+numpar then begin
+                1238 (10300)         testto(' ,'); scan
+                1239 (10312)       end
+                1240 (10316)     end;
+                1241 (10316)     testto(' )');
+                1242 (10339)   end {then};
+                1243 (10339)   code4(43,level-t1[idpn1],t2[idpn1]);
+                1244 (10368)   if t3[idpn1]<>0 then begin
+                1245 (10379)     n:=0; i:=bstack+numpar;
+                1246 (10392)     repeat
+                1247 (10401)       case chr(stack[i] shr 8) of
+                1248 (10412)       'd':  n:=succ(n);
+                1249 (10424)       'w':  begin
+                1250 (10439)               prcall2; idpnt:=pop;
+                1251 (10449)               gpval(idpnt,true,
+                1252 (10459)                   high(t0[idpnt]));
+                1253 (10474)             end;
+                1254 (10474)       chr(0): begin
+                1255 (10484)             n2:=stack[i];
+                1256 (10488)             i:=i-1;
+                1257 (10502)             case chr(stack[i] shr 8) of
+                1258 (10518)               'e':  n:=succ(n+n2);
+                1259 (10535)               'x':  begin
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 22
+
+                1260 (10550)                       prcall2;
+                1261 (10554)                       idpnt:=pop;
+                1262 (10560)                       if high(t0[idpnt])='n'
+                1263 (10573)                       then begin
+                1264 (10576)                         code3($22,t2[idpnt]+
+                1265 (10585)                           2*t3[idpnt]);
+                1266 (10607)                         code1($3e)
+                1267 (10609)                       end else
+                1268 (10615)                         code4(41,
+                1269 (10620)                           level-t1[idpnt],
+                1270 (10628)                           2*(t2[idpnt]+
+                1271 (10639)                           t3[idpnt]));
+                1272 (10659)                       code2($3c,t3[idpnt])
+                1273 (10665)                     end
+                1274 (10675)               end {case}
+                1275 (10677)             end
+                1276 (10677)       end; {case}
+                1277 (10679)       i:=prec(i);
+                1278 (10683)     until i=bstack;
+                1279 (10692)     prcall2
+                1280 (10700)   end
+                1281 (10704) end {prcall};
+                1282 (10704) 
+                1283 (10705) 
+                1284 (10705) {###################################}
+                1285 (10705) { * mainexp *       ( of statement) }
+                1286 (10705) {###################################}
+                1287 (10705) {  see forward declaration above    }
+                1288 (10705) 
+                1289 (10705) proc mainexp(reqtype: char;
+                1290 (10705)   var arsize: integer);
+                1291 (10705) 
+                1292 (10705) { variables of mainexp}
+                1293 (10705) var opcode,roff: integer;
+                1294 (10708)     savtype: char;
+                1295 (10708) 
+                1296 (10708) { * argument *         ( of mainexp ) }
+                1297 (10708) 
+                1298 (10708) proc argument(rtype: char);
+                1299 (10708) begin
+                1300 (10708)   parse(' ('); scan; express;
+                1301 (10730)   testtype(rtype);
+                1302 (10740)   testto(' )'); scan
+                1303 (10749) end; {argument}
+                1304 (10754) 
+                1305 (10754) {#######################################}
+                1306 (10754) { * simexp *             ( of mainexp ) }
+                1307 (10754) {#######################################}
+                1308 (10754) 
+                1309 (10754) proc simexp(var arsize1: integer);
+                1310 (10754) 
+                1311 (10754) var opcode: integer;
+                1312 (10757)     sign: char;
+                1313 (10757) 
+                1314 (10757) {body of simexp  follows later }
+                1315 (10757) 
+                1316 (10757) {#######################################}
+                1317 (10757) { * term *               ( of simexp )  }
+                1318 (10757) {#######################################}
+                1319 (10757) 
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 23
+
+                1320 (10757) proc term(var arsize2: integer);
+                1321 (10757) 
+                1322 (10757) var opcode: integer;
+                1323 (10760) 
+                1324 (10760) { body of term follows later }
+                1325 (10760) 
+                1326 (10760) {#######################################}
+                1327 (10760) { * factor *             ( of term )    }
+                1328 (10760) {#######################################}
+                1329 (10760) 
+                1330 (10760) proc factor(var arsize3: integer);
+                1331 (10760) 
+                1332 (10760) var i, idpnt: integer;
+                1333 (10763) 
+                1334 (10763) { * index *              ( of factor )  }
+                1335 (10763) 
+                1336 (10763) proc index(chk: boolean);
+                1337 (10763) 
+                1338 (10763) var savtype: char;
+                1339 (10766) 
+                1340 (10766) begin {index}
+                1341 (10766)   scan; savtype:=restype;
+                1342 (10772)   express; testtype('i'); testto(' ]');
+                1343 (10801)   if savtype='r' then begin
+                1344 (10808)     code3($22,1); code1($12);
+                1345 (10829)   end;
+                1346 (10829)   if chk then begin
+                1347 (10833)     if savtype='q' then
+                1348 (10842)       checkindex(0,63)
+                1349 (10850)     else
+                1350 (10856)       checkindex(0,t3[idpnt])
+                1351 (10865)   end;
+                1352 (10875)   restype:=savtype; scan
+                1353 (10883) end;
+                1354 (10887) 
+                1355 (10888) 
+                1356 (10888) begin { *** body of factor *** }
+                1357 (10888)   arsize3:=0;
+                1358 (10892)   case token of
+                1359 (10896)     'id': begin {identifier }
+                1360 (10908)             idpnt:=findid;
+                1361 (10914)             if idpnt=0 then error(5);
+                1362 (10936)             restype:=low(t0[idpnt]);
+                1363 (10944)             case high(t0[idpnt]) of
+                1364 (10957)               'v','w','d':
+                1365 (10976)                     begin
+                1366 (10979)                       scan;
+                1367 (10983)                       if (restype='q') and (token=' [')
+                1368 (10997)                       then begin
+                1369 (10999)                         code4(39,level-t1[idpnt],
+                1370 (11012)                           2*t2[idpnt]);
+                1371 (11034)                         index(true);
+                1372 (11042)                         code1($03);
+                1373 (11050)                         code1($54);
+                1374 (11058)                         restype:='c';
+                1375 (11060)                       end
+                1376 (11064)                       else
+                1377 (11064)                         code4(39,level-t1[idpnt],
+                1378 (11077)                           2*t2[idpnt]);
+                1379 (11099)                     end;
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 24
+
+                1380 (11099)               'h':  begin code3($22,t2[idpnt]);
+                1381 (11125)                       code1($17); scan end;
+                1382 (11137)               'i':  begin code3($22,t2[idpnt]);
+                1383 (11163)                       scan;
+                1384 (11167)                       if token=' [' then begin
+                1385 (11175)                         index(true); code1($03);
+                1386 (11194)                         code1($17)
+                1387 (11196)                       end else begin
+                1388 (11205)                         error(16)
+                1389 (11207)                       end
+                1390 (11213)                     end;
+                1391 (11213)               'm':  begin code3($22,t2[idpnt]);
+                1392 (11239)                       code1($3d); scan
+                1393 (11247)                     end;
+                1394 (11251)               'n':  begin code3($22,t2[idpnt]);
+                1395 (11277)                       scan;
+                1396 (11281)                       if token=' [' then begin
+                1397 (11289)                         index(true);
+                1398 (11300)                         code3($22,1);code1($12);
+                1399 (11318)                         code1($03); code1($3d);
+                1400 (11334)                         if restype='r' then
+                1401 (11340)                         begin
+                1402 (11341)                           code2($3b,1);
+                1403 (11354)                           arsize3:=1
+                1404 (11354)                         end
+                1405 (11356)                       end else begin
+                1406 (11363)                         code1($3d);
+                1407 (11371)                         code2($3b,t3[idpnt]);
+                1408 (11387)                         arsize3:=t3[idpnt];
+                1409 (11391)                       end
+                1410 (11399)                     end;
+                1411 (11399)               'r','t': begin
+                1412 (11416)                       code3(35,2);
+                1413 (11426)                       idpnt:=prec(idpnt);
+                1414 (11430)                       prcall(idpnt); scan;
+                1415 (11449)                       restype:=low(t0[idpnt]);
+                1416 (11457)                     end;
+                1417 (11462)               'c':  if low(t0[idpnt])<>'r' then
+                1418 (11483)                       begin code3(34,t2[idpnt]);
+                1419 (11503)                       scan end
+                1420 (11507)                     else begin
+                1421 (11510)                       code2($3a,2);
+                1422 (11520)                       code2(t2[idpnt] and 255,
+                1423 (11530)                         t2[idpnt] shr 8);
+                1424 (11548)                       code2(t3[idpnt] and 255,
+                1425 (11558)                         t3[idpnt] shr 8);
+                1426 (11576)                       arsize3:=1; scan
+                1427 (11582)                     end;
+                1428 (11586)               'a','e','x':
+                1429 (11607)                     begin scan;
+                1430 (11614)                       if token=' [' then begin
+                1431 (11622)                         index(true);
+                1432 (11633)                         code4($28,
+                1433 (11635)                             level-t1[idpnt],
+                1434 (11643)                             2*t2[idpnt]);
+                1435 (11665)                         if restype='r' then
+                1436 (11671)                         begin
+                1437 (11672)                           code2($3b,1);
+                1438 (11685)                           arsize3:=1
+                1439 (11685)                         end
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 25
+
+                1440 (11687)                       end else begin
+                1441 (11694)                         code4($27,
+                1442 (11696)                             level-t1[idpnt],
+                1443 (11704)                             2*t2[idpnt]);
+                1444 (11726)                         code2($3b,t3[idpnt]);
+                1445 (11742)                         arsize3:=t3[idpnt];
+                1446 (11746)                       end
+                1447 (11754)                     end;
+                1448 (11754)               's','u':
+                1449 (11768)                     begin
+                1450 (11771)                       code3(35,2*t3[idpnt]+2);
+                1451 (11793)                       idpnt:=prec(idpnt);
+                1452 (11797)                       prcall(idpnt); scan;
+                1453 (11816)                       restype:=low(t0[idpnt]);
+                1454 (11824)                       idpnt:=succ(idpnt);
+                1455 (11833)                       arsize3:=t3[idpnt]
+                1456 (11838)                     end
+                1457 (11842)               else error(1)
+                1458 (11855)             end {case}
+                1459 (11863)           end; {identifier}
+                1460 (11866)     'nu': begin code3(34,value[0]); scan;
+                1461 (11892)             restype:='i'
+                1462 (11892)           end;
+                1463 (11898)     'ru': begin code2($3a,2);
+                1464 (11919)             code2(value[0] and 255,
+                1465 (11927)               value[0] shr 8);
+                1466 (11943)             code2(value[1] and 255,
+                1467 (11951)               value[1] shr 8);
+                1468 (11967)             scan; restype:='r';
+                1469 (11973)             arsize3:=1
+                1470 (11977)           end;
+                1471 (11983)     'st': begin
+                1472 (11994)           if (reqtype='n') and (value[0]<3)
+                1473 (12009)             then begin
+                1474 (12011)               if value[0]<2 then begin
+                1475 (12023)                 code3(34,ord(ident[1]));
+                1476 (12040)                 restype:='c'
+                1477 (12040)               end else begin
+                1478 (12049)                 code3(34,packed(ident[1],
+                1479 (12053)                   ident[2]));
+                1480 (12070)                 restype:='p'
+                1481 (12070)               end
+                1482 (12072)             end else begin
+                1483 (12079)               case reqtype of
+                1484 (12079)                 'c','u','n':
+                1485 (12101)                     begin
+                1486 (12104)                       if vartype='q' then begin
+                1487 (12111)                         arsize3:=0;
+                1488 (12116)                         restype:='q';
+                1489 (12122)                         code2($56,value[0]);
+                1490 (12140)                       end else begin
+                1491 (12143)                         arsize3:=prec(value[0]);
+                1492 (12149)                         restype:='c';
+                1493 (12156)                         code2($39,value[0]);
+                1494 (12174)                       end;
+                1495 (12174)                       for i:=1 to value[0] do
+                1496 (12182)                         code1(ord(ident[i]));
+                1497 (12209)                       if vartype='q' then code1(0);
+                1498 (12241)                     end;
+                1499 (12241)                 'p': begin
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 26
+
+                1500 (12251)                       if odd(value[0]) then
+                1501 (12257)                         error(15);
+                1502 (12269)                       value[0]:=value[0] shr 1;
+                1503 (12279)                       arsize3:=prec(value[0]);
+                1504 (12290)                       restype:='p';
+                1505 (12297)                       code2($3a,value[0]);
+                1506 (12315)                       for i:=1 to value[0] do
+                1507 (12323)                         begin
+                1508 (12336)                         code1(ident[2*i]);
+                1509 (12353)                         code1(ident[2*i-1]);
+                1510 (12373)                       end
+                1511 (12373)                     end
+                1512 (12373)                 else error(14)
+                1513 (12392)               end {case}
+                1514 (12400)             end;
+                1515 (12400)             scan
+                1516 (12400)           end;
+                1517 (12404)     'od': begin
+                1518 (12415)             argument('i'); code1(7);
+                1519 (12431)             restype:='b'
+                1520 (12431)           end;
+                1521 (12437)     'me': begin
+                1522 (12448)             parse(' ['); index(false);
+                1523 (12465)             code1(23); restype:='i';
+                1524 (12475)           end;
+                1525 (12479)     ' (': begin
+                1526 (12490)             scan; mainexp(reqtype,arsize3);
+                1527 (12512)             testto(' )'); scan
+                1528 (12521)           end; {no type change}
+                1529 (12528)     'no': begin
+                1530 (12536)             scan; factor(arsize3);
+                1531 (12552)             if (arsize3<>0) then error(15);
+                1532 (12570)             code1($11);
+                1533 (12578)             if restype<>'i' then
+                1534 (12584)               testtype('b')
+                1535 (12590)           end;
+                1536 (12596)     'cr': begin
+                1537 (12607)             argument('i'); code1(52);
+                1538 (12623)             restype:='c'
+                1539 (12623)           end;
+                1540 (12629)     'hi': begin
+                1541 (12640)             argument('p'); code1(51);
+                1542 (12656)             restype:='c'
+                1543 (12656)           end;
+                1544 (12662)     'lo': begin
+                1545 (12673)             argument('p'); code1(52);
+                1546 (12689)             restype:='c'
+                1547 (12689)           end;
+                1548 (12695)     'su': begin
+                1549 (12706)             argument('u'); code1($14);
+                1550 (12722)           end;
+                1551 (12722)     'pc': begin
+                1552 (12733)             argument('u'); code1($15)
+                1553 (12743)           end;
+                1554 (12749)     'cp': begin
+                1555 (12760)             argument('i'); restype:='q';
+                1556 (12770)           end;
+                1557 (12774)     'ni': begin
+                1558 (12785)             code3(34,0); scan; restype:='q';
+                1559 (12801)           end;
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 27
+
+                1560 (12805)     'ox': begin
+                1561 (12816)             argument('u');
+                1562 (12824)             restype:='i'
+                1563 (12824)           end;
+                1564 (12830)     ' @': begin
+                1565 (12841)             scan; factor(arsize3);
+                1566 (12857)             if arsize3<>0 then error(15);
+                1567 (12875)             testtype('i');
+                1568 (12883)             restype:='f'
+                1569 (12883)           end;
+                1570 (12889)     'tr': begin
+                1571 (12900)             code3(34,1); scan;
+                1572 (12914)             restype:='b';
+                1573 (12916)           end;
+                1574 (12920)     'fa': begin
+                1575 (12931)             code3(34,0); scan;
+                1576 (12945)             restype:='b'
+                1577 (12945)           end;
+                1578 (12951)     'tc': begin
+                1579 (12962)             parse(' ('); scan;
+                1580 (12975)             arrayexp(1,'r');
+                1581 (12985)             testto(' )'); scan;
+                1582 (12998)             code1($47); restype:='i';
+                1583 (13008)           end;
+                1584 (13012)     'cv': begin
+                1585 (13023)             argument('i');
+                1586 (13031)             code1($46); arsize3:=1;
+                1587 (13041)             restype:='r'
+                1588 (13045)           end;
+                1589 (13051)     'pa': begin
+                1590 (13062)             parse(' ('); scan; express;
+                1591 (13079)             testtype('c');
+                1592 (13087)             if token=' ,' then begin
+                1593 (13095)               scan; express; testtype('c');
+                1594 (13114)               code1(53)
+                1595 (13116)             end;
+                1596 (13122)             testto(' )'); scan; restype:='p'
+                1597 (13135)           end
+                1598 (13137)     else error(1)
+                1599 (13146)   end {case of token}
+                1600 (13154) end {factor};
+                1601 (13154) 
+                1602 (13155) begin  { *** body of term *** }
+                1603 (13155)   factor(arsize2);
+                1604 (13169)   repeat
+                1605 (13169)     case token of
+                1606 (13169)       ' *': opcode:=5;
+                1607 (13183)       'di': opcode:=6;
+                1608 (13200)       'an': opcode:=15;
+                1609 (13217)       'sh': opcode:=18;
+                1610 (13234)       'sr': opcode:=19;
+                1611 (13251)       ' /': opcode:=$45
+                1612 (13266)       else opcode:=0
+                1613 (13275)     end {case};
+                1614 (13283)     if opcode>0 then begin
+                1615 (13290)       if (restype='r') and
+                1616 (13300)             (arsize2=1) then begin
+                1617 (13308)         scan; factor(arsize2);
+                1618 (13327)         if (restype<>'r') or (arsize2<>1) then
+                1619 (13341)           error(14);
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 28
+
+                1620 (13353)         case opcode of
+                1621 (13353)           5: code1($44);
+                1622 (13372)           $45: code1($45)
+                1623 (13384)           else error(17)
+                1624 (13395)         end{case}
+                1625 (13403)       end else begin
+                1626 (13406)         if opcode=$45 then error(9);
+                1627 (13424)         if arsize2<>0 then error(15);
+                1628 (13442)         if (restype='b') and (opcode=15)
+                1629 (13455)           then begin
+                1630 (13457)           scan; factor(arsize2);
+                1631 (13476)           if arsize2<>0 then error(15);
+                1632 (13494)           testtype('b');
+                1633 (13502)           code1(opcode)
+                1634 (13502)         end else begin
+                1635 (13515)           testtype('i'); scan;
+                1636 (13527)           factor(arsize2);
+                1637 (13539)           if arsize2<>0 then error(15);
+                1638 (13557)           testtype('i'); code1(opcode);
+                1639 (13575)         end
+                1640 (13575)       end
+                1641 (13575)     end;
+                1642 (13575)   until opcode=0;
+                1643 (13581) end {term};
+                1644 (13585) 
+                1645 (13586) 
+                1646 (13586) begin { *** body of simexp *** }
+                1647 (13586)   sign:=' ';
+                1648 (13590)   if token=' +' then begin
+                1649 (13602)     sign:='+'; scan
+                1650 (13611)   end else if token=' -' then begin
+                1651 (13626)     sign:='-'; scan
+                1652 (13635)   end;
+                1653 (13639)   term(arsize1);
+                1654 (13651)   if sign<>' ' then begin
+                1655 (13658)     if (restype='r')and (arsize1=1) then begin
+                1656 (13676)       if sign='-' then code1($4e)
+                1657 (13691)     end else begin
+                1658 (13700)       testtype('i');
+                1659 (13708)       if arsize1<>0 then error(15);
+                1660 (13726)       if sign='-' then code1(2);
+                1661 (13744)     end
+                1662 (13744)   end;
+                1663 (13744)   repeat
+                1664 (13744)     case token of
+                1665 (13744)       ' &': opcode:=1;
+                1666 (13758)       ' +': opcode:=3;
+                1667 (13775)       ' -': opcode:=4;
+                1668 (13792)       'or': opcode:=14;
+                1669 (13809)       'xo': opcode:=16
+                1670 (13824)       else opcode:=0
+                1671 (13833)     end {case};
+                1672 (13841)     if opcode>1 then begin {if 1}
+                1673 (13851)       if (restype='r') and (arsize1=1)
+                1674 (13864)         then begin {real}
+                1675 (13869)         scan; term(arsize1);
+                1676 (13885)         if (restype<>'r') or (arsize1<>1) then
+                1677 (13899)           error(17);
+                1678 (13911)         case opcode of
+                1679 (13911)           3:  code1($42);
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 29
+
+                1680 (13930)           4:  code1($43)
+                1681 (13942)           else error(17)
+                1682 (13953)         end {case}
+                1683 (13961)       end {real}
+                1684 (13961)       else begin {not real}
+                1685 (13964)         if (arsize1<>0) then error(15);
+                1686 (13982)         if (restype='b') and (opcode>=14)
+                1687 (13995)           then begin {boolean}
+                1688 (14000)           scan; term(arsize1);
+                1689 (14016)           if arsize1<>0 then error(15);
+                1690 (14034)           testtype('b'); code1(opcode)
+                1691 (14042)         end {boolean}
+                1692 (14052)         else begin {not boolean}
+                1693 (14055)           testtype('i'); scan;
+                1694 (14067)           term(arsize1);
+                1695 (14079)           if arsize1<>0 then error(15);
+                1696 (14097)           testtype('i'); code1(opcode);
+                1697 (14115)         end {not boolean}
+                1698 (14115)       end {not real}
+                1699 (14115)     end {if 1}
+                1700 (14115)     else if opcode=1 then begin {else 1}
+                1701 (14128)       sign:=restype;
+                1702 (14128)       scan; term(opcode);
+                1703 (14152)       arsize1:=arsize1+opcode+1;
+                1704 (14163)       testtype(sign)
+                1705 (14168)     end {else 1}
+                1706 (14178)   until opcode=0
+                1707 (14182) end {simexp};
+                1708 (14188) 
+                1709 (14189) 
+                1710 (14189) begin { *** body of mainexp *** }
+                1711 (14189)   roff:=0;
+                1712 (14193)   simexp(arsize);
+                1713 (14209)   if (restype='r') and (arsize=1) then
+                1714 (14223)     roff:=$40;
+                1715 (14229)   case token of
+                1716 (14233)     ' =': opcode:=8;
+                1717 (14247)     ' <': opcode:=10;
+                1718 (14264)     ' >': opcode:=12;
+                1719 (14281)     '<>': opcode:=9;
+                1720 (14298)     '<=': opcode:=13;
+                1721 (14315)     '>=': opcode:=11
+                1722 (14330)     else opcode:=0
+                1723 (14339)   end {case};
+                1724 (14347)   if opcode>0 then begin
+                1725 (14354)     if (arsize<>0) and (roff=0) then
+                1726 (14371)       error(15);
+                1727 (14383)     scan; savtype:=restype; simexp(arsize);
+                1728 (14407)     if ((roff=0) and (arsize<>0))
+                1729 (14421)       or((roff<>0) and (arsize>1)) then
+                1730 (14437)       error(15);
+                1731 (14449)     testtype(savtype); code1(opcode+roff);
+                1732 (14474)     arsize:=0; restype:='b'
+                1733 (14480)   end
+                1734 (14482) end {mainexp};
+                1735 (14486) 
+                1736 (14487) 
+                1737 (14487) {#########################################}
+                1738 (14487) { * assign *             ( of statement ) }
+                1739 (14487) {#########################################}
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 30
+
+                1740 (14487) 
+                1741 (14487) proc assign;
+                1742 (14487) 
+                1743 (14487) var savetype: char;
+                1744 (14490) 
+                1745 (14490)   proc assign1;
+                1746 (14490)   begin
+                1747 (14490)     testto(':='); scan; express;
+                1748 (14512)     gpval(idpnt,true,vartyp2);
+                1749 (14528)   end {assign1};
+                1750 (14528) 
+                1751 (14529) begin {assign}
+                1752 (14529)   idpnt:=findid;
+                1753 (14537)   if idpnt=0 then error(5);
+                1754 (14559)   if t0[idpnt]='pr' then begin
+                1755 (14571)     prcall(idpnt);scan end
+                1756 (14588)   else begin
+                1757 (14591)     getvar; savetype:=vartype;
+                1758 (14595)     if relad<2 then begin
+                1759 (14610)       assign1; testtype(vartype)
+                1760 (14617)     end else begin
+                1761 (14630)       if vartyp2='i' then error(16); {8-bit mem}
+                1762 (14648)       testto(':='); scan;
+                1763 (14661)       if relad=3 then begin
+                1764 (14668)         arrayexp(1,vartype); relad:=1;
+                1765 (14685)         code1($53);
+                1766 (14697)         if vartyp2='n' then begin
+                1767 (14704)           code1($3f);
+                1768 (14715)           code3($22,1);code1($12);
+                1769 (14733)           code3($22,t2[idpnt]+2);
+                1770 (14752)           code1($3);code1($3e)
+                1771 (14762)         end else
+                1772 (14768)           code4($2a,level-t1[idpnt],
+                1773 (14781)             2*t2[idpnt]+2);
+                1774 (14806)         code2($3c,1)
+                1775 (14810)       end else begin
+                1776 (14819)         arrayexp(t3[idpnt],vartype);
+                1777 (14837)         if vartyp2='n' then begin
+                1778 (14844)           code3($22,t2[idpnt]+2*t3[idpnt]);
+                1779 (14875)           code1($3e);
+                1780 (14883)         end else
+                1781 (14883)           code4($29,level-t1[idpnt],
+                1782 (14896)             2*(t2[idpnt]+t3[idpnt]));
+                1783 (14927)         code2($3c,t3[idpnt]);
+                1784 (14943)       end
+                1785 (14943)     end
+                1786 (14943)   end
+                1787 (14943) end {assign};
+                1788 (14943) 
+                1789 (14944) { * case1 *             ( of statement ) }
+                1790 (14944) 
+                1791 (14944) proc case1;
+                1792 (14944) 
+                1793 (14944) var i1,i2,casave: integer;
+                1794 (14947)     savetype: char;
+                1795 (14947) 
+                1796 (14947)   proc case2;
+                1797 (14947) 
+                1798 (14947)     proc case3;
+                1799 (14950)     begin
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 31
+
+                1800 (14950)       scan; code1(22); code3(34,getcon);
+                1801 (14981)       testtype(savetype);
+                1802 (14991)       code1(8); scan
+                1803 (14999)     end;
+                1804 (15003) 
+                1805 (15004)   begin {case2}
+                1806 (15004)     i1:=0; case3;
+                1807 (15016)     while token=' ,' do begin
+                1808 (15027)       push(pc); code3(38,0); i1:=succ(i1);
+                1809 (15051)       case3
+                1810 (15056)     end;
+                1811 (15060)     testto(' :'); savpc:=pc; code3(37,0);
+                1812 (15090)     for k2:=1 to i1 do fixup(pop);
+                1813 (15121)     push(savpc);
+                1814 (15145)     scan; statmnt
+                1815 (15149)   end {case2};
+                1816 (15153) 
+                1817 (15154) begin {case1}
+                1818 (15154)   scan; express; testto('of');
+                1819 (15173)   savetype:=restype; i2:=1; case2;
+                1820 (15191)   while token=' ;' do begin
+                1821 (15202)     casave:=pc; code3(36,0); fixup(pop);
+                1822 (15232)     push(casave); i2:=succ(i2); case2
+                1823 (15251)   end;
+                1824 (15255)   if token='el' then begin
+                1825 (15266)     casave:=pc; code3(36,0); fixup(pop);
+                1826 (15299)     push(casave); scan; statmnt
+                1827 (15313)   end;
+                1828 (15317)   testto('en'); for k2:=1 to i2 do fixup(pop);
+                1829 (15357)   code3(35,-2); scan
+                1830 (15382) end {case1};
+                1831 (15386) 
+                1832 (15387) { * openrw *              ( of statement ) }
+                1833 (15387) 
+                1834 (15387) proc openrw(x: integer);
+                1835 (15387) begin
+                1836 (15387)   parse(' ('); parse('id');
+                1837 (15410)   idpnt:=findid;
+                1838 (15416)   if idpnt=0 then error(5);
+                1839 (15438)   getvar; code1(x);
+                1840 (15452)   testferror;
+                1841 (15456)   if relad=2 then error(15);
+                1842 (15474)   if vartype<>'f' then error(14);
+                1843 (15492)   gpval(idpnt,true,vartyp2);
+                1844 (15508)   testto(' )'); scan
+                1845 (15517) end {openrw};
+                1846 (15521) 
+                1847 (15522) { * gpsec *               ( of statement )  }
+                1848 (15522) 
+                1849 (15522) proc gpsec(code);   { get/put sector }
+                1850 (15522) 
+                1851 (15522)   proc gpsec1;
+                1852 (15525)   begin
+                1853 (15525)     scan; express; testtype('i');
+                1854 (15546)     testto(' ,');
+                1855 (15555)   end;
+                1856 (15555) 
+                1857 (15556) begin {gpsec}
+                1858 (15556)   parse(' ('); gpsec1; gpsec1; gpsec1;
+                1859 (15579)   code1(code);
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 32
+
+                1860 (15589)   parse('id'); idpnt:=findid;
+                1861 (15604)   if idpnt=0 then error(5);
+                1862 (15626)   getvar; code3(34,$db); { get file error code }
+                1863 (15640)   if relad=2 then error(15);
+                1864 (15658)   code1(23); if vartype<>'i' then error(14);
+                1865 (15684)   gpval(idpnt,true,vartyp2);
+                1866 (15700)   testto(' )');
+                1867 (15709) end {gpsec};
+                1868 (15709) 
+                1869 (15710) 
+                1870 (15710) begin {body of statement }
+                1871 (15710)   if token=' ;' then scan;
+                1872 (15727)   case token of
+                1873 (15727)     'id': assign;
+                1874 (15743) 
+                1875 (15746)     'if': begin {if}
+                1876 (15754)             scan; express; testtype('b');
+                1877 (15770)             testto('th'); scan;  savpc:=pc;
+                1878 (15783)             code3(37,0); statmnt;
+                1879 (15805)             if token='el' then begin {else}
+                1880 (15816)               k2:=pc; code3(36,0);
+                1881 (15834)               fixup(savpc); scan; statmnt;
+                1882 (15852)               fixup(k2)
+                1883 (15852)             end else fixup(savpc)
+                1884 (15865)           end; {if}
+                1885 (15878) 
+                1886 (15878)     'be':  begin {begin}
+                1887 (15886)             repeat
+                1888 (15886)               scan; statmnt
+                1889 (15890)             until token<>(' ;');
+                1890 (15901)             testto('en'); scan
+                1891 (15914)           end; {begin}
+                1892 (15921) 
+                1893 (15921)     'rp': begin {repeat}
+                1894 (15929)             savpc:=pc;
+                1895 (15929)             repeat
+                1896 (15937)               scan; statmnt
+                1897 (15941)             until token='un';
+                1898 (15952)             scan; express; testtype('b');
+                1899 (15972)             code3(37,savpc)
+                1900 (15974)           end {repeat};
+                1901 (15984) 
+                1902 (15987)     're': begin {read}
+                1903 (15995)             parse(' ('); scan;
+                1904 (16008)             if token=' @' then begin
+                1905 (16016)               scan; express; testtype('f');
+                1906 (16035)               device:=true;
+                1907 (16037)               code1(44); testto(' ,')
+                1908 (16052)             end
+                1909 (16058)             else begin
+                1910 (16061)               device:=false; code1(26)
+                1911 (16069)             end;
+                1912 (16075)             repeat
+                1913 (16075)               begin {main loop of read}
+                1914 (16075)                 if token=' ,' then scan;
+                1915 (16090)                 testto('id'); idpnt:=findid;
+                1916 (16105)                 if idpnt=0 then error(5);
+                1917 (16127)                 getvar;
+                1918 (16131)                 if relad=2 then error(15);
+                1919 (16149)                 case vartype of
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 33
+
+                1920 (16149)                   'i':  code1(28);
+                1921 (16168)                   'c':  code1(27);
+                1922 (16186)                   'p':  begin
+                1923 (16196)                         code1(27); code1(27);
+                1924 (16212)                         code1(53)
+                1925 (16214)                         end
+                1926 (16220)                   else error(114)
+                1927 (16225)                 end {case};
+                1928 (16233)                 gpval(idpnt,true,vartyp2)
+                1929 (16239)               end {mainloop of read}
+                1930 (16249)             until token<>' ,';
+                1931 (16256)             testto(' )'); scan;
+                1932 (16273)             if device then code1(45);
+                1933 (16288)           end {read};
+                1934 (16288) 
+                1935 (16291)     'wr','wl':
+                1936 (16304)           begin {write,writeln}
+                1937 (16307)             if token='wl' then wln:=true
+                1938 (16318)             else wln:=false;
+                1939 (16329)             scan;
+                1940 (16337)             if token=' (' then begin
+                1941 (16345)               scan;
+                1942 (16352)               if token=' @' then begin
+                1943 (16360)                 scan; express; testtype('f');
+                1944 (16379)                 device:=true; code1(44);
+                1945 (16393)                 testto(' ,');
+                1946 (16402)               end else device:=false;
+                1947 (16407)               repeat
+                1948 (16411)                 if token=' ,' then scan;
+                1949 (16426)                 if (token=' )') and device
+                1950 (16434)                        and wln then
+                1951 (16439)                    {empty writeln except device}
+                1952 (16444)                    k2:=k2 {do nothing}
+                1953 (16447)                 else if token='st' then begin
+                1954 (16466)                   {string}
+                1955 (16469)                   code1(50);
+                1956 (16477)                   for k2:=1 to value[0]-1 do
+                1957 (16491)                     code1(ord(ident[k2])
+                1958 (16505)                         and 127);
+                1959 (16518)                   code1(ord(ident[value[0]])
+                1960 (16538)                       or 128);
+                1961 (16551)                   scan
+                1962 (16551)                 end else begin
+                1963 (16558)                   {expression}
+                1964 (16558)                   express;
+                1965 (16562)                   case restype of
+                1966 (16562)                     'i':  code1(30);
+                1967 (16581)                     'c':  code1(29);
+                1968 (16599)                     'q':  code1($57);
+                1969 (16617)                     'p':  begin
+                1970 (16627)                             code1(22);
+                1971 (16635)                             code1(51);
+                1972 (16643)                             code1(29);
+                1973 (16651)                             code1(52);
+                1974 (16659)                             code1(29);
+                1975 (16667)                           end
+                1976 (16667)                     else error(14)
+                1977 (16672)                   end {case}
+                1978 (16680)                 end {expression}
+                1979 (16680)               until token<>' ,';
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 34
+
+                1980 (16687)               if wln then begin {writeln(..)}
+                1981 (16698)                 code2(32,13); code1(29);
+                1982 (16716)                 code2(32,10); code1(29);
+                1983 (16734)               end;
+                1984 (16734)               if device then code1(45);
+                1985 (16749)               testto(' )'); scan
+                1986 (16758)             end {if}
+                1987 (16762)             else if wln then begin {writeln}
+                1988 (16772)               code2(32,13); code1(29);
+                1989 (16790)               code2(32,10); code1(29);
+                1990 (16808)             end
+                1991 (16808)           end {write, writeln};
+                1992 (16808) 
+                1993 (16811)     'cs': case1; {case statement}
+                1994 (16826) 
+                1995 (16826)     'wh': begin {while}
+                1996 (16834)             scan; savpc:=pc; express;
+                1997 (16850)             testtype('b');
+                1998 (16858)             k2:=pc; code3(37,0);
+                1999 (16876)             testto('do'); scan; statmnt;
+                2000 (16893)             code3(36,savpc); fixup(k2)
+                2001 (16905)           end {while};
+                2002 (16915) 
+                2003 (16918)     'fo': begin {for}
+                2004 (16926)             parse('id'); assign;
+                2005 (16939)             if t0[idpnt]='pr' then error(1);
+                2006 (16962)             savtp1:=low(t0[idpnt]);
+                2007 (16970)             case token of
+                2008 (16975)               'to': k2:=1;
+                2009 (16989)               'dw': k2:=0
+                2010 (17004)               else merror(2,'to')
+                2011 (17018)             end {case of token};
+                2012 (17026)             scan; express; testtype(savtp1);
+                2013 (17044)             bottom1:=pc; code1(22);
+                2014 (17060)             gpval(idpnt,false,vartyp2);
+                2015 (17076)             code1(13-k2-k2);
+                2016 (17094)             savpc:=pc; code3(37,0);
+                2017 (17112)             testto('do'); scan; statmnt;
+                2018 (17129)             gpval(idpnt,false,vartyp2);
+                2019 (17145)             code1(21-k2);
+                2020 (17158)             gpval(idpnt,true,vartyp2);
+                2021 (17174)             code3(36,bottom1); fixup(savpc);
+                2022 (17196)             code3(35,-2);
+                2023 (17207)           end {for};
+                2024 (17207) 
+                2025 (17210)     'me': begin {mem}
+                2026 (17218)             parse(' ['); scan; express;
+                2027 (17235)             testtype('i');
+                2028 (17243)             testto(' ]'); parse(':=');
+                2029 (17261)             scan; express; code1(24);
+                2030 (17277)             testtype('i');
+                2031 (17285)           end {mem};
+                2032 (17285) 
+                2033 (17288)     'ca': begin {call}
+                2034 (17296)             parse(' ('); scan; express;
+                2035 (17313)             testtype('i');
+                2036 (17321)             testto(' )'); code1(25); scan
+                2037 (17338)           end {call};
+                2038 (17342) 
+                2039 (17345)     'op': openrw(47);
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 35
+
+                2040 (17361) 
+                2041 (17364)     'ow': openrw(48);
+                2042 (17380) 
+                2043 (17383)     'ob': openrw(80);
+                2044 (17399) 
+                2045 (17402)     'gb': begin
+                2046 (17410)             parse(' ('); scan; express;
+                2047 (17427)             testtype('f'); testto(' ,');
+                2048 (17444)             scan; express; testtype('i');
+                2049 (17460)             testto(' ,'); scan; testto('id');
+                2050 (17482)             idpnt:=findid;
+                2051 (17488)             if idpnt=0 then error(5);
+                2052 (17510)             getvar;
+                2053 (17514)             if relad<>0 then error(15);
+                2054 (17532)             code1($51); testferror;
+                2055 (17544)             gpval(idpnt,true,vartyp2);
+                2056 (17560)             testto(' )'); scan
+                2057 (17569)           end;
+                2058 (17573) 
+                2059 (17576)     'pb': begin
+                2060 (17584)             parse(' ('); scan; express;
+                2061 (17601)             testtype('f'); testto(' ,');
+                2062 (17618)             scan; express; testtype('i');
+                2063 (17634)             testto(' ,'); scan; express;
+                2064 (17651)             code1($52);testferror;
+                2065 (17663)             testto(' )');
+                2066 (17672)             scan
+                2067 (17672)           end;
+                2068 (17676) 
+                2069 (17679)     'ru': begin
+                2070 (17687)             code1($41); scan;
+                2071 (17699)           end;
+                2072 (17699) 
+                2073 (17702)     'fi': begin
+                2074 (17710)             code1(46); scan
+                2075 (17718)           end;
+                2076 (17722) 
+                2077 (17725)     'ge': gpsec(55);
+                2078 (17741) 
+                2079 (17744)     'pu': gpsec(56);
+                2080 (17760) 
+                2081 (17763)     'cl': begin {close}
+                2082 (17771)             parse(' (');
+                2083 (17780)             repeat
+                2084 (17780)               scan; express; code1(49);
+                2085 (17796)               testtype('f');
+                2086 (17804)               testferror
+                2087 (17804)             until token<>' ,';
+                2088 (17815)             testto(' )'); scan;
+                2089 (17832)           end {close}
+                2090 (17832) 
+                2091 (17832)     else if (token<>'en') and (token<>' ;')
+                2092 (17850)       and (token<>'un') then begin
+                2093 (17861)       error(10); scan
+                2094 (17872)     end
+                2095 (17876)   end {case of statements}
+                2096 (17878) end;
+                2097 (17878) 
+                2098 (17879) { * findforw *          ( of block ) }
+                2099 (17879) 
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 36
+
+                2100 (17879) func findforw;
+                2101 (17879) 
+                2102 (17879) var i,j,sav1: integer;
+                2103 (17882) 
+                2104 (17882)   func found(start: integer):boolean;
+                2105 (17882)   var ii,i9: integer;
+                2106 (17885)   begin {compare}
+                2107 (17885)     ii:= 0;
+                2108 (17889)     repeat
+                2109 (17893)       ii:=succ(ii);
+                2110 (17897)     until (ii >= 8) or
+                2111 (17909)       (ident[ii] <> idtab[start+ii]);
+                2112 (17932)     found:=(ii >= 8);
+                2113 (17943)   end {compare};
+                2114 (17947) 
+                2115 (17948) 
+                2116 (17948) begin {findforw}
+                2117 (17948)   i:=succ(forwpn);
+                2118 (17954)   repeat
+                2119 (17959)     i:=prec(i)
+                2120 (17959)   until (i=0) or found(8*fortab[i]);
+                2121 (17994)   findforw:=i;
+                2122 (17998)   if i>0 then
+                2123 (18012)     if i=forwpn then forwpn:=forwpn-1
+                2124 (18032)     else begin
+                2125 (18042)       sav1:=fortab[i];
+                2126 (18046)       for j:=1 to forwpn-1 do
+                2127 (18066)       fortab[j]:=fortab[succ(j)];
+                2128 (18085)       fortab[forwpn]:=sav1;
+                2129 (18111)       findforw:=forwpn;
+                2130 (18119)       forwpn:=forwpn-1
+                2131 (18131)     end
+                2132 (18133) end {findforw};
+                2133 (18138) 
+                2134 (18139) 
+                2135 (18139) begin { *** body of block *** }
+                2136 (18139)   dpnt:=3; t2[bottom]:=pc;
+                2137 (18151)   code3(36,0);
+                2138 (18169)   stackpn1:=stackpnt; forwpn:=0;
+                2139 (18179) 
+                2140 (18183)   if token='co' then begin    { * const * }
+                2141 (18194)     scan;
+                2142 (18198)     repeat
+                2143 (18198)       deccon; testto(' ;'); scan
+                2144 (18211)     until token <> 'id';
+                2145 (18222)   end {const};
+                2146 (18226) 
+                2147 (18226)   if token='me' then memory;  { * mem * }
+                2148 (18241) 
+                2149 (18241)   if token='va' then variable;{ * var * }
+                2150 (18256) 
+                2151 (18256)   while (token='pr')or (token='fu') do begin
+                2152 (18276)     parlevel:=0;
+                2153 (18278)     case token of
+                2154 (18282)     'pr': begin               { * proc * }
+                2155 (18294)             parse('id'); npara:=0;
+                2156 (18305)             putsym('p','r'); cproc:=spnt;
+                2157 (18319)             level:=succ(level);
+                2158 (18331)           end;
+                2159 (18336)     'fu': begin               { * func * }
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 37
+
+                2160 (18347)             parse('id'); npara:=1;
+                2161 (18358)             putsym('f','i');
+                2162 (18372)             cproc:=spnt; level:=succ(level);
+                2163 (18384)             putsym('f','i');
+                2164 (18399)             t2[spnt]:=parlevel;
+                2165 (18403)             parlevel:=succ(parlevel);
+                2166 (18415)           end
+                2167 (18420)     end; {case of token}
+                2168 (18422)     if forwpn=0 then find:=0
+                2169 (18432)     else find:=findforw;
+                2170 (18447)     if find<>0 then begin
+                2171 (18458)       spnt:=spnt-npara-1;
+                2172 (18472)       cproc:=fortab[find];
+                2173 (18481)       fixup(t2[cproc]);
+                2174 (18503)     end;
+                2175 (18503)     scan; spnt1:=spnt;
+                2176 (18507)     dpnt1:=dpnt;
+                2177 (18515)     if token=' (' then parameter;
+                2178 (18538)     if t0[cproc]='fi' then function;
+                2179 (18557)     testto(' ;');
+                2180 (18566)     for i:=1 to npara do
+                2181 (18572)     t2[succ(spnt-i)]:=t2[succ(spnt-i)]
+                2182 (18604)           -parlevel;
+                2183 (18609)     scan;
+                2184 (18636)     if token='fw' then begin
+                2185 (18644)       if forwpn=8 then merror(13,'ov');
+                2186 (18668)       forwpn:=succ(forwpn);
+                2187 (18672)       fortab[forwpn]:=cproc;
+                2188 (18681)       t2[cproc]:=pc;
+                2189 (18693)       code3(36,0);
+                2190 (18711)       scan
+                2191 (18711)     end else block(cproc);
+                2192 (18728)     level:=prec(level);
+                2193 (18732)     dpnt:=dpnt1; spnt:=spnt1;
+                2194 (18745)     case high(t0[spnt]) of
+                2195 (18761)       'r':  t0[spnt]:=packed('t',low(t0[spnt]));
+                2196 (18785)       's':  t0[spnt]:=packed('u',low(t0[spnt]))
+                2197 (18813)     end {case};
+                2198 (18821)     testto(' ;'); scan
+                2199 (18830)   end {procedure of function};
+                2200 (18834) 
+                2201 (18837)   testto('be');     { * begin * }
+                2202 (18846)   if forwpn<>0 then merror(13,'ur');
+                2203 (18867)   scan; fixup(t2[bottom]);
+                2204 (18885)   t2[bottom]:=pc;
+                2205 (18889)   code3(35,2*dpnt);
+                2206 (18912)   repeat
+                2207 (18912)     statmnt
+                2208 (18912)   until token='en';
+                2209 (18923)   scan;
+                2210 (18931)   if level>0 then code1(1) else code1(0);
+                2211 (18960)   stackpnt:=stackpn1;
+                2212 (18960) end {block};
+                2213 (18968) 
+                2214 (18969) { * savtable *    ( global) }
+                2215 (18969) 
+                2216 (18969) proc savtable; { save lib table in @ofno }
+                2217 (18969) 
+                2218 (18969) var i,j,num: integer;
+                2219 (18972)     vtype1: char;
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 38
+
+                2220 (18972) 
+                2221 (18972) begin
+                2222 (18972)   writeln(@ofno,spnt,',',pc+2);
+                2223 (19001)   for i:=1 to spnt do begin {for every entry }
+                2224 (19020)     for j:=1 to 8 do begin
+                2225 (19037)       write(@ofno,idtab[8*i+j])
+                2226 (19057)     end;
+                2227 (19061)     writeln(@ofno,',',t0[i],',',t1[i],',',
+                2228 (19108)       t2[i],',',t3[i]);
+                2229 (19135)     vtype1:=high(t0[i]);
+                2230 (19143)     if ((vtype1='p') or (vtype1='f') or
+                2231 (19162)       (vtype1='g')) and (t3[i]<>0) then begin
+                2232 (19183)       num:=stack[t3[i]];
+                2233 (19194)       write(@ofno,num);
+                2234 (19213)       for j:=1 to num do
+                2235 (19219)         write(@ofno,',',stack[t3[i]+j]);
+                2236 (19258)       write(@ofno,cr,lf);
+                2237 (19284)     end {then};
+                2238 (19284)   end {for}
+                2239 (19284) end {savtable};
+                2240 (19298) 
+                2241 (19299) { * main program * }
+                2242 (19299) 
+                2243 (19299) begin {main}
+                2244 (19299)   init;scan;
+                2245 (19310)   case token of
+                2246 (19310)     'pg': begin
+                2247 (19322)             libflg:=false;
+                2248 (19324)             asetfile(pname,scyclus,sdrive,'Q');
+                2249 (19350)           end;
+                2250 (19350)     'li': begin
+                2251 (19361)             libflg:=true;
+                2252 (19363)             asetfile(pname,scyclus,sdrive,'T');
+                2253 (19389)           end
+                2254 (19389)     else
+                2255 (19389)       merror(2,'pg')
+                2256 (19397)   end {case}
+                2257 (19405)   parse('id');
+                2258 (19414)   i:=0;
+                2259 (19416)   repeat
+                2260 (19420)     i:=succ(i);
+                2261 (19424)   until (i>7) or (pname[i] = ':') or
+                2262 (19447)       (pname[i]<>uppercase(ident[i+1]));
+                2263 (19476)   if i<8 then
+                2264 (19486)     merror(2,packed(pname[0],pname[1]));
+                2265 (19511)     { name differs from filename }
+                2266 (19511)   parse(' ;');
+                2267 (19520)   if ofno<>nooutput then openw(ofno);
+                2268 (19536)   scan;
+                2269 (19540)   if (token='us') and (libflg=false) then begin
+                2270 (19556)     repeat
+                2271 (19559)       getlib; scan
+                2272 (19563)     until token<>' ,';
+                2273 (19574)     testto(' ;'); scan
+                2274 (19587)   end;
+                2275 (19591)   block(0); testto(' .');
+                2276 (19608)   if ofno<>nooutput then begin
+                2277 (19615)     write(@ofno,'E');
+                2278 (19626)     savebyte(pc and 255);
+                2279 (19639)     savebyte(pc shr 8);
+
+----------------------------------------------------------------------
+
+R65 Pascal program COMPILE1        2/11/23     page 39
+
+                2280 (19652)     close(ofno);
+                2281 (19658)     if libflg then begin
+                2282 (19662)       asetfile(pname,scyclus,sdrive,'L');
+                2283 (19687)       openw(ofno);
+                2284 (19693)       savtable;
+                2285 (19697)       close(ofno)
+                2286 (19697)     end
+                2287 (19703)   end else
+                2288 (19703)     runerr:=$87; {no loader file}
+                2289 (19712)   writeln;
+                2290 (19712)   writeln;
+                2291 (19718)   writeln('End compile');
+                2292 (19742)   writeln;
+                2293 (19742)   writeln('Code lenght:          ',pc);
+                2294 (19782)   writeln('Compiler stack size:  ',stackmax);
+                2295 (19816)   writeln('Ident stack size:     ',spntmax);
+                2296 (19850)   write('Pascal errors:        ');
+                2297 (19873)   if numerr>0 then write(invvid);
+                2298 (19886)   writeln(numerr,norvid);
+                2299 (19900)   if prt then begin
+                2300 (19904)     write(prtoff);
+                2301 (19910)     setemucom(9);
+                2302 (19918)   end;
+                2303 (19918)   close(fno);
+                2304 (19924)   { check whether second pass is not required }
+                2305 (19924)   if (runerr=0) and libflg then runerr:=-1;
+                2306 (19940) end {main}.
+                2307 (19945) 
+
+End compile
+
+Code lenght:          19944
+Compiler stack size:  134
+Ident stack size:     206
+Pascal errors:        0

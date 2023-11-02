@@ -17,21 +17,23 @@ const stopcode = $2010;
 mem   endstk = $000e: integer;
       runerr = $000c: integer&;
       sp     = $0008: integer;
-var fbytes,i:integer;
+var freewords,i:integer;
     str:cpnt;
 begin
-  fbytes:=endstk-sp;
-  if (endstk>0) and ((endstk-sp) < (strsize+512))
-  { avoid 16-bit signed integer overflow }
-  then begin
+  { Pascal has no type unsigned integer. }
+  { But the free space can be larger than 32767 }
+  { We work therefore with free words here }
+  freewords:=(endstk-sp) shr 1;
+  if freewords < (strsize + 256) then begin
+    { 256 words are left for the growing stack }
     runerr:=$88;
     call(stopcode);
   end;
   { allocate heap memory }
   endstk:=endstk-strsize;
-  str:=cpnt(endstk+144);
+  str:=cpnt(endstk);
   { initialize the string }
-  for i:=0 to strsize-1 do str[i]:=endmark;
+  str[0]:=endmark;
   strnew:=str;
 end;
 
@@ -101,6 +103,23 @@ begin
     if s1[i]=ch then strpos:=i
     else strpos:=-1;
   end;
+end;
+
+{ **** strread: read string from input }
+{ returns the number of chars read }
+func strread(f: file; s: cpnt): integer;
+var i: integer;
+    ch: char;
+begin
+  i:=-1;
+  repeat
+    i:=succ(i);
+    read(@f,ch);
+    s[i]:=ch;
+    until (ch=chr($d)) or (ch=chr($1f)) or
+      (ch=chr($7f)) or (ch=chr(0)) or (i>=strsize-1);
+  s[i]:=chr(0);
+  strread:=i;
 end;
 
 begin

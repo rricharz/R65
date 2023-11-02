@@ -522,6 +522,42 @@ void write6502(uint16_t address, uint8_t value)
             memory[R8_EMURES] = sleepmicros / 1000;
             memory[R8_EMUCOM] = 0;
         }
+        else if (value == 8) {              // start listing
+            int i,end;
+            char s[32],name[32];
+            if (printFile)
+                fclose(printFile);                
+            i = 15;
+            while ((memory[M8_FILNAM+i] == ' ') && (i > 0) )    // find end of file name
+                i--;
+            end = i + 1;    
+            for (i = 0; i < end; i++) {        
+                if (memory[M8_FILNAM+i] == ':') {               // remove :
+                s[i]=' ';
+                end = i;               
+                }
+                else
+                    s[i] = memory[M8_FILNAM+i];
+            
+            if ((s[i] >= 'A') && (s[i] <= 'Z'))             // convert to small letters
+                s[i] = s[i] + 0x20;
+            }    
+            s[end] = 0;                                         // add end of string mark
+            sprintf(name, "Listings/%s.txt", s);
+            printf("Writing listing to %s\n", name);
+            printFile = fopen(name,"w");
+            if (printFile == NULL)
+                printf("Cannot open %s\n",s);
+        }
+        else if (value == 9) {              // end listing
+            printf("Closing listing\n");
+            if (printFile)
+                fclose(printFile);
+            char *s = "printout.txt";
+            printFile = fopen(s,"w");
+            if (printFile == NULL)
+                printf("Cannot open %s\n",s);            
+        }
         else {
             printf("Unknown emulator command %02X, pc=%04X\n", value, pc-3);
         memory[R8_EMURES] = 0X67;           // set result to 0
@@ -661,8 +697,7 @@ int catchSubroutine(uint16_t ea)
                 }
                 return 1;
             }
-            if ((a == 0x0e) || (a == 0x0b)) { // invvid,norvid
-                fprintf(printFile,"#####");
+            if ((a == 0x0e) || (a == 0x0b)) {  // invvid,norvid, do nothing
                 return 1;
             }
             if (a == 0x0C) {                   // new page: simulate page break
@@ -793,12 +828,12 @@ int r65Setup()
     
     // loadCodeFromListing("Assembler/assembler.txt", 1);
     
-    loadCodeFromListing("Assembler/kim1.txt", 1);
-    loadCodeFromListing("Assembler/monitor.txt", 1);
-    loadCodeFromListing("Assembler/disk.txt", 1);    
-    loadCodeFromListing("Assembler/iocontrol.txt", 1);
-    loadCodeFromListing("Assembler/crt.txt", 1);
-    loadCodeFromListing("Assembler/exdos.txt", 1);
+    loadCodeFromListing("Listings/kim1.txt", 1);
+    loadCodeFromListing("Listings/monitor.txt", 1);
+    loadCodeFromListing("Listings/disk.txt", 1);    
+    loadCodeFromListing("Listings/iocontrol.txt", 1);
+    loadCodeFromListing("Listings/crt.txt", 1);
+    loadCodeFromListing("Listings/exdos.txt", 1);
     
     char *s = "printout.txt";
     printFile = fopen(s,"w");

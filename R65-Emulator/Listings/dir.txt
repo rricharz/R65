@@ -1,0 +1,200 @@
+
+R65 Pascal program DIR             2/11/23     page 1
+
+
+                   1 (    4) {
+                   2 (    4)          *******************
+                   3 (    4)          *                 *
+                   4 (    4)          *   dir <drive>   *
+                   5 (    4)          *                 *
+                   6 (    4)          *******************
+                   7 (    4) 
+                   8 (    4)     2018,2019 rricharz (r77@bluewin.ch)
+                   9 (    4)     2023 removed inverse video display
+                  10 (    4)     2023 default drive 1
+                  11 (    4) 
+                  12 (    4) Display the directory of a disk drive.
+                  13 (    4) Uses EPROM (disk.asm) calls to get info
+                  14 (    4) from disk directory.
+                  15 (    4) 
+                  16 (    4) Written 2018 to test the R65 emulator and
+                  17 (    4) to demonstrate the power of Tiny Pascal.
+                  18 (    4) 
+                  19 (    4) Makes a table to find out how long the
+                  20 (    4) longest name is. Then computes the number
+                  21 (    4) of columns which can be displayed and
+                  22 (    4) displays the directory.
+                  23 (    4) 
+                  24 (    4) Usage:  dir drive                   }
+                  25 (    4) 
+                  26 (    4) program dir;
+                  27 (    4) uses syslib,arglib,strlib;
+                  28 ( 1800) 
+                  29 ( 1800) {R65 disk eprom calls and params: }
+                  30 ( 1800) const aprepdo =$f4a7;
+                  31 ( 1803)       agetentx=$f63a;
+                  32 ( 1803)       aenddo  =$f625;
+                  33 ( 1803)       tsectors = 2560;
+                  34 ( 1803)       maxent  = 255;
+                  35 ( 1803) 
+                  36 ( 1803) mem   filtyp  =$0300: char&;
+                  37 ( 1803)       filcyc  =$0311: integer&;
+                  38 ( 1803)       filstp  =$0312: char&;
+                  39 ( 1803)       filloc  =$0313: integer;
+                  40 ( 1803)       filsiz  =$0315: integer;
+                  41 ( 1803)       fillnk  =$031e: integer;
+                  42 ( 1803)       scyfc   =$037c: integer&;
+                  43 ( 1803)       filerr=$db: integer&;
+                  44 ( 1803) 
+                  45 ( 1803) var default: boolean;
+                  46 ( 1803)     drive,index,i,ti,maxlen,nument,col,
+                  47 ( 1803)     ncol,row,nspaces,sfree,sdel,
+                  48 ( 1803)     lines       : integer;
+                  49 ( 1803)     ffree,fdel  : real;
+                  50 ( 1803)     filstptab   : array[80] of char;
+                  51 ( 1803)     s           : cpnt;
+                  52 ( 1803)     entry       : array[maxent] of cpnt;
+                  53 ( 1803) 
+                  54 ( 1803) 
+                  55 ( 1803) func hex(d:integer):char;
+                  56 ( 1803) { convert hex digit to hex char }
+                  57 ( 1803) begin
+                  58 ( 1803)   if (d>=0) and (d<10) then
+                  59 ( 1822)     hex:=chr(d+ord('0'))
+
+----------------------------------------------------------------------
+
+R65 Pascal program DIR             2/11/23     page 2
+
+                  60 ( 1832)   else if (d>=10) and (d<16) then
+                  61 ( 1855)     hex:=chr(d+ord('A')-10)
+                  62 ( 1868)   else hex:='?';
+                  63 ( 1879) end;
+                  64 ( 1883) 
+                  65 ( 1884) proc checkfilerr;
+                  66 ( 1884) begin
+                  67 ( 1884)   if filerr<>0 then begin
+                  68 ( 1895)     writeln('Cannot read directory');
+                  69 ( 1926)     abort;
+                  70 ( 1930)   end;
+                  71 ( 1930) end;
+                  72 ( 1930) 
+                  73 ( 1931) func smaller(pnt1,pnt2:cpnt):boolean;
+                  74 ( 1931) var k:integer;
+                  75 ( 1934) begin
+                  76 ( 1934)   k:=0;
+                  77 ( 1938)   while (pnt2[k]=pnt1[k]) and (k<15) do
+                  78 ( 1970)     k:=k+1;
+                  79 ( 1980)   smaller:=(pnt2[k]<pnt1[k]);
+                  80 ( 2009) end;
+                  81 ( 2013) 
+                  82 ( 2014) proc sort;
+                  83 ( 2014) var i,j:integer;
+                  84 ( 2017)     savepnt:cpnt;
+                  85 ( 2017) begin
+                  86 ( 2017)   for i:=0 to nument-1 do
+                  87 ( 2031)      for j:=nument-1 downto i do
+                  88 ( 2052)        if smaller(entry[j],entry[j+1]) then begin
+                  89 ( 2092)           savepnt:=entry[j];
+                  90 ( 2099)           entry[j]:=entry[j+1];
+                  91 ( 2118)           entry[j+1]:=savepnt;
+                  92 ( 2133)        end;
+                  93 ( 2141) end;
+                  94 ( 2169) 
+                  95 ( 2170) begin {main}
+                  96 ( 2170)   drive:=1; {default drive}
+                  97 ( 2179)   filerr:=0;
+                  98 ( 2181)   agetval(drive,default);
+                  99 ( 2205)   if (drive<0) or (drive>1) then begin
+                 100 ( 2220)     writeln('Drive must be 0 or 1');
+                 101 ( 2250)     abort
+                 102 ( 2250)   end;
+                 103 ( 2254)   fildrv:=drive;
+                 104 ( 2254)   call(aprepdo);
+                 105 ( 2266)   checkfilerr;
+                 106 ( 2270) 
+                 107 ( 2270)   scyfc:=255; { write disk name }
+                 108 ( 2277)   call(agetentx);
+                 109 ( 2281)   checkfilerr;
+                 110 ( 2285) 
+                 111 ( 2285)   write(invvid,'Directory drive ',drive,': ');
+                 112 ( 2313)   for i:=0 to 15 do
+                 113 ( 2321)     write(filnam[i]);
+                 114 ( 2340)   writeln(norvid);
+                 115 ( 2363) 
+                 116 ( 2363)   index:=0; ti:=0; maxlen:=0;
+                 117 ( 2377)   sdel:=0;
+                 118 ( 2383)   repeat
+                 119 ( 2387)     scyfc:=index;
+
+----------------------------------------------------------------------
+
+R65 Pascal program DIR             2/11/23     page 3
+
+                 120 ( 2387)     call(agetentx);
+                 121 ( 2400)     checkfilerr;
+                 122 ( 2404)     { check for end mark }
+                 123 ( 2404)     if filtyp<>chr(0) then begin
+                 124 ( 2412)       { check for deleted flag }
+                 125 ( 2415)       if (fillnk and 255)<128 then begin
+                 126 ( 2425)         entry[ti]:=strnew;
+                 127 ( 2438)         s:=entry[ti];
+                 128 ( 2446)         for i:=0 to 15 do s[i]:=filnam[i];
+                 129 ( 2482)         for i:=16 to 20 do s[i]:=' ';
+                 130 ( 2525)         i:=20;
+                 131 ( 2545)         repeat
+                 132 ( 2549)           i:=i-1;
+                 133 ( 2555)         until (i=0) or
+                 134 ( 2567)           (s[i]<>' ');
+                 135 ( 2580)         s[i+1]:='.';
+                 136 ( 2593)         s[i+2]:=hex(filcyc shr 4);
+                 137 ( 2619)         s[i+3]:=hex(filcyc and 15);
+                 138 ( 2645)         if maxlen<i+3 then maxlen:=i+3;
+                 139 ( 2670)         filstptab[ti]:=filstp;
+                 140 ( 2683)         ti:=ti+1
+                 141 ( 2691)       end else {deleted}
+                 142 ( 2701)         sdel:=sdel+(filsiz shr 8);
+                 143 ( 2712)     end else {end mark}
+                 144 ( 2720)       sfree:=tsectors-filloc;
+                 145 ( 2727)     index:=index+1
+                 146 ( 2736)   until (index>=255) or (filtyp=chr(0));
+                 147 ( 2758)   call(aenddo);
+                 148 ( 2766) 
+                 149 ( 2766)   nument:=ti-1;
+                 150 ( 2772)   sort;
+                 151 ( 2781)   ncol:=48 div (maxlen+2);
+                 152 ( 2790)   if nument<8 then ncol:=2
+                 153 ( 2805)   else if nument<8 then ncol:=1;
+                 154 ( 2826)   nspaces:=(48 div ncol)-maxlen-1;
+                 155 ( 2844)   lines:=nument div ncol;
+                 156 ( 2853) 
+                 157 ( 2862)   for col:=0 to lines do
+                 158 ( 2868)   begin
+                 159 ( 2881)     for row:=0 to ncol-1 do begin
+                 160 ( 2903)       ti:=col+(lines+1)*row;
+                 161 ( 2914)       s:=entry[ti];
+                 162 ( 2928)       if (ti<=nument) then begin
+                 163 ( 2945)         for i:=0 to maxlen do
+                 164 ( 2954)           write(s[i]);
+                 165 ( 2978)         if row<(ncol-1) then
+                 166 ( 3003)           for i:=1 to nspaces do write(' ')
+                 167 ( 3028)       end
+                 168 ( 3028)     end;
+                 169 ( 3042)     writeln
+                 170 ( 3056)   end;
+                 171 ( 3062)   ffree:=conv(sfree)/conv(tsectors);
+                 172 ( 3084)   fdel:=conv(sdel)/conv(tsectors);
+                 173 ( 3100)   writeln('Free:',sfree,'(',
+                 174 ( 3121)     trunc(100.0*ffree+0.5),
+                 175 ( 3141)     '%),deleted:',sdel,'(',
+                 176 ( 3162)     trunc(100.0*fdel+0.5),'%),',
+                 177 ( 3188)     'files:',index-1);
+                 178 ( 3209) end.
+                 179 ( 3209) 
+
+End compile
+
+Code lenght:          3208
+Compiler stack size:  65
+Ident stack size:     124
+Pascal errors:        0

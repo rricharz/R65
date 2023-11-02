@@ -66,6 +66,12 @@ mem  { The & below are required for 8-bit!}
 
 var day,month,year: integer;
 
+proc setemucom(i:integer);
+mem emucom=$1430:integer&;
+begin
+  emucom:=i;
+end;
+
 { * getbcd(address)          * }
 { get 16-bit data from memory in bcd format }
 

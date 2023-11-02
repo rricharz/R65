@@ -1,5 +1,5 @@
 program test;
-uses strlib;
+uses syslib,strlib;
 
 const  cx='x';
        cy='yy';
@@ -60,5 +60,11 @@ begin
   testpos('e',16);
   testpos('t',0);
   testpos('t',2);
+  writeln;
+
+  repeat
+    write('input?'); i:=strread(input,s3);
+    writeln(i,  ' chars read, string=', s3);
+    until i=0;
 end.
  

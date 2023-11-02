@@ -9,7 +9,7 @@ First version 1978 by rricharz
 Original version 3.7 (20K)  01/08/82 rricharz
 
 Recovered 2018 by rricharz (r77@bluewin.ch)
-Extended 2018-2023 by rricharz
+Improved 2018-2023 by rricharz
 
 Original derived from the publication by
 Kin-Man Chung and Herbert Yen in
@@ -37,8 +37,8 @@ the Pascal loader (compile2).
 
 usage:
  compile1 name[.cy[,drv]] [xxx]
-  where x:       l: do hard copy print
-                 i: index bound checking
+  where x:       l,p: no hard copy print
+                 i,r: index bound checking
                  n: no loader file
   [] means not required                     }
 
@@ -200,7 +200,7 @@ begin
   write('Continue?');
   read(@key,answer);
   if answer<>'Y' then begin
-    crlf; write(prtoff); close(fno);
+    crlf; write(prtoff); setemucom(9); close(fno);
     if (ofno<>nooutput) and (ofno<>yesoutput)
       then close(ofno);
     writeln('Aborting compile1 on request');
@@ -345,15 +345,13 @@ begin {init}
 
   agetstring(request,default,dummy,dummy);
   icheck:=false;
-  prt:=false; ofno:=yesoutput;
+  prt:=true; ofno:=yesoutput;
   if not default then begin
     if request[0]<>'/' then argerror(103);
     for i:=1 to 8 do
       case request[i] of
-        'L': prt:=true;
-        'P': prt:=true;
-        'I': icheck:=true;
-        'R': icheck:=true;
+        'P','L': prt:=false;
+        'I','R': icheck:=true;
         'N': ofno:=nooutput;
         ' ': begin end
         else argerror(104)
@@ -369,7 +367,10 @@ begin {init}
   arglist[9]:=sdrive;
   numarg:=1;
 
-  if prt then write(prton);
+  if prt then begin
+    write(prton);
+    setemucom(8);
+  end
 
   line:=0; newpage; crlf; line:=1;
   write('   1 (    4) '); getchr
@@ -580,6 +581,7 @@ begin
     if ofno<>nooutput then
       write(@ofno,ident[succ(i)])
   end;
+  write(prtoff);
   asetfile(name&'        ',0,cdrive,'L');
   openr(libfil);  { get table file }
   read(@libfil,nent,size);
@@ -1147,7 +1149,7 @@ begin
             relad:=3;
             code3($22,1); code1($12)
           end;
-          if vartyp2='q' then
+          if t3[idpnt]<63 then { don't know which}
             checkindex(0,63)
           else
             checkindex(0,t3[idpnt]);
@@ -2294,9 +2296,10 @@ begin {main}
   write('Pascal errors:        ');
   if numerr>0 then write(invvid);
   writeln(numerr,norvid);
-  write(prtoff);
-  if prt then
-    write(@printer,formfeed);
+  if prt then begin
+    write(prtoff);
+    setemucom(9);
+  end;
   close(fno);
   { check whether second pass is not required }
   if (runerr=0) and libflg then runerr:=-1;
