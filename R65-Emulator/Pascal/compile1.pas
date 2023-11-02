@@ -203,7 +203,7 @@ begin
     crlf; write(prtoff); close(fno);
     if (ofno<>nooutput) and (ofno<>yesoutput)
       then close(ofno);
-    write('Aborting compile1 on request');
+    writeln('Aborting compile1 on request');
     abort
   end
   else crlf;
@@ -2291,11 +2291,15 @@ begin {main}
   writeln('Code lenght:          ',pc);
   writeln('Compiler stack size:  ',stackmax);
   writeln('Ident stack size:     ',spntmax);
-  writeln('Pascal errors:        ',numerr);
+  write('Pascal errors:        ');
+  if numerr>0 then write(invvid);
+  writeln(numerr,norvid);
   write(prtoff);
   if prt then
     write(@printer,formfeed);
   close(fno);
+  { check whether second pass is not required }
+  if (runerr=0) and libflg then runerr:=-1;
 end {main}.
 
 

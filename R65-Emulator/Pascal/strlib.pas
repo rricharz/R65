@@ -88,6 +88,21 @@ begin
   else strcmp:=-1;
 end;
 
+{ **** strpos: find occurance of char **** }
+{ returns -1 if char not found }
+func strpos(ch:char; s1:cpnt; start:integer): integer;
+var i,len: integer;
+begin
+  len:=strlen(s1);
+  if start>=len then strpos:=-1
+  else  begin
+    i:=start;
+    while (i<len) and (s1[i]<>ch) do i:=succ(i);
+    if s1[i]=ch then strpos:=i
+    else strpos:=-1;
+  end;
+end;
+
 begin
 end.
  

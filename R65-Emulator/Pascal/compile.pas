@@ -15,7 +15,13 @@ compile filename [xx]
   [] means not required                }
 
 program compile;
-uses syslib;
+uses syslib,arglib;
+
+const adelete=$c80c; { exdos vector }
+
+var cyclus,drive: integer;
+    name: array[15] of char;
+    default: boolean;
 
 {       * runprog *           }
 
@@ -32,8 +38,23 @@ end;
 {       * main *              }
 
 begin {main}
+
+  {get file name to be able to delete :Q}
+  cyclus:=0; drive:=1;
+  agetstring(name,default,cyclus,drive);
+
   runprog('COMPILE1:R      ');
+
+  cyclus:=filcyc;
+  {make sure that load runs same cyclus}
+  argtype[8]:='i';
+  arglist[8]:=cyclus;
+
   if runerr=0 then
     runprog('COMPILE2:R      ');
+  if runerr=0 then begin
+    asetfile(name,cyclus,drive,'Q');
+    call(adelete);
+  end else runerr:=0;
 end.
 
