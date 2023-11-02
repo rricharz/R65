@@ -1,0 +1,549 @@
+
+R65 Pascal program PEDIT           2/11/23     page 1
+
+
+                   1 (    4) program pedit;
+                   2 (    4) 
+                   3 (    4) { Pascal editor, original 1980 RR
+                   4 (    4)   rewritten 2023 RR for R65 system }
+                   5 (    4) 
+                   6 (    4) uses syslib, arglib, strlib;
+                   7 ( 1800) 
+                   8 ( 1800) const maxlines = 420; xmax=56;
+                   9 ( 1803)     scrlins = 16; maxfs = 20; line1x = 20;
+                  10 ( 1803)     eol    = chr($00); esc    = chr($00);
+                  11 ( 1803)     pgdown = chr($02); pgup   = chr($08);
+                  12 ( 1803)     pgend  = chr($10); clrscr = chr($11);
+                  13 ( 1803)     clrlin = chr($17); cdown  = chr($18);
+                  14 ( 1803)     cup    = chr($1a); cleft  = chr($03);
+                  15 ( 1803)     inschr = chr($15); delchr = chr($19);
+                  16 ( 1803)     rubout = chr($5f); cright = chr($16);
+                  17 ( 1803) 
+                  18 ( 1803) mem curlin = $ed: integer&;
+                  19 ( 1803)     curpos = $ee: integer&;
+                  20 ( 1803)     video  = $400: array[900] of char&;
+                  21 ( 1803) 
+                  22 ( 1803) var line, nlines, topline: integer;
+                  23 ( 1803)     name: array[15] of char;
+                  24 ( 1803)     fno: file;
+                  25 ( 1803)     chi : char;
+                  26 ( 1803)     cyclus,drive,mark,nmark,savecx: integer;
+                  27 ( 1803)     default, iseof, exit: boolean;
+                  28 ( 1803)     fs: array[maxfs] of char;
+                  29 ( 1803)     linepnt: array[maxlines] of cpnt;
+                  30 ( 1803)     relpnt:  integer;
+                  31 ( 1803) 
+                  32 ( 1803) func new:cpnt;
+                  33 ( 1803) begin
+                  34 ( 1803)   if relpnt<maxlines-1 then begin
+                  35 ( 1819)     relpnt:=relpnt+1; new:=linepnt[relpnt];
+                  36 ( 1837)   end else  {assign new memory}
+                  37 ( 1848)     new:=strnew;
+                  38 ( 1854) end;
+                  39 ( 1858) 
+                  40 ( 1859) proc release(p:cpnt);
+                  41 ( 1859) begin
+                  42 ( 1859)   linepnt[relpnt]:=p; relpnt:=relpnt-1;
+                  43 ( 1882) end;
+                  44 ( 1887) 
+                  45 ( 1888) proc setnumlin(l,c:integer);
+                  46 ( 1888) mem numlin=$1789: integer&;
+                  47 ( 1891)     numchr=$178a: integer&;
+                  48 ( 1891) begin
+                  49 ( 1891)   numlin:=l; numchr:=c;
+                  50 ( 1902) end;
+                  51 ( 1911) 
+                  52 ( 1912) func column:integer;
+                  53 ( 1912) begin
+                  54 ( 1912)   column:=line-topline+1;
+                  55 ( 1928) end;
+                  56 ( 1933) 
+                  57 ( 1934) func readline(fin: file; pnt: cpnt): boolean;
+                  58 ( 1934) const alteof=chr(127);
+                  59 ( 1937) var ch1: char;
+
+----------------------------------------------------------------------
+
+R65 Pascal program PEDIT           2/11/23     page 2
+
+                  60 ( 1937)     pos: integer;
+                  61 ( 1937) begin
+                  62 ( 1937)   pos := 0; read(@fno,ch1);
+                  63 ( 1955)   while (ch1>=' ') and (ch1<>alteof) and
+                  64 ( 1970)       (pos<xmax-1) do begin
+                  65 ( 1985)     pnt[pos]:=ch1; pos:=pos+1; read(@fno,ch1);
+                  66 ( 2018)     end;
+                  67 ( 2019)   while pos<xmax do begin
+                  68 ( 2032)     pnt[pos]:=' '; pos:=pos+1;
+                  69 ( 2048)   end;
+                  70 ( 2053)   readline:=(ch1=eof) or (ch1=alteof);
+                  71 ( 2070) end;
+                  72 ( 2075) 
+                  73 ( 2076) proc goto(xpos, ypos: integer);
+                  74 ( 2076) begin
+                  75 ( 2076)   curlin:=ypos; { top on line 2 }
+                  76 ( 2089)   if curlin>15 then curlin:=15;
+                  77 ( 2100)   curpos:=xpos-1;
+                  78 ( 2110) end;
+                  79 ( 2115) 
+                  80 ( 2116) proc showline(pnt:cpnt; y: integer);
+                  81 ( 2116) var lstart,pos: integer;
+                  82 ( 2119) begin
+                  83 ( 2119)   lstart:=y*xmax;
+                  84 ( 2127)   for pos:=0 to xmax-1 do
+                  85 ( 2142)     video[lstart+pos]:=pnt[pos];
+                  86 ( 2169) end;
+                  87 ( 2192) 
+                  88 ( 2193) proc showtop;
+                  89 ( 2193) begin
+                  90 ( 2193)   goto(1,0); write(invvid,clrlin);
+                  91 ( 2214)   write('line ', line, ' of ',nlines-1,norvid);
+                  92 ( 2241) end;
+                  93 ( 2241) 
+                  94 ( 2242) proc showerror(s:array[15] of char);
+                  95 ( 2242) var i: integer;
+                  96 ( 2245)     ch: char;
+                  97 ( 2245) begin
+                  98 ( 2245)   goto(line1x,0); write(invvid,clrlin);
+                  99 ( 2263)   for i:=0 to 15 do write(s[i]);
+                 100 ( 2289)   read(@input,ch);
+                 101 ( 2311)   goto(line1x,0); write(norvid,clrlin);
+                 102 ( 2328) end;
+                 103 ( 2328) 
+                 104 ( 2329) proc showall;
+                 105 ( 2329) var lstart,y,i,l,lstart: integer;
+                 106 ( 2332) begin
+                 107 ( 2332)   showtop;
+                 108 ( 2338)   for y:=1 to scrlins-1 do begin
+                 109 ( 2358)     l:=topline-1+y; lstart:=y*xmax;
+                 110 ( 2380)     if l<nlines then
+                 111 ( 2389)       showline(linepnt[l],y)
+                 112 ( 2405)     else
+                 113 ( 2415)       for i:=0 to xmax-1 do
+                 114 ( 2428)         video[lstart+i]:=' ';
+                 115 ( 2449)   end;
+                 116 ( 2470) end;
+                 117 ( 2484) 
+                 118 ( 2485) proc updline(pnt: cpnt; lstart:integer);
+                 119 ( 2485) var pos: integer;
+
+----------------------------------------------------------------------
+
+R65 Pascal program PEDIT           2/11/23     page 3
+
+                 120 ( 2488) begin
+                 121 ( 2488)   for pos:=0 to xmax-1 do
+                 122 ( 2500)     pnt[pos]:=video[lstart+pos];
+                 123 ( 2526) end;
+                 124 ( 2546) 
+                 125 ( 2547) func lastpos(l:integer):integer;
+                 126 ( 2547) var endpos:integer;
+                 127 ( 2550)     s:cpnt;
+                 128 ( 2550) begin
+                 129 ( 2550)   endpos:=xmax-1;
+                 130 ( 2556)   s:=linepnt[l]
+                 131 ( 2561)   while (s[endpos]=chr(ord(' ') and $7f))
+                 132 ( 2588)     and (endpos>0) do endpos:=endpos-1;
+                 133 ( 2607)   lastpos:=endpos;
+                 134 ( 2615) end;
+                 135 ( 2623) 
+                 136 ( 2624) proc chkline;
+                 137 ( 2624) begin
+                 138 ( 2624)   if line<1 then line:=1
+                 139 ( 2639)   else if line>nlines-1 then line:=nlines-1;
+                 140 ( 2669) end;
+                 141 ( 2674) 
+                 142 ( 2675) proc chktop(show: boolean);
+                 143 ( 2675) var savetop,bottom:integer;
+                 144 ( 2678) begin
+                 145 ( 2678)   savetop:=topline; bottom:=topline+scrlins-1;
+                 146 ( 2697)   if line<topline then topline:=line;
+                 147 ( 2714)   if line>=bottom then
+                 148 ( 2726)     topline:=line-scrlins+2;
+                 149 ( 2743)   if show and (savetop<>topline) then showall;
+                 150 ( 2769) end;
+                 151 ( 2769) 
+                 152 ( 2770) proc delline;
+                 153 ( 2770) var i:integer; savpnt:cpnt;
+                 154 ( 2773) begin
+                 155 ( 2773)   chkline; savpnt:=linepnt[line];
+                 156 ( 2783)   if line<mark then mark:=mark-1
+                 157 ( 2807)   else if line<mark+nmark then nmark:=nmark-1;
+                 158 ( 2840)   for i:=line to nlines-2 do
+                 159 ( 2859)     linepnt[i]:=linepnt[i+1];
+                 160 ( 2880)   release(savpnt); nlines:=nlines-1;
+                 161 ( 2918)   chkline; chktop(false);
+                 162 ( 2935)   line:=line-1; savecx:=1;
+                 163 ( 2948) end;
+                 164 ( 2952) 
+                 165 ( 2953) proc join;
+                 166 ( 2953) var p,p1,p2,pm:integer;
+                 167 ( 2956)     s1,s2:cpnt;
+                 168 ( 2956) begin
+                 169 ( 2956)   p1:=lastpos(line-1); p2:=lastpos(line);
+                 170 ( 2989)   s1:=linepnt[line-1]; s2:=linepnt[line];
+                 171 ( 3012)   for p:=p1+1 to xmax-1 do s1[p]:=s2[p-p1-1];
+                 172 ( 3065)   if p1+p2<xmax then delline
+                 173 ( 3097)   else begin
+                 174 ( 3107)     pm:=xmax-p1;
+                 175 ( 3109)     for p:=0 to xmax-pm do s2[+p]:=s2[p+pm-1];
+                 176 ( 3160)     for p:=xmax-pm+1 to xmax-1 do s2[p]:=' ';
+                 177 ( 3214)     line:=line-1;
+                 178 ( 3238)   end;
+                 179 ( 3243)   savecx:=p1+2; chkline; chktop(false); showall;
+
+----------------------------------------------------------------------
+
+R65 Pascal program PEDIT           2/11/23     page 4
+
+                 180 ( 3270) end;
+                 181 ( 3270) 
+                 182 ( 3271) func edlin(pnt: cpnt): char;
+                 183 ( 3271) const key    = @1;
+                 184 ( 3274) var   ch1: char;
+                 185 ( 3274)       exit: boolean;
+                 186 ( 3274)       lstart: integer;
+                 187 ( 3274) begin
+                 188 ( 3274)   goto(savecx,column);
+                 189 ( 3292)   if savecx=1 then write(cright,cleft)
+                 190 ( 3307)   else write(cleft,cright); {to update cursor}
+                 191 ( 3317)   exit:=false; lstart:=column*xmax;
+                 192 ( 3331)   repeat
+                 193 ( 3336)     read(@key,ch1);
+                 194 ( 3344)     case ch1 of
+                 195 ( 3345)       inschr: if video[lstart+xmax-1]
+                 196 ( 3368)                         =' ' then write(ch1);
+                 197 ( 3382)       delchr,rubout: if (curpos=0) and (line>1)
+                 198 ( 3411)              then begin
+                 199 ( 3413)                updline(pnt,lstart) ;join; exit:=true;
+                 200 ( 3436)                end
+                 201 ( 3440)              else write(cleft,delchr);
+                 202 ( 3449)       cup,cdown,esc,cr,
+                 203 ( 3477)       pgup,pgdown,hom,pgend: exit:=true
+                 204 ( 3508)       else begin
+                 205 ( 3517)              if (ch1>=' ') and (ch1<chr($7f))
+                 206 ( 3530)                then write(inschr);
+                 207 ( 3539)              write(ch1);
+                 208 ( 3544)              if curpos>=xmax-1 then
+                 209 ( 3551)                write(cleft);
+                 210 ( 3559)            end
+                 211 ( 3559)     end {case};
+                 212 ( 3561)     until exit;
+                 213 ( 3561)   updline(pnt,lstart);
+                 214 ( 3582)   edlin := ch1;
+                 215 ( 3582)   if (ch1<>delchr) and (ch1<>rubout) then
+                 216 ( 3604)     savecx:=curpos+1;
+                 217 ( 3613) end;
+                 218 ( 3618) 
+                 219 ( 3619) proc readinput;
+                 220 ( 3619) begin
+                 221 ( 3619)   cyclus:=0; drive:=1;
+                 222 ( 3632)   agetstring(name,default,cyclus,drive);
+                 223 ( 3676)   asetfile(name,cyclus,drive,'P');
+                 224 ( 3698)   openr(fno); write(hom, clrscr); setnumlin($0f,$37);
+                 225 ( 3720)   nlines := 1; line:=1; topline:=1;
+                 226 ( 3734)   repeat
+                 227 ( 3738)     linepnt[nlines] := strnew;
+                 228 ( 3748)     iseof := readline(fno, linepnt[nlines]);
+                 229 ( 3772)     nlines := nlines+1;
+                 230 ( 3782)     showtop; write(invvid,' reading',norvid);
+                 231 ( 3806)     until iseof or (nlines >= maxlines-1);
+                 232 ( 3821)   if nlines >= maxlines-1 then
+                 233 ( 3834)       showerror('too many lines  ');
+                 234 ( 3863)   close(fno);
+                 235 ( 3869) end;
+                 236 ( 3869) 
+                 237 ( 3870) proc writeoutput;
+                 238 ( 3870) var pos,endpos:integer;s,saveline:cpnt;
+                 239 ( 3873) begin
+
+----------------------------------------------------------------------
+
+R65 Pascal program PEDIT           2/11/23     page 5
+
+                 240 ( 3873)   cyclus:=0; drive:=1;
+                 241 ( 3883)   asetfile(name,cyclus,drive,'P');
+                 242 ( 3909)   openw(fno);
+                 243 ( 3915)   for line:=1 to nlines-1 do begin
+                 244 ( 3937)     showtop; write(invvid,' writing',norvid);
+                 245 ( 3956)     endpos:=lastpos(line);
+                 246 ( 3968)     s:=linepnt[line];
+                 247 ( 3976)     for pos:=0 to endpos do
+                 248 ( 3990)       write(@fno,chr(ord(s[pos]) and $7f));
+                 249 ( 4024)     if (line<nlines-1) or (endpos<>0) then
+                 250 ( 4057)       write(@fno,cr);
+                 251 ( 4070)   end;
+                 252 ( 4070)   close(fno); line:=nlines-1;
+                 253 ( 4096) end;
+                 254 ( 4101) 
+                 255 ( 4102) proc clrmarks;
+                 256 ( 4102) var x,savel:integer; s:cpnt;
+                 257 ( 4105) begin
+                 258 ( 4105)   savel:=line;
+                 259 ( 4107)   for line:=1 to nlines-1 do begin
+                 260 ( 4137)     s:=linepnt[line];
+                 261 ( 4141)     for x:=0 to xmax-1 do
+                 262 ( 4159)       s[x]:=chr(ord(s[x]) and $7f);
+                 263 ( 4186)     showtop;
+                 264 ( 4209)     end;
+                 265 ( 4209)   line:=savel; mark:=0; nmark:=0;
+                 266 ( 4239) end;
+                 267 ( 4243) 
+                 268 ( 4244) proc find(again:boolean);
+                 269 ( 4244) var pos,x,i:integer;
+                 270 ( 4247)     ch:char;
+                 271 ( 4247)     found:boolean;
+                 272 ( 4247)     s2:cpnt;
+                 273 ( 4247) 
+                 274 ( 4247)   proc checkrest;
+                 275 ( 4247)   var failed:boolean;
+                 276 ( 4250)       x1:integer;
+                 277 ( 4250)       s1:cpnt;
+                 278 ( 4250)   begin
+                 279 ( 4250)     failed:=false; pos:=1; x1:=x+1;
+                 280 ( 4270)     while (fs[pos]<>cr) and (pos<maxfs)
+                 281 ( 4292)       and (x1<xmax) do begin
+                 282 ( 4305)       s1:=linepnt[line];
+                 283 ( 4309)       if s1[x1] <> fs[pos] then failed:=true;
+                 284 ( 4341)       pos:=pos+1; x1:=x1+1;
+                 285 ( 4362)       end;
+                 286 ( 4367)      if (failed=false) and (fs[pos]=cr)
+                 287 ( 4387)       then found:=true;
+                 288 ( 4394)   end;
+                 289 ( 4398) 
+                 290 ( 4399) begin
+                 291 ( 4399)   pos:=0;
+                 292 ( 4403)   if not again then begin
+                 293 ( 4412)     goto(line1x,0);
+                 294 ( 4425)     write(invvid,'find?',clrlin);
+                 295 ( 4437)     repeat
+                 296 ( 4437)       read(@input,ch); fs[pos]:=ch; pos:=pos+1;
+                 297 ( 4464)       until (ch=cr) or (pos>=maxfs);
+                 298 ( 4483)     write(norvid);
+                 299 ( 4490)     end;
+
+----------------------------------------------------------------------
+
+R65 Pascal program PEDIT           2/11/23     page 6
+
+                 300 ( 4490)   if fs[0]=cr then begin
+                 301 ( 4499)     {empty string -> delete all marks}
+                 302 ( 4502)     clrmarks; showall;
+                 303 ( 4510)     end
+                 304 ( 4510)   else begin
+                 305 ( 4513)     found:=false;
+                 306 ( 4515)     repeat
+                 307 ( 4519)       x:=0;
+                 308 ( 4521)       repeat
+                 309 ( 4525)         pos:=0;
+                 310 ( 4527)         s2:=linepnt[line];
+                 311 ( 4535)         if s2[x]=fs[pos] then checkrest;
+                 312 ( 4569)         x:=x+1;
+                 313 ( 4575)         until found or (x>=xmax);
+                 314 ( 4591)       showtop; line:=line+1;
+                 315 ( 4605)       until found or (line>=nlines);
+                 316 ( 4623)     if found then begin
+                 317 ( 4631)       line:=line-1; x:=x-1; i:=0;
+                 318 ( 4658)       s2:=linepnt[line];
+                 319 ( 4666)       while fs[i]<>cr do begin {*4*}
+                 320 ( 4688)         s2[x+i]:=chr(ord(s2[x+i]) or $80);
+                 321 ( 4715)          i:=i+1;
+                 322 ( 4726)         end
+                 323 ( 4731)       end
+                 324 ( 4731)     else begin
+                 325 ( 4737)       line:=nlines-1;
+                 326 ( 4743)     end
+                 327 ( 4748)   end
+                 328 ( 4748) end;
+                 329 ( 4748) 
+                 330 ( 4749) proc insertline;
+                 331 ( 4749) var i:integer;
+                 332 ( 4752)     s1,s2:cpnt;
+                 333 ( 4752) begin
+                 334 ( 4752)   if nlines<maxlines-1 then begin
+                 335 ( 4765)     if line<mark then mark:=mark+1
+                 336 ( 4784)     else if line<mark+nmark then nmark:=nmark+1;
+                 337 ( 4817)     if line<nlines-1 then begin
+                 338 ( 4834)       for i:=nlines-1 downto line+1 do
+                 339 ( 4854)         linepnt[i+1]:=linepnt[i];
+                 340 ( 4875)       end;
+                 341 ( 4897)     linepnt[line+1]:=strnew;
+                 342 ( 4910)     s1:=linepnt[line+1]; s2:=linepnt[line];
+                 343 ( 4933)     for i:=0 to xmax-1 do s1[i]:=' ';
+                 344 ( 4967)     for i:=curpos to xmax-1 do begin
+                 345 ( 5006)       s1[i-curpos]:=s2[i]; s2[i]:=' ';
+                 346 ( 5034)       end;
+                 347 ( 5038)     line:=line+1; nlines:=nlines+1;
+                 348 ( 5069)     savecx:=1; chkline; chktop(false); showall;
+                 349 ( 5096)   end;
+                 350 ( 5096) end;
+                 351 ( 5096) 
+                 352 ( 5097) proc paste;
+                 353 ( 5097) var l,i:integer; s1,s2:cpnt;
+                 354 ( 5100) begin
+                 355 ( 5100)   for i:=nlines-1 downto line do
+                 356 ( 5113)     linepnt[i+nmark]:=linepnt[i];
+                 357 ( 5139)   nlines:=nlines+nmark;
+                 358 ( 5165)   if mark>line then mark:=mark+nmark;
+                 359 ( 5190)   for l:=mark to mark+nmark-1 do begin
+
+----------------------------------------------------------------------
+
+R65 Pascal program PEDIT           2/11/23     page 7
+
+                 360 ( 5228)     linepnt[line]:=strnew;
+                 361 ( 5238)     s1:=linepnt[line]; s2:=linepnt[l];
+                 362 ( 5258)     for i:=0 to xmax-1 do s1[i]:=s2[i];
+                 363 ( 5298)     line:=line+1;
+                 364 ( 5324)   end;
+                 365 ( 5329)   showall;
+                 366 ( 5347) end;
+                 367 ( 5347) 
+                 368 ( 5348) proc move;
+                 369 ( 5348) var i,j,saveline:integer; savepnt:cpnt;
+                 370 ( 5351) begin
+                 371 ( 5351)   saveline:=line; { insert above}
+                 372 ( 5361)   if line>=mark+nmark then begin
+                 373 ( 5375)     mark:=mark+nmark-1;
+                 374 ( 5389)     for j:=0 to nmark-1 do begin
+                 375 ( 5416)       savepnt:=linepnt[mark];
+                 376 ( 5420)       for i:=mark to line-1 do
+                 377 ( 5442)         linepnt[i]:=linepnt[i+1];
+                 378 ( 5463)       mark:=mark-1; line:=line-1;
+                 379 ( 5502)       linepnt[line]:=savepnt;
+                 380 ( 5511)     end;
+                 381 ( 5519)   end else if line<mark then begin
+                 382 ( 5545)     for j:=0 to nmark-1 do begin
+                 383 ( 5570)       savepnt:=linepnt[mark];
+                 384 ( 5574)       for i:=mark downto line+1 do
+                 385 ( 5596)         linepnt[i]:=linepnt[i-1];
+                 386 ( 5617)       linepnt[line]:=savepnt;
+                 387 ( 5643)       mark:=mark+1; line:=line+1;
+                 388 ( 5668)     end;
+                 389 ( 5673)   end else showerror('move inside move');
+                 390 ( 5714)  mark:=saveline; line:=saveline; showall;
+                 391 ( 5734) end;
+                 392 ( 5734) 
+                 393 ( 5735) func doesc: boolean;
+                 394 ( 5735) var ch:char;
+                 395 ( 5738)     i,n:integer;
+                 396 ( 5738)     s,savl:cpnt;
+                 397 ( 5738) begin
+                 398 ( 5738)   doesc:=false; goto(line1x,0); savecx:=1;
+                 399 ( 5758)   write(invvid,'t,b,ln,f,g,cn,p,m,dn,w,q,k?');
+                 400 ( 5793)   read(@input,ch); if ch<>cr then read(@input,n);
+                 401 ( 5820)   case ch of
+                 402 ( 5821)     't': begin {top}
+                 403 ( 5832)            line:=1; chktop(true);
+                 404 ( 5846)          end;
+                 405 ( 5846)     'b': begin {bottom}
+                 406 ( 5856)            line:=nlines-1; chktop(true);
+                 407 ( 5875)          end;
+                 408 ( 5875)     'l': begin {line number}
+                 409 ( 5885)            line:=n; chkline; chktop(true);
+                 410 ( 5905)          end;
+                 411 ( 5905)     'f','g': begin {find string}
+                 412 ( 5922)            find(ch='g'); chkline; chktop(false);
+                 413 ( 5947)            showall;
+                 414 ( 5951)          end;
+                 415 ( 5951)     'c': begin {mark lines for copy}
+                 416 ( 5961)            if n<1 then n:=1;
+                 417 ( 5973)            if line+n>= nlines-1 then
+                 418 ( 5992)              showerror('too many lines  ')
+                 419 ( 6015)            else begin
+
+----------------------------------------------------------------------
+
+R65 Pascal program PEDIT           2/11/23     page 8
+
+                 420 ( 6024)              mark:=line; nmark:=n;
+                 421 ( 6032)              for line:=mark to mark+nmark-1 do begin
+                 422 ( 6069)                s:=linepnt[line];
+                 423 ( 6073)                for i:=0 to xmax-1 do
+                 424 ( 6091)                  s[i]:= chr(ord(s[i]) or $80);
+                 425 ( 6118)              end;
+                 426 ( 6137)              line:=mark;
+                 427 ( 6151)            end;
+                 428 ( 6159)            showall;
+                 429 ( 6163)          end;
+                 430 ( 6163)     'p': begin {paste marked lines}
+                 431 ( 6173)            if mark=0 then showerror('nothing marked  ')
+                 432 ( 6201) 
+                 433 ( 6207)            else begin
+                 434 ( 6210) 
+                 435 ( 6210)              if nlines+nmark>=maxlines then
+                 436 ( 6222)                showerror('too many lines  ')
+                 437 ( 6244)              else paste;
+                 438 ( 6257)            end;
+                 439 ( 6257)          end;
+                 440 ( 6257)     'm': begin {move marked lines }
+                 441 ( 6267)            if mark=0 then showerror('nothing marked  ')
+                 442 ( 6295) 
+                 443 ( 6301)            else move;
+                 444 ( 6308) 
+                 445 ( 6308)          end;
+                 446 ( 6308)     'd': begin {delete n lines}
+                 447 ( 6318)            if n<1 then n:=1;
+                 448 ( 6330)            if line+n=maxlines-3 then
+                 449 ( 6348)              n:=maxlines-3-line;
+                 450 ( 6359)            for i:=1 to n do begin
+                 451 ( 6387)              delline; line:=line+1;
+                 452 ( 6397)            end;
+                 453 ( 6402)            chkline; chktop(false); showall;
+                 454 ( 6432)          end;
+                 455 ( 6432)     'w': writeoutput; {write output}
+                 456 ( 6449)     'q': begin {write output and quit}
+                 457 ( 6456)            writeoutput; doesc:=true;
+                 458 ( 6462)          end;
+                 459 ( 6466)     'k': doesc:=true {kill program}
+                 460 ( 6478)     else showerror('unknown escape  ')
+                 461 ( 6503)   end {case};
+                 462 ( 6511)   goto(line1x,0); write(norvid,clrlin);
+                 463 ( 6527) end;
+                 464 ( 6527) 
+                 465 ( 6528) begin {main}
+                 466 ( 6528)   relpnt:=maxlines-1;
+                 467 ( 6536)   mark:=0; nmark:=0; savecx:=1;
+                 468 ( 6555)   readinput; fs[0]:=chr(0);
+                 469 ( 6567)   topline:= 1; line:=1; showall; exit:=false;
+                 470 ( 6590)   repeat
+                 471 ( 6594)     showtop; chi := edlin(linepnt[line]);
+                 472 ( 6614)     case chi of
+                 473 ( 6618)       cup: begin
+                 474 ( 6629)              line:=line-1; chkline; chktop(true);
+                 475 ( 6652)            end;
+                 476 ( 6652)       cdown: begin
+                 477 ( 6662)              line:=line+1; chkline; chktop(true);
+                 478 ( 6685)            end;
+                 479 ( 6685)       pgup: begin
+
+----------------------------------------------------------------------
+
+R65 Pascal program PEDIT           2/11/23     page 9
+
+                 480 ( 6695)              line:=line-15; chkline; chktop(true);
+                 481 ( 6718)            end;
+                 482 ( 6718)       pgdown: begin
+                 483 ( 6728)              line:=line+15; chkline; chktop(true);
+                 484 ( 6751)            end;
+                 485 ( 6751)       hom: begin
+                 486 ( 6761)              line:=1; savecx:=1; chktop(true);
+                 487 ( 6781)            end;
+                 488 ( 6781)       pgend: begin
+                 489 ( 6791)              line:=nlines-1; savecx:=1; chktop(true);
+                 490 ( 6816)            end;
+                 491 ( 6816)       cr:  insertline;
+                 492 ( 6830)       esc: if doesc then exit:=true
+                 493 ( 6849)     end {case};
+                 494 ( 6857)     until exit;
+                 495 ( 6857)   setnumlin($29,$2f);
+                 496 ( 6874)   writeln(hom, clrscr, 'closing...');
+                 497 ( 6897) end.
+                 498 ( 6897) 
+
+End compile
+
+Code lenght:          6896
+Compiler stack size:  97
+Ident stack size:     159
+Pascal errors:        0
