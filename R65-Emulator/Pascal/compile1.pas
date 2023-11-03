@@ -1149,7 +1149,7 @@ begin
             relad:=3;
             code3($22,1); code1($12)
           end;
-          if t3[idpnt]<63 then { don't know which}
+          if (vartyp2='q') and (t3[idpnt]=0) then
             checkindex(0,63)
           else
             checkindex(0,t3[idpnt]);
@@ -1344,10 +1344,11 @@ begin {index}
     code3($22,1); code1($12);
   end;
   if chk then begin
-    if savtype='q' then
+    if (savtype='q') and (t3[idpnt]=0) then
+      { is an arrayed cpnt }
       checkindex(0,63)
     else
-      checkindex(0,t3[idpnt])
+      checkindex(0,t3[idpnt]);
   end;
   restype:=savtype; scan
 end;
