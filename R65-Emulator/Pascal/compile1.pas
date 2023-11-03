@@ -1173,6 +1173,7 @@ var bstack,numpar,i,n,n2: integer;
 { * prcall1 *           ( of prcall ) }
 
 proc prcall1;
+var ressize:integer;
 
   proc prcall3;
   begin {prcall3}
@@ -1188,7 +1189,11 @@ proc prcall1;
 
 begin {prcall1}
   case chr(stack[i] shr 8) of
-    'd':  begin express;
+    'd':  begin
+            if chr(stack[i] and 255) = 'q' then
+              mainexp('q',ressize)
+            else
+              express;
             if chr(stack[i] and 255)<>'u' then
               testtype(chr(stack[i] and 255));
           end;
@@ -1482,9 +1487,10 @@ begin { *** body of factor *** }
               end
             end else begin
               case reqtype of
-                'c','u','n':
+                'c','u','n','q':
                     begin
-                      if vartype='q' then begin
+                      if (vartype='q') or
+                         (reqtype='q') then begin
                         arsize3:=0;
                         restype:='q';
                         code2($56,value[0]);
@@ -1495,7 +1501,8 @@ begin { *** body of factor *** }
                       end;
                       for i:=1 to value[0] do
                         code1(ord(ident[i]));
-                      if vartype='q' then code1(0);
+                      if (vartype='q') or
+                         (reqtype='q') then code1(0);
                     end;
                 'p': begin
                       if odd(value[0]) then
