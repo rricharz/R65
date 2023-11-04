@@ -14,7 +14,7 @@ const strsize=64;
 
 func strnew:cpnt;
 const stopcode = $2010;
-mem   endstk = $000e: integer;
+        mem   endstk = $000e: integer;
       runerr = $000c: integer&;
       sp     = $0008: integer;
 var freewords,i:integer;
@@ -38,6 +38,7 @@ begin
 end;
 
 { ***** strlen: length of string ***** }
+
 func strlen(strin:cpnt):integer;
 var i:integer;
 begin
@@ -48,12 +49,13 @@ begin
 end;
 
 { ***** strcopy: copy cpnt string ***** }
+{ maximal max characters }
 
-proc strcpy(strin, strout:cpnt);
+proc strcpy(strin, strout:cpnt; max: integer);
 var i: integer;
 begin
   i:=0;
-  while (strin[i]<>endmark)
+  while (strin[i]<>endmark) and (i<max)
                 and (i<strsize-2) do begin
     strout[i]:=strin[i];
     i:=succ(i);
@@ -62,6 +64,7 @@ begin
 end;
 
 { **** stradd: add string to string ***** }
+
 proc stradd(strin,strinout:cpnt);
 var i,j:integer;
 begin
@@ -78,6 +81,7 @@ end;
 { returns -1  if s1<s2
            0  if s1=s2
            1  if s1>s2                  }
+
 func strcmp(s1,s2:cpnt):integer;
 var i:integer;
 begin
@@ -107,6 +111,7 @@ end;
 
 { **** strread: read string from input }
 { returns the number of chars read }
+
 func strread(f: file; s: cpnt): integer;
 var i: integer;
     ch: char;
@@ -120,6 +125,36 @@ begin
       (ch=chr($7f)) or (ch=chr(0)) or (i>=strsize-1);
   s[i]:=chr(0);
   strread:=i;
+end;
+
+{ **** intstr: convert integer to string **** }
+{ right justified in a field of 6 chars }
+
+proc intstr(n:integer;s:cpnt;fsize:integer);
+var pos,n0,n1:integer;
+    isneg:boolean;
+begin
+  pos:=fsize-1; n0:=n; isneg:=false;
+  if (n0<0) then begin
+    isneg:=true; n0:=-n0;
+  end;
+  s[pos+1]:=chr(0); { end mark }
+  repeat
+    { avoid 2nd division for mod }
+    n1:=n0 div 10;
+    s[pos]:=chr(n0-10*n1+ord('0'));
+    n0:=n1; pos:=pos-1;
+    until (n0=0) or (pos<0);
+  if (n0<>0) or (isneg and (pos<0)) then begin
+    for pos:=0 to fsize-1 do s[pos]:=chr($23);
+  end else begin
+    if isneg then begin
+      s[pos]:='-'; pos:=pos-1;
+    end;
+    while pos>=0 do begin
+      s[pos]:=' '; pos:=pos-1;
+    end;
+  end;
 end;
 
 begin

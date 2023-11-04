@@ -15,7 +15,8 @@ and EXDOS delete.
 Written 2018 to test the R65 emulator and
 to demonstrate the power of Tiny Pascal.
 
-Usage:  clean drive                   }
+Usage:  clean [drive]
+        default: drive 1                 }
 
 program clean;
 uses syslib,arglib;
@@ -93,7 +94,7 @@ begin
 end;
 
 begin { mani }
-  drive:=0; {default drive}
+  drive:=1; {default drive}
   agetval(drive,default);
   if (drive<0) or (drive>1) then begin
     writeln('Drive must be 0 or 1');

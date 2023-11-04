@@ -32,7 +32,7 @@ begin
   writeln('s1: ',  s1);
   writeln('s1 is now a string constant');
   writeln('strlen(s1): ',  strlen(s1));
-  strcpy(s1,s2);
+  strcpy(s1,s2,20);
   writeln('strcpy(s1,s2): s2=',s2);
   stradd(s1,s2);
   writeln('stradd(s1,s2): s2=',s2);
@@ -40,6 +40,8 @@ begin
   writeln('stradd(',  chr($27),
     '****',   chr($27) ,  ',s2): s2=',  s2);
   writeln;
+  write(invvid,'Waiting, type any key ',norvid);
+  read(@input,ch);
 
   res[0]:='smaller than ';
   res[1]:='equal to ';
@@ -52,6 +54,8 @@ begin
   testcmp('axcd','abcd');
   testcmp('abcd','axcd');
   writeln;
+  write(invvid,'Waiting, type any key ',norvid);
+  read(@input,ch);
 
   writeln('Checking strpos in ', s1, ':');
   testpos('a',0);
@@ -61,6 +65,13 @@ begin
   testpos('t',0);
   testpos('t',2);
   writeln;
+
+  writeln('field size 3:');
+  intstr(100,s3,3);   writeln(100,': ',tab8,s3);
+  intstr(-20,s3,3);   writeln(-20,': ',tab8,s3);
+  intstr(-300,s3,3);  writeln(-300,': ',tab8,s3);
+  intstr(32767,s3,3); writeln(32767,': ',tab8,s3);
+  intstr(0,s3,3);     writeln(0,': ',tab8,s3);
 
   repeat
     write('input?'); i:=strread(input,s3);

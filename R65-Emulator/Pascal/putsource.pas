@@ -4,27 +4,27 @@
          *   putsource   *
          *               *
          *****************
- 
+
     move the source file from the WORK disk
     on the disk SOURCEPASCAL or SOURCECOMPIL
- 
+
     usage: putsource filename
- 
+
     2019 rricharz (r77@bluewin.ch)
 }
- 
+
 program putsource;
 uses syslib,arglib;
- 
+
 const afloppy=$c827; { exdos vector }
       aexport=$c82a; { exdos vector }
- 
+
 mem filerr=$db: integer&;
- 
+
 var cyclus,drive,k: integer;
     fname,dname: array[15] of char;
     default,ok: boolean;
- 
+
 func contains(t:array[7] of char):boolean;
 { check for substring in fname }
 { the substring must end with a blank }
@@ -47,7 +47,7 @@ begin
   until found or (i>15);
   contains:=found;
 end;
- 
+
 proc runprog
   (name: array[15] of char;
    cyc: integer; drv: integer);
@@ -57,16 +57,16 @@ begin
   filcy1:=cyc; fildrv:=drv; filflg:=$40;
   run
 end;
- 
+
 proc writename(text: array[15] of char);
 { write name without blanks }
 var i: integer;
- 
+
 begin
   for i:=0 to 15 do
     if text[i]<>' ' then write(text[i]);
 end;
- 
+
 proc setsubtype(subtype:char);
 var i:integer;
 begin
@@ -78,12 +78,12 @@ begin
   fname[i]:=':';
   fname[i+1]:=subtype;
 end;
- 
+
 func letter(ch:char):boolean;
 begin
   letter:=(ch>='A') and (ch<='Z');
 end;
- 
+
 proc setargs(name:array[15] of char;
   carg,cyc,drv:integer);
 var k:integer;
@@ -98,13 +98,13 @@ begin
     argtype[carg+9]:='i';
     arglist[carg+9]:=drv;
 end;
- 
+
 proc setargi(val,carg:integer);
 begin
   argtype[carg]:='i';
   arglist[carg]:=val;
 end;
- 
+
 begin
   ok:=true;
   filerr:=0;
@@ -157,13 +157,13 @@ begin
         writeln(invvid,'Copy failed',norvid);
     end else begin {if successfull}
       setargi(filcyc,8);
- 
+
       { export the source file }
       write('Exporting the source file');
       fildrv:=1;
       call(aexport);
       writeln;
- 
+
       { delete the source file }
       writeln('Deleting the source file');
       drive:=0; filerr:=0;
@@ -173,7 +173,7 @@ begin
         writeln(invvid,
           'Deleting original failed',norvid);
       end;
- 
+
       { clean the destination drive }
       setargi(0,0);
       argtype[1]:=chr(0);
@@ -181,7 +181,7 @@ begin
       runprog('CLEAN:R         ',cyclus,drive);
       if (filerr<>0) or (runerr<>0) then
          ok:=false;
- 
+
       { pack the destination drive }
       writeln('Packing PSOURCE');
       setargi(0,0);
@@ -191,7 +191,7 @@ begin
       if (filerr<>0) or (runerr<>0) then
          ok:=false;
     end;
- 
+
     { make sure that PASCAL is on drive 0 }
     writeln('Putting disk PASCAL in drive 0');
     cyclus:=0; drive:=0;

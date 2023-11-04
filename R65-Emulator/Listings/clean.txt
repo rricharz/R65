@@ -1,0 +1,187 @@
+
+R65 Pascal program CLEAN           4/11/23     page 1
+
+
+                   1 (    4) {
+                   2 (    4)          *****************
+                   3 (    4)          *               *
+                   4 (    4)          *  clean drive  *
+                   5 (    4)          *               *
+                   6 (    4)          *****************
+                   7 (    4) 
+                   8 (    4)     2018 rricharz (r77@bluewin.ch)
+                   9 (    4) 
+                  10 (    4) Clean disk. Only the latest cyclus of
+                  11 (    4) each file is kept. Uses EPROM (disk.asm)
+                  12 (    4) calls to get info from disk directory
+                  13 (    4) and EXDOS delete.
+                  14 (    4) 
+                  15 (    4) Written 2018 to test the R65 emulator and
+                  16 (    4) to demonstrate the power of Tiny Pascal.
+                  17 (    4) 
+                  18 (    4) Usage:  clean [drive]
+                  19 (    4)         default: drive 1                 }
+                  20 (    4) 
+                  21 (    4) program clean;
+                  22 (    4) uses syslib,arglib;
+                  23 ( 1093) 
+                  24 ( 1093) {R65 disk eprom calls and params: }
+                  25 ( 1093) const aprepdo =$f4a7;
+                  26 ( 1096)       agetentx=$f63a;
+                  27 ( 1096)       aenddo  =$f625;
+                  28 ( 1096)       adelete =$c80c;
+                  29 ( 1096) mem   filtyp  =$0300: char&;
+                  30 ( 1096)       filcyc  =$0311: integer&;
+                  31 ( 1096)       filstp  =$0312: char&;
+                  32 ( 1096)       filloc  =$0313: integer;
+                  33 ( 1096)       filsiz  =$0315: integer;
+                  34 ( 1096)       fillnk  =$031e: integer;
+                  35 ( 1096)       scyfc   =$037c: integer&;
+                  36 ( 1096)       filerr  =$db: integer&;
+                  37 ( 1096) 
+                  38 ( 1096) var default: boolean;
+                  39 ( 1096)     drive,index,i,ti,maxlen,nument,sfree,
+                  40 ( 1096)     sdel,sfound : integer;
+                  41 ( 1096)     { 1280 = 80 names of 16 chars }
+                  42 ( 1096)     nametab     : array[1280] of char;
+                  43 ( 1096)     filstptab   : array[80] of char;
+                  44 ( 1096)     cyctab      : array[80] of integer;
+                  45 ( 1096)     foundtab    : array[80] of boolean;
+                  46 ( 1096)     sizetab     : array[80] of integer;
+                  47 ( 1096)     name        : array[15] of char;
+                  48 ( 1096) 
+                  49 ( 1096) proc bcderror(e:integer);
+                  50 ( 1096) begin
+                  51 ( 1096)   writeln;
+                  52 ( 1101)   write(invvid,'ERROR ');
+                  53 ( 1117)   write((e shr 4) and 15);
+                  54 ( 1128)   writeln(e and 15,norvid);
+                  55 ( 1145) end;
+                  56 ( 1145) 
+                  57 ( 1146) func hex(d:integer):char;
+                  58 ( 1146) { convert hex digit to hex char }
+                  59 ( 1146) begin
+
+----------------------------------------------------------------------
+
+R65 Pascal program CLEAN           4/11/23     page 2
+
+                  60 ( 1146)   if (d>=0) and (d<10) then
+                  61 ( 1165)     hex:=chr(d+ord('0'))
+                  62 ( 1175)   else if (d>=10) and (d<16) then
+                  63 ( 1198)     hex:=chr(d+ord('A')-10)
+                  64 ( 1211)   else hex:='?';
+                  65 ( 1222) end;
+                  66 ( 1226) 
+                  67 ( 1227) proc mark(i3: integer);
+                  68 ( 1227) {mark entry for delete}
+                  69 ( 1227) var j: integer;
+                  70 ( 1230) begin
+                  71 ( 1230)   write('Found ');
+                  72 ( 1239)   for j:=0 to maxlen do
+                  73 ( 1245)     write(nametab[16*i3+j]);
+                  74 ( 1275)   write('.');
+                  75 ( 1291)   writeln(hex(cyctab[i3] shr 4),
+                  76 ( 1310)           hex(cyctab[i3] and 15));
+                  77 ( 1337)   foundtab[i3]:=true
+                  78 ( 1341) end;
+                  79 ( 1347) 
+                  80 ( 1348) proc check(i1,i2: integer);
+                  81 ( 1348) {check and mark entries for delete}
+                  82 ( 1348) var j: integer;
+                  83 ( 1351) begin
+                  84 ( 1351)   if filstptab[i2]='Q' then mark(i2)
+                  85 ( 1367)   else begin
+                  86 ( 1380)     j:=-1;
+                  87 ( 1382)     repeat
+                  88 ( 1387)      j:=j+1;
+                  89 ( 1393)       until (j>maxlen) or
+                  90 ( 1407)            (nametab[16*i1+j]<>
+                  91 ( 1419)           nametab[16*i2+j]);
+                  92 ( 1440)     if j>maxlen then mark(i1)
+                  93 ( 1456)   end
+                  94 ( 1466) end;
+                  95 ( 1466) 
+                  96 ( 1467) begin { mani }
+                  97 ( 1467)   drive:=1; {default drive}
+                  98 ( 1476)   agetval(drive,default);
+                  99 ( 1496)   if (drive<0) or (drive>1) then begin
+                 100 ( 1511)     writeln('Drive must be 0 or 1');
+                 101 ( 1541)     abort
+                 102 ( 1541)   end;
+                 103 ( 1545)   fildrv:=drive;
+                 104 ( 1545)   call(aprepdo);
+                 105 ( 1557) 
+                 106 ( 1557)   scyfc:=255; { write disk name }
+                 107 ( 1564)   call(agetentx);
+                 108 ( 1568)   write('Cleaning drive ',
+                 109 ( 1584)       drive,': ');
+                 110 ( 1592)   for i:=0 to 15 do
+                 111 ( 1600)     write(filnam[i]);
+                 112 ( 1619)   writeln;
+                 113 ( 1633) 
+                 114 ( 1639)   index:=0; ti:=0; maxlen:=0;
+                 115 ( 1653)   sdel:=0; sfound:=0;
+                 116 ( 1665)   repeat
+                 117 ( 1669)     scyfc:=index;
+                 118 ( 1669)     call(agetentx);
+                 119 ( 1682)     { check for end mark }
+
+----------------------------------------------------------------------
+
+R65 Pascal program CLEAN           4/11/23     page 3
+
+                 120 ( 1682)     if filtyp<>chr(0) then begin
+                 121 ( 1690)       { check for deleted flag }
+                 122 ( 1693)       if (fillnk and 255)<128 then begin
+                 123 ( 1703)         for i:=0 to 15 do
+                 124 ( 1714)           nametab[16*ti+i]:=filnam[i];
+                 125 ( 1742)         i:=16;
+                 126 ( 1764)         repeat
+                 127 ( 1768)           i:=i-1;
+                 128 ( 1774)         until (i=0) or
+                 129 ( 1786)           (nametab[16*ti+i]<>' ');
+                 130 ( 1805)         if maxlen<i then maxlen:=i;
+                 131 ( 1821)         filstptab[ti]:=filstp;
+                 132 ( 1837)         cyctab[ti]:=filcyc;
+                 133 ( 1849)         foundtab[ti]:=false;
+                 134 ( 1859)         sizetab[ti]:=filsiz shr 8;
+                 135 ( 1873)         for i:=0 to ti-1 do
+                 136 ( 1890)           if (foundtab[i]=false) and
+                 137 ( 1911)                (foundtab[ti]=false) then
+                 138 ( 1922)             check(i,ti);
+                 139 ( 1940)         ti:=ti+1
+                 140 ( 1958)       end else {deleted}
+                 141 ( 1968)         sdel:=sdel+(filsiz shr 8);
+                 142 ( 1979)     end else {end mark}
+                 143 ( 1987)       sfree:=2560-filloc;
+                 144 ( 1994)     index:=index+1
+                 145 ( 2003)   until (index>=255) or (filtyp=chr(0));
+                 146 ( 2025)   call(aenddo);
+                 147 ( 2033)   nument:=ti;
+                 148 ( 2033) 
+                 149 ( 2041)   for ti:=0 to nument-1 do begin
+                 150 ( 2063)     if foundtab[ti] then begin
+                 151 ( 2071)       for i:=0 to 15 do
+                 152 ( 2082)          name[i]:=nametab[16*ti+i];
+                 153 ( 2107)          asetfile(name,cyctab[ti],drive,
+                 154 ( 2143)                ' ');
+                 155 ( 2155)       filerr:=0;
+                 156 ( 2157)       call(adelete);
+                 157 ( 2165)       if filerr<>0 then bcderror(filerr);
+                 158 ( 2183)       sfound:=sfound+sizetab[ti];
+                 159 ( 2191)     end
+                 160 ( 2200)   end;
+                 161 ( 2200) 
+                 162 ( 2214)   writeln('Free: ',sfree,', found: ',sfound,
+                 163 ( 2236)     ', now deleted: ',sdel+sfound);
+                 164 ( 2273) 
+                 165 ( 2273) end.
+                 166 ( 2273) 
+
+End compile
+
+Code lenght:          2272
+Compiler stack size:  51
+Ident stack size:     105
+Pascal errors:        0

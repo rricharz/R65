@@ -28,6 +28,18 @@ var line, nlines, topline: integer;
     fs: array[maxfs] of char;
     linepnt: array[maxlines] of cpnt;
     relpnt:  integer;
+    stemp: cpnt;
+
+proc putontop(s:cpnt;pos:integer;inv:boolean);
+var i:integer;
+begin
+  i:=0; { faster version: if not in loop }
+  if inv then while s[i]<>chr(0) do begin
+    video[i+pos]:=chr(ord(s[i]) or 128); i:=i+1;
+  end else while s[i]<>chr(0) do begin
+    video[i+pos]:=s[i]; i:=i+1;
+  end;
+end;
 
 func new:cpnt;
 begin
@@ -87,8 +99,8 @@ end;
 
 proc showtop;
 begin
-  goto(1,0); write(invvid,clrlin);
-  write('line ', line, ' of ',nlines-1,norvid);
+  intstr(line,stemp,3); putontop(stemp,5,true);
+  intstr(nlines-1,stemp,3); putontop(stemp,12,true);
 end;
 
 proc showerror(s:array[15] of char);
@@ -217,31 +229,41 @@ begin
 end;
 
 proc readinput;
+var i,pend:integer;
 begin
   cyclus:=0; drive:=1;
+  goto(1,1); write(clrscr); goto(1,1);
   agetstring(name,default,cyclus,drive);
   asetfile(name,cyclus,drive,'P');
-  openr(fno); write(hom, clrscr); setnumlin($0f,$37);
+  openr(fno); setnumlin($0f,$37);
   nlines := 1; line:=1; topline:=1;
+  pend:=15; while name[pend]=' ' do pend:=pend-1;
+  for i:=0 to pend do stemp[i]:=name[i];
+  stemp[pend+1]:=chr(0);
+  stradd(':P.',stemp);
+  putontop(stemp,26,true);
   repeat
     linepnt[nlines] := strnew;
     iseof := readline(fno, linepnt[nlines]);
     nlines := nlines+1;
-    showtop; write(invvid,' reading',norvid);
+    showtop; putontop('Reading',16,true);
     until iseof or (nlines >= maxlines-1);
   if nlines >= maxlines-1 then
       showerror('too many lines  ');
   close(fno);
+  putontop('       ',16,false);
+  showall;
 end;
 
 proc writeoutput;
 var pos,endpos:integer;s,saveline:cpnt;
 begin
   cyclus:=0; drive:=1;
+  goto(1,1); write(clrscr);
   asetfile(name,cyclus,drive,'P');
   openw(fno);
   for line:=1 to nlines-1 do begin
-    showtop; write(invvid,' writing',norvid);
+    showtop; putontop('Writing',16,true);
     endpos:=lastpos(line);
     s:=linepnt[line];
     for pos:=0 to endpos do
@@ -250,6 +272,8 @@ begin
       write(@fno,cr);
   end;
   close(fno); line:=nlines-1;
+  putontop('       ',16,false);
+  showall;
 end;
 
 proc clrmarks;
@@ -299,9 +323,12 @@ begin
     end;
   if fs[0]=cr then begin
     {empty string -> delete all marks}
+    putontop('Clearing marks',16,true);
     clrmarks; showall;
+    putontop('              ',16,false);
     end
   else begin
+    putontop('Searching',16,true);
     found:=false;
     repeat
       x:=0;
@@ -323,7 +350,8 @@ begin
       end
     else begin
       line:=nlines-1;
-    end
+    end;
+    putontop('         ',16,false);
   end
 end;
 
@@ -463,6 +491,9 @@ begin
 end;
 
 begin {main}
+  stemp:=strnew;
+  write(hom,clrscr);
+  putontop('Line xxx of xxx ',0,true);
   relpnt:=maxlines-1;
   mark:=0; nmark:=0; savecx:=1;
   readinput; fs[0]:=chr(0);

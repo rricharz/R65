@@ -393,6 +393,8 @@ int i, end, filtyp, filstp;
     sprintf(name, "Files/%s%s", s, extension);
     // printf("Editing %s\n", name);
     
+    crtUpdate();
+    
     // execute mousepad command
     sprintf(estring, "mousepad Files/%s%s", s, extension);
     printf("Running %s, waiting for completion\n", estring);   
