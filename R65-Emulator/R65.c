@@ -74,9 +74,12 @@ const char *mnemonic[] = {           // p-codes
 uint8_t memory[65536];
 int timeOfSpMin;
 int timeOfPascalMin;
+int timeOfTemp;          // time of last temperature read
 
 int spMin;              // minimum value of sp during execution
 int pascalMinFree;      // minimal value of pascalFreeStack
+
+int T = 0;
 
 int rawPrint = 0;       // for Tektronix plotter
 
@@ -102,8 +105,20 @@ clock_t lastCrtSync = 0;
 void checkMinTimeout()
 /********************/
 {
-    // keep displayed figures for 5 seconds, then reset
+    // keep displayed figures for n seconds, then reset
+    
     int now = time(NULL) % 86400;
+    
+    if ((now - timeOfSpMin) > 5) {
+        spMin = sp;
+        timeOfSpMin = now;
+        global_pendingCrtUpdate = 1;
+    }
+    if ((now - timeOfTemp) > 1) {
+        timeOfTemp = now;
+        T = -1;   // force temperature read
+        global_pendingCrtUpdate = 1;
+    }
     if ((now - timeOfSpMin) > 5) {
         spMin = sp;
         timeOfSpMin = now;

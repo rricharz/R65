@@ -212,8 +212,22 @@ void infoPanel()
         struct tm * now_tm;
         now = time(NULL);
         now_tm = localtime(&now);
-        sprintf(s1," %02d-%02d", now_tm->tm_hour,   
-          now_tm->tm_min, now_tm->tm_sec);
+ 
+        if (T < 0) {
+            FILE *temperatureFile =
+                fopen("/sys/class/thermal/thermal_zone0/temp", "r");
+ 	        if (temperatureFile != NULL) {
+		        fscanf(temperatureFile, "%d", &T);
+                T  = T / 1000;
+		        if (T < 0) T = 0;
+		        if (T > 99) T = 99;
+		        fclose (temperatureFile);
+		    }
+	        else T = 0;
+        }
+        
+        sprintf(s1,"%02d.%02d %02d°", now_tm->tm_hour,   
+          now_tm->tm_min, (int)T);
     }
     sprintf(s2,"%04X  %02X",pc, spMin);
     sprintf(s3,"%05d %02X", (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),

@@ -73,3 +73,4 @@ extern int pendingIRQ;
 extern uint8_t memory[65536];
 extern int spMin;
 extern int pascalMinFree;
+extern int T;

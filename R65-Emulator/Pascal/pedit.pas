@@ -76,6 +76,12 @@ begin
   curpos:=xpos-1;
 end;
 
+proc clrmessage;
+var i:integer;
+begin
+  for i:=inpx-1 to xmax-1 do top[i]:=128;
+end;
+
 proc getinput(var n:integer; s:cpnt);
 var i,j,stop:integer; ch: char;
 begin
@@ -141,9 +147,10 @@ proc showerror(s:cpnt);
 var i: integer;
     ch: char;
 begin
+  clrmessage;
   putontop(s,36,true);
-  read(@input,ch);
-  putontop('                ',36,false);
+  read(@key,ch);
+  clrmessage;
 end;
 
 proc showall;
@@ -276,6 +283,7 @@ begin
   stradd(':P.',stemp);
   hexstr(filcyc,stemp2);
   stradd(stemp2,stemp);
+  while strlen(stemp)<17 do stradd(' ',stemp);
   putontop(stemp,17,true);
   putontop('Reading',36,true);
   repeat
@@ -285,9 +293,9 @@ begin
     showtop;
     until iseof or (nlines >= maxlines-1);
   if nlines >= maxlines-1 then
-      showerror('Too many lines  ');
+      showerror('Too many lines');
   close(fno);
-    for i:=inpx-1 to xmax-1 do top[i]:=128;
+  clrmessage;
   showall;
 end;
 
@@ -336,7 +344,7 @@ var pos,x,i:integer;
       x1:integer;
       s1:cpnt;
   begin
-    failed:=false; pos:=2; x1:=x+1;
+    failed:=false; pos:=3; x1:=x+1;
     while (fs[pos]<>chr(0)) and (x1<xmax) do begin
       s1:=linepnt[line];
       if s1[x1] <> fs[pos] then failed:=true;
@@ -359,7 +367,7 @@ begin
     repeat
       x:=0;
       repeat
-        pos:=1;
+        pos:=2;
         s2:=linepnt[line];
         if s2[x]=fs[pos] then checkrest;
         x:=x+1;
@@ -367,10 +375,10 @@ begin
       showtop; line:=line+1;
       until found or (line>=nlines);
     if found then begin
-      line:=line-1; x:=x-1; i:=1;
+      line:=line-1; x:=x-1; i:=2;
       s2:=linepnt[line];
       while fs[i]<>chr(0) do begin
-        s2[x+i-1]:=chr(ord(s2[x+i-1]) or $80);
+        s2[x+i-2]:=chr(ord(s2[x+i-2]) or $80);
          i:=i+1;
         end
       end
@@ -450,68 +458,72 @@ var ch:char;
 begin
   doesc:=false; savecx:=1;
   getinput(n,stemp); ch:=stemp[0];
-  case ch of
-    't': begin {top}
-           line:=1; chktop(true);
-         end;
-    'b': begin {bottom}
-           line:=nlines-1; chktop(true);
-         end;
-    'l': begin {line number}
-           line:=n; chkline; chktop(true);
-         end;
-    'f','g': begin {find string}
-           find(ch='g'); chkline; chktop(false);
-           showall;
-         end;
-    'c': begin {mark lines for copy}
-           if n<1 then n:=1;
-           if line+n>= nlines-1 then
-             showerror('Too many lines  ')
-           else begin
-             mark:=line; nmark:=n;
-             for line:=mark to mark+nmark-1 do begin
-               s:=linepnt[line];
-               for i:=0 to xmax-1 do
-                 s[i]:= chr(ord(s[i]) or $80);
+  if (strlen(stemp)>1) and (stemp[1]<>' ') then
+    showerror('Expected f: xxx')
+  else begin
+    case ch of
+      't': begin {top}
+             line:=1; chktop(true);
+           end;
+      'b': begin {bottom}
+             line:=nlines-1; chktop(true);
+           end;
+      'l': begin {line number}
+             line:=n; chkline; chktop(true);
+           end;
+      'f','g': begin {find string}
+             find(ch='g'); chkline; chktop(false);
+             showall;
+           end;
+      'c': begin {mark lines for copy}
+             if n<1 then n:=1;
+             if line+n>= nlines-1 then
+               showerror('Too many lines')
+             else begin
+               mark:=line; nmark:=n;
+               for line:=mark to mark+nmark-1 do
+               begin
+                 s:=linepnt[line];
+                 for i:=0 to xmax-1 do
+                   s[i]:= chr(ord(s[i]) or $80);
+               end;
+               line:=mark;
              end;
-             line:=mark;
+             showall;
            end;
-           showall;
-         end;
-    'p': begin {paste marked lines}
-           if mark=0 then showerror('Nothing marked  ')
-
-           else begin
-
-             if nlines+nmark>=maxlines then
-               showerror('Too many lines  ')
-             else paste;
+      'p': begin {paste marked lines}
+             if mark=0 then
+               showerror('Nothing marked')
+             else begin
+               if nlines+nmark>=maxlines then
+                 showerror('Too many lines')
+               else paste;
+             end;
            end;
-         end;
-    'm': begin {move marked lines }
-           if mark=0 then showerror('Nothing marked  ')
-
-           else move;
-
-         end;
-    'd': begin {delete n lines}
-           if n<1 then n:=1;
-           if line+n=maxlines-3 then
-             n:=maxlines-3-line;
-           for i:=1 to n do begin
-             delline; line:=line+1;
+      'm': begin {move marked lines }
+             if mark=0 then
+               showerror('Nothing marked')
+             else move;
            end;
-           chkline; chktop(false); showall;
-         end;
-    'w': writeoutput; {write output}
-    'q': begin {write output and quit}
-           writeoutput; doesc:=true;
-         end;
-    'k': doesc:=true {kill program}
-    else showerror('Unknown escape  ')
-  end {case};
-  for i:=inpx-1 to xmax-1 do top[i]:=128;
+      'd': begin {delete n lines}
+             if n<1 then n:=1;
+             if line+n=maxlines-3 then
+               n:=maxlines-3-line;
+             for i:=1 to n do begin
+               delline; line:=line+1;
+             end;
+             chkline; chktop(false); showall;
+           end;
+      'w': writeoutput; {write output}
+      'q': begin {write output and quit}
+             writeoutput; doesc:=true;
+           end;
+      'k': doesc:=true; {kill program}
+      '?','h': showerror('tb/l/fg/cpm/d/wqk/?h')
+      else showerror('Unknown escape')
+    end {case};
+  end;
+  clrmessage;
 end;
 
 begin {main}
@@ -521,7 +533,7 @@ begin {main}
   putontop('Line xxx of xxx',0,true);
   relpnt:=maxlines-1;
   mark:=0; nmark:=0; savecx:=1;
-  for i:=inpx-1 to xmax-1 do top[i]:=128;
+  clrmessage;
   readinput; fs[0]:=chr(0);
   topline:= 1; line:=1; showall; exit:=false;
   repeat
