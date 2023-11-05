@@ -49,13 +49,12 @@ begin
 end;
 
 { ***** strcopy: copy cpnt string ***** }
-{ maximal max characters }
 
-proc strcpy(strin, strout:cpnt; max: integer);
+proc strcpy(strin, strout:cpnt);
 var i: integer;
 begin
   i:=0;
-  while (strin[i]<>endmark) and (i<max)
+  while (strin[i]<>endmark)
                 and (i<strsize-2) do begin
     strout[i]:=strin[i];
     i:=succ(i);
@@ -155,6 +154,20 @@ begin
       s[pos]:=' '; pos:=pos-1;
     end;
   end;
+end;
+
+{ hexstr: convert hex byte to hex string }
+
+proc hexstr(d:integer; s:cpnt);
+  func hchar(h:integer):char;
+  begin
+    if h<10 then hchar:=chr(h+ord('0'))
+    else hchar:=chr(h-10+ord('A'));
+  end;
+begin
+  s[0]:=hchar((d shr 4) and 15);
+  s[1]:=hchar(d and 15);
+  s[2]:=chr(0);
 end;
 
 begin

@@ -168,7 +168,6 @@ proc getbl(base:integer);  {get block }
     lcyclus:=0; ldrive:=cdrive;
     write('Loading library ');
     prtext8(output,lname);
-    writeln;
     { loading library from same drive }
     { as program compile2 }
     asetfile(lname&'        ',

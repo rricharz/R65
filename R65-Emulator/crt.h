@@ -30,8 +30,8 @@
 #define LED_SIZE   (13 * panelScale)
 #define LED_VDIST  (50 * panelScale)
 
-#define MIN_WINDOW_WIDTH    800   // proposed minimal width of main window
-#define MIN_WINDOW_HEIGHT   480   // proposed minimal height of main window
+#define MIN_WINDOW_WIDTH    1160   // proposed minimal width of main window
+#define MIN_WINDOW_HEIGHT   660    // proposed minimal height of main window
 #define PANEL_FONTSIZE      (12.0 * panelScale)
 #define WINDOW_NAME     "R65 Emulator"    // name of main window
 #define ICON_NAME       ""                // path to icon for window

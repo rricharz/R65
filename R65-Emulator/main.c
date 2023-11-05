@@ -504,7 +504,7 @@ int main (int argc, char *argv[])
 	gtk_window_fullscreen(GTK_WINDOW(global_window));
 	windowWidth  = screenWidth;
 	windowHeight = screenHeight;
-	panelScale = (double)(windowWidth) / (double)(MIN_WINDOW_WIDTH);
+	panelScale = (1.75 * (double)(windowWidth) / (double)(MIN_WINDOW_WIDTH));
     }	
     else {
 	// DISPLAY DECORATED WINDOW
@@ -513,7 +513,7 @@ int main (int argc, char *argv[])
 		MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
 	windowWidth  = MIN_WINDOW_WIDTH;
 	windowHeight = MIN_WINDOW_HEIGHT;
-	panelScale = 1.0;
+	panelScale = 1.75;
     }
     printf("Window dimensions: %d x %d\n", windowWidth, windowHeight);
     

@@ -240,7 +240,7 @@ void infoPanel()
         "Pascal pc and free pages");
 
     SETBUTTONCOLOR;
-    Text(panelOffset + 14 * panelScale, 430 * panelScale,
+    Text(panelOffset + 14 * panelScale, 345 * panelScale,
             "R65 System 1978-1982 RR", "Monospace", 10 * panelScale, 0, 0);    
 }
 
@@ -335,6 +335,8 @@ void crtUpdate()
                 SETPASCALCOLOR;
             else
                 SETNORMALTEXTCOLOR;
+            if (read6502(global_videoBaseAddress + (NUMCHAR*onscreenCurlin)
+               + onscreenCurpos) & 0x80) Stroke(0,0,0);
             xx = hcell * onscreenCurpos;
             yy = vcell * (onscreenCurlin + 1) + 3;
             if (hcell < 10) StrokeWidth(2);

@@ -6,7 +6,7 @@ program pedit;
 uses syslib, arglib, strlib;
 
 const maxlines = 420; xmax=56;
-    scrlins = 16; maxfs = 20; line1x = 20;
+    scrlins = 16;
     eol    = chr($00); esc    = chr($00);
     pgdown = chr($02); pgup   = chr($08);
     pgend  = chr($10); clrscr = chr($11);
@@ -14,30 +14,33 @@ const maxlines = 420; xmax=56;
     cup    = chr($1a); cleft  = chr($03);
     inschr = chr($15); delchr = chr($19);
     rubout = chr($5f); cright = chr($16);
+    mlenght   = 19; inpx=37;
 
-mem curlin = $ed: integer&;
-    curpos = $ee: integer&;
-    video  = $400: array[900] of char&;
+mem curlin  = $ed: integer&;
+    curpos  = $ee: integer&;
+    filcyc  = $311: integer&;
+    video   = $400: array[900] of char&;
+    top     = $400: array[xmax] of integer&;
 
-var line, nlines, topline: integer;
+var line,nlines,topline,i: integer;
     name: array[15] of char;
     fno: file;
     chi : char;
     cyclus,drive,mark,nmark,savecx: integer;
     default, iseof, exit: boolean;
-    fs: array[maxfs] of char;
+    fs: cpnt;
     linepnt: array[maxlines] of cpnt;
     relpnt:  integer;
-    stemp: cpnt;
+    stemp,stemp2: cpnt;
 
 proc putontop(s:cpnt;pos:integer;inv:boolean);
 var i:integer;
 begin
   i:=0; { faster version: if not in loop }
   if inv then while s[i]<>chr(0) do begin
-    video[i+pos]:=chr(ord(s[i]) or 128); i:=i+1;
+    top[i+pos]:=ord(s[i]) or 128; i:=i+1;
   end else while s[i]<>chr(0) do begin
-    video[i+pos]:=s[i]; i:=i+1;
+    top[i+pos]:=ord(s[i]); i:=i+1;
   end;
 end;
 
@@ -66,7 +69,45 @@ begin
   column:=line-topline+1;
 end;
 
-func readline(fin: file; pnt: cpnt): boolean;
+proc goto(xpos, ypos: integer);
+begin
+  curlin:=ypos; { top on line 2 }
+  if curlin>15 then curlin:=15;
+  curpos:=xpos-1;
+end;
+
+proc getinput(var n:integer; s:cpnt);
+var i,j,stop:integer; ch: char;
+begin
+  goto(inpx,0); write(chr(ord(':') or 128));
+  read(@key,ch); i:=0;
+  while (ch<>chr(13)) do begin
+    if (ch=rubout) then begin
+      if i>0 then i:=i-1; goto(i+inpx+1,0);
+      write(chr(ord(' ') or 128),cleft);
+    end else if (ch>=' ') and (ch<=chr($7d)) and
+      (inpx+i<xmax-1) then begin
+      goto(i+inpx+1,0);
+      write(chr(ord(ch) or 128)); i:=i+1;
+    end;
+    read(@key,ch);
+  end;
+  stop:=i+inpx;
+  i:=inpx; n:=0;
+  while ((top[i] and 127)>=ord('0')) and
+    ((top[i] and 127)<=ord('9')) and
+    (i<stop) do begin
+    n:=10*n+(top[i] and 127)-ord('0');
+    i:=i+1;
+  end;
+  j:=0;
+  while i<stop do begin
+    s[j]:=chr(top[i] and 127); i:=i+1; j:=j+1;
+  end;
+  s[j]:=chr(0);
+end;
+
+func readline(input: file; pnt: cpnt): boolean;
 const alteof=chr(127);
 var ch1: char;
     pos: integer;
@@ -80,13 +121,6 @@ begin
     pnt[pos]:=' '; pos:=pos+1;
   end;
   readline:=(ch1=eof) or (ch1=alteof);
-end;
-
-proc goto(xpos, ypos: integer);
-begin
-  curlin:=ypos; { top on line 2 }
-  if curlin>15 then curlin:=15;
-  curpos:=xpos-1;
 end;
 
 proc showline(pnt:cpnt; y: integer);
@@ -103,14 +137,13 @@ begin
   intstr(nlines-1,stemp,3); putontop(stemp,12,true);
 end;
 
-proc showerror(s:array[15] of char);
+proc showerror(s:cpnt);
 var i: integer;
     ch: char;
 begin
-  goto(line1x,0); write(invvid,clrlin);
-  for i:=0 to 15 do write(s[i]);
+  putontop(s,36,true);
   read(@input,ch);
-  goto(line1x,0); write(norvid,clrlin);
+  putontop('                ',36,false);
 end;
 
 proc showall;
@@ -232,26 +265,29 @@ proc readinput;
 var i,pend:integer;
 begin
   cyclus:=0; drive:=1;
-  goto(1,1); write(clrscr); goto(1,1);
+  goto(1,1); write(clrscr);
   agetstring(name,default,cyclus,drive);
   asetfile(name,cyclus,drive,'P');
-  openr(fno); setnumlin($0f,$37);
+  openr(fno);
   nlines := 1; line:=1; topline:=1;
   pend:=15; while name[pend]=' ' do pend:=pend-1;
   for i:=0 to pend do stemp[i]:=name[i];
   stemp[pend+1]:=chr(0);
   stradd(':P.',stemp);
-  putontop(stemp,26,true);
+  hexstr(filcyc,stemp2);
+  stradd(stemp2,stemp);
+  putontop(stemp,17,true);
+  putontop('Reading',36,true);
   repeat
     linepnt[nlines] := strnew;
     iseof := readline(fno, linepnt[nlines]);
     nlines := nlines+1;
-    showtop; putontop('Reading',16,true);
+    showtop;
     until iseof or (nlines >= maxlines-1);
   if nlines >= maxlines-1 then
-      showerror('too many lines  ');
+      showerror('Too many lines  ');
   close(fno);
-  putontop('       ',16,false);
+    for i:=inpx-1 to xmax-1 do top[i]:=128;
   showall;
 end;
 
@@ -262,8 +298,9 @@ begin
   goto(1,1); write(clrscr);
   asetfile(name,cyclus,drive,'P');
   openw(fno);
+  putontop('Writing',36,true);
   for line:=1 to nlines-1 do begin
-    showtop; putontop('Writing',16,true);
+    showtop;
     endpos:=lastpos(line);
     s:=linepnt[line];
     for pos:=0 to endpos do
@@ -272,7 +309,6 @@ begin
       write(@fno,cr);
   end;
   close(fno); line:=nlines-1;
-  putontop('       ',16,false);
   showall;
 end;
 
@@ -300,40 +336,30 @@ var pos,x,i:integer;
       x1:integer;
       s1:cpnt;
   begin
-    failed:=false; pos:=1; x1:=x+1;
-    while (fs[pos]<>cr) and (pos<maxfs)
-      and (x1<xmax) do begin
+    failed:=false; pos:=2; x1:=x+1;
+    while (fs[pos]<>chr(0)) and (x1<xmax) do begin
       s1:=linepnt[line];
       if s1[x1] <> fs[pos] then failed:=true;
       pos:=pos+1; x1:=x1+1;
       end;
-     if (failed=false) and (fs[pos]=cr)
+     if (failed=false) and (fs[pos]=chr(0))
       then found:=true;
   end;
 
 begin
-  pos:=0;
-  if not again then begin
-    goto(line1x,0);
-    write(invvid,'find?',clrlin);
-    repeat
-      read(@input,ch); fs[pos]:=ch; pos:=pos+1;
-      until (ch=cr) or (pos>=maxfs);
-    write(norvid);
-    end;
-  if fs[0]=cr then begin
+  if not again then strcpy(stemp,fs);
+  if fs[1]=chr(0) then begin
     {empty string -> delete all marks}
-    putontop('Clearing marks',16,true);
+    putontop('Clearing marks',36,true);
     clrmarks; showall;
-    putontop('              ',16,false);
     end
   else begin
-    putontop('Searching',16,true);
+    putontop('Searching',36,true);
     found:=false;
     repeat
       x:=0;
       repeat
-        pos:=0;
+        pos:=1;
         s2:=linepnt[line];
         if s2[x]=fs[pos] then checkrest;
         x:=x+1;
@@ -341,17 +367,16 @@ begin
       showtop; line:=line+1;
       until found or (line>=nlines);
     if found then begin
-      line:=line-1; x:=x-1; i:=0;
+      line:=line-1; x:=x-1; i:=1;
       s2:=linepnt[line];
-      while fs[i]<>cr do begin {*4*}
-        s2[x+i]:=chr(ord(s2[x+i]) or $80);
+      while fs[i]<>chr(0) do begin
+        s2[x+i-1]:=chr(ord(s2[x+i-1]) or $80);
          i:=i+1;
         end
       end
     else begin
       line:=nlines-1;
     end;
-    putontop('         ',16,false);
   end
 end;
 
@@ -414,7 +439,7 @@ begin
       linepnt[line]:=savepnt;
       mark:=mark+1; line:=line+1;
     end;
-  end else showerror('move inside move');
+  end else showerror('Move inside move');
  mark:=saveline; line:=saveline; showall;
 end;
 
@@ -423,9 +448,8 @@ var ch:char;
     i,n:integer;
     s,savl:cpnt;
 begin
-  doesc:=false; goto(line1x,0); savecx:=1;
-  write(invvid,'t,b,ln,f,g,cn,p,m,dn,w,q,k?');
-  read(@input,ch); if ch<>cr then read(@input,n);
+  doesc:=false; savecx:=1;
+  getinput(n,stemp); ch:=stemp[0];
   case ch of
     't': begin {top}
            line:=1; chktop(true);
@@ -443,7 +467,7 @@ begin
     'c': begin {mark lines for copy}
            if n<1 then n:=1;
            if line+n>= nlines-1 then
-             showerror('too many lines  ')
+             showerror('Too many lines  ')
            else begin
              mark:=line; nmark:=n;
              for line:=mark to mark+nmark-1 do begin
@@ -456,17 +480,17 @@ begin
            showall;
          end;
     'p': begin {paste marked lines}
-           if mark=0 then showerror('nothing marked  ')
+           if mark=0 then showerror('Nothing marked  ')
 
            else begin
 
              if nlines+nmark>=maxlines then
-               showerror('too many lines  ')
+               showerror('Too many lines  ')
              else paste;
            end;
          end;
     'm': begin {move marked lines }
-           if mark=0 then showerror('nothing marked  ')
+           if mark=0 then showerror('Nothing marked  ')
 
            else move;
 
@@ -485,17 +509,19 @@ begin
            writeoutput; doesc:=true;
          end;
     'k': doesc:=true {kill program}
-    else showerror('unknown escape  ')
+    else showerror('Unknown escape  ')
   end {case};
-  goto(line1x,0); write(norvid,clrlin);
+  for i:=inpx-1 to xmax-1 do top[i]:=128;
 end;
 
 begin {main}
-  stemp:=strnew;
+  stemp:=strnew; stemp2:=strnew; fs:=strnew;
+  setnumlin($0f,$37);
   write(hom,clrscr);
-  putontop('Line xxx of xxx ',0,true);
+  putontop('Line xxx of xxx',0,true);
   relpnt:=maxlines-1;
   mark:=0; nmark:=0; savecx:=1;
+  for i:=inpx-1 to xmax-1 do top[i]:=128;
   readinput; fs[0]:=chr(0);
   topline:= 1; line:=1; showall; exit:=false;
   repeat
