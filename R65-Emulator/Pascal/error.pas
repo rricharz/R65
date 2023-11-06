@@ -4,25 +4,25 @@
         *     ERROR     *
         *               *
         *****************
-
+ 
 Displays Pascal error codes as text
-
+ 
 Usage: error errnum
-
+ 
                                 }
-
+ 
 program error;
 uses syslib,arglib;
-
+ 
 var err:integer;
     default:boolean;
-
+ 
 begin
-
+ 
   err:=0;
   agetval(err,default);
   write('Error ',err,': ');
-
+ 
   write(invvid);
   case err of
     05: writeln('File type error');
@@ -50,7 +50,10 @@ begin
     101: writeln('Argument is not string or default');
     102: writeln('Argument is not number or default');
     103: writeln('Argument is not starting with /');
-    104: writeln('Unknown argument')
+    104: writeln('Unknown argument');
+    105: writeln('Drive is not 0 or 1');
+    106: writeln('Argument syntax');
+    107: writeln('Too many arguments')
     else writeln('Undefined')
     end;
   write(norvid);
