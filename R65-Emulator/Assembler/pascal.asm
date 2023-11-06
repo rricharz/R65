@@ -118,7 +118,9 @@ HARGUM  JMP $FCF2       #######
 ******************
 * NO ARGUMENTS
 *
-STOP    LDA STPROG      IS ANOTHER PROGRAM
+STOP    LDA =47
+        STA NUMCHR      FORCE 48 CHARS/LINE
+        LDA STPROG      IS ANOTHER PROGRAM
         LDX STPROG+1    RUNNING?
         CMP USERST
         BNE STOP1

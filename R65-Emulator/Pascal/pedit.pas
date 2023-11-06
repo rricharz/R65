@@ -244,21 +244,22 @@ begin
   repeat
     read(@key,ch1);
     case ch1 of
-      inschr: if video[lstart+xmax-1]
-                        =' ' then write(ch1);
       delchr,rubout: if (curpos=0) and (line>1)
              then begin
                updline(pnt,lstart) ;join; exit:=true;
                end
              else write(cleft,delchr);
+      cleft: if curpos>0 then write(cleft);
+      cright:if curpos<xmax-1 then write(cright);
       cup,cdown,esc,cr,
       pgup,pgdown,hom,pgend: exit:=true
       else begin
              if (ch1>=' ') and (ch1<chr($7f))
-               then write(inschr);
-             write(ch1);
-             if curpos>=xmax-1 then
-               write(cleft);
+             and (curpos<xmax-1) and
+             (video[lstart+xmax-1]=' ') and
+             (video[lstart+xmax-2]=' ') then begin
+               write(inschr); write(ch1);
+             end;
            end
     end {case};
     until exit;
