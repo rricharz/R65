@@ -14,7 +14,7 @@
 }
 
 program putsource;
-uses syslib,arglib;
+uses syslib,arglib,disklib;
 
 const afloppy=$c827; { exdos vector }
       aexport=$c82a; { exdos vector }
@@ -190,6 +190,7 @@ begin
       runprog('PACK:R          ',cyclus,drive);
       if (filerr<>0) or (runerr<>0) then
          ok:=false;
+      {dummy}cyclus:=freedrv(0,true);
     end;
 
     { make sure that PASCAL is on drive 0 }
@@ -202,6 +203,6 @@ begin
   if not ok then begin
     writeln(invvid,'Putsource failed',norvid);
     filerr:=0; runerr:=0;
-  end;
+  end
 end.
- 
+

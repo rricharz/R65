@@ -3,9 +3,9 @@ program pedit;
 { Pascal editor, original 1980 RR
   rewritten 2023 RR for R65 system }
 
-uses syslib, arglib, strlib;
+uses syslib, arglib, strlib, disklib;
 
-const maxlines = 420; xmax=56;
+const maxlines = 400; xmax=56;
     scrlins = 16;
     eol    = chr($00); esc    = chr($00);
     pgdown = chr($02); pgup   = chr($08);
@@ -334,7 +334,7 @@ begin
     s:=linepnt[line];
     for pos:=0 to endpos do
       write(@fno,chr(ord(s[pos]) and $7f));
-    if (line<nlines-1) or (endpos<>0) then
+    if (line<nlines-1) or (endpos<0) then
       write(@fno,cr);
   end;
   close(fno); line:=nlines-1;
@@ -585,5 +585,6 @@ begin {main}
     end {case};
     until exit;
   setnumlin($29,$2f);
-  writeln(hom, clrscr, 'closing...');
+  write(hom,clrscr);
+  i:=freedsk(fildrv,true);
 end.

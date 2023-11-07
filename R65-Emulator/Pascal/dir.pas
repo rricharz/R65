@@ -30,7 +30,7 @@ uses syslib,arglib,strlib;
 const aprepdo =$f4a7;
       agetentx=$f63a;
       aenddo  =$f625;
-      tsectors = 2560;
+      tsectors = 2560;n
       maxent  = 255;
 
 mem   filtyp  =$0300: char&;

@@ -19,13 +19,13 @@ Usage:  edit filnam[:x][.cy[,drive]]
 }
 
 program edit;
-uses syslib,arglib;
+uses syslib,arglib,disklib;
 
 const aedit=$c80f; { exdos vector }
       cup = chr($1a);
 mem filerr=$db: integer&;
 
-var cyclus,drive: integer;
+var cyclus,drive,dummy: integer;
     name: array[15] of char;
     default: boolean;
 
@@ -57,4 +57,5 @@ begin { main }
   call(aedit);
   if filerr<>0 then bcderror(filerr);
   writeln;
+  dummy:=freedsk(fildrv,true);
 end.
