@@ -175,13 +175,14 @@ begin
 end;
 
 func lastpos(l:integer):integer;
+{ returns -1 if line empty }
 var endpos:integer;
     s:cpnt;
 begin
   endpos:=xmax-1;
   s:=linepnt[l]
   while (s[endpos]=chr(ord(' ') and $7f))
-    and (endpos>0) do endpos:=endpos-1;
+    and (endpos>=0) do endpos:=endpos-1;
   lastpos:=endpos;
 end;
 
@@ -249,16 +250,35 @@ begin
                updline(pnt,lstart) ;join; exit:=true;
                end
              else write(cleft,delchr);
-      cleft: if curpos>0 then write(cleft);
-      cright:if curpos<xmax-1 then write(cright);
+      cleft: if curpos>0 then write(cleft)
+             else if line>1 then begin
+               updline(pnt,lstart);
+               line:=line-1; curpos:=lastpos(line)+1;
+               exit:=true;
+             end;
+      cright:if (curpos<lastpos(line)+1) and
+               (curpos<xmax-1) then begin
+               write(cright);
+             end else if line<nlines-1 then begin
+               updline(pnt,lstart);
+               line:=line+1; curpos:=0;
+               exit:=true;
+             end;
       cup,cdown,esc,cr,
       pgup,pgdown,hom,pgend: exit:=true
       else begin
              if (ch1>=' ') and (ch1<chr($7f))
-             and (curpos<xmax-1) and
-             (video[lstart+xmax-1]=' ') and
-             (video[lstart+xmax-2]=' ') then begin
+             then begin
                write(inschr); write(ch1);
+               if curpos<1 then begin
+                 updline(pnt,lstart);
+                 line:=line+1;
+                 if line>=nlines then begin
+                   linepnt[line]:=strnew;
+                   nlines:=nlines+1;
+                 end;
+                 curpos:=0; exit:=true;
+               end;
              end;
            end
     end {case};
@@ -540,11 +560,13 @@ begin {main}
   repeat
     showtop; chi := edlin(linepnt[line]);
     case chi of
-      cup: begin
-             line:=line-1; chkline; chktop(true);
-           end;
-      cdown: begin
-             line:=line+1; chkline; chktop(true);
+      cup,cdown: begin
+             if chi=cup then line:=line-1
+             else line:=line+1;
+             chkline;
+             if curpos>lastpos(line)+2 then
+               savecx:=lastpos(line)+2;
+             chktop(true);
            end;
       pgup: begin
              line:=line-15; chkline; chktop(true);

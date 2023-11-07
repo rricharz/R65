@@ -1793,7 +1793,7 @@ PERROR  JSR PRTINF
         BYT ' at '+128
         JSR PRTN
         JSR PRTINF
-        BYT $D,$8D
+        BYT $D,$8A
 *
 PERROR1 JMP STOP
 *

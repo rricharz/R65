@@ -170,6 +170,28 @@ begin
   s[2]:=chr(0);
 end;
 
+{ *** strins: insert char into string *** }
+{ inserts char if string is short enough }
+
+proc strins(ch:char;pos:integer;s:cpnt);
+var i,l:integer;
+begin
+  l:=strlen(s);
+  if (l<strsize-1) and (pos>=0)
+    and (pos<strsize-1) then begin
+    for i:=l downto pos do
+      { move includes end mark }
+      s[i+1]:=s[i];
+    if pos > l then begin
+      for i:=l to pos-1 do s[i]:=' ';
+      s[pos+1]:=chr(0);
+    end;
+    s[pos]:=ch;
+  end
+end;
+
 begin
 end.
- 
+
+
+
