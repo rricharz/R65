@@ -4,45 +4,50 @@ program find;
   The cyclus is ignored.
   File type is required either as
   name:x, name* or name:?
- 
+
   2023 rricharz                       }
- 
-uses syslib,arglib,wildlib;
- 
+
+uses syslib,arglib,wildlib,disklib;
+
 const afloppy=$c827;
- 
+
 mem   filerr=$db: integer&;
- 
+
 var   cyclus,drive,entry: integer;
       default,found,last: boolean;
       name: array[namesize] of char;
- 
-proc findond(nm:array[15] of char; d:integer);
+
+proc findond(nm:array[15] of char; drv:integer);
 {********************************************}
- 
+
 const  prflab     = $ece3;
- 
+
 var first: boolean;
     i: integer;
- 
+    nm2: array[namesize] of char;
+
 begin
   filerr:=0;
   first:=true;
+  fildrv:=drv;
   if nm[0]<>' ' then begin
-    cyclus:=0; drive:=d;
+    cyclus:=0; drive:=drv;
     asetfile(nm,cyclus,drive,' ');
     call(afloppy);
+  end else begin
+    dskname;
+    for i:=0 to namesize do nm2[i]:=filnam[i];
   end;
   if filerr=0 then begin
     last:=false; entry:=0;
     while (entry<numentries) and not last do begin
       cyclus:=0;
-      findentry(name,d,entry,found,last);
+      findentry(name,drv,entry,found,last);
       if found and (not last) then begin
         if first then begin
           write(invvid,'Disk ');
           if nm[0]=' ' then
-            write(drive)
+            writename(nm2)
           else
             writename(nm);
           writeln(':',norvid);
@@ -58,7 +63,7 @@ begin
     writeln(' not found');
   end;
 end;
- 
+
 begin
   cyclus:=0; drive:=255;
   agetstring(name,default,cyclus,drive);
@@ -73,4 +78,5 @@ begin
     findond('PASCAL          ',0);
   end;
 end.
- 
+
+

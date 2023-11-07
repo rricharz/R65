@@ -3,9 +3,9 @@ program pedit;
 { Pascal editor, original 1980 RR
   rewritten 2023 RR for R65 system }
 
-uses syslib, arglib, strlib, disklib;
+uses syslib, arglib, strlib;
 
-const maxlines = 400; xmax=56;
+const maxlines = 420; xmax=56;
     scrlins = 16;
     eol    = chr($00); esc    = chr($00);
     pgdown = chr($02); pgup   = chr($08);
@@ -87,7 +87,7 @@ var i,j,stop:integer; ch: char;
 begin
   goto(inpx,0); write(chr(ord(':') or 128));
   read(@key,ch); i:=0;
-  while (ch<>chr(13)) do begin
+  while (ch<>chr(13)) and (ch<>esc) do begin
     if (ch=rubout) then begin
       if i>0 then i:=i-1; goto(i+inpx+1,0);
       write(chr(ord(' ') or 128),cleft);
@@ -180,7 +180,7 @@ var endpos:integer;
     s:cpnt;
 begin
   endpos:=xmax-1;
-  s:=linepnt[l]
+  s:=linepnt[l];
   while (s[endpos]=chr(ord(' ') and $7f))
     and (endpos>=0) do endpos:=endpos-1;
   lastpos:=endpos;
@@ -269,7 +269,10 @@ begin
       else begin
              if (ch1>=' ') and (ch1<chr($7f))
              then begin
-               write(inschr); write(ch1);
+               if (ord(video[lstart+xmax-1])
+                  and $7f)=ord(' ') then begin
+                 write(inschr); write(ch1);
+               end;
                if curpos<1 then begin
                  updline(pnt,lstart);
                  line:=line+1;
@@ -334,8 +337,7 @@ begin
     s:=linepnt[line];
     for pos:=0 to endpos do
       write(@fno,chr(ord(s[pos]) and $7f));
-    if (line<nlines-1) or (endpos<0) then
-      write(@fno,cr);
+    if (line<nlines-1) then write(@fno,cr);
   end;
   close(fno); line:=nlines-1;
   showall;
@@ -540,8 +542,9 @@ begin
              writeoutput; doesc:=true;
            end;
       'k': doesc:=true; {kill program}
-      '?','h': showerror('tb/l/fg/cpm/d/wqk/?h')
-      else showerror('Unknown escape')
+      '?','h': showerror('tb/l/fg/cpm/d/wqk/?h');
+      chr(0): begin end
+      else showerror('tb/l/fg/cpm/d/wqk/?h')
     end {case};
   end;
   clrmessage;
@@ -585,6 +588,5 @@ begin {main}
     end {case};
     until exit;
   setnumlin($29,$2f);
-  write(hom,clrscr);
-  i:=freedsk(fildrv,true);
+  writeln(hom, clrscr, 'closing...');
 end.
