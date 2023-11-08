@@ -6,7 +6,7 @@ program pedit;
 uses syslib, arglib, strlib,disklib;
 
 const
-    maxlines= 420;      xmax   =56;
+    maxlines= 360;      xmax   = 56;
     scrlins = 16;       mlenght= 19;
     inpx    = 37;
     eol     = chr($00); esc    = chr($00);
@@ -26,7 +26,7 @@ mem curlin  = $ed: integer&;
     topc    = $400: array[xmax] of char&;
 
 
-var line,nlines,topline,i,dummy: integer;
+var line,nlines,topline,i,dummy,debug: integer;
     name: array[15] of char;
     fno: file;
     chi : char;
@@ -46,15 +46,6 @@ begin
   end else while s[i]<>chr(0) do begin
     topc[i+pos]:=s[i]; i:=i+1;
   end;
-end;
-
-func new:cpnt;
-var i:integer;
-begin
-  if relpnt<maxlines-1 then begin
-    relpnt:=relpnt+1; new:=linepnt[relpnt];
-  end else  {assign new memory}
-    new:=strnew;
 end;
 
 proc release(p:cpnt);
@@ -85,6 +76,35 @@ proc clrmessage;
 var i:integer;
 begin
   for i:=inpx-1 to xmax-1 do topi[i]:=128;
+end;
+
+proc showerror(s:cpnt);
+var i: integer;
+    ch: char;
+begin
+  clrmessage;
+  putontop(s,36,true);
+  read(@key,ch);
+  clrmessage;
+end;
+
+func new:cpnt;
+var i:integer;
+begin
+  if relpnt<maxlines-1 then begin
+    relpnt:=relpnt+1; new:=linepnt[relpnt];
+  end else begin
+    if nlines<maxlines-1 then new:=strnew
+    else new:=nil;
+    if nlines>maxlines-5 then
+      showerror('Warning: Low memory');
+  end;
+end;
+
+proc newline;
+begin
+  linepnt[nlines]:=new;
+  nlines:=nlines+1;
 end;
 
 proc getinput(var n:integer; s:cpnt);
@@ -140,7 +160,7 @@ begin
   lstart:=y*xmax;
   if (pnt=nil) then
    for pos:=0 to xmax-1 do
-    video[lstart+pos]:='&'
+    video[lstart+pos]:='_'
   else begin
     pos:=0;
     while (pos<xmax) and (pnt[pos]<>chr(0)) do begin
@@ -156,16 +176,6 @@ proc showtop;
 begin
   intstr(line,stemp,3); putontop(stemp,5,true);
   intstr(nlines-1,stemp,3); putontop(stemp,12,true);
-end;
-
-proc showerror(s:cpnt);
-var i: integer;
-    ch: char;
-begin
-  clrmessage;
-  putontop(s,36,true);
-  read(@key,ch);
-  clrmessage;
 end;
 
 proc showall;
@@ -289,12 +299,13 @@ begin
              then begin
                lastch:=video[lstart+xmax-1];
                lastch:=chr(ord(lastch) and $7f);
+               if (lastch<>' ') and
+                 (line>=nlines-1) then newline;
                if curpos>=xmax-1 then begin
-                 { insert char at last position }
+                 if line>=nlines-1 then newline;
                  video[lstart+xmax-1]:=ch1;
                  curpos:=0;
                  lastch:=cdown;
-                 if line>=nlines-1 then newline;
                end else begin
                  write(inschr); write(ch1);
                end;
@@ -333,8 +344,8 @@ begin
     iseof := readline(fno, linepnt[nlines]);
     nlines := nlines+1;
     showtop;
-    until iseof or (nlines >= maxlines-1);
-  if nlines >= maxlines-1 then
+    until iseof or (nlines >= maxlines-9);
+  if nlines >= maxlines-9 then
       showerror('Too many lines');
   close(fno);
   clrmessage;
@@ -440,13 +451,13 @@ begin
       for i:=nlines-1 downto line+1 do
         linepnt[i+1]:=linepnt[i];
       end;
-    newline(line+1]);;
+    linepnt[line+1]:=new;
     s1:=linepnt[line+1]; s2:=linepnt[line];
     for i:=0 to xmax-1 do s1[i]:=' ';
     for i:=curpos to xmax-1 do begin
       s1[i-curpos]:=s2[i]; s2[i]:=' ';
       end;
-    line:=line+1;
+    line:=line+1; nlines:=nlines+1;
     savecx:=1; chkline; chktop(false); showall;
   end;
 end;
@@ -454,17 +465,19 @@ end;
 proc paste;
 var l,i:integer; s1,s2:cpnt;
 begin
-  for i:=nlines-1 downto line do
-    linepnt[i+nmark]:=linepnt[i];
-  nlines:=nlines+nmark;
-  if mark>line then mark:=mark+nmark;
-  for l:=mark to mark+nmark-1 do begin
-    linepnt[line]:=new;
-    s1:=linepnt[line]; s2:=linepnt[l];
-    for i:=0 to xmax-1 do s1[i]:=s2[i];
-    line:=line+1;
-  end;
-  showall;
+  if nlines+nmark<nlines-5 then begin
+    for i:=nlines-1 downto line do
+      linepnt[i+nmark]:=linepnt[i];
+    nlines:=nlines+nmark;
+    if mark>line then mark:=mark+nmark;
+    for l:=mark to mark+nmark-1 do begin
+      linepnt[line]:=new;
+      s1:=linepnt[line]; s2:=linepnt[l];
+      for i:=0 to xmax-1 do s1[i]:=s2[i];
+      line:=line+1;
+    end;
+    showall;
+  end else showerror('Error: Out of memory');
 end;
 
 proc move;
@@ -574,7 +587,7 @@ begin
 end;
 
 proc insert(ch:char;l:integer);
-{ insert line at start of line, can be recursive }
+{ insert char at start of line }
 var i,y:integer;
     pnt:cpnt;
 begin
@@ -586,20 +599,16 @@ begin
 end;
 
 begin {main}
-  stemp:=strnew; stemp2:=strnew; fs:=strnew;
-  setnumlin($0f,$37);
-  write(hom,clrscr);
+  stemp:=strnew; stemp2:=strnew; fs:=strnew; debug:=0;
+  setnumlin($0f,$37); write(hom,clrscr);
   putontop('Line xxx of xxx',0,true);
-  relpnt:=maxlines-1;
-  mark:=0; nmark:=0; savecx:=1;
-  clrmessage;
-  readinput; fs[0]:=chr(0);
+  relpnt:=maxlines-1; mark:=0; nmark:=0; savecx:=1;
+  clrmessage; readinput; fs[0]:=chr(0);
   topline:= 1; line:=1; showall; exit:=false;
   repeat
     showtop; chi := edlin(linepnt[line]);
     if (ord(chi)>=$20) and (ord(chi)<=$7e) then begin
       { printable character }
-              topc[38]:=chi; { debug }
       insert(chi,line+1);
     end else case chi of
       cup,cdown: begin
