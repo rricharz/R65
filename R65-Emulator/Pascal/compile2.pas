@@ -23,7 +23,7 @@ usage:
   [] means not required                    }
 
 program compile2;
-uses syslib,arglib;
+uses syslib,arglib,disklib;
 
 const wrfile=$e81b;
       sblock=$5000;
@@ -37,7 +37,7 @@ mem endstk=$e,
     filsa1=$0331: integer;
     filtyp=$0300: char&;
 
-var pointer,address,exit,maxsize,
+var pointer,address,exit,maxsize,dummy,
     scyclus,sdrive,offset,cdrive: integer;
     ch: char;
     source: file;
@@ -185,6 +185,7 @@ proc getbl(base:integer);  {get block }
     mem[pointer+3]:=0;
     pointer:=pointer+4;
     offset:=pointer-sblock;
+    writeln;
     writeln('Library loaded')
   end {getlib};
 
@@ -248,12 +249,5 @@ begin {main}
   blocksave(sblock,pointer);
   writeln('Program has been stored');
   endstk:=topmem-144;
+  dummy:=freedsk(sdrive,true);
 end.
-
-
-
-
-
-
-
-

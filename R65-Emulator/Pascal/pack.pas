@@ -18,12 +18,12 @@ Usage:  pack [drive]
 }
 
 program pack;
-uses syslib,arglib;
+uses syslib,arglib,disklib;
 
 const apack=$c809; { exdos vector }
 mem filerr=$db: integer&;
 
-var drive: integer;
+var drive,dummy: integer;
     default: boolean;
 
 proc bcderror(e:integer);
@@ -45,4 +45,5 @@ begin
   call(apack);
   if filerr<>0 then bcderror(filerr);
   if curpos>1 then writeln;
+  dummy:=freedsk(drive,true);
 end.

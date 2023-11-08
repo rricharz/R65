@@ -345,19 +345,22 @@ void crtUpdate()
             // Display cursor
             int onscreenCurlin = (global_curloc - global_videoBaseAddress) / NUMCHAR;
             int onscreenCurpos = (global_curloc - global_videoBaseAddress) % NUMCHAR;
-            if (memory[M8_SFLAG] & 1)
-                SETPASCALCOLOR;
-            else
-                SETNORMALTEXTCOLOR;
-            if (read6502(global_videoBaseAddress + (NUMCHAR*onscreenCurlin)
-               + onscreenCurpos) & 0x80) Stroke(0,0,0);
-            xx = hcell * onscreenCurpos;
-            yy = vcell * (onscreenCurlin + 1) + 3;
-            if (hcell < 10) StrokeWidth(2);
-            else StrokeWidth(hcell / 5);
-            Line(xx + crtOffset, yy  + crtOffset + hcell/3,
-                xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell / 3);
-            StrokeWidth(2);
+            
+            if ((onscreenCurlin >= 0) && (onscreenCurlin < 16)) {
+                if (memory[M8_SFLAG] & 1)
+                    SETPASCALCOLOR;
+                else
+                    SETNORMALTEXTCOLOR;
+                if (read6502(global_videoBaseAddress + (NUMCHAR*onscreenCurlin)
+                   + onscreenCurpos) & 0x80) Stroke(0,0,0);
+                xx = hcell * onscreenCurpos;
+                yy = vcell * (onscreenCurlin + 1) + 3;
+                if (hcell < 10) StrokeWidth(2);
+                else StrokeWidth(hcell / 5);
+                Line(xx + crtOffset, yy  + crtOffset + hcell/3,
+                    xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell / 3);
+                StrokeWidth(2);
+            }
         }
         
         // Update complete

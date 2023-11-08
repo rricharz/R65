@@ -14,13 +14,13 @@
 }
 
 program putobject;
-uses syslib,arglib,disklib;
+uses syslib,arglib;
 
 const afloppy=$c827; { exdos vector }
 
 mem filerr=$db: integer&;
 
-var cyclus,drive,k,dummy: integer;
+var cyclus,drive,k: integer;
     fname,dname: array[15] of char;
     default,ok,libflag: boolean;
 
@@ -126,18 +126,12 @@ begin
     if (filerr<>0) then ok:=false;
     { find out which files to copy }
     libflag := contains('LIB     ');
-    { clean WORK }
-    setargi(1,0);
-    argtype[1]:=chr(0);
-    cyclus:=0; drive:=0; filerr:=0;
-    runprog('CLEAN:R         ',cyclus,drive);
-    if (filerr<>0) or (runerr<>0) then
-      ok:=false;
     { copy the object file(s) }
     argtype[10]:='i';
     arglist[10]:=0; {copy to drive 0}
     argtype[11]:=chr(0);
     cyclus:=0; drive:=0; filerr:=0;
+    writeln('Copying the file(s)');
     if libflag then begin
       setsubtype('L');
       setargs(fname,0,0,1);
@@ -163,8 +157,7 @@ begin
         writeln(invvid,'Copy failed',norvid);
     end else begin {if successfull}
       { delete the original file }
-      setargi(filcyc,8);
-      writeln;
+      setargi(0,8);
       writeln('Deleting the original file(s)');
       drive:=0; filerr:=0;
       runprog('DELETE:R        ',cyclus,drive);
@@ -203,6 +196,4 @@ begin
     writeln(invvid,'Putobject failed',norvid);
     filerr:=0; runerr:=0;
   end;
-  dummy:=freedsk(0,true);                           
 end.
-

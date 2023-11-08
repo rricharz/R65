@@ -21,7 +21,7 @@ const afloppy=$c827; { exdos vector }
 
 mem filerr=$db: integer&;
 
-var cyclus,drive,k: integer;
+var cyclus,drive,k,dummy: integer;
     fname,dname: array[15] of char;
     default,ok: boolean;
 
@@ -129,16 +129,9 @@ begin
     asetfile(dname,cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
-    { clean WORK }
-    setargi(1,0);
-    argtype[1]:=chr(0);
-    cyclus:=0; drive:=0; filerr:=0;
-    runprog('CLEAN:R         ',cyclus,drive);
-    if (filerr<>0) or (runerr<>0) then
-      ok:=false;
     { copy the source file }
     if ok then begin
-      write('Copying ');
+      write('Copying the source file');
       writename(fname);
       writeln(',1,0');
       setargs(fname,0,0,1);
@@ -157,7 +150,6 @@ begin
         writeln(invvid,'Copy failed',norvid);
     end else begin {if successfull}
       setargi(filcyc,8);
-
       { export the source file }
       write('Exporting the source file');
       fildrv:=1;
@@ -167,6 +159,7 @@ begin
       { delete the source file }
       writeln('Deleting the source file');
       drive:=0; filerr:=0;
+      setargi(0,8);
       runprog('DELETE:R        ',cyclus,drive);
       if (filerr<>0) or (runerr<>0) then  begin
         ok:=false;
@@ -190,7 +183,7 @@ begin
       runprog('PACK:R          ',cyclus,drive);
       if (filerr<>0) or (runerr<>0) then
          ok:=false;
-      {dummy}cyclus:=freedrv(0,true);
+      dummy:=freedsk(0,true);
     end;
 
     { make sure that PASCAL is on drive 0 }

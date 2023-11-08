@@ -3,26 +3,30 @@ program pedit;
 { Pascal editor, original 1980 RR
   rewritten 2023 RR for R65 system }
 
-uses syslib, arglib, strlib;
+uses syslib, arglib, strlib,disklib;
 
-const maxlines = 420; xmax=56;
-    scrlins = 16;
-    eol    = chr($00); esc    = chr($00);
-    pgdown = chr($02); pgup   = chr($08);
-    pgend  = chr($10); clrscr = chr($11);
-    clrlin = chr($17); cdown  = chr($18);
-    cup    = chr($1a); cleft  = chr($03);
-    inschr = chr($15); delchr = chr($19);
-    rubout = chr($5f); cright = chr($16);
-    mlenght   = 19; inpx=37;
+const
+    maxlines= 420;      xmax   =56;
+    scrlins = 16;       mlenght= 19;
+    inpx    = 37;
+    eol     = chr($00); esc    = chr($00);
+    rdown   = chr($02); rup    = chr($08);
+    pgdown  = chr($26); pgup   = chr($24);
+    pgend   = chr($10); clrscr = chr($11);
+    clrlin  = chr($17); cdown  = chr($18);
+    cup     = chr($1a); cleft  = chr($03);
+    inschr  = chr($15); delchr = chr($19);
+    rubout  = chr($5f); cright = chr($16);
 
 mem curlin  = $ed: integer&;
     curpos  = $ee: integer&;
     filcyc  = $311: integer&;
     video   = $400: array[900] of char&;
-    top     = $400: array[xmax] of integer&;
+    topi    = $400: array[xmax] of integer&;
+    topc    = $400: array[xmax] of char&;
 
-var line,nlines,topline,i: integer;
+
+var line,nlines,topline,i,dummy: integer;
     name: array[15] of char;
     fno: file;
     chi : char;
@@ -38,13 +42,14 @@ var i:integer;
 begin
   i:=0; { faster version: if not in loop }
   if inv then while s[i]<>chr(0) do begin
-    top[i+pos]:=ord(s[i]) or 128; i:=i+1;
+    topi[i+pos]:=ord(s[i]) or 128; i:=i+1;
   end else while s[i]<>chr(0) do begin
-    top[i+pos]:=ord(s[i]); i:=i+1;
+    topc[i+pos]:=s[i]; i:=i+1;
   end;
 end;
 
 func new:cpnt;
+var i:integer;
 begin
   if relpnt<maxlines-1 then begin
     relpnt:=relpnt+1; new:=linepnt[relpnt];
@@ -79,7 +84,7 @@ end;
 proc clrmessage;
 var i:integer;
 begin
-  for i:=inpx-1 to xmax-1 do top[i]:=128;
+  for i:=inpx-1 to xmax-1 do topi[i]:=128;
 end;
 
 proc getinput(var n:integer; s:cpnt);
@@ -100,15 +105,15 @@ begin
   end;
   stop:=i+inpx;
   i:=inpx; n:=0;
-  while ((top[i] and 127)>=ord('0')) and
-    ((top[i] and 127)<=ord('9')) and
+  while ((topi[i] and 127)>=ord('0')) and
+    ((topi[i] and 127)<=ord('9')) and
     (i<stop) do begin
-    n:=10*n+(top[i] and 127)-ord('0');
+    n:=10*n+(topi[i] and 127)-ord('0');
     i:=i+1;
   end;
   j:=0;
   while i<stop do begin
-    s[j]:=chr(top[i] and 127); i:=i+1; j:=j+1;
+    s[j]:=chr(topi[i] and 127); i:=i+1; j:=j+1;
   end;
   s[j]:=chr(0);
 end;
@@ -133,8 +138,18 @@ proc showline(pnt:cpnt; y: integer);
 var lstart,pos: integer;
 begin
   lstart:=y*xmax;
-  for pos:=0 to xmax-1 do
-    video[lstart+pos]:=pnt[pos];
+  if (pnt=nil) then
+   for pos:=0 to xmax-1 do
+    video[lstart+pos]:='&'
+  else begin
+    pos:=0;
+    while (pos<xmax) and (pnt[pos]<>chr(0)) do begin
+      video[lstart+pos]:=pnt[pos]; pos:=pos+1
+    end;
+    while pos<xmax do begin
+      video[lstart+pos]:=' '; pos:=pos+1
+    end
+  end;
 end;
 
 proc showtop;
@@ -181,8 +196,10 @@ var endpos:integer;
 begin
   endpos:=xmax-1;
   s:=linepnt[l];
-  while (s[endpos]=chr(ord(' ') and $7f))
-    and (endpos>=0) do endpos:=endpos-1;
+  while (chr(ord(s[endpos]) and $7f)=' ')
+    and (endpos>0) do endpos:=endpos-1;
+  if (endpos=0) and (chr(ord(s[endpos]) and $7f)=' ')
+  then endpos:=-1;
   lastpos:=endpos;
 end;
 
@@ -197,8 +214,9 @@ var savetop,bottom:integer;
 begin
   savetop:=topline; bottom:=topline+scrlins-1;
   if line<topline then topline:=line;
-  if line>=bottom then
-    topline:=line-scrlins+2;
+  { keep cursor above bottom line, if possible }
+  if line>=bottom-1 then
+    topline:=line-scrlins+3;
   if show and (savetop<>topline) then showall;
 end;
 
@@ -234,16 +252,17 @@ end;
 
 func edlin(pnt: cpnt): char;
 const key    = @1;
-var   ch1: char;
+var   ch1,lastch: char;
       exit: boolean;
       lstart: integer;
 begin
-  goto(savecx,column);
+   goto(savecx,column);
   if savecx=1 then write(cright,cleft)
   else write(cleft,cright); {to update cursor}
   exit:=false; lstart:=column*xmax;
   repeat
     read(@key,ch1);
+    lastch:=' ');
     case ch1 of
       delchr,rubout: if (curpos=0) and (line>1)
              then begin
@@ -256,38 +275,37 @@ begin
                line:=line-1; curpos:=lastpos(line)+1;
                exit:=true;
              end;
-      cright:if (curpos<lastpos(line)+1) and
-               (curpos<xmax-1) then begin
+      cright:if curpos<xmax-1 then begin
                write(cright);
              end else if line<nlines-1 then begin
                updline(pnt,lstart);
                line:=line+1; curpos:=0;
                exit:=true;
              end;
-      cup,cdown,esc,cr,
+      cup,cdown,esc,cr,rup,rdown,
       pgup,pgdown,hom,pgend: exit:=true
       else begin
              if (ch1>=' ') and (ch1<chr($7f))
              then begin
-               if (ord(video[lstart+xmax-1])
-                  and $7f)=ord(' ') then begin
+               lastch:=video[lstart+xmax-1];
+               lastch:=chr(ord(lastch) and $7f);
+               if curpos>=xmax-1 then begin
+                 { insert char at last position }
+                 video[lstart+xmax-1]:=ch1;
+                 curpos:=0;
+                 lastch:=cdown;
+                 if line>=nlines-1 then newline;
+               end else begin
                  write(inschr); write(ch1);
                end;
-               if curpos<1 then begin
-                 updline(pnt,lstart);
-                 line:=line+1;
-                 if line>=nlines then begin
-                   linepnt[line]:=strnew;
-                   nlines:=nlines+1;
-                 end;
-                 curpos:=0; exit:=true;
-               end;
+               if lastch<>' ' then exit:=true;
              end;
            end
     end {case};
     until exit;
   updline(pnt,lstart);
-  edlin := ch1;
+  if lastch<>' ' then edlin:=lastch
+  else edlin:=ch1;
   if (ch1<>delchr) and (ch1<>rubout) then
     savecx:=curpos+1;
 end;
@@ -311,7 +329,7 @@ begin
   putontop(stemp,17,true);
   putontop('Reading',36,true);
   repeat
-    linepnt[nlines] := strnew;
+    linepnt[nlines] := new;
     iseof := readline(fno, linepnt[nlines]);
     nlines := nlines+1;
     showtop;
@@ -422,13 +440,13 @@ begin
       for i:=nlines-1 downto line+1 do
         linepnt[i+1]:=linepnt[i];
       end;
-    linepnt[line+1]:=strnew;
+    newline(line+1]);;
     s1:=linepnt[line+1]; s2:=linepnt[line];
     for i:=0 to xmax-1 do s1[i]:=' ';
     for i:=curpos to xmax-1 do begin
       s1[i-curpos]:=s2[i]; s2[i]:=' ';
       end;
-    line:=line+1; nlines:=nlines+1;
+    line:=line+1;
     savecx:=1; chkline; chktop(false); showall;
   end;
 end;
@@ -441,7 +459,7 @@ begin
   nlines:=nlines+nmark;
   if mark>line then mark:=mark+nmark;
   for l:=mark to mark+nmark-1 do begin
-    linepnt[line]:=strnew;
+    linepnt[line]:=new;
     s1:=linepnt[line]; s2:=linepnt[l];
     for i:=0 to xmax-1 do s1[i]:=s2[i];
     line:=line+1;
@@ -550,6 +568,23 @@ begin
   clrmessage;
 end;
 
+proc newline;
+begin
+  linepnt[nlines]:=new; nlines:=nlines+1;
+end;
+
+proc insert(ch:char;l:integer);
+{ insert line at start of line, can be recursive }
+var i,y:integer;
+    pnt:cpnt;
+begin
+  if l>=nlines then newline;
+  pnt:=linepnt[l];
+  for i:=xmax-2 downto 0 do pnt[i+1]:=pnt[i];
+  pnt[0]:=ch; y:=l-topline+1;
+  if (y>0) and (y<scrlins) then showline(pnt,y);
+end;
+
 begin {main}
   stemp:=strnew; stemp2:=strnew; fs:=strnew;
   setnumlin($0f,$37);
@@ -562,7 +597,11 @@ begin {main}
   topline:= 1; line:=1; showall; exit:=false;
   repeat
     showtop; chi := edlin(linepnt[line]);
-    case chi of
+    if (ord(chi)>=$20) and (ord(chi)<=$7e) then begin
+      { printable character }
+              topc[38]:=chi; { debug }
+      insert(chi,line+1);
+    end else case chi of
       cup,cdown: begin
              if chi=cup then line:=line-1
              else line:=line+1;
@@ -577,6 +616,12 @@ begin {main}
       pgdown: begin
              line:=line+15; chkline; chktop(true);
            end;
+      rup: if (topline>1) then begin
+             topline:=topline-1;chktop(false);showall;
+           end;
+      rdown: if (topline<nlines-15) then begin
+             topline:=topline+1;chktop(false);showall;
+           end;
       hom: begin
              line:=1; savecx:=1; chktop(true);
            end;
@@ -588,5 +633,6 @@ begin {main}
     end {case};
     until exit;
   setnumlin($29,$2f);
-  writeln(hom, clrscr, 'closing...');
+  writeln(hom, clrscr);
+  dummy:=freedsk(fildrv,true);
 end.
