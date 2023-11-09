@@ -165,7 +165,7 @@ begin
   lstart:=y*xmax;
   if (pnt=nil) then
    for pos:=0 to xmax-1 do
-    video[lstart+pos]:='_'
+    video[lstart+pos]:=' '
   else begin
     pos:=0;
     while (pos<xmax) and (pnt[pos]<>endmark) do begin
@@ -281,9 +281,8 @@ begin
     case ch1 of
       delchr,rubout: if (curpos=0) and (line>1)
              then begin
-               updline(pnt,lstart) ;join; exit:=true;
-               end
-             else write(cleft,delchr);
+               updline(pnt,lstart);join;exit:=true;
+             end else write(cleft,delchr);
       cleft: if curpos>0 then write(cleft)
              else if line>1 then begin
                updline(pnt,lstart);
@@ -413,6 +412,7 @@ var pos,x,i:integer;
   end;
 
 begin
+  clrmessage;
   if not again then strcpy(stemp,fs);
   if fs[1]=endmark then begin
     {empty string -> delete all marks}
@@ -610,6 +610,12 @@ begin
   if (y>0) and (y<scrlins) then showline(pnt,y);
 end;
 
+func printable(ch:char):boolean;
+begin
+  printable:=((ord(ch)>=$20) and (ord(ch)<=$7e))
+    and (ch<>rubout);
+end;
+
 begin {main}
   for i:=0 to maxlines-1 do linepnt[i]:=nil;
   stemp:=strnew; stemp2:=strnew; fs:=strnew; debug:=0;
@@ -621,10 +627,8 @@ begin {main}
   topline:= 1; line:=1; showall; exit:=false;
   repeat
     showtop; chi := edlin(linepnt[line]);
-    if (ord(chi)>=$20) and (ord(chi)<=$7e) then begin
-      { printable character }
-      insert(chi,line+1);
-    end else case chi of
+    if printable(chi) then insert(chi,line+1)
+    else case chi of
       cup,cdown: begin
              if chi=cup then line:=line-1
              else line:=line+1;
