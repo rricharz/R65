@@ -267,17 +267,17 @@ end;
 
 func edlin(pnt: cpnt): char;
 const key    = @1;
-var   ch1,lastch: char;
+var   ch1,lstch1,lstch2: char;
       exit: boolean;
       lstart: integer;
 begin
-   goto(savecx,column);
+  goto(savecx,column);
   if savecx=1 then write(cright,cleft)
   else write(cleft,cright); {to update cursor}
   exit:=false; lstart:=column*xmax;
   repeat
     read(@key,ch1);
-    lastch:=' ');
+    lstch1:=' '; lstch2:=' ';
     case ch1 of
       delchr,rubout: if (curpos=0) and (line>1)
              then begin
@@ -302,25 +302,26 @@ begin
       else begin
              if (ch1>=' ') and (ch1<chr($7f))
              then begin
-               lastch:=video[lstart+xmax-1];
-               lastch:=chr(ord(lastch) and $7f);
-               if (lastch<>' ') and
-                 (line>=nlines-1) then newline;
+               lstch1:=video[lstart+xmax-1];
+               lstch1:=chr(ord(lstch1) and $7f);
+               lstch2:=video[lstart+xmax-2];
+               lstch2:=chr(ord(lstch2) and $7f);
                if curpos>=xmax-1 then begin
                  if line>=nlines-1 then newline;
                  video[lstart+xmax-1]:=ch1;
                  curpos:=0;
-                 lastch:=cdown;
+                 lstch1:=cdown;
                end else begin
                  write(inschr); write(ch1);
                end;
-               if lastch<>' ' then exit:=true;
+               if (lstch1<>' ') or (lstch2<>' ')
+                 then exit:=true;
              end;
            end
     end {case};
     until exit;
   updline(pnt,lstart);
-  if lastch<>' ' then edlin:=lastch
+  if (lstch1<>' ') or (lstch2<>' ') then edlin:=lstch1
   else edlin:=ch1;
   if (ch1<>delchr) and (ch1<>rubout) then
     savecx:=curpos+1;
@@ -515,6 +516,7 @@ var ch:char;
     i,n:integer;
     s,savl:cpnt;
 begin
+  clrmessage;
   doesc:=false; savecx:=1;
   getinput(n,stemp); ch:=stemp[0];
   if (strlen(stemp)>1) and (stemp[1]<>' ') then
@@ -595,12 +597,14 @@ proc insert(ch:char;l:integer);
 { insert char at start of line (recursive) }
 var i,y:integer;
     pnt:cpnt;
-    lstch:char;
+    lstch1,lstch2:char;
 begin
   if l>=nlines then newline;
   pnt:=linepnt[l];
-  lstch:=chr(ord(pnt[xmax-1]) and $7f);
-  if lstch<>' ' then insert(lstch,l+1);
+  lstch1:=chr(ord(pnt[xmax-1]) and $7f);
+  lstch2:=chr(ord(pnt[xmax-2]) and $7f);
+  if (lstch1<>' ') or (lstch2<>' ')
+    then insert(lstch1,l+1);
   for i:=xmax-2 downto 0 do pnt[i+1]:=pnt[i];
   pnt[0]:=ch; y:=l-topline+1;
   if (y>0) and (y<scrlins) then showline(pnt,y);
@@ -613,6 +617,7 @@ begin {main}
   putontop('Line xxx of xxx',0,true);
   relpnt:=maxlines-1; mark:=0; nmark:=0; savecx:=1;
   clrmessage; readinput; fs[0]:=endmark;
+  putontop('pedit version 2.0',36,true);
   topline:= 1; line:=1; showall; exit:=false;
   repeat
     showtop; chi := edlin(linepnt[line]);
