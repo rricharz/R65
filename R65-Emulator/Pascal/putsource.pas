@@ -131,9 +131,9 @@ begin
     if (filerr<>0) then ok:=false;
     { copy the source file }
     if ok then begin
-      write('Copying the source file');
+      write('Copying the source file ');
       writename(fname);
-      writeln(',1,0');
+      writeln;
       setargs(fname,0,0,1);
       argtype[10]:='i';
       arglist[10]:=0; {copy to drive 0}

@@ -41,9 +41,9 @@ proc putontop(s:cpnt;pos:integer;inv:boolean);
 var i:integer;
 begin
   i:=0; { faster version: if not in loop }
-  if inv then while s[i]<>chr(0) do begin
+  if inv then while s[i]<>endmark do begin
     topi[i+pos]:=ord(s[i]) or 128; i:=i+1;
-  end else while s[i]<>chr(0) do begin
+  end else while s[i]<>endmark do begin
     topc[i+pos]:=s[i]; i:=i+1;
   end;
 end;
@@ -90,12 +90,17 @@ end;
 
 func new:cpnt;
 var i:integer;
+    s:cpnt;
 begin
   if relpnt<maxlines-1 then begin
     relpnt:=relpnt+1; new:=linepnt[relpnt];
   end else begin
-    if nlines<maxlines-1 then new:=strnew
-    else new:=nil;
+    if nlines<maxlines-1 then begin
+      s:=strnew;
+      for i:=0 to xmax-1 do s[i]:=' ';
+      s[xmax]:=endmark;
+      new:=s;
+    end else new:=nil;
     if nlines>maxlines-5 then
       showerror('Warning: Low memory');
   end;
@@ -135,7 +140,7 @@ begin
   while i<stop do begin
     s[j]:=chr(topi[i] and 127); i:=i+1; j:=j+1;
   end;
-  s[j]:=chr(0);
+  s[j]:=endmark;
 end;
 
 func readline(input: file; pnt: cpnt): boolean;
@@ -163,7 +168,7 @@ begin
     video[lstart+pos]:='_'
   else begin
     pos:=0;
-    while (pos<xmax) and (pnt[pos]<>chr(0)) do begin
+    while (pos<xmax) and (pnt[pos]<>endmark) do begin
       video[lstart+pos]:=pnt[pos]; pos:=pos+1
     end;
     while pos<xmax do begin
@@ -332,7 +337,7 @@ begin
   nlines := 1; line:=1; topline:=1;
   pend:=15; while name[pend]=' ' do pend:=pend-1;
   for i:=0 to pend do stemp[i]:=name[i];
-  stemp[pend+1]:=chr(0);
+  stemp[pend+1]:=endmark;
   stradd(':P.',stemp);
   hexstr(filcyc,stemp2);
   stradd(stemp2,stemp);
@@ -397,18 +402,18 @@ var pos,x,i:integer;
       s1:cpnt;
   begin
     failed:=false; pos:=3; x1:=x+1;
-    while (fs[pos]<>chr(0)) and (x1<xmax) do begin
+    while (fs[pos]<>endmark) and (x1<xmax) do begin
       s1:=linepnt[line];
       if s1[x1] <> fs[pos] then failed:=true;
       pos:=pos+1; x1:=x1+1;
       end;
-     if (failed=false) and (fs[pos]=chr(0))
+     if (failed=false) and (fs[pos]=endmark)
       then found:=true;
   end;
 
 begin
   if not again then strcpy(stemp,fs);
-  if fs[1]=chr(0) then begin
+  if fs[1]=endmark then begin
     {empty string -> delete all marks}
     putontop('Clearing marks',36,true);
     clrmarks; showall;
@@ -429,7 +434,7 @@ begin
     if found then begin
       line:=line-1; x:=x-1; i:=2;
       s2:=linepnt[line];
-      while fs[i]<>chr(0) do begin
+      while fs[i]<>endmark do begin
         s2[x+i-2]:=chr(ord(s2[x+i-2]) or $80);
          i:=i+1;
         end
@@ -574,7 +579,7 @@ begin
            end;
       'k': doesc:=true; {kill program}
       '?','h': showerror('tb/l/fg/cpm/d/wqk/?h');
-      chr(0): begin end
+      endmark: begin end
       else showerror('tb/l/fg/cpm/d/wqk/?h')
     end {case};
   end;
@@ -587,23 +592,27 @@ begin
 end;
 
 proc insert(ch:char;l:integer);
-{ insert char at start of line }
+{ insert char at start of line (recursive) }
 var i,y:integer;
     pnt:cpnt;
+    lstch:char;
 begin
   if l>=nlines then newline;
   pnt:=linepnt[l];
+  lstch:=chr(ord(pnt[xmax-1]) and $7f);
+  if lstch<>' ' then insert(lstch,l+1);
   for i:=xmax-2 downto 0 do pnt[i+1]:=pnt[i];
   pnt[0]:=ch; y:=l-topline+1;
   if (y>0) and (y<scrlins) then showline(pnt,y);
 end;
 
 begin {main}
+  for i:=0 to maxlines-1 do linepnt[i]:=nil;
   stemp:=strnew; stemp2:=strnew; fs:=strnew; debug:=0;
   setnumlin($0f,$37); write(hom,clrscr);
   putontop('Line xxx of xxx',0,true);
   relpnt:=maxlines-1; mark:=0; nmark:=0; savecx:=1;
-  clrmessage; readinput; fs[0]:=chr(0);
+  clrmessage; readinput; fs[0]:=endmark;
   topline:= 1; line:=1; showall; exit:=false;
   repeat
     showtop; chi := edlin(linepnt[line]);
