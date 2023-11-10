@@ -11,7 +11,7 @@ const
     inpx    = 37;
     eol     = chr($00); esc    = chr($00);
     rdown   = chr($02); rup    = chr($08);
-    pgdown  = chr($26); pgup   = chr($24);
+    pgdown  = chr($1a); pgup   = chr($18);
     pgend   = chr($10); clrscr = chr($11);
     clrlin  = chr($17); cdown  = chr($18);
     cup     = chr($1a); cleft  = chr($03);
@@ -36,6 +36,12 @@ var line,nlines,topline,i,dummy,debug: integer;
     linepnt: array[maxlines] of cpnt;
     relpnt:  integer;
     stemp,stemp2: cpnt;
+
+func printable(ch:char):boolean;
+begin
+  printable:=((ord(ch)>=$20) and (ord(ch)<=$7e))
+    and (ch<>rubout);
+end;
 
 proc putontop(s:cpnt;pos:integer;inv:boolean);
 var i:integer;
@@ -299,8 +305,7 @@ begin
       cup,cdown,esc,cr,rup,rdown,
       pgup,pgdown,hom,pgend: exit:=true
       else begin
-             if (ch1>=' ') and (ch1<chr($7f))
-             then begin
+             if printable(ch1) then begin
                lstch1:=video[lstart+xmax-1];
                lstch1:=chr(ord(lstch1) and $7f);
                lstch2:=video[lstart+xmax-2];
@@ -610,12 +615,6 @@ begin
   if (y>0) and (y<scrlins) then showline(pnt,y);
 end;
 
-func printable(ch:char):boolean;
-begin
-  printable:=((ord(ch)>=$20) and (ord(ch)<=$7e))
-    and (ch<>rubout);
-end;
-
 begin {main}
   for i:=0 to maxlines-1 do linepnt[i]:=nil;
   stemp:=strnew; stemp2:=strnew; fs:=strnew; debug:=0;
@@ -623,7 +622,7 @@ begin {main}
   putontop('Line xxx of xxx',0,true);
   relpnt:=maxlines-1; mark:=0; nmark:=0; savecx:=1;
   clrmessage; readinput; fs[0]:=endmark;
-  putontop('pedit version 2.0',36,true);
+  putontop('R65 PEDIT V 2.10',36,true);
   topline:= 1; line:=1; showall; exit:=false;
   repeat
     showtop; chi := edlin(linepnt[line]);

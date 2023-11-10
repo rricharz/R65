@@ -176,6 +176,12 @@ begin
           ok:=false;
         end;
       end;
+      { delete any remaining :Q files }
+      writeln('Deleting any remaining temporary files');
+       setsubtype('Q');
+      fname[0]:='*';
+      setargs(fname,0,0,1);
+      runprog('DELETE:R        ',cyclus,drive);
       { clean the destination drive }
       setargi(0,0);
       argtype[1]:=chr(0);

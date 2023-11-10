@@ -4,36 +4,36 @@
          * R65 Pascal Main System *
          *                        *
          **************************
- 
+
      Based on version 01/08/82 rricharz
      1979-1982  rricharz (r77@bluewin.ch)
      2018       recovered
-     2023       last change
- 
+     2023       last change version 5.4
+
 R65 Pascal System Program. This program is
 called, when Pascal is executed. It allows to
 call other programs by names and with
 arguments.
- 
+
 Examples:
   compile test1:p
   compile test1:p:04,1
   copy test3:P,0,1
   copy test3:P,0 1
   find test*
- 
+
 First tries to run program from drive 1,
 unless a drive is specified in the call.
 If not found there and not specified,
 tries to run in from drive 0.
 Default for arguments is drive 1.
 }
- 
+
 program system;
 uses syslib;
- 
+
 const stopcode=$2010;
- 
+
 var
   i, m, n: integer;
   ch: char;
@@ -42,48 +42,48 @@ var
   runname,aname: array[15] of char;
   drive1,drive2: integer;
   cyclus1,cyclus2: integer;
- 
+
 { * runprog * }
- 
+
 proc runprog
   (name: array[15] of char;
    drv: integer; cyc: integer);
- 
+
 var i: integer;
- 
+
 begin
   for i:=0 to 15 do filnm1[i]:=name[i];
   filcy1:=cyc; fildrv:=drv; filflg:=$40;
   run
 end;
- 
+
 { * uppercase * }
- 
+
 func uppercase(ch1: char): char;
- 
+
 begin
   if (ch1 >= 'a') and (ch1 <= 'z') then
     uppercase := chr(ord(ch1) - 32)
   else
     uppercase := ch1;
 end;
- 
+
 { * next * }
- 
+
 proc next;
- 
+
 begin
   read(@input,ch);
   ch:=uppercase(ch);
 end;
- 
+
 { * getnum * }
- 
+
 proc getnum
   (var num: integer);
- 
+
 var sign: integer;
- 
+
 begin
   sign:=1; num:=0;
   case ch of
@@ -97,20 +97,20 @@ begin
   end;
   num:=sign*num
 end;
- 
+
 { * getfname * }
- 
+
 proc getfname
   (var name: array[15] of char;
    ptype: char; var ok: boolean;
    var drv: integer; var cyc: integer);
- 
+
 var i, j: integer;
- 
+
   func nexthexdigit: integer;
- 
+
   var d: integer;
- 
+
   begin
     next;
     if (ch>='0') and (ch<='9') then
@@ -122,7 +122,7 @@ var i, j: integer;
     nexthexdigit:=0;
     end;
   end;
- 
+
 begin
   ok:=((ch>='A') and (ch<='Z'))
     or (ch='*') or (ch='?') or (ch='/');
@@ -154,24 +154,24 @@ begin
       argerr:=105;
   end
 end;
- 
+
 { * clearinput * }
- 
+
 proc clearinput;
- 
+
 begin
   buffpn:=-1;
 end;
- 
+
 { * main * }
- 
+
 begin {main}
   maxseq:=mmaxseq-1;
   for i:=0 to mmaxseq-1 do fidrtb[i]:=0;
   clearinput; writeln;
-  writeln('R65 Pascal (06/11/23)');
+  writeln('R65 PASCAL VERSION 5.4');
   ok:=true;
- 
+
   repeat {main loop (endless)}
     write('P*');
     next;
@@ -234,7 +234,7 @@ begin {main}
       if ch<>cr then argerr:=106;
     end {ok}
     else argerr:=106;
- 
+
     if argerr<>0 then begin
       writeln;
       writeln(invvid,'Argument error ', argerr,norvid);
@@ -263,4 +263,3 @@ begin {main}
     end
   until false;
 end.
- 

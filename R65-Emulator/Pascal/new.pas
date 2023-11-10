@@ -22,6 +22,8 @@ program new;
 uses syslib,arglib;
 
 const anew=$c812; { exdos vector }
+      cup=chr($1a);
+
 mem filerr=$db: integer&;
 
 var cyclus,drive: integer;
@@ -51,9 +53,9 @@ begin
     writeln(invvid,'Wild cards not allowed',norvid)
   else begin
     asetfile(name,cyclus,drive,'P');
+    write(cup); { avoid empty line }
     call(anew);
     if filerr<>0 then bcderror(filerr);
     writeln;
   end;
 end.
-

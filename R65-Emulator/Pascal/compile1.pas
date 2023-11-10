@@ -10,6 +10,7 @@ Original version 3.7 (20K)  01/08/82 rricharz
 
 Recovered 2018 by rricharz (r77@bluewin.ch)
 Improved 2018-2023 by rricharz
+Version 4 with cpnt strings
 
 Original derived from the publication by
 Kin-Man Chung and Herbert Yen in
@@ -27,7 +28,6 @@ defined types. Floating point numbers (real)
 and file io to floppy disks are supported.
 
 Precompiled libraries are merged in the loader.
-
 The table of reserved words and the library
 tables are loaded from the same drive as
 the compiler.
@@ -91,7 +91,7 @@ var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
 
     token: packed char;
 
-    prt,libflg,icheck: boolean;
+    prt,libflg,icheck,ateof: boolean;
 
     fno,ofno: file;
 
@@ -271,19 +271,26 @@ proc getchr;
   end;
 
 begin
-  read(@fno,ch);
-  if ch=cr then begin
-    crlf;
-    writenum(line); write(' (');
-    if (pc+2)<9999 then write(' ');
-    writenum(pc+2); write(') ');
-    ch:=' '
-  end {if}
-  else if ch=eof then begin
-    writeln('Illegal eof');
-    abort
-  end {else if}
-  else write(ch)
+  if ateof then begin
+    writeln('Unexpected eof');
+    abort;
+  end else begin
+    read(@fno,ch);
+    if ch=cr then begin
+      crlf;
+      writenum(line); write(' (');
+      if (pc+2)<9999 then write(' ');
+      writenum(pc+2); write(') ');
+      ch:=' ';
+    end {if}
+    else if ch=eof then begin
+      ateof:=true;
+      { we need to suppy one more char }
+      { for end. at end of file to work properly }
+      ch:=' ';
+    end {else if}
+    else write(ch);
+  end;
 end {getchr};
 
 {       * splitconv *   (global) }
@@ -308,6 +315,7 @@ var i,j,dummy: integer;
     default: boolean;
 
 begin {init}
+  ateof:=false;
   cdrive:=fildrv; { drive of compile program }
   fipnt:=-1;
   endstk:=idtabpos-144;
@@ -317,6 +325,7 @@ begin {init}
   stackmax:=0;spntmax:=0; numerr:=0;
   t0[0]:='vi'; t1[0]:=0; t2[0]:=0; t3[0]:=0;
   { prepare resword table }
+  writeln('Reading list of reserved words');
   asetfile('RESWORDS:W      ',0,cdrive,'W');
   openr(fno);
   for i:=0 to nresw do begin
@@ -336,8 +345,8 @@ begin {init}
   close(fno);
 
   writeln;
-  writeln('R65 Pascal Compiler');
-  writeln('Pass 1  Version 4.0');
+  writeln('R65 PASCAL COMPILER');
+  writeln('Version 4.1, Pass 1');
 
   sdrive:=1; {default drive for source }
   scyclus:=0;
@@ -2312,26 +2321,3 @@ begin {main}
   { check whether second pass is not required }
   if (runerr=0) and libflg then runerr:=-1;
 end {main}.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
