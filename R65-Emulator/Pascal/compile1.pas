@@ -105,23 +105,24 @@ var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
            {type of symbol}
 
         {High letter:
-         a:array, c:constant, d;const parameter.
-         e:constant array parameter, f:function,
-         g:array function, h;8-bit memory var,
-         i:8-bit array memory variable,
-         m:16-bit memory variable,
-         n:16-bit array memory variable,
-         p:procedure,
-         q:indexed cpnt,
-         r,t:function result,
-         s,u:array function result,
-         v:variable, w:variable parameter,
+         a:array, c:constant, d;const parameter
+         e:constant array parameter, f:function
+         g:array function, h;8-bit memory var
+         i:8-bit array memory variable
+         m:16-bit memory variable
+         n:16-bit array memory variable
+         p:procedure
+         q:indexed cpnt
+         r,t:function result
+         s,u:array function result
+         v:variable, w:variable parameter
          x:variable array parameter
 
          Low letter:
-         i:integer, c:char, p:packed char,
-         q:cpoint (pointer to char),
-         r:real(array multiple of two),
+         i:integer, c:char, p:packed char
+         q:cpoint (pointer to char)
+         r:real(array multiple of two)
+         s:const cpnt
          f:file, b:boolean, u:undefined  }
 
     t1: array[symbsize] of integer;
@@ -638,16 +639,6 @@ var l,f9,i,n,stackpn1,forwpn,find,cproc,
     spnt1,dpnt1,parlevel: integer;
     fortab: array[8] of integer;
 
-{ * testtype *      (of block) }
-
-proc testtype(ttype: char);
-
-begin
-  if restype<>ttype then
-    if (restype<>'u') and (ttype<>'u') then
-      merror(14,packed(ttype,restype));
-end;
-
 { * find ident *    (of block) }
 { this is a fast version for compiler speed }
 
@@ -715,6 +706,16 @@ begin {code3}
   end
 end {code3};
 
+{ * testtype *      (of block) }
+
+proc testtype(ttype: char);
+
+begin
+  if restype<>ttype then
+    if (restype<>'u') and (ttype<>'u') then
+      merror(14,packed(ttype,restype));
+end;
+
 { * putsym *   (of block) }
 
 proc putsym(ltyp1,ltyp2: char);
@@ -768,9 +769,13 @@ begin
           end else if value[0]=2 then begin
             val:=(ord(ident[1]) shl 8) +
               ord(ident[2]);
-              restype:='p';
-          end
-          else error(15);
+            restype:='p';
+          end else if value[0]>2 then begin
+            val:=pc;
+            for ii:=1 to value[0] do
+                        code1(ord(ident[ii]));
+            code1(0); value[0]:=0; restype:='s';
+          end else error(15);
     'cr': begin parse(' ('); scan; val:=getcon;
             if (val>127) or (val<0) then
               error(12);
@@ -1192,7 +1197,7 @@ var ressize:integer;
     getvar;
     if chr(stack[i] and 255)<>vartype then
       if chr(stack[i] and 255)<>'u' then
-        error(14);
+        merror(14,'01');
       push(idpnt);
   end {prcall3};
 
@@ -1213,12 +1218,12 @@ begin {prcall1}
           end;
     'w':  begin
             prcall3;
-            if relad<>0 then error(14);
+            if relad<>0 then merror(14,'02');
             gpval(idpnt,false,vartyp2);
           end;
     'x':  begin
             prcall3;
-            if relad<>2 then error(14);
+            if relad<>2 then merror(14,'03');
             if vartyp2='i' then error(16);
             i:=succ(i);
             if stack[i]<>t3[idpnt] then
@@ -1230,7 +1235,7 @@ begin {prcall1}
               2*t2[idpnt]);
             code2($3b,stack[i]);
           end
-    else error(14)
+    else merror(14,'04')
   end {case}
 end {prcall1};
 
@@ -1526,7 +1531,7 @@ begin { *** body of factor *** }
                         code1(ident[2*i-1]);
                       end
                     end
-                else error(14)
+                else merror(14,'05')
               end {case}
             end;
             scan
@@ -1633,7 +1638,7 @@ begin  { *** body of term *** }
             (arsize2=1) then begin
         scan; factor(arsize2);
         if (restype<>'r') or (arsize2<>1) then
-          error(14);
+          merror(14,'06');
         case opcode of
           5: code1($44);
           $45: code1($45)
@@ -1762,6 +1767,9 @@ var savetype: char;
   proc assign1;
   begin
     testto(':='); scan; express;
+    if (vartype='q') and (restype='s') then begin
+      code1($58); restype:='q';
+    end;
     gpval(idpnt,true,vartyp2);
   end {assign1};
 
@@ -1856,7 +1864,7 @@ begin
   getvar; code1(x);
   testferror;
   if relad=2 then error(15);
-  if vartype<>'f' then error(14);
+  if vartype<>'f' then merror(14,'07');
   gpval(idpnt,true,vartyp2);
   testto(' )'); scan
 end {openrw};
@@ -1878,7 +1886,7 @@ begin {gpsec}
   if idpnt=0 then error(5);
   getvar; code3(34,$db); { get file error code }
   if relad=2 then error(15);
-  code1(23); if vartype<>'i' then error(14);
+  code1(23); if vartype<>'i' then merror(14,'08');
   gpval(idpnt,true,vartyp2);
   testto(' )');
 end {gpsec};
@@ -1983,6 +1991,10 @@ begin {body of statement }
                     'i':  code1(30);
                     'c':  code1(29);
                     'q':  code1($57);
+                    's':  begin
+                            code1($58);
+                            code1($57);
+                          end;
                     'p':  begin
                             code1(22);
                             code1(51);
@@ -1990,7 +2002,7 @@ begin {body of statement }
                             code1(52);
                             code1(29);
                           end
-                    else error(14)
+                    else merror(14,'09')
                   end {case}
                 end {expression}
               until token<>' ,';
