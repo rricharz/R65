@@ -46,7 +46,9 @@ program compile1;
 
 uses syslib, arglib;
 
-const table     =$97ff; {user ident table -1}
+const title='R65 PASCAL COMPILER Version 4.2, Pass 1';
+
+      table     =$97ff; {user ident table -1}
       idtab     =$95ff; {resword table -1}
       idlength  =64;    {max. length of ident}
       stacksize =256;   {stack size}
@@ -346,8 +348,7 @@ begin {init}
   close(fno);
 
   writeln;
-  writeln('R65 PASCAL COMPILER');
-  writeln('Version 4.1, Pass 1');
+  writeln(title);
 
   sdrive:=1; {default drive for source }
   scyclus:=0;
@@ -1349,6 +1350,7 @@ var opcode: integer;
 proc factor(var arsize3: integer);
 
 var i, idpnt: integer;
+    h: char;
 
 { * index *              ( of factor )  }
 
@@ -1380,7 +1382,8 @@ begin { *** body of factor *** }
             idpnt:=findid;
             if idpnt=0 then error(5);
             restype:=low(t0[idpnt]);
-            case high(t0[idpnt]) of
+            h:=high(t0[idpnt]);
+            case h of
               'v','w','d':
                     begin
                       scan;
@@ -1392,8 +1395,7 @@ begin { *** body of factor *** }
                         code1($03);
                         code1($54);
                         restype:='c';
-                      end
-                      else
+                      end else
                         code4(39,level-t1[idpnt],
                           2*t2[idpnt]);
                     end;
@@ -1434,10 +1436,23 @@ begin { *** body of factor *** }
                       prcall(idpnt); scan;
                       restype:=low(t0[idpnt]);
                     end;
-              'c':  if low(t0[idpnt])<>'r' then
-                      begin code3(34,t2[idpnt]);
-                      scan end
-                    else begin
+              'c':  if low(t0[idpnt])<>'r' then begin
+                      code3(34,t2[idpnt]);
+                      scan;
+                      if restype='s' then begin
+                        if token=' [' then begin
+                          index(true);
+                          code1($03);
+                          code1($58);
+                          code1($54);
+                          restype:='c';
+                        end else begin
+                          code1($58);
+                          restype:='q';
+                        end;
+                      end;
+                      {scan;}
+                    end else begin
                       code2($3a,2);
                       code2(t2[idpnt] and 255,
                         t2[idpnt] shr 8);
