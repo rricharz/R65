@@ -357,8 +357,14 @@ void crtUpdate()
                 yy = vcell * (onscreenCurlin + 1) + 3;
                 if (hcell < 10) StrokeWidth(2);
                 else StrokeWidth(hcell / 5);
-                Line(xx + crtOffset, yy  + crtOffset + hcell/2,
-                    xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell/2);
+                if (NUMCHAR > 48)  {
+                        Line(xx + crtOffset - hcell/12, yy  + crtOffset + hcell/2,
+                        xx + crtOffset - hcell/12, yy  + crtOffset - 3*hcell/2);
+                }
+                else { 
+                  Line(xx + crtOffset, yy  + crtOffset + hcell/3,
+                    xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell/3);
+                }
                 StrokeWidth(2);
             }
         }
