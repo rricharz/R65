@@ -52,9 +52,10 @@ begin {main}
 
   if runerr=0 then
     runprog('COMPILE2:R      ');
-  if runerr=0 then begin
-    asetfile(name,cyclus,drive,'Q');
-    call(adelete);
-  end else runerr:=0;
+
+  asetfile(name,cyclus,drive,'Q');
+  call(adelete);
+
+  runerr:=0;
 end.
 

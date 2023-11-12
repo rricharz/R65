@@ -10,7 +10,7 @@ Original version 3.7 (20K)  01/08/82 rricharz
 
 Recovered 2018 by rricharz (r77@bluewin.ch)
 Improved 2018-2023 by rricharz
-Version 4 with cpnt strings
+Version 4 with cpnt strings and exit statement
 
 Original derived from the publication by
 Kin-Man Chung and Herbert Yen in
@@ -40,23 +40,8 @@ usage:
   where x:       l,p: no hard copy print
                  i,r: index bound checking
                  n: no loader file
-  [] means not required                     }
+  [] means not required
 
-program compile1;
-
-uses syslib, arglib;
-
-const title='R65 PASCAL COMPILER Version 4.2, Pass 1';
-
-      table     =$97ff; {user ident table -1}
-      idtab     =$95ff; {resword table -1}
-      idlength  =64;    {max. length of ident}
-      stacksize =256;   {stack size}
-      pagelenght=60;    {no of lines per page}
-      nooutput  =@0;
-      maxfi     =3;     {max number of ins fls}
-
-{
 The compiler uses 2 fixed memory areas to store
 the table of reserved words and the table of
 idents. The top of the Pascal stack (endstk) is
@@ -66,9 +51,23 @@ of chars would store the chars as 16 bit
 numers and would therefore require twice the
 space. An array of packed chars would require
 more coding and slow the scanner module of the
-compiler down.                               }
+compiler down.                                }
 
-    nresw=61;   {number of res. words, max 64}
+program compile1;
+
+uses syslib, arglib;
+
+const version='4.2';
+
+    table     =$97ff; {user ident table -1}
+    idtab     =$95ff; {resword table -1}
+    idlength  =64;    {max. length of ident}
+    stacksize =256;   {stack size}
+    pagelenght=60;    {no of lines per page}
+    nooutput  =@0;
+    maxfi     =3;     {max number of ins fls}
+
+    nresw=63;   {number of res. words, max 64}
     symbsize=256;     {id table entries}
     reswtabpos=$c600; { up to $c7ff }
     idtabpos=$be00;   { up to $c5ff }
@@ -162,8 +161,6 @@ begin
   line:=succ(line);
   if (line div pagelenght)*pagelength=line
     then newpage;
-  if prt then
-    for i:=1 to 16 do write(@printer,' ')
 end {crlf};
 
 {       error message   (global)        }
@@ -250,14 +247,15 @@ begin
     write(@printer,formfeed);
   writeln; { Do not count this line}
   if pname[0]<>'x' then begin
-    write('R65 Pascal ');
-    if libflg then write('library ')
-    else write('program ');
+    write('R65 COMPILE ');
+    write(version);
+    if libflg then write(': library ')
+    else write(': program ');
     prtext16(output,pname);
   end;
-  tab(34);
-  prtdate(output); write('     ');
-  writeln('page ',(line div pagelenght)+1);
+  write(' ');
+  prtdate(output);
+  writeln(' page ',(line div pagelenght)+1);
   writeln;
 end {newpage};
 
@@ -318,6 +316,8 @@ var i,j,dummy: integer;
     default: boolean;
 
 begin {init}
+  writeln('R65 PASCAL COMPILER version ', version,
+    ', Pass  1');
   ateof:=false;
   cdrive:=fildrv; { drive of compile program }
   fipnt:=-1;
@@ -348,7 +348,6 @@ begin {init}
   close(fno);
 
   writeln;
-  writeln(title);
 
   sdrive:=1; {default drive for source }
   scyclus:=0;
@@ -2121,6 +2120,11 @@ begin {body of statement }
     'ge': gpsec(55);
 
     'pu': gpsec(56);
+
+    'ex': begin {exit}
+            if level>0 then code1(1) else code1(0);
+            scan;
+          end;
 
     'cl': begin {close}
             parse(' (');

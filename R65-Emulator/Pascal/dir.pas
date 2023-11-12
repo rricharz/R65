@@ -30,7 +30,7 @@ uses syslib,arglib,strlib;
 const aprepdo =$f4a7;
       agetentx=$f63a;
       aenddo  =$f625;
-      tsectors = 2560;n
+      tsectors = 2560;
       maxent  = 255;
 
 mem   filtyp  =$0300: char&;
@@ -40,17 +40,16 @@ mem   filtyp  =$0300: char&;
       filsiz  =$0315: integer;
       fillnk  =$031e: integer;
       scyfc   =$037c: integer&;
-      filerr=$db: integer&;
+      filerr  =$00db: integer&;
 
-var default: boolean;
+var default,sortit: boolean;
     drive,index,i,ti,maxlen,nument,col,
     ncol,row,nspaces,sfree,sdel,
-    lines       : integer;
-    ffree,fdel  : real;
-    filstptab   : array[80] of char;
-    s           : cpnt;
-    entry       : array[maxent] of cpnt;
-
+    lines        : integer;
+    ffree,fdel   : real;
+    filstptab    : array[80] of char;
+    s            : cpnt;
+    entry        : array[maxent] of cpnt;
 
 func hex(d:integer):char;
 { convert hex digit to hex char }
@@ -92,14 +91,32 @@ begin
        end;
 end;
 
+proc getoptions;
+var dummy:integer;
+    options:array[15] of char;
+begin
+  agetstring(options,default,dummy,dummy);
+  sortit:=false;
+  if not default then begin
+    if options[0]<>'/' then argerror(103);
+    for i:=1 to 15 do
+      case options[i] of
+        'S': sortit:=true;
+        ' ': begin end
+        else argerror(104)
+      end; {case}
+  end;
+end;
+
 begin {main}
   drive:=1; {default drive}
   filerr:=0;
-  agetval(drive,default);
+  if argtype[carg]='i' then agetval(drive,default);
   if (drive<0) or (drive>1) then begin
     writeln('Drive must be 0 or 1');
     abort
   end;
+  getoptions;
   fildrv:=drive;
   call(aprepdo);
   checkfilerr;
@@ -147,7 +164,7 @@ begin {main}
   call(aenddo);
 
   nument:=ti-1;
-  sort;
+  if sortit then sort;
   ncol:=48 div (maxlen+2);
   if nument<8 then ncol:=2
   else if nument<8 then ncol:=1;

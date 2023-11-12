@@ -32,7 +32,9 @@ Default for arguments is drive 1.
 program system;
 uses syslib;
 
-const stopcode=$2010;
+const title='R65 PASCAL VERSION 5.4';
+
+  stopcode=$2010;
 
 var
   i, m, n: integer;
@@ -169,7 +171,7 @@ begin {main}
   maxseq:=mmaxseq-1;
   for i:=0 to mmaxseq-1 do fidrtb[i]:=0;
   clearinput; writeln;
-  writeln('R65 PASCAL VERSION 5.4');
+  writeln(title);
   ok:=true;
 
   repeat {main loop (endless)}

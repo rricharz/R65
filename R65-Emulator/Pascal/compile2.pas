@@ -7,7 +7,7 @@
     ********************************
 
 First version 19978 by rricharz
-Current version 3.1  01/08/82 rricharz
+Original version 3.1  01/08/82 rricharz
 
 Recovered 2018 by rricharz (r77@bluewin.ch)
 
@@ -25,9 +25,11 @@ usage:
 program compile2;
 uses syslib,arglib,disklib;
 
-const wrfile=$e81b;
-      sblock=$5000;
-      eblock=topmem;
+const
+    title='R65 PASCAL COMPILER Version 4.2, Pass 2';
+    wrfile=$e81b;
+    sblock=$5000;
+    eblock=topmem;
 
 mem endstk=$e,
     stprog=$11: integer;
@@ -37,11 +39,11 @@ mem endstk=$e,
     filsa1=$0331: integer;
     filtyp=$0300: char&;
 
-var pointer,address,exit,maxsize,dummy,
+var pointer,address,maxsize,dummy,
     scyclus,sdrive,offset,cdrive: integer;
     ch: char;
     source: file;
-    exit,def: boolean;
+    stop,def: boolean;
     name: array[15] of char;
 
 
@@ -110,8 +112,7 @@ begin
   cdrive:=fildrv; { drive of compile program }
   endstk:=sblock-144;   {reserve memory }
   writeln;
-  writeln(tab8,'-- R65 Pascal Compiler --');
-  writeln(tab8,'   Pass 2  Version 3.1');
+  writeln(title);
   scyclus:=0; sdrive:=1;
   agetstring(name,default,scyclus,sdrive);
   asetfile(name,scyclus,sdrive,'Q');
@@ -191,7 +192,7 @@ proc getbl(base:integer);  {get block }
 
 
 begin { * body of getbl * }
-  exit:=false;
+  stop:=false;
   repeat
     read(@source,ch);
     case ch of
@@ -211,7 +212,7 @@ begin { * body of getbl * }
 
       'L':  getlib;
 
-      'E':  exit:=true;
+      'E':  stop:=true;
 
       eof:  error(106)
 
@@ -222,8 +223,8 @@ begin { * body of getbl * }
           error(101);
       end {data}
     end {case};
-  until exit;
-  exit:=false;
+  until stop;
+  stop:=false;
   mem[sblock]:=(pointer-sblock) and 255;
   mem[sblock+1]:=(pointer-sblock) shr 8;
   address:=getbyte2+(getbyte2 shl 8)+base;

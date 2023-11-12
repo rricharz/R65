@@ -30,7 +30,7 @@ var shipmap: array[1] of integer;
     score,lastscore,dummy,
     lasercount          : integer;
 
-    exit,landed         : boolean;
+    stop,landed         : boolean;
 
 proc showship;
 begin
@@ -65,7 +65,7 @@ begin
     sspeedx:=-(random and 7);
   end;
   if shipy<=0 then begin
-    exit:=true; landed:=true;
+    stop:=true; landed:=true;
     move(0,ysize-9);
     write(@plotdev,'ALIENS LANDED   ');
   end;
@@ -147,7 +147,7 @@ begin
   birdx:=-1; lastbirdx:=-1;
   birdcount:=0; lasercount:=0;
   score:=0; lastscore:=-1;
-  exit:=false; landed:=false;
+  stop:=false; landed:=false;
   grinit;
   cleargr;
   move(0,ysize-9);
@@ -199,10 +199,10 @@ begin
     delay10msec(5);
     if (keypressed<>chr(0)) then begin
       if keypressed=' ' then laser
-      else exit:=true;
+      else stop:=true;
       keypressed:=chr(0);
     end;
-    until exit or (score>99);
+    until stop or (score>99);
   delay10msec(100);
   grend;
   if landed then

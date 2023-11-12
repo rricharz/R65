@@ -1,285 +1,286 @@
 
-R65 Pascal program COMPILE2        8/11/23     page 1
+R65 COMPILE 4.2: program COMPILE2         12/11/23 page 1
 
 
-                   1 (    4) 
-                   2 (    4) {   ********************************
-                   3 (    4)     *                              *
-                   4 (    4)     *  R65 "Tiny" Pascal Compiler  *
-                   5 (    4)     *      Pass 2  (Loader)        *
-                   6 (    4)     *                              *
-                   7 (    4)     ********************************
-                   8 (    4) 
-                   9 (    4) First version 19978 by rricharz
-                  10 (    4) Current version 3.1  01/08/82 rricharz
-                  11 (    4) 
-                  12 (    4) Recovered 2018 by rricharz (r77@bluewin.ch)
-                  13 (    4) 
-                  14 (    4) Original derived from the publication by
-                  15 (    4) Kin-Man Chung and Herbert Yen in
-                  16 (    4) Byte, Volume 3, Number 9 and Number 10, 1978
-                  17 (    4) 
-                  18 (    4) Adapted for the R65 computer system and
-                  19 (    4) substantially enhanced by rricharz 1978-1982
-                  20 (    4) 
-                  21 (    4) usage:
-                  22 (    4)  compile2 name[.cy[,drv]]
-                  23 (    4)   [] means not required                    }
-                  24 (    4) 
-                  25 (    4) program compile2;
-                  26 (    4) uses syslib,arglib,disklib;
-                  27 ( 1369) 
-                  28 ( 1369) const wrfile=$e81b;
-                  29 ( 1372)       sblock=$5000;
-                  30 ( 1372)       eblock=topmem;
-                  31 ( 1372) 
-                  32 ( 1372) mem endstk=$e,
-                  33 ( 1372)     stprog=$11: integer;
-                  34 ( 1372)     filerr=$db: integer&;
-                  35 ( 1372)     filsa=$031a,
-                  36 ( 1372)     filea=$031c,
-                  37 ( 1372)     filsa1=$0331: integer;
-                  38 ( 1372)     filtyp=$0300: char&;
-                  39 ( 1372) 
-                  40 ( 1372) var pointer,address,exit,maxsize,dummy,
-                  41 ( 1372)     scyclus,sdrive,offset,cdrive: integer;
-                  42 ( 1372)     ch: char;
-                  43 ( 1372)     source: file;
-                  44 ( 1372)     exit,def: boolean;
-                  45 ( 1372)     name: array[15] of char;
-                  46 ( 1372) 
-                  47 ( 1372) 
-                  48 ( 1372) { * error * }
-                  49 ( 1372) 
-                  50 ( 1372) proc error(x:integer);
-                  51 ( 1372) 
-                  52 ( 1372) mem runerr=$0c: integer&;
-                  53 ( 1375) 
-                  54 ( 1375) begin
-                  55 ( 1375)   writeln;
-                  56 ( 1377)   write('*** ');
-                  57 ( 1388)   if x<100 then {file error, bcd}
-                  58 ( 1395)     writeln('File error ',(x shr 4),(x and 15))
-                  59 ( 1425)   else
-
-----------------------------------------------------------------------
-
-R65 Pascal program COMPILE2        8/11/23     page 2
-
-                  60 ( 1432)     case x of
-                  61 ( 1435)       101: writeln('Program too long');
-                  62 ( 1469)       102: writeln('Data input format ',ch);
-                  63 ( 1509)       105: writeln('Wrong address');
-                  64 ( 1539)       106: writeln('Unexpected eof');
-                  65 ( 1570)       107: writeln('Pointer not matching')
-                  66 ( 1601)       else writeln('Unknown error ',x)
-                  67 ( 1625)     end {case}
-                  68 ( 1638)   close(source);
-                  69 ( 1644)   runerr:=x;
-                  70 ( 1644)   abort;
-                  71 ( 1656) end {error};
-                  72 ( 1656) 
-                  73 ( 1657) 
-                  74 ( 1657) { * testerror * }
-                  75 ( 1657) 
-                  76 ( 1657) proc testerr;
-                  77 ( 1657) 
-                  78 ( 1657) var i: integer;
-                  79 ( 1660) 
-                  80 ( 1660) begin
-                  81 ( 1660)   if filerr<>0 then error(filerr)
-                  82 ( 1674) end;
-                  83 ( 1680) 
-                  84 ( 1681) 
-                  85 ( 1681) { * blocksave * }
-                  86 ( 1681) 
-                  87 ( 1681) proc blocksave(lowlim,highlim: integer);
-                  88 ( 1681) 
-                  89 ( 1681) var i: integer;
-                  90 ( 1684) 
-                  91 ( 1684) begin
-                  92 ( 1684)   asetfile(name,scyclus,sdrive,'R');
-                  93 ( 1708)   filsa:=lowlim;
-                  94 ( 1708)   filea:=highlim;
-                  95 ( 1716)   filsa1:=lowlim;
-                  96 ( 1724)   filtyp:='B';
-                  97 ( 1734)   call(wrfile);
-                  98 ( 1743)   testerr
-                  99 ( 1743) end {blocksave};
-                 100 ( 1747) 
-                 101 ( 1748) 
-                 102 ( 1748) { * init * }
-                 103 ( 1748) 
-                 104 ( 1748) proc init; {initialize program}
-                 105 ( 1748) 
-                 106 ( 1748) var i: integer;
-                 107 ( 1751)     default: boolean;
-                 108 ( 1751) 
-                 109 ( 1751) begin
-                 110 ( 1751)   cdrive:=fildrv; { drive of compile program }
-                 111 ( 1760)   endstk:=sblock-144;   {reserve memory }
-                 112 ( 1769)   writeln;
-                 113 ( 1769)   writeln(tab8,'-- R65 Pascal Compiler --');
-                 114 ( 1810)   writeln(tab8,'   Pass 2  Version 3.1');
-                 115 ( 1842)   scyclus:=0; sdrive:=1;
-                 116 ( 1850)   agetstring(name,default,scyclus,sdrive);
-                 117 ( 1894)   asetfile(name,scyclus,sdrive,'Q');
-                 118 ( 1916)   openr(source);
-                 119 ( 1922)   writeln;
+   1 (    4) 
+   2 (    4) {   ********************************
+   3 (    4)     *                              *
+   4 (    4)     *  R65 "Tiny" Pascal Compiler  *
+   5 (    4)     *      Pass 2  (Loader)        *
+   6 (    4)     *                              *
+   7 (    4)     ********************************
+   8 (    4) 
+   9 (    4) First version 19978 by rricharz
+  10 (    4) Original version 3.1  01/08/82 rricharz
+  11 (    4) 
+  12 (    4) Recovered 2018 by rricharz (r77@bluewin.ch)
+  13 (    4) 
+  14 (    4) Original derived from the publication by
+  15 (    4) Kin-Man Chung and Herbert Yen in
+  16 (    4) Byte, Volume 3, Number 9 and Number 10, 1978
+  17 (    4) 
+  18 (    4) Adapted for the R65 computer system and
+  19 (    4) substantially enhanced by rricharz 1978-1982
+  20 (    4) 
+  21 (    4) usage:
+  22 (    4)  compile2 name[.cy[,drv]]
+  23 (    4)   [] means not required                    }
+  24 (    4) 
+  25 (    4) program compile2;
+  26 (    4) uses syslib,arglib,disklib;
+  27 ( 1369) 
+  28 ( 1369) const
+  29 ( 1369)     title='R65 PASCAL COMPILER Version 4.2, Pass 2';
+  30 ( 1412)     wrfile=$e81b;
+  31 ( 1412)     sblock=$5000;
+  32 ( 1412)     eblock=topmem;
+  33 ( 1412) 
+  34 ( 1412) mem endstk=$e,
+  35 ( 1412)     stprog=$11: integer;
+  36 ( 1412)     filerr=$db: integer&;
+  37 ( 1412)     filsa=$031a,
+  38 ( 1412)     filea=$031c,
+  39 ( 1412)     filsa1=$0331: integer;
+  40 ( 1412)     filtyp=$0300: char&;
+  41 ( 1412) 
+  42 ( 1412) var pointer,address,maxsize,dummy,
+  43 ( 1412)     scyclus,sdrive,offset,cdrive: integer;
+  44 ( 1412)     ch: char;
+  45 ( 1412)     source: file;
+  46 ( 1412)     stop,def: boolean;
+  47 ( 1412)     name: array[15] of char;
+  48 ( 1412) 
+  49 ( 1412) 
+  50 ( 1412) { * error * }
+  51 ( 1412) 
+  52 ( 1412) proc error(x:integer);
+  53 ( 1412) 
+  54 ( 1412) mem runerr=$0c: integer&;
+  55 ( 1415) 
+  56 ( 1415) begin
+  57 ( 1415)   writeln;
+  58 ( 1417)   write('*** ');
+  59 ( 1428)   if x<100 then {file error, bcd}
 
 ----------------------------------------------------------------------
 
-R65 Pascal program COMPILE2        8/11/23     page 3
+R65 COMPILE 4.2: program COMPILE2         12/11/23 page 2
 
-                 120 ( 1922)   scyclus:=filcyc;
-                 121 ( 1932) end {init};
-                 122 ( 1936) 
-                 123 ( 1937) 
-                 124 ( 1937) { * getbyte1 * }
-                 125 ( 1937) 
-                 126 ( 1937) func getbyte1: integer;
-                 127 ( 1937) 
-                 128 ( 1937) var byte: integer;
-                 129 ( 1940) 
-                 130 ( 1940) begin
-                 131 ( 1940)   if (ch<'0') or (ch>'@') then error(102);
-                 132 ( 1968)   byte:=(ord(ch) and 15) shl 4;
-                 133 ( 1977)   read(@source,ch);
-                 134 ( 1992)   if (ch<'0') or (ch>'@') then error(102);
-                 135 ( 2019)   byte:=byte + ((ord(ch) and 15));
-                 136 ( 2030)   getbyte1:=byte;
-                 137 ( 2035)   { heartbeat: }
-                 138 ( 2043)   if (pointer and 63)=0 then write('.');
-                 139 ( 2058) end {getbyte1};
-                 140 ( 2058) 
-                 141 ( 2059) 
-                 142 ( 2059) { * getbyte2 * }
-                 143 ( 2059) 
-                 144 ( 2059) func getbyte2: integer;
-                 145 ( 2059) begin
-                 146 ( 2059)   read(@source,ch); getbyte2:=getbyte1
-                 147 ( 2075) end {getbyte2};
-                 148 ( 2085) 
-                 149 ( 2086) 
-                 150 ( 2086) { * getbl * }
-                 151 ( 2086) 
-                 152 ( 2086) proc getbl(base:integer);  {get block }
-                 153 ( 2086) 
-                 154 ( 2086)   proc getlib; {get library }
-                 155 ( 2089) 
-                 156 ( 2089)   var i: integer;
-                 157 ( 2092)       savsr: file;
-                 158 ( 2092)       ch1: char;
-                 159 ( 2092)       lname: array[7] of char;
-                 160 ( 2092)       lcyclus,ldrive: integer;
-                 161 ( 2092) 
-                 162 ( 2092)   begin
-                 163 ( 2092)     savsr:=source;
-                 164 ( 2094)     for i:=0 to 7 do begin
-                 165 ( 2119)       read(@source,ch1);
-                 166 ( 2129)       lname[i]:=ch1
-                 167 ( 2134)     end;
-                 168 ( 2142)     lcyclus:=0; ldrive:=cdrive;
-                 169 ( 2162)     write('Loading library ');
-                 170 ( 2187)     prtext8(output,lname);
-                 171 ( 2201)     { loading library from same drive }
-                 172 ( 2201)     { as program compile2 }
-                 173 ( 2201)     asetfile(lname&'        ',
-                 174 ( 2217)       lcyclus,ldrive,'T');
-                 175 ( 2233)     openr(source);
-                 176 ( 2239)     getbl(offset-2);
-                 177 ( 2252)     close(source);
-                 178 ( 2258)     source:=savsr;
-                 179 ( 2258)     if (pointer+4-sblock)>maxsize then
-
-----------------------------------------------------------------------
-
-R65 Pascal program COMPILE2        8/11/23     page 4
-
-                 180 ( 2277)       error(101);
-                 181 ( 2293)     mem[pointer-1]:=43;
-                 182 ( 2302)     mem[pointer]:=0;
-                 183 ( 2309)     mem[pointer+1]:=3;
-                 184 ( 2319)     mem[pointer+2]:=0;
-                 185 ( 2329)     mem[pointer+3]:=0;
-                 186 ( 2339)     pointer:=pointer+4;
-                 187 ( 2346)     offset:=pointer-sblock;
-                 188 ( 2358)     writeln;
-                 189 ( 2363)     writeln('Library loaded')
-                 190 ( 2384)   end {getlib};
-                 191 ( 2390) 
-                 192 ( 2391) 
-                 193 ( 2391) begin { * body of getbl * }
-                 194 ( 2391)   exit:=false;
-                 195 ( 2395)   repeat
-                 196 ( 2399)     read(@source,ch);
-                 197 ( 2409)     case ch of
-                 198 ( 2410) 
-                 199 ( 2414)       'F':  begin {fixup}
-                 200 ( 2421)               address:=getbyte2+
-                 201 ( 2427)                   (getbyte2 shl 8)+offset;
-                 202 ( 2437)               if (address<offset) or
-                 203 ( 2455)                   (address>maxsize) then begin
-                 204 ( 2465)                 writeln;
-                 205 ( 2468)                 write(address,' ',offset);
-                 206 ( 2486)                 error(105);
-                 207 ( 2494)               end;
-                 208 ( 2494)               mem[address+sblock]:=getbyte2;
-                 209 ( 2508)               mem[address+sblock+1]:=getbyte2;
-                 210 ( 2526)             end {fixup};
-                 211 ( 2527) 
-                 212 ( 2530)       'L':  getlib;
-                 213 ( 2541) 
-                 214 ( 2544)       'E':  exit:=true;
-                 215 ( 2553) 
-                 216 ( 2560)       eof:  error(106)
-                 217 ( 2569) 
-                 218 ( 2575)       else begin {data}
-                 219 ( 2578)         mem[pointer]:=getbyte1;
-                 220 ( 2588)         pointer:=pointer+1;
-                 221 ( 2595)         if (pointer-sblock)>maxsize then
-                 222 ( 2608)           error(101);
-                 223 ( 2624)       end {data}
-                 224 ( 2624)     end {case};
-                 225 ( 2626)   until exit;
-                 226 ( 2626)   exit:=false;
-                 227 ( 2635)   mem[sblock]:=(pointer-sblock) and 255;
-                 228 ( 2652)   mem[sblock+1]:=(pointer-sblock) shr 8;
-                 229 ( 2670)   address:=getbyte2+(getbyte2 shl 8)+base;
-                 230 ( 2688)   if address<>(pointer-sblock) then begin
-                 231 ( 2710)     writeln(address,' ',pointer-sblock);
-                 232 ( 2735)     error(107)
-                 233 ( 2737)   end
-                 234 ( 2743) end {getbl};
-                 235 ( 2743) 
-                 236 ( 2744) 
-                 237 ( 2744) { * main * }
-                 238 ( 2744) 
-                 239 ( 2744) begin {main}
+  60 ( 1435)     writeln('File error ',(x shr 4),(x and 15))
+  61 ( 1465)   else
+  62 ( 1472)     case x of
+  63 ( 1475)       101: writeln('Program too long');
+  64 ( 1509)       102: writeln('Data input format ',ch);
+  65 ( 1549)       105: writeln('Wrong address');
+  66 ( 1579)       106: writeln('Unexpected eof');
+  67 ( 1610)       107: writeln('Pointer not matching')
+  68 ( 1641)       else writeln('Unknown error ',x)
+  69 ( 1665)     end {case}
+  70 ( 1678)   close(source);
+  71 ( 1684)   runerr:=x;
+  72 ( 1684)   abort;
+  73 ( 1696) end {error};
+  74 ( 1696) 
+  75 ( 1697) 
+  76 ( 1697) { * testerror * }
+  77 ( 1697) 
+  78 ( 1697) proc testerr;
+  79 ( 1697) 
+  80 ( 1697) var i: integer;
+  81 ( 1700) 
+  82 ( 1700) begin
+  83 ( 1700)   if filerr<>0 then error(filerr)
+  84 ( 1714) end;
+  85 ( 1720) 
+  86 ( 1721) 
+  87 ( 1721) { * blocksave * }
+  88 ( 1721) 
+  89 ( 1721) proc blocksave(lowlim,highlim: integer);
+  90 ( 1721) 
+  91 ( 1721) var i: integer;
+  92 ( 1724) 
+  93 ( 1724) begin
+  94 ( 1724)   asetfile(name,scyclus,sdrive,'R');
+  95 ( 1748)   filsa:=lowlim;
+  96 ( 1748)   filea:=highlim;
+  97 ( 1756)   filsa1:=lowlim;
+  98 ( 1764)   filtyp:='B';
+  99 ( 1774)   call(wrfile);
+ 100 ( 1783)   testerr
+ 101 ( 1783) end {blocksave};
+ 102 ( 1787) 
+ 103 ( 1788) 
+ 104 ( 1788) { * init * }
+ 105 ( 1788) 
+ 106 ( 1788) proc init; {initialize program}
+ 107 ( 1788) 
+ 108 ( 1788) var i: integer;
+ 109 ( 1791)     default: boolean;
+ 110 ( 1791) 
+ 111 ( 1791) begin
+ 112 ( 1791)   cdrive:=fildrv; { drive of compile program }
+ 113 ( 1800)   endstk:=sblock-144;   {reserve memory }
+ 114 ( 1809)   writeln;
+ 115 ( 1809)   writeln(title);
+ 116 ( 1826)   scyclus:=0; sdrive:=1;
+ 117 ( 1834)   agetstring(name,default,scyclus,sdrive);
+ 118 ( 1878)   asetfile(name,scyclus,sdrive,'Q');
+ 119 ( 1900)   openr(source);
 
 ----------------------------------------------------------------------
 
-R65 Pascal program COMPILE2        8/11/23     page 5
+R65 COMPILE 4.2: program COMPILE2         12/11/23 page 3
 
-                 240 ( 2744)   init; maxsize:=eblock-sblock-2;
-                 241 ( 2759)   pointer:=sblock+2; offset:=2;
-                 242 ( 2776)   getbl(0);
-                 243 ( 2788)   mem[pointer-1]:=0;
-                 244 ( 2797)   mem[pointer]:=255;
-                 245 ( 2804)   mem[pointer+1]:=255;
-                 246 ( 2814)   pointer:=pointer+1;
-                 247 ( 2821)   close(source);
-                 248 ( 2832)   writeln;
-                 249 ( 2832)   blocksave(sblock,pointer);
-                 250 ( 2851)   writeln('Program has been stored');
-                 251 ( 2881)   endstk:=topmem-144;
-                 252 ( 2886)   dummy:=freedsk(sdrive,true);
-                 253 ( 2904) end.
-                 254 ( 2908) 
+ 120 ( 1906)   writeln;
+ 121 ( 1906)   scyclus:=filcyc;
+ 122 ( 1916) end {init};
+ 123 ( 1920) 
+ 124 ( 1921) 
+ 125 ( 1921) { * getbyte1 * }
+ 126 ( 1921) 
+ 127 ( 1921) func getbyte1: integer;
+ 128 ( 1921) 
+ 129 ( 1921) var byte: integer;
+ 130 ( 1924) 
+ 131 ( 1924) begin
+ 132 ( 1924)   if (ch<'0') or (ch>'@') then error(102);
+ 133 ( 1952)   byte:=(ord(ch) and 15) shl 4;
+ 134 ( 1961)   read(@source,ch);
+ 135 ( 1976)   if (ch<'0') or (ch>'@') then error(102);
+ 136 ( 2003)   byte:=byte + ((ord(ch) and 15));
+ 137 ( 2014)   getbyte1:=byte;
+ 138 ( 2019)   { heartbeat: }
+ 139 ( 2027)   if (pointer and 63)=0 then write('.');
+ 140 ( 2042) end {getbyte1};
+ 141 ( 2042) 
+ 142 ( 2043) 
+ 143 ( 2043) { * getbyte2 * }
+ 144 ( 2043) 
+ 145 ( 2043) func getbyte2: integer;
+ 146 ( 2043) begin
+ 147 ( 2043)   read(@source,ch); getbyte2:=getbyte1
+ 148 ( 2059) end {getbyte2};
+ 149 ( 2069) 
+ 150 ( 2070) 
+ 151 ( 2070) { * getbl * }
+ 152 ( 2070) 
+ 153 ( 2070) proc getbl(base:integer);  {get block }
+ 154 ( 2070) 
+ 155 ( 2070)   proc getlib; {get library }
+ 156 ( 2073) 
+ 157 ( 2073)   var i: integer;
+ 158 ( 2076)       savsr: file;
+ 159 ( 2076)       ch1: char;
+ 160 ( 2076)       lname: array[7] of char;
+ 161 ( 2076)       lcyclus,ldrive: integer;
+ 162 ( 2076) 
+ 163 ( 2076)   begin
+ 164 ( 2076)     savsr:=source;
+ 165 ( 2078)     for i:=0 to 7 do begin
+ 166 ( 2103)       read(@source,ch1);
+ 167 ( 2113)       lname[i]:=ch1
+ 168 ( 2118)     end;
+ 169 ( 2126)     lcyclus:=0; ldrive:=cdrive;
+ 170 ( 2146)     write('Loading library ');
+ 171 ( 2171)     prtext8(output,lname);
+ 172 ( 2185)     { loading library from same drive }
+ 173 ( 2185)     { as program compile2 }
+ 174 ( 2185)     asetfile(lname&'        ',
+ 175 ( 2201)       lcyclus,ldrive,'T');
+ 176 ( 2217)     openr(source);
+ 177 ( 2223)     getbl(offset-2);
+ 178 ( 2236)     close(source);
+ 179 ( 2242)     source:=savsr;
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.2: program COMPILE2         12/11/23 page 4
+
+ 180 ( 2242)     if (pointer+4-sblock)>maxsize then
+ 181 ( 2261)       error(101);
+ 182 ( 2277)     mem[pointer-1]:=43;
+ 183 ( 2286)     mem[pointer]:=0;
+ 184 ( 2293)     mem[pointer+1]:=3;
+ 185 ( 2303)     mem[pointer+2]:=0;
+ 186 ( 2313)     mem[pointer+3]:=0;
+ 187 ( 2323)     pointer:=pointer+4;
+ 188 ( 2330)     offset:=pointer-sblock;
+ 189 ( 2342)     writeln;
+ 190 ( 2347)     writeln('Library loaded')
+ 191 ( 2368)   end {getlib};
+ 192 ( 2374) 
+ 193 ( 2375) 
+ 194 ( 2375) begin { * body of getbl * }
+ 195 ( 2375)   stop:=false;
+ 196 ( 2379)   repeat
+ 197 ( 2383)     read(@source,ch);
+ 198 ( 2393)     case ch of
+ 199 ( 2394) 
+ 200 ( 2398)       'F':  begin {fixup}
+ 201 ( 2405)               address:=getbyte2+
+ 202 ( 2411)                   (getbyte2 shl 8)+offset;
+ 203 ( 2421)               if (address<offset) or
+ 204 ( 2439)                   (address>maxsize) then begin
+ 205 ( 2449)                 writeln;
+ 206 ( 2452)                 write(address,' ',offset);
+ 207 ( 2470)                 error(105);
+ 208 ( 2478)               end;
+ 209 ( 2478)               mem[address+sblock]:=getbyte2;
+ 210 ( 2492)               mem[address+sblock+1]:=getbyte2;
+ 211 ( 2510)             end {fixup};
+ 212 ( 2511) 
+ 213 ( 2514)       'L':  getlib;
+ 214 ( 2525) 
+ 215 ( 2528)       'E':  stop:=true;
+ 216 ( 2537) 
+ 217 ( 2544)       eof:  error(106)
+ 218 ( 2553) 
+ 219 ( 2559)       else begin {data}
+ 220 ( 2562)         mem[pointer]:=getbyte1;
+ 221 ( 2572)         pointer:=pointer+1;
+ 222 ( 2579)         if (pointer-sblock)>maxsize then
+ 223 ( 2592)           error(101);
+ 224 ( 2608)       end {data}
+ 225 ( 2608)     end {case};
+ 226 ( 2610)   until stop;
+ 227 ( 2610)   stop:=false;
+ 228 ( 2619)   mem[sblock]:=(pointer-sblock) and 255;
+ 229 ( 2636)   mem[sblock+1]:=(pointer-sblock) shr 8;
+ 230 ( 2654)   address:=getbyte2+(getbyte2 shl 8)+base;
+ 231 ( 2672)   if address<>(pointer-sblock) then begin
+ 232 ( 2694)     writeln(address,' ',pointer-sblock);
+ 233 ( 2719)     error(107)
+ 234 ( 2721)   end
+ 235 ( 2727) end {getbl};
+ 236 ( 2727) 
+ 237 ( 2728) 
+ 238 ( 2728) { * main * }
+ 239 ( 2728) 
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.2: program COMPILE2         12/11/23 page 5
+
+ 240 ( 2728) begin {main}
+ 241 ( 2728)   init; maxsize:=eblock-sblock-2;
+ 242 ( 2743)   pointer:=sblock+2; offset:=2;
+ 243 ( 2760)   getbl(0);
+ 244 ( 2772)   mem[pointer-1]:=0;
+ 245 ( 2781)   mem[pointer]:=255;
+ 246 ( 2788)   mem[pointer+1]:=255;
+ 247 ( 2798)   pointer:=pointer+1;
+ 248 ( 2805)   close(source);
+ 249 ( 2816)   writeln;
+ 250 ( 2816)   blocksave(sblock,pointer);
+ 251 ( 2835)   writeln('Program has been stored');
+ 252 ( 2865)   endstk:=topmem-144;
+ 253 ( 2870)   dummy:=freedsk(sdrive,true);
+ 254 ( 2888) end.
+ 255 ( 2892) 
 
 End compile
 
-Code lenght:          2907
+Code lenght:          2891
 Compiler stack size:  54
 Ident stack size:     113
 Pascal errors:        0

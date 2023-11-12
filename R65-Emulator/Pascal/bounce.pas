@@ -20,10 +20,10 @@ const gravity=0.15;
 
 var x,y,xspeed,yspeed: real;
     xi,yi,xl,yl,keycode: integer;
-    exit:boolean;
+    stop:boolean;
 
 begin
-  exit:=false;
+  stop:=false;
   grinit;
   cleargr;
   xspeed:=conv(random)/256.0+0.25;
@@ -75,8 +75,8 @@ begin
       03: xspeed:=xspeed/keyfactor;
       22: xspeed:=xspeed*keyfactor;
       24: yspeed:=yspeed/keyfactor;
-      69: exit:=true { E }
+      69: stop:=true { E }
       end;
-  until exit;
+  until stop;
   grend;
 end.

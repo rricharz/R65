@@ -3,18 +3,19 @@ program pedit;
 { Pascal editor, original 1980 RR
   rewritten 2023 RR for R65 system }
 
-uses syslib, arglib, strlib,disklib;
+uses syslib, arglib, strlib, disklib;
 
-const
+const title='R65 PEDIT 2.1'; {max 20 chars}
+
     maxlines= 360;      xmax   = 56;
     scrlins = 16;       mlenght= 19;
     inpx    = 37;
     eol     = chr($00); esc    = chr($00);
     rdown   = chr($02); rup    = chr($08);
-    pgdown  = chr($1a); pgup   = chr($18);
+    pgdown  = chr($14); pgup   = chr($12);
+    cdown   = chr($18); cup    = chr($1a);
     pgend   = chr($10); clrscr = chr($11);
-    clrlin  = chr($17); cdown  = chr($18);
-    cup     = chr($1a); cleft  = chr($03);
+    clrlin  = chr($17); cleft  = chr($03);
     inschr  = chr($15); delchr = chr($19);
     rubout  = chr($5f); cright = chr($16);
 
@@ -31,7 +32,7 @@ var line,nlines,topline,i,dummy,debug: integer;
     fno: file;
     chi : char;
     cyclus,drive,mark,nmark,savecx: integer;
-    default, iseof, exit: boolean;
+    default, iseof, stop: boolean;
     fs: cpnt;
     linepnt: array[maxlines] of cpnt;
     relpnt:  integer;
@@ -274,36 +275,36 @@ end;
 func edlin(pnt: cpnt): char;
 const key    = @1;
 var   ch1,lstch1,lstch2: char;
-      exit: boolean;
+      stop: boolean;
       lstart: integer;
 begin
   goto(savecx,column);
   if savecx=1 then write(cright,cleft)
   else write(cleft,cright); {to update cursor}
-  exit:=false; lstart:=column*xmax;
+  stop:=false; lstart:=column*xmax;
   repeat
     read(@key,ch1);
     lstch1:=' '; lstch2:=' ';
     case ch1 of
       delchr,rubout: if (curpos=0) and (line>1)
              then begin
-               updline(pnt,lstart);join;exit:=true;
+               updline(pnt,lstart);join;stop:=true;
              end else write(cleft,delchr);
       cleft: if curpos>0 then write(cleft)
              else if line>1 then begin
                updline(pnt,lstart);
                line:=line-1; curpos:=lastpos(line)+1;
-               exit:=true;
+               stop:=true;
              end;
       cright:if curpos<xmax-1 then begin
                write(cright);
              end else if line<nlines-1 then begin
                updline(pnt,lstart);
                line:=line+1; curpos:=0;
-               exit:=true;
+               stop:=true;
              end;
       cup,cdown,esc,cr,rup,rdown,
-      pgup,pgdown,hom,pgend: exit:=true
+      pgup,pgdown,hom,pgend: stop:=true
       else begin
              if printable(ch1) then begin
                lstch1:=video[lstart+xmax-1];
@@ -319,11 +320,11 @@ begin
                  write(inschr); write(ch1);
                end;
                if (lstch1<>' ') or (lstch2<>' ')
-                 then exit:=true;
+                 then stop:=true;
              end;
            end
     end {case};
-    until exit;
+    until stop;
   updline(pnt,lstart);
   if (lstch1<>' ') or (lstch2<>' ') then edlin:=lstch1
   else edlin:=ch1;
@@ -440,6 +441,7 @@ begin
     if found then begin
       line:=line-1; x:=x-1; i:=2;
       s2:=linepnt[line];
+      savecx:=x+i-1;
       while fs[i]<>endmark do begin
         s2[x+i-2]:=chr(ord(s2[x+i-2]) or $80);
          i:=i+1;
@@ -476,7 +478,7 @@ end;
 proc paste;
 var l,i:integer; s1,s2:cpnt;
 begin
-  if nlines+nmark<nlines-5 then begin
+  if nlines+nmark<maxlines-2 then begin
     for i:=nlines-1 downto line do
       linepnt[i+nmark]:=linepnt[i];
     nlines:=nlines+nmark;
@@ -622,8 +624,8 @@ begin {main}
   putontop('Line xxx of xxx',0,true);
   relpnt:=maxlines-1; mark:=0; nmark:=0; savecx:=1;
   clrmessage; readinput; fs[0]:=endmark;
-  putontop('R65 PEDIT V 2.10',36,true);
-  topline:= 1; line:=1; showall; exit:=false;
+  putontop(title,36,true);
+  topline:= 1; line:=1; showall; stop:=false;
   repeat
     showtop; chi := edlin(linepnt[line]);
     if printable(chi) then insert(chi,line+1)
@@ -655,9 +657,9 @@ begin {main}
              line:=nlines-1; savecx:=1; chktop(true);
            end;
       cr:  insertline;
-      esc: if doesc then exit:=true
+      esc: if doesc then stop:=true
     end {case};
-    until exit;
+    until stop;
   setnumlin($29,$2f);
   writeln(hom, clrscr);
   dummy:=freedsk(fildrv,true);

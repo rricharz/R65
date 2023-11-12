@@ -116,7 +116,7 @@ begin
   if m<0. then begin
     sign:='-'; m:=-m;
   end;
-  if dotused then
+  if dotused and (m>=10000.0) then
     writeflo(f,r)
   else if m=0. then
     begin
@@ -287,14 +287,14 @@ end;
 begin
   writeln('Enter an expression, examples are:');
   writeln('32767     input decimal number');
-  writeln('88.       force scientific display');
   writeln('$FFF      input hex number');
   writeln('%1101     input binary number');
   writeln('-55.35    input negative number');
   writeln('2*(5+28)  math expression');
   writeln('R*3       last result');
-  writeln('<return>  exit');
+  writeln('<return>,<esc>    exit');
   writeln('operators: +,-,*,/,(),&,|,<<,>>');
+  writeln('functions: SQRT()');
   r:=0.0; lastr:=0.0;
   dotused:=false;
   repeat
@@ -304,3 +304,4 @@ begin
     r:=express; checkfor(cr);
   until stop;
 end.
+
