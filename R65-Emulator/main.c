@@ -304,12 +304,13 @@ int clickStillDown(void)
 //////////////////////////////////////////////////////
 static gboolean on_next_timer_event(GtkWidget *widget)
 //////////////////////////////////////////////////////
-// Updates the screen (and blinks the cursor, if uncommented)
+// Updates the screen and blinks the cursor
 {
         global_surface_has_been_updated = FALSE;
         g_source_remove(global_timeout_ref);    // stop timer, in case crtUpdate takes too long
-        // global_pendingCrtUpdate = TRUE;
-        // crtUpdate();
+        showCursor = !showCursor;
+        global_pendingCrtUpdate = TRUE;
+        crtUpdate();
 	if (global_surface_has_been_updated)
 		gtk_widget_queue_draw(widget);
 	global_timeout_ref = g_timeout_add(TIME_INTERVAL,

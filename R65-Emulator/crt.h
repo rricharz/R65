@@ -42,6 +42,7 @@ extern int      global_curlin;
 extern int      global_curpos;
 extern int      global_curloc;
 extern int      global_graphicsFlag;
+extern int      showCursor;
     
 void crt_init();
 void crtUpdate();

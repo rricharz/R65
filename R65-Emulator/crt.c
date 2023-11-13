@@ -38,6 +38,7 @@ int      vcell;
 int      csize;
 int      xdot2;
 int      ydot2;
+int      showCursor;
 
 int led[NUM_LEDS];
 
@@ -346,7 +347,7 @@ void crtUpdate()
             int onscreenCurlin = (global_curloc - global_videoBaseAddress) / NUMCHAR;
             int onscreenCurpos = (global_curloc - global_videoBaseAddress) % NUMCHAR;
             
-            if ((onscreenCurlin >= 0) && (onscreenCurlin < 16)) {
+            if ((onscreenCurlin >= 0) && (onscreenCurlin < 16) && showCursor) {
                 if (memory[M8_SFLAG] & 1)
                     SETPASCALCOLOR;
                 else
@@ -356,15 +357,9 @@ void crtUpdate()
                 xx = hcell * onscreenCurpos;
                 yy = vcell * (onscreenCurlin + 1) + 3;
                 if (hcell < 10) StrokeWidth(2);
-                else StrokeWidth(hcell / 5);
-                if (NUMCHAR > 48)  {
-                        Line(xx + crtOffset - hcell/12, yy  + crtOffset + hcell/2,
-                        xx + crtOffset - hcell/12, yy  + crtOffset - 3*hcell/2);
-                }
-                else { 
-                  Line(xx + crtOffset, yy  + crtOffset + hcell/3,
+                else StrokeWidth(hcell / 5); 
+                Line(xx + crtOffset, yy  + crtOffset + hcell/3,
                     xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell/3);
-                }
                 StrokeWidth(2);
             }
         }

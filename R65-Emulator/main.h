@@ -1,5 +1,5 @@
 
-#define TIME_INTERVAL   300                         // time interval for timer function in msec
+#define TIME_INTERVAL   500                         // time interval for timer function in msec
 
 // wrapper for cairo graphics
 void Background(double r, double g, double b);
