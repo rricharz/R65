@@ -31,7 +31,7 @@ var line,nlines,topline,i,dummy,debug: integer;
     name: array[15] of char;
     fno: file;
     chi : char;
-    cyclus,drive,mark,nmark,savecx: integer;
+    cyclus,drive,mark,savecx: integer;
     default, iseof, stop: boolean;
     fs: cpnt;
     linepnt: array[maxlines] of cpnt;
@@ -100,17 +100,16 @@ var i:integer;
     s:cpnt;
 begin
   if relpnt<maxlines-1 then begin
-    relpnt:=relpnt+1; new:=linepnt[relpnt];
-  end else begin
-    if nlines<maxlines-1 then begin
-      s:=strnew;
-      for i:=0 to xmax-1 do s[i]:=' ';
-      s[xmax]:=endmark;
-      new:=s;
-    end else new:=nil;
-    if nlines>maxlines-5 then
-      showerror('Warning: Low memory');
+    relpnt:=relpnt+1; s:=linepnt[relpnt];
+  end else if nlines<maxlines-1 then s:=strnew
+  else s:=nil;
+  new:=s;
+  if s<>nil then begin
+    for i:=0 to xmax-1 do s[i]:=' ';
+    s[xmax]:=endmark;
   end;
+  if nlines>maxlines-5 then
+    showerror('Warning: Low memory');
 end;
 
 proc newline;
@@ -119,10 +118,18 @@ begin
   nlines:=nlines+1;
 end;
 
-proc getinput(var n:integer; s:cpnt);
+
+func isnumber(ci:integer):boolean;
+begin
+  isnumber:=(ci>=ord('0')) and (ci<=ord('9'))
+end;
+
+proc getinput(var c:char;var n:integer; s:cpnt);
+{ get input line on top and analyze it }
 var i,j,stop:integer; ch: char;
 begin
   goto(inpx,0); write(chr(ord(':') or 128));
+  {read input}
   read(@key,ch); i:=0;
   while (ch<>chr(13)) and (ch<>esc) do begin
     if (ch=rubout) then begin
@@ -135,16 +142,20 @@ begin
     end;
     read(@key,ch);
   end;
-  stop:=i+inpx;
-  i:=inpx; n:=0;
-  while ((topi[i] and 127)>=ord('0')) and
-    ((topi[i] and 127)<=ord('9')) and
-    (i<stop) do begin
+  stop:=i+inpx; n:=0; s[0]:=endmark; c:=endmark;
+  {set c}
+  if stop<=inpx then exit;
+  c:=chr(topi[inpx] and 127);
+  {set n}
+  if stop<inpx+1 then exit;
+  i:=inpx+1;
+  while isnumber(topi[i] and 127) and
+      (i<stop) do begin
     n:=10*n+(topi[i] and 127)-ord('0');
     i:=i+1;
   end;
   j:=0;
-  while i<stop do begin
+  while i<=stop do begin
     s[j]:=chr(topi[i] and 127); i:=i+1; j:=j+1;
   end;
   s[j]:=endmark;
@@ -246,8 +257,7 @@ proc delline;
 var i:integer; savpnt:cpnt;
 begin
   chkline; savpnt:=linepnt[line];
-  if line<mark then mark:=mark-1
-  else if line<mark+nmark then nmark:=nmark-1;
+  if line<mark then mark:=mark-1;
   for i:=line to nlines-2 do
     linepnt[i]:=linepnt[i+1];
   release(savpnt); nlines:=nlines-1;
@@ -393,7 +403,7 @@ begin
       s[x]:=chr(ord(s[x]) and $7f);
     showtop;
     end;
-  line:=savel; mark:=0; nmark:=0;
+  line:=savel; mark:=0;
 end;
 
 proc find(again:boolean);
@@ -407,7 +417,7 @@ var pos,x,i:integer;
       x1:integer;
       s1:cpnt;
   begin
-    failed:=false; pos:=3; x1:=x+1;
+    failed:=false; pos:=2; x1:=x+1;
     while (fs[pos]<>endmark) and (x1<xmax) do begin
       s1:=linepnt[line];
       if s1[x1] <> fs[pos] then failed:=true;
@@ -420,7 +430,7 @@ var pos,x,i:integer;
 begin
   clrmessage;
   if not again then strcpy(stemp,fs);
-  if fs[1]=endmark then begin
+  if fs[0]=endmark then begin
     {empty string -> delete all marks}
     putontop('Clearing marks',36,true);
     clrmarks; showall;
@@ -431,7 +441,7 @@ begin
     repeat
       x:=0;
       repeat
-        pos:=2;
+        pos:=1;
         s2:=linepnt[line];
         if s2[x]=fs[pos] then checkrest;
         x:=x+1;
@@ -439,11 +449,11 @@ begin
       showtop; line:=line+1;
       until found or (line>=nlines);
     if found then begin
-      line:=line-1; x:=x-1; i:=2;
+      line:=line-1; x:=x-1; i:=1;
       s2:=linepnt[line];
-      savecx:=x+i-1;
+      savecx:=x+i;
       while fs[i]<>endmark do begin
-        s2[x+i-2]:=chr(ord(s2[x+i-2]) or $80);
+        s2[x+i-1]:=chr(ord(s2[x+i-1]) or $80);
          i:=i+1;
         end
       end
@@ -458,8 +468,7 @@ var i:integer;
     s1,s2:cpnt;
 begin
   if nlines<maxlines-1 then begin
-    if line<mark then mark:=mark+1
-    else if line<mark+nmark then nmark:=nmark+1;
+    if line<mark then mark:=mark+1;
     if line<nlines-1 then begin
       for i:=nlines-1 downto line+1 do
         linepnt[i+1]:=linepnt[i];
@@ -478,44 +487,19 @@ end;
 proc paste;
 var l,i:integer; s1,s2:cpnt;
 begin
-  if nlines+nmark<maxlines-2 then begin
+  if nlines<maxlines-1 then begin
+
     for i:=nlines-1 downto line do
-      linepnt[i+nmark]:=linepnt[i];
-    nlines:=nlines+nmark;
-    if mark>line then mark:=mark+nmark;
-    for l:=mark to mark+nmark-1 do begin
-      linepnt[line]:=new;
-      s1:=linepnt[line]; s2:=linepnt[l];
-      for i:=0 to xmax-1 do s1[i]:=s2[i];
-      line:=line+1;
-    end;
+      linepnt[i+1]:=linepnt[i];
+    nlines:=nlines+1;
+    if mark>line then mark:=mark+1;
+    linepnt[line]:=new;
+    s1:=linepnt[line];
+    s2:=linepnt[mark];
+    for i:=0 to xmax do s1[i]:=s2[i];
+    line:=line+1;
     showall;
   end else showerror('Error: Out of memory');
-end;
-
-proc move;
-var i,j,saveline:integer; savepnt:cpnt;
-begin
-  saveline:=line; { insert above}
-  if line>=mark+nmark then begin
-    mark:=mark+nmark-1;
-    for j:=0 to nmark-1 do begin
-      savepnt:=linepnt[mark];
-      for i:=mark to line-1 do
-        linepnt[i]:=linepnt[i+1];
-      mark:=mark-1; line:=line-1;
-      linepnt[line]:=savepnt;
-    end;
-  end else if line<mark then begin
-    for j:=0 to nmark-1 do begin
-      savepnt:=linepnt[mark];
-      for i:=mark downto line+1 do
-        linepnt[i]:=linepnt[i-1];
-      linepnt[line]:=savepnt;
-      mark:=mark+1; line:=line+1;
-    end;
-  end else showerror('Move inside move');
- mark:=saveline; line:=saveline; showall;
 end;
 
 func doesc: boolean;
@@ -525,9 +509,12 @@ var ch:char;
 begin
   clrmessage;
   doesc:=false; savecx:=1;
-  getinput(n,stemp); ch:=stemp[0];
-  if (strlen(stemp)>1) and (stemp[1]<>' ') then
-    showerror('Expected f: xxx')
+  getinput(ch,n,stemp);
+  if (ch='f') and (stemp[0]<>' ') and
+    (strlen(stemp)<>0) then
+    showerror('Expected f xxx')
+  else if (ch<>'l') and (ch<>'d') and (n>0) then
+    showerror('n>1 not allowed')
   else begin
     case ch of
       't': begin {top}
@@ -536,42 +523,25 @@ begin
       'b': begin {bottom}
              line:=nlines-1; chktop(true);
            end;
-      'l': begin {line number}
+      'l': begin {goto line}
              line:=n; chkline; chktop(true);
            end;
       'f','g': begin {find string}
              find(ch='g'); chkline; chktop(false);
              showall;
            end;
-      'c': begin {mark lines for copy}
-             if n<1 then n:=1;
-             if line+n>= nlines-1 then
-               showerror('Too many lines')
-             else begin
-               mark:=line; nmark:=n;
-               for line:=mark to mark+nmark-1 do
-               begin
-                 s:=linepnt[line];
-                 for i:=0 to xmax-1 do
-                   s[i]:= chr(ord(s[i]) or $80);
-               end;
-               line:=mark;
-             end;
+      'c': begin {mark line for copy}
+             mark:=line;
+             s:=linepnt[line];
+             for i:=0 to xmax-1 do
+               s[i]:= chr(ord(s[i]) or $80);
+             line:=mark;
              showall;
            end;
-      'p': begin {paste marked lines}
+      'p': begin {paste copied line}
              if mark=0 then
-               showerror('Nothing marked')
-             else begin
-               if nlines+nmark>=maxlines then
-                 showerror('Too many lines')
-               else paste;
-             end;
-           end;
-      'm': begin {move marked lines }
-             if mark=0 then
-               showerror('Nothing marked')
-             else move;
+               showerror('Error: Nothing marked')
+             else paste;
            end;
       'd': begin {delete n lines}
              if n<1 then n:=1;
@@ -589,7 +559,7 @@ begin
       'k': doesc:=true; {kill program}
       '?','h': showerror('tb/l/fg/cpm/d/wqk/?h');
       endmark: begin end
-      else showerror('tb/l/fg/cpm/d/wqk/?h')
+      else showerror('tb/l/fg/cp/d/wqk/?h')
     end {case};
   end;
   clrmessage;
@@ -622,7 +592,7 @@ begin {main}
   stemp:=strnew; stemp2:=strnew; fs:=strnew; debug:=0;
   setnumlin($0f,$37); write(hom,clrscr);
   putontop('Line xxx of xxx',0,true);
-  relpnt:=maxlines-1; mark:=0; nmark:=0; savecx:=1;
+  relpnt:=maxlines-1; mark:=0; savecx:=1;
   clrmessage; readinput; fs[0]:=endmark;
   putontop(title,36,true);
   topline:= 1; line:=1; showall; stop:=false;

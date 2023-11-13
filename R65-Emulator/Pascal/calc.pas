@@ -9,60 +9,56 @@
    systems. CALC tries to handle
    this limited accuracy.
 
-   Written 2019-2023 by rricharz
-
-   The following operators are allowed:
-
-     +,-       prefix for decimal input
-     +,-,*,/   arithmetic operators
-     ()        brackets
-     |,&       bitwise operators
-     <<,>>     bitwise shift operators
-
-     $XX..     hex numeric input
-     %XX..     binary numeric input
-}
+   Written 2019-2023 by rricharz  }
 
 program calc;
-uses syslib,mathlib;
+uses syslib,mathlib,strlib;
 
 var ch: char;
     r,lastr: real;
     stop,dotused: boolean;
 
+proc release(s: cpnt);
+{********************}
+{ Only the last allocated string can be released }
+{ This is suitable for recursive functions }
+mem endstk=$000e: integer;
+begin
+  if cpnt(endstk)=s then endstk:=endstk+strsize;
+end;
+
 func fix(rf: real): integer;
 {**************************}
 begin
-  if (rf>32767.5) then
-    begin
+  if (rf>32767.5) then begin
       write(invvid,'Integer value exceeds');
       write(' upper limit, set to 32767');
-      writeln(norvid);
-      fix:=$7fff;
-    end
-  else if (rf<-32768.5) then
-    begin
+      writeln(norvid); fix:=$7fff;
+    end else if (rf<-32768.5) then begin
       write(invvid,'Integer value exceeds');
       write(' lower limit, set to -32768');
-      writeln(norvid);
-      fix:=$8000;
-    end
-  else
+      writeln(norvid); fix:=$8000;
+    end else
     fix:=trunc(rf);
 end;
 
 proc checkfor(c: char);
 {*********************}
 begin
-  if ch<>c then
-    begin
-      write(invvid,'SYNTAX ERROR: expected ');
-      if c=cr then write('<eol>')
-      else write(c);
-      write(' but found ');
-      if ch=cr then writeln('<eol>',norvid)
-      else writeln(ch,norvid);
-    end;
+  if ch<>c then begin
+    write(invvid,'SYNTAX ERROR: expected ');
+    if c=cr then write('<eol>')
+    else write(c);
+    write(' but found ');
+    if ch=cr then writeln('<eol>',norvid)
+    else writeln(ch,norvid);
+  end;
+end;
+
+proc skip(c:char);
+{****************}
+begin
+  checkfor(c); read(@input,ch);
 end;
 
 func isnumber(cn:char):boolean;
@@ -76,69 +72,66 @@ proc writehex(f:file; r: integer);
 var mask, m, n, r1: integer;
 begin
   write(@f,'$'); mask := $f000; n := 12;
-  while mask <>0 do
-    begin
-      r1 := (r and mask) shr n;
-      if r1 < 10 then
-        write(@f,r1)
-      else
-        write(@f,chr(ord(r1)+ord('A')-10));
-      mask := mask shr 4; n := n - 4;
-    end;
+  while mask <>0 do begin
+    r1 := (r and mask) shr n;
+    if r1 < 10 then write(@f,r1)
+    else  write(@f,chr(ord(r1)+ord('A')-10));
+    mask := mask shr 4; n := n - 4;
+  end;
 end;
 
 proc writebinary(f:file; r: integer);
 {***********************************}
 var mask: integer;
 begin
-  write(@f,'% ');
-  mask := $8000;
-  while mask <> 0 do
-    begin
-      if (r and mask) <> 0 then write(@f,'1')
-      else write(@f,'0');
-      mask := mask shr 1;
-      if mask = $0800 then write(@f,' ');
-      if mask = $0080 then write(@f,' ');
-      if mask = $0008 then write(@f,' ');
-    end;
+  write(@f,'% '); mask := $8000;
+  while mask <> 0 do begin
+   if (r and mask) <> 0 then write(@f,'1')
+   else write(@f,'0');
+   mask := mask shr 1;
+   if mask = $0800 then write(@f,' ');
+   if mask = $0080 then write(@f,' ');
+   if mask = $0008 then write(@f,' ');
+  end;
 end;
 
 proc writeauto(f:file;r:real);
 {****************************}
 { outputs 5 digits }
 var m,m1,max,rnd: real;
-    i1:integer;
+    i1,d1:integer;
     sign: char;
-    d1: integer;
 begin
   sign:=' '; m:=r;
   if m<0. then begin
     sign:='-'; m:=-m;
   end;
-  if dotused and (m>=10000.0) then
-    writeflo(f,r)
-  else if m=0. then
-    begin
-      write(@f,' 0',tab8,tab8); writehex(f,0);
-      write(@f,'  ',tab8); writebinary(f,0);
-    end
-  else if r=conv($8000) then
-    begin
-      write(@f,'-32768',tab8,tab8); write(@f,'$8000');
-      write(@f,'  ',tab8);
-      write(@f,'% 1000 0000 0000 0000');
-    end
-  else if m>=32767.5 then writeflo(f,r)
+  if dotused and (m>=10000.0) then writeflo(f,r)
+  else if m=0. then begin
+    write(@f,' 0',tab8,tab8); writehex(f,0);
+    write(@f,'  ',tab8); writebinary(f,0);
+  end else if r=conv($8000) then begin
+    write(@f,'-32768',tab8,tab8); write(@f,'$8000');
+    write(@f,'  ',tab8);
+    write(@f,'% 1000 0000 0000 0000');
+  end else if m>=32767.5 then writeflo(f,r)
   else if m<0.01 then writeflo(f,r)
   else begin
-    if m>=10000. then begin d1:=0; rnd:=0.5 end
-    else if m>=1000. then begin d1:=1; rnd:=0.05 end
-    else if m>=100. then begin d1:=2; rnd:=0.005 end
-    else if m>=10. then begin d1:=3; rnd:=0.0005 end
-    else if m>=1. then begin d1:=4; rnd:=0.00005 end
-    else if m>=0.1 then begin d1:=5; rnd:=0.000005 end
-    else begin d1:=6; rnd:=0.0000005 end;
+    if m>=10000. then begin
+      d1:=0; rnd:=0.5
+    end else if m>=1000. then begin
+      d1:=1; rnd:=0.05
+    end else if m>=100. then begin
+      d1:=2; rnd:=0.005
+    end else if m>=10. then begin
+      d1:=3; rnd:=0.0005
+    end else if m>=1. then begin
+      d1:=4; rnd:=0.00005
+    end else if m>=0.1 then begin
+      d1:=5; rnd:=0.000005
+    end else begin
+      d1:=6; rnd:=0.0000005
+    end;
     m:=m+rnd; { round }
     write(@f,sign,trunc(m));
     m1:=m-conv(trunc(m));
@@ -175,6 +168,49 @@ begin
   else hexval:=-1;
 end;
 
+func isletter(ch:char):boolean;
+{*****************************}
+begin
+  isletter:=(ord(ch)>=ord('A'))and(ord(ch)<=ord('Z'))
+end;
+
+func function:real;
+{*****************}
+var i: integer;
+    r: real;
+    lstring: cpnt;
+begin
+  lstring:=strnew;
+  lstring[0]:=chr(0);
+  strins(ch,0,lstring); read(@input,ch); i:=1;
+  while isletter(ch) do begin
+    strins(ch,i,lstring); read(@input,ch); i:=i+1;
+  end;
+  stop:=false;
+  if strcmp(lstring,'R')=0 then begin
+    function:=lastr; release(lstring); exit;
+  end;
+  if strcmp(lstring,'PI')=0 then begin
+    function:=pi; release(lstring); exit;
+  end;
+  { functions with single argument follow }
+  checkfor('('); r:=express; skip(')');
+  if strcmp(lstring,'SQR')=0 then begin
+    function:=r*r; release(lstring); exit;
+  end;
+  if strcmp(lstring,'SQRT')=0 then begin
+    if r>=0.0 then r:=sqrt(r)
+    else begin
+      writeln(invvid,'Negative argument not allowed',
+        norvid); r:=0.0
+    end;
+    function:=r; release(lstring); exit;
+  end;
+  writeln(invvid,'Unknown function ',lstring,norvid);
+  function:=0.0;
+  release(lstring);
+end;
+
 func factor:real;
 {***************}
 var negative:boolean;
@@ -183,6 +219,10 @@ var negative:boolean;
 begin
   negative:=false; rf:=0.;
   read(@input,ch);
+  if ch='-' then begin
+    negative:=true;
+    read(@input,ch);
+  end;
   if ch='(' then begin
     stop:=false; rf:=express;
     checkfor(')'); read(@input,ch);
@@ -200,15 +240,15 @@ begin
       iv:=(iv shl 4)+hexval; read(@input,ch);
     end;
     rf:=conv(iv);
-  end else if ch='R' then begin
-    rf:= lastr; read(@input,ch);
+  end else if isletter(ch) then begin
+    rf:=function;
   end else if ch<>chr(0) then begin
     if ch<>cr then begin
       if ch<>cr then stop:=false;
       if ch='+' then read(@input,ch);
-      if ch='-' then begin
+      {if ch='-' then begin
         negative:=true; read(@input,ch);
-      end;
+      end;}
       if not isnumber(ch) then
         writeln(invvid,
           'SYNTAX ERROR: NUMBER EXPECTED',norvid);
@@ -294,7 +334,7 @@ begin
   writeln('R*3       last result');
   writeln('<return>,<esc>    exit');
   writeln('operators: +,-,*,/,(),&,|,<<,>>');
-  writeln('functions: SQRT()');
+  writeln('functions: SQRT(),SQR()');
   r:=0.0; lastr:=0.0;
   dotused:=false;
   repeat
@@ -304,4 +344,3 @@ begin
     r:=express; checkfor(cr);
   until stop;
 end.
-
