@@ -1,4 +1,4 @@
-{
+ {
    Pascal CALC for R65 computer system
 
    Note: The R65 Pascal system used
@@ -12,7 +12,9 @@
    Written 2019-2023 by rricharz  }
 
 program calc;
-uses syslib,mathlib,strlib;
+uses syslib,mathlib,strlib,ledlib;
+
+mem vidpnt=$00e9:integer;
 
 var ch: char;
     r,lastr: real;
@@ -95,13 +97,41 @@ begin
   end;
 end;
 
+proc showled(s1:cpnt);
+{********************}
+var s2:cpnt;
+    pos1,i,mask:integer;
+begin
+  s2:=strnew;
+  { s1 is left justfied (except space for minus}
+  { s1 has no end mark and should not be modified }
+  mask:=0;
+  for i:=11 downto 0 do begin
+    if (s1[i]<>' ') and (s1[i]<>'+') then begin
+      if s1[i]='.' then
+        mask:=128
+      else begin
+        strins(chr(ord(s1[i]) or mask),0,s2);
+        mask:=0;
+      end;
+    end;
+  end;
+  while strlen(s2)<8 do strins(' ',0,s2);
+  if strlen(s2)>8 then strcpy('--------',s2);
+  ledstring(s2);
+  release(s2);
+end;
+
 proc writeauto(f:file;r:real);
 {****************************}
 { outputs 5 digits }
 var m,m1,max,rnd: real;
     i1,d1:integer;
     sign: char;
+    s1:cpnt;
 begin
+  { 7-segment display is copy of video memory }
+  s1:=cpnt(vidpnt);
   sign:=' '; m:=r;
   if m<0. then begin
     sign:='-'; m:=-m;
@@ -143,6 +173,7 @@ begin
     write(@f,'  ',tab8); writehex(f,trunc(r+rnd));
     write(@f,'  ',tab8); writebinary(f,trunc(r+rnd))
   end;
+  showled(s1);
 end;
 
 func express:real;
@@ -289,13 +320,12 @@ var
 begin
   rs:=factor;
   while (ch='*') or (ch='/') or (ch='&') or (ch='<')
-    or (ch='>') do begin
+    or (ch='>') or (ch='^') do begin
     case ch of
       '*': begin rs:=rs*factor; end;
       '/': begin rs:=rs/factor; end;
-      '&': begin
-             rs:=conv(fix(rs) and fix(factor));
-           end;
+      '&': rs:=conv(fix(rs) and fix(factor));
+      '^': rs:=exp(factor*ln(rs));
       '<': begin
              read(@input,ch); checkfor('<');
              rs:=conv(fix(rs) shl fix(factor));
@@ -335,7 +365,7 @@ begin
   writeln('2*(5+28)   math expression               ');
   writeln('R*3        last result                   ');
   writeln('<return>,<esc>    exit                   ');
-  writeln('Operators: +,-,*,/,(),&,|,<<,>>          ');
+  writeln('Operators: +,-,*,/,^,(),&,|,<<,>>        ');
   writeln('Functions: SQRT(),SQR(),SIN(),COS()      ');
   writeln('           TAN(),EXP(),LN(),LOG()        ');
   writeln(norvid);

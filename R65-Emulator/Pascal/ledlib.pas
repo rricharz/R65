@@ -1,6 +1,6 @@
 {
   ledlib.pas   R65 led display library
- 
+
 On the original R65 computer, the KIM-1
 was mounted directly behind the front panel.
 The KIM-1 keyboard and 6-digit 7-segment
@@ -11,34 +11,34 @@ the front panel was replaced and 8 leds were
 used to display 1 data byte. 8 switches were
 available for input. In Pascal, LEDLIB was
 providing a driver for these displays.
- 
-This is a new version of LEDLIB for the R65
+
+This is a modified version of LEDLIB for the R65
 emulator. It emulates output to the 7-segment
 display (8 digits, not 6 like on the original
 system) or the 8 leds. The output appears on
-the top panel of the emulator. On the R65
-replica, the output appears on the 7-segment
-display of the front panel.
+the panel of the emulator. On the R65 replica,
+the output appears on the 7-segment display of the
+front panel.
 }
- 
+
 library ledlib;
- 
+
 mem ledreg=$1432: array[7] of char&;
- 
-proc ledstring(s:array[7] of char);
-{*********************************}
+
+proc ledstring(s:cpnt);
+{*********************}
 var i: integer;
 begin
   for i:=0 to 7 do
     ledreg[i]:=s[i];
 end;
- 
+
 proc ledstop;
 {***********}
 begin
   ledreg[0]:=chr(0);
 end;
- 
+
 proc ledhex(d,p,digits: integer);
 {*******************************}
 { d:     value to display
@@ -69,7 +69,7 @@ begin
         end;
     end;
 end;
- 
+
 proc ledbyte(d: integer);
 {***********************}
 var d1,i:integer;
@@ -84,7 +84,7 @@ begin
       d1:=d1 shr 1;
     end;
 end;
- 
+
 begin
 end.
  

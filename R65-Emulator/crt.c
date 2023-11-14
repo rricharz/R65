@@ -205,9 +205,16 @@ void infoPanel()
     
     // show 7 segment displays
     int usedByUser = 0;
-    for (int i=0; i<8; i++)
-          if (s1[i]=read6502_8(RS8_LED+i)) usedByUser = 1;
-    s1[8]=0;
+    int j=0;
+    for (int i=0; i<8; i++) {
+        if (s1[j]=read6502_8(RS8_LED+i)) usedByUser = 1;
+        if (s1[j]&128) {
+            s1[j]=s1[j]&127;
+            s1[(j++)+1]='.';      
+        }
+        j++;
+    }
+    s1[j]=0;
     if (!usedByUser) {
         time_t now;
         struct tm * now_tm;
