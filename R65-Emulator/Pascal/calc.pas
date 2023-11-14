@@ -193,18 +193,34 @@ begin
   if strcmp(lstring,'PI')=0 then begin
     function:=pi; release(lstring); exit;
   end;
+  if strcmp(lstring,'E')=0 then begin
+    function:=e; release(lstring); exit;
+  end;
   { functions with single argument follow }
   checkfor('('); r:=express; skip(')');
   if strcmp(lstring,'SQR')=0 then begin
     function:=r*r; release(lstring); exit;
   end;
   if strcmp(lstring,'SQRT')=0 then begin
-    if r>=0.0 then r:=sqrt(r)
-    else begin
-      writeln(invvid,'Negative argument not allowed',
-        norvid); r:=0.0
-    end;
-    function:=r; release(lstring); exit;
+    function:=sqrt(r); release(lstring); exit;
+  end;
+  if strcmp(lstring,'SIN')=0 then begin
+    function:=sin(r); release(lstring); exit;
+  end;
+  if strcmp(lstring,'COS')=0 then begin
+    function:=cos(r); release(lstring); exit;
+  end;
+  if strcmp(lstring,'TAN')=0 then begin
+    function:=tan(r); release(lstring); exit;
+  end;
+  if strcmp(lstring,'EXP')=0 then begin
+    function:=exp(r); release(lstring); exit;
+  end;
+  if strcmp(lstring,'LN')=0 then begin
+    function:=ln(r); release(lstring); exit;
+  end;
+  if strcmp(lstring,'LOG')=0 then begin
+    function:=log(r); release(lstring); exit;
   end;
   writeln(invvid,'Unknown function ',lstring,norvid);
   function:=0.0;
@@ -217,11 +233,9 @@ var negative:boolean;
     rf,rt: real;
     i,iv: integer;
 begin
-  negative:=false; rf:=0.;
-  read(@input,ch);
+  negative:=false; rf:=0.;  read(@input,ch);
   if ch='-' then begin
-    negative:=true;
-    read(@input,ch);
+    negative:=true; read(@input,ch);
   end;
   if ch='(' then begin
     stop:=false; rf:=express;
@@ -233,15 +247,13 @@ begin
     end;
     rf:=conv(iv);
   end else if ch='$' then begin
-    stop:=false;
-    read(@input,ch);
-    iv:=0;
+    stop:=false; read(@input,ch); iv:=0;
     while hexval>=0 do begin
       iv:=(iv shl 4)+hexval; read(@input,ch);
     end;
     rf:=conv(iv);
   end else if isletter(ch) then begin
-    rf:=function;
+    write(invvid); rf:=function; write(norvid)
   end else if ch<>chr(0) then begin
     if ch<>cr then begin
       if ch<>cr then stop:=false;
@@ -261,8 +273,7 @@ begin
         dotused:=true; read(@input,ch); rt:=0.1;
         while isnumber(ch) do begin
           rf:=rf+conv(ord(ch)-ord('0'))*rt;
-          rt:=rt/10.;
-          read(@input,ch);
+          rt:=rt/10.; read(@input,ch);
         end;
       end;
     end;
@@ -280,23 +291,17 @@ begin
   while (ch='*') or (ch='/') or (ch='&') or (ch='<')
     or (ch='>') do begin
     case ch of
-      '*': begin
-             rs:=rs*factor;
-           end;
-      '/': begin
-             rs:=rs/factor;
-           end;
+      '*': begin rs:=rs*factor; end;
+      '/': begin rs:=rs/factor; end;
       '&': begin
              rs:=conv(fix(rs) and fix(factor));
            end;
       '<': begin
-             read(@input,ch);
-             checkfor('<');
+             read(@input,ch); checkfor('<');
              rs:=conv(fix(rs) shl fix(factor));
              end;
       '>': begin
-             read(@input,ch);
-             checkfor('>');
+             read(@input,ch); checkfor('>');
              rs:=conv(fix(rs) shr fix(factor));
            end
       end {case};
@@ -309,12 +314,8 @@ begin
   re:=simexp;
   while (ch='+') or (ch='-') or (ch='|') do begin
     case ch of
-      '+': begin
-             re:=re+simexp;
-           end;
-      '-': begin
-             re:=re-simexp;
-           end;
+      '+': begin re:=re+simexp; end;
+      '-': begin re:=re-simexp; end;
       '|': begin
              re:=conv(fix(re) or fix(factor));
            end
@@ -325,22 +326,22 @@ end;
 
 {*********main body********}
 begin
-  writeln('Enter an expression, examples are:');
-  writeln('32767     input decimal number');
-  writeln('$FFF      input hex number');
-  writeln('%1101     input binary number');
-  writeln('-55.35    input negative number');
-  writeln('2*(5+28)  math expression');
-  writeln('R*3       last result');
-  writeln('<return>,<esc>    exit');
-  writeln('operators: +,-,*,/,(),&,|,<<,>>');
-  writeln('functions: SQRT(),SQR()');
-  r:=0.0; lastr:=0.0;
-  dotused:=false;
+  write(invvid);
+  writeln('Enter an expression, for example:        ');
+  writeln('32767      input decimal number          ');
+  writeln('$FFF       input hex number              ');
+  writeln('%1101      input binary number           ');
+  writeln('-55.35     input negative number         ');
+  writeln('2*(5+28)   math expression               ');
+  writeln('R*3        last result                   ');
+  writeln('<return>,<esc>    exit                   ');
+  writeln('Operators: +,-,*,/,(),&,|,<<,>>          ');
+  writeln('Functions: SQRT(),SQR(),SIN(),COS()      ');
+  writeln('           TAN(),EXP(),LN(),LOG()        ');
+  writeln(norvid);
+  r:=0.0; lastr:=0.0; dotused:=false;
   repeat
-    stop:=true;
-    writeauto(output,r); writeln;
-    dotused:=false; lastr:=r;
-    r:=express; checkfor(cr);
+    stop:=true; writeauto(output,r); writeln;
+    dotused:=false; lastr:=r; r:=express; checkfor(cr);
   until stop;
 end.

@@ -171,9 +171,10 @@ begin
       (pos<xmax-1) do begin
     pnt[pos]:=ch1; pos:=pos+1; read(@fno,ch1);
     end;
-  while pos<xmax do begin
+  { not  required, done by new }
+  { while pos<xmax do begin
     pnt[pos]:=' '; pos:=pos+1;
-  end;
+  end; }
   readline:=(ch1=eof) or (ch1=alteof);
 end;
 
@@ -343,10 +344,10 @@ begin
 end;
 
 proc readinput;
-var i,pend:integer;
+var i,pend,maxl1:integer;
 begin
   cyclus:=0; drive:=1;
-  goto(1,1); write(clrscr);
+  goto(1,1); write(clrscr); goto(1,0);
   agetstring(name,default,cyclus,drive);
   asetfile(name,cyclus,drive,'P');
   openr(fno);
@@ -360,12 +361,15 @@ begin
   while strlen(stemp)<17 do stradd(' ',stemp);
   putontop(stemp,17,true);
   putontop('Reading',36,true);
+  maxl1:=maxlines-9;
+  showtop;
   repeat
     linepnt[nlines] := new;
     iseof := readline(fno, linepnt[nlines]);
     nlines := nlines+1;
-    showtop;
-    until iseof or (nlines >= maxlines-9);
+    if (nlines and $1f)=0 then showtop;
+    until iseof or (nlines >= maxl1);
+  showtop;
   if nlines >= maxlines-9 then
       showerror('Too many lines');
   close(fno);
@@ -374,36 +378,40 @@ begin
 end;
 
 proc writeoutput;
-var pos,endpos:integer;s,saveline:cpnt;
+var pos,endpos,nlm1:integer;s,saveline:cpnt;
 begin
   cyclus:=0; drive:=1;
-  goto(1,1); write(clrscr);
+  goto(1,1); write(clrscr); goto(1,0);
   asetfile(name,cyclus,drive,'P');
   openw(fno);
   putontop('Writing',36,true);
-  for line:=1 to nlines-1 do begin
-    showtop;
+  nlm1:=nlines-1;
+  for line:=1 to nlm1 do begin
+    if (line and $1f)=0 then showtop;
     endpos:=lastpos(line);
     s:=linepnt[line];
     for pos:=0 to endpos do
       write(@fno,chr(ord(s[pos]) and $7f));
-    if (line<nlines-1) then write(@fno,cr);
+    if (line<nlm1) then write(@fno,cr);
   end;
+  showtop;
   close(fno); line:=nlines-1;
   showall;
 end;
 
 proc clrmarks;
-var x,savel:integer; s:cpnt;
+var x,savel,xm1:integer; s:cpnt;
 begin
   savel:=line;
   for line:=1 to nlines-1 do begin
     s:=linepnt[line];
-    for x:=0 to xmax-1 do
+    xm1:=xmax-1;
+    for x:=0 to xm1 do
       s[x]:=chr(ord(s[x]) and $7f);
-    showtop;
+    if (line and $1f)=0 then showtop;
     end;
   line:=savel; mark:=0;
+  showtop;
 end;
 
 proc find(again:boolean);
@@ -446,7 +454,8 @@ begin
         if s2[x]=fs[pos] then checkrest;
         x:=x+1;
         until found or (x>=xmax);
-      showtop; line:=line+1;
+      if (line and $0f)=0 then showtop;
+      line:=line+1;
       until found or (line>=nlines);
     if found then begin
       line:=line-1; x:=x-1; i:=1;
@@ -460,6 +469,7 @@ begin
     else begin
       line:=nlines-1;
     end;
+    showtop;
   end
 end;
 
@@ -526,9 +536,12 @@ begin
       'l': begin {goto line}
              line:=n; chkline; chktop(true);
            end;
-      'f','g': begin {find string}
-             find(ch='g'); chkline; chktop(false);
+      'f','a': begin {find string (again)}
+             find(ch='a'); chkline; chktop(false);
              showall;
+           end;
+      'z': begin {clear marks}
+             clrmarks;
            end;
       'c': begin {mark line for copy}
              mark:=line;
@@ -559,7 +572,7 @@ begin
       'k': doesc:=true; {kill program}
       '?','h': showerror('tb/l/fg/cpm/d/wqk/?h');
       endmark: begin end
-      else showerror('tb/l/fg/cp/d/wqk/?h')
+      else showerror('tb/l/faz/cp/d/wqk/?h')
     end {case};
   end;
   clrmessage;

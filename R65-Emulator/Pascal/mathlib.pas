@@ -12,7 +12,7 @@ Math real functions:
   sin(r)        r in deg
   cos(r)        r in deg
   tan(r)        r in deg
-  ln(r)
+  ln(r),log(r)
   exp(r)
 
 Real output functions:
@@ -25,13 +25,12 @@ Real output functions:
 library mathlib;
 
 const pi = 3.14159;
-      e  = 2.27282;
+      e  = 2.71828;
 
 func fabs(x:real):real;
 {*********************}
 begin
-  if x<0. then fabs:=-x
-  else fabs:=x;
+  if x<0. then fabs:=-x else fabs:=x;
 end;
 
 func sqrt(n:real):real;
@@ -40,12 +39,15 @@ func sqrt(n:real):real;
 const accuracy = 0.0001; {rel accuracy }
 var lower,upper,guess:real;
 begin
+  if n=0.0 then begin sqrt:=0.0; exit end;
+  if n<0.0 then begin
+    writeln('sqrt(x) for x<0 called');
+    sqrt:=0.0; exit;
+    end;
   if n<1.0 then begin
-    lower:=n;
-    upper:=1.0
+    lower:=n; upper:=1.0
   end else begin
-    lower:=1.0;
-    upper:=n
+    lower:=1.0; upper:=n
   end;
   guess:=1.0;
   while (upper-lower)>(accuracy*guess) do begin
@@ -76,24 +78,19 @@ var m:real;
   end;
 
 begin
-  if x<0. then m:=-x
-  else m:=x;
+  if x<0. then m:=-x else m:=x;
   while m>=(360.) do m:=m-360.;
   if m=0. then cos:=1.
   else if m=90. then cos:=0.
   else if m=180. then cos:=-1.
   else if m > 180. then begin
     m:=m-180.;
-    if m>90. then
-      cos:=cos0((180.-m)*pi/180.)
-    else
-      cos:=-cos0(m*pi/180.);
+    if m>90. then cos:=cos0((180.-m)*pi/180.)
+    else cos:=-cos0(m*pi/180.);
   end
   else begin
-    if m>90. then
-      cos:=-cos0((180.-m)*pi/180.)
-    else
-      cos:=cos0(m*pi/180.);
+    if m>90. then cos:=-cos0((180.-m)*pi/180.)
+    else cos:=cos0(m*pi/180.);
   end;
 end;
 
@@ -108,7 +105,11 @@ func tan(x:real):real;
 {********************}
 { argument x in degree }
 begin
-  tan:=sin(x)/cos(x);
+  if cos(x)=0.0 then begin
+    writeln('tan(90) undefined');
+    if sin(x)>0.0 then tan:=1.0e+38
+    else tan:=-1.0e+38
+  end else tan:=sin(x)/cos(x);
 end;
 
 proc writeflo(f:file;r:real);
@@ -122,29 +123,18 @@ var m: real;
     sign: char;
 begin
   e:=0; m:=r; sign:=' ';
-  if m<0. then begin
-    sign:='-'; m:=-m;
-  end;
-  while m>=10. do begin
-    e:=e+1; m:=m/10.;
-  end;
+  if m<0. then begin sign:='-'; m:=-m; end;
+  while m>=10. do begin e:=e+1; m:=m/10.; end;
   if m>0. then
-    while m<1. do begin
-      e:=e-1; m:=10.*m;
-    end;
+    while m<1. do begin e:=e-1; m:=10.*m; end;
   m:=m+0.0005; { round }
-  if m>=10. then begin
-    e:=e+1; m:=m/10.;
-  end;
+  if m>=10. then begin e:=e+1; m:=m/10.; end;
   write(@f,' ',sign,trunc(m),'.');
   for i:=1 to 3 do begin
-    m:=10.*(m-conv(trunc(m)));
-    write(@f,trunc(m));
+    m:=10.*(m-conv(trunc(m))); write(@f,trunc(m));
   end;
-  if e<0 then begin
-    write(@f,'e-'); e:=-e
-  end else
-    write(@f,'e+');
+  if e<0 then begin write(@f,'e-'); e:=-e end
+  else write(@f,'e+');
   if e>=10 then write(@f,e)
   else if e>=1 then write(@f,'0',e)
   else write(@f,'00');
@@ -173,11 +163,8 @@ begin
     2: rnd:=0.005;
     3: rnd:=0.0005
   end {case};
-  sign:=' ';
-  m:=r;
-  if m<0. then begin
-    sign:='-'; m:=-m;
-  end;
+  sign:=' '; m:=r;
+  if m<0. then begin sign:='-'; m:=-m; end;
   m:=m+rnd; { round }
   if m>32767. then writeflo(f,r)
   else begin
@@ -196,8 +183,7 @@ begin
     m:=m-conv(m1);
     if d1>0 then write(@f,'.');
     for i1:=1 to d1 do begin
-      m:=10.*m;
-      write(@f,trunc(m));
+      m:=10.*m; write(@f,trunc(m));
       m:=m-conv(trunc(m));
     end;
     for i1:=1 to n1-n do write(@f,' ');
@@ -225,24 +211,17 @@ var r: real;
     ch: char;
 
 begin
-  r:=0.0;
-  neg:=false;
-  read(@f,ch);
-  if (ch='+') then
-      read(@f,ch)
+  r:=0.0; neg:=false; read(@f,ch);
+  if (ch='+') then read(@f,ch)
   else if (ch='-') then begin
-    neg:=true;
-      read(@f,ch);
+    neg:=true; read(@f,ch);
   end;
   while (ch<='9') and (ch>='0') do begin
-    r:=10.*r+conv(ord(ch)-ord('0'));
-    read(@f,ch);
+    r:=10.*r+conv(ord(ch)-ord('0')); read(@f,ch);
   end;
   if (ch<>'.') and (ch<>'E') and (ch<>'e') then
-  begin
-    {numeric integer}
-    if neg then r:=-r;
-    readflo:=r
+  begin {numeric integer}
+    if neg then r:=-r; readflo:=r
   end else begin {numeric real}
     n:=0;
     if (ch<>'E') and (ch<>'e') then read(@f,ch);
@@ -258,22 +237,17 @@ begin
       end;
       n1:=0;
       if (ch<='9') or (ch>='0') then begin
-        n1:=ord(ch)-ord('0');
-        read(@f,ch);
+        n1:=ord(ch)-ord('0'); read(@f,ch);
         if (ch<='9') and (ch>='0') then begin
-          n1:=10*n1+ord(ch)-ord('0');
-          read(@f,ch);
+          n1:=10*n1+ord(ch)-ord('0'); read(@f,ch);
         end;
         if ems then n:=n-n1 else n:=n+n1
       end
     end;
     while n>0 do begin
-      n:=prec(n);
-      r:=10.*r;
+      n:=prec(n); r:=10.*r;
     end;
-    while n<0 do begin
-      n:=succ(n); r:=0.1*r;
-    end;
+    while n<0 do begin n:=succ(n); r:=0.1*r; end;
     if neg then r:=-r;
     readflo:=r;
   end
@@ -281,7 +255,7 @@ end;
 
 func ln(r:real):real;
 {*******************}
-{ compute natural logarithm ln     }
+{ compute natural logarithm ln }
 var r0,rm1,rp1,a,b,res,d,q: real;
     e1:integer;
 
@@ -294,8 +268,9 @@ var r0,rm1,rp1,a,b,res,d,q: real;
   end;
 
 begin
-  if r<0.0 then begin
-    writeln('ln(x) for x<0 called');
+  if fabs(r-1.0)<0.0001 then begin ln:=0.0; exit end;
+  if r<=0.0 then begin
+    writeln('ln(x) for x<=0 called');
     ln:=-1.0e-38
   end else begin
     r0:=r;
@@ -303,16 +278,13 @@ begin
     getexp(r0,e1);
     rm1:=r0-1.0; rp1:=r0+1.0; d:=1.0;
     a:=rm1; b:=rp1; res:=0.0;
-    rm1:=rm1*rm1;
-    rp1:=rp1*rp1;
+    rm1:=rm1*rm1; rp1:=rp1*rp1;
     repeat
-      q:=a/(d*b);
-      res:=res+q;
-      a:=a*rm1;
-      b:=b*rp1;
+      q:=a/(d*b); res:=res+q;
+      a:=a*rm1; b:=b*rp1;
       d:=d+2.0;
     until (q<0.0001)and(q>-0.0001);
-    ln:=2.0*res+conv(e1)*0.69315
+    ln:=2.0*res+conv(e1)*0.69315;
   end
 end;
 
@@ -339,8 +311,7 @@ begin
   { compute e-function }
   res:=1.0; f:=1.0;
   for n:=1 to 7 do begin
-    f:=f*x0/conv(n);
-    res:=res+f;
+    f:=f*x0/conv(n); res:=res+f;
   end;
   { add e2 back into result }
   addpof2(res,e2);
@@ -348,6 +319,12 @@ begin
   exp:=res;
 end;
 
+func log(x:real):real;
+begin
+  if fabs(x-10.0)<0.0001 then begin
+    log:=1.0; exit end;
+  log:=ln(x)*0.434294;
+end;
+
 begin
 end.
- 
