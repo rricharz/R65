@@ -193,3 +193,4 @@ begin {main}
     trunc(100.0*fdel+0.5),'%),',
     'files:',index-1);
 end.
+

@@ -170,10 +170,10 @@ begin
   s[2]:=chr(0);
 end;
 
-{ *** strins: insert char into string *** }
+{ *** strinsc: insert char into string *** }
 { inserts char if string is short enough }
 
-proc strins(ch:char;pos:integer;s:cpnt);
+proc strinsc(ch:char;pos:integer;s:cpnt);
 var i,l:integer;
 begin
   l:=strlen(s);
@@ -190,8 +190,16 @@ begin
   end
 end;
 
+{ *** strdelc: delete char in string *** }
+
+proc strdelc(pos:integer;s:cpnt);
+var i,l:integer;
+begin
+  l:=strlen(s);
+  for i:=pos to l-1 do
+      { move includes end mark }
+      s[i]:=s[i+1];
+end;
+
 begin
 end.
-
-
-

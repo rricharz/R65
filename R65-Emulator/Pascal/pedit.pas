@@ -9,7 +9,7 @@ const title='R65 PEDIT 2.1'; {max 20 chars}
 
     maxlines= 360;      xmax   = 56;
     scrlins = 16;       mlenght= 19;
-    inpx    = 37;
+    inpx    = 37;       marked = 58;
     eol     = chr($00); esc    = chr($00);
     rdown   = chr($02); rup    = chr($08);
     pgdown  = chr($14); pgup   = chr($12);
@@ -31,7 +31,7 @@ var line,nlines,topline,i,dummy,debug: integer;
     name: array[15] of char;
     fno: file;
     chi : char;
-    cyclus,drive,mark,savecx: integer;
+    cyclus,drive,mark,nmarks,savecx: integer;
     default, iseof, stop: boolean;
     fs: cpnt;
     linepnt: array[maxlines] of cpnt;
@@ -107,6 +107,7 @@ begin
   if s<>nil then begin
     for i:=0 to xmax-1 do s[i]:=' ';
     s[xmax]:=endmark;
+    s[marked]:=chr(0);
   end;
   if nlines>maxlines-5 then
     showerror('Warning: Low memory');
@@ -402,16 +403,18 @@ end;
 proc clrmarks;
 var x,savel,xm1:integer; s:cpnt;
 begin
+  putontop('Clearing marks',36,true);
   savel:=line;
   for line:=1 to nlines-1 do begin
     s:=linepnt[line];
-    xm1:=xmax-1;
-    for x:=0 to xm1 do
-      s[x]:=chr(ord(s[x]) and $7f);
-    if (line and $1f)=0 then showtop;
+    if s[marked]<>chr(0) then begin
+      xm1:=xmax-1;
+      for x:=0 to xm1 do
+        s[x]:=chr(ord(s[x]) and $7f);
+      s[marked]:=chr(0);
+      end;
     end;
   line:=savel; mark:=0;
-  showtop;
 end;
 
 proc find(again:boolean);
@@ -440,8 +443,7 @@ begin
   if not again then strcpy(stemp,fs);
   if fs[0]=endmark then begin
     {empty string -> delete all marks}
-    putontop('Clearing marks',36,true);
-    clrmarks; showall;
+    clrmarks;
     end
   else begin
     putontop('Searching',36,true);
@@ -461,6 +463,7 @@ begin
       line:=line-1; x:=x-1; i:=1;
       s2:=linepnt[line];
       savecx:=x+i;
+      s2[marked]:=chr(1);
       while fs[i]<>endmark do begin
         s2[x+i-1]:=chr(ord(s2[x+i-1]) or $80);
          i:=i+1;
@@ -495,26 +498,61 @@ begin
 end;
 
 proc paste;
-var l,i:integer; s1,s2:cpnt;
+var l,i,saveline:integer; s1,s2:cpnt;
 begin
-  if nlines<maxlines-1 then begin
-
-    for i:=nlines-1 downto line do
-      linepnt[i+1]:=linepnt[i];
-    nlines:=nlines+1;
-    if mark>line then mark:=mark+1;
-    linepnt[line]:=new;
-    s1:=linepnt[line];
-    s2:=linepnt[mark];
-    for i:=0 to xmax do s1[i]:=s2[i];
-    line:=line+1;
-    showall;
+  saveline:=line;
+  if nlines+nmarks<maxlines then begin
+    if (line>=mark+nmarks) or
+          (line<mark) then begin
+      putontop('Pasting',36,true);
+      for l:=0 to nmarks-1 do begin
+        for i:=nlines-1 downto line do
+          linepnt[i+1]:=linepnt[i];
+        nlines:=nlines+1;
+        if mark>line then mark:=mark+1;
+        linepnt[line]:=new;
+        s1:=linepnt[line];
+        s2:=linepnt[mark+l];
+        for i:=0 to xmax do s1[i]:=s2[i];
+        s1[marked]:=chr($80);
+        line:=line+1;
+      end;
+      showall;
+    end else showerror('Cannot paste here');
   end else showerror('Error: Out of memory');
+  line:=saveline; chktop(false);
+end;
+
+proc move;
+var l,i,saveline:integer; s1,s2,savpnt:cpnt;
+begin
+  saveline:=line;
+  if (line>=mark+nmarks) or
+        (line<mark) then begin
+    putontop('Moving',36,true);
+    for l:=0 to nmarks-1 do begin
+      savpnt:=linepnt[mark];
+      if mark>line then begin
+        for i:=mark-1 downto line do
+          linepnt[i+1]:=linepnt[i];
+        linepnt[line]:=savpnt;
+        line:=line+1; mark:=mark+1;
+      end else begin
+        for i:=mark+1 to line-1 do
+          linepnt[i-1]:=linepnt[i];
+        linepnt[line-1]:=savpnt;
+        saveline:=saveline-1;
+      end;
+    end;
+    showall;
+  end else showerror('Cannot move here');
+  line:=saveline; mark:=saveline;
+  chktop(false);
 end;
 
 func doesc: boolean;
 var ch:char;
-    i,n:integer;
+    i,j,n:integer;
     s,savl:cpnt;
 begin
   clrmessage;
@@ -523,7 +561,8 @@ begin
   if (ch='f') and (stemp[0]<>' ') and
     (strlen(stemp)<>0) then
     showerror('Expected f xxx')
-  else if (ch<>'l') and (ch<>'d') and (n>0) then
+  else if (ch<>'l') and (ch<>'d') and
+    (ch<>'c') and (n>0) then
     showerror('n>1 not allowed')
   else begin
     case ch of
@@ -541,20 +580,31 @@ begin
              showall;
            end;
       'z': begin {clear marks}
-             clrmarks;
+             clrmarks; showall;
            end;
-      'c': begin {mark line for copy}
+      'c': begin {mark lines for copy}
+             clrmarks;
+             if n<1 then n:=1;
+             if n>nlines-line then n:=nlines-line;
              mark:=line;
-             s:=linepnt[line];
-             for i:=0 to xmax-1 do
-               s[i]:= chr(ord(s[i]) or $80);
-             line:=mark;
+             nmarks:=n;
+             for i:=0 to n-1 do begin
+               s:=linepnt[line+i];
+               for j:=0 to xmax-1 do
+                 s[j]:= chr(ord(s[j]) or $80);
+               s[marked]:=chr(1);
+             end;
              showall;
            end;
-      'p': begin {paste copied line}
+      'p': begin {paste copied lines}
              if mark=0 then
-               showerror('Error: Nothing marked')
+               showerror('Error: Nothing copied')
              else paste;
+           end;
+      'm': begin {move copied lines}
+             if mark=0 then
+               showerror('Error: Nothing copied')
+             else move;
            end;
       'd': begin {delete n lines}
              if n<1 then n:=1;
@@ -572,7 +622,7 @@ begin
       'k': doesc:=true; {kill program}
       '?','h': showerror('tb/l/fg/cpm/d/wqk/?h');
       endmark: begin end
-      else showerror('tb/l/faz/cp/d/wqk/?h')
+      else showerror('tb/l/faz/cpm/d/wqk/?')
     end {case};
   end;
   clrmessage;

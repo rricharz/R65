@@ -18,7 +18,27 @@ mem vidpnt=$00e9:integer;
 
 var ch: char;
     r,lastr: real;
-    stop,dotused: boolean;
+    stop,dotused,firsterror: boolean;
+
+proc clearinput;
+{**************}
+begin
+  buffpn:=-1;
+end;
+
+proc error(s1,s2:cpnt);
+{*********************}
+begin
+  if firsterror then
+    writeln(invvid,'Error: ',s1,' ',s2,norvid);
+  firsterror:=false;
+end;
+
+proc readch;
+begin
+  if firsterror then read(@input,ch)
+  else ch:=cr;
+end;
 
 proc release(s: cpnt);
 {********************}
@@ -26,41 +46,46 @@ proc release(s: cpnt);
 { This is suitable for recursive functions }
 mem endstk=$000e: integer;
 begin
-  if cpnt(endstk)=s then endstk:=endstk+strsize;
+  if cpnt(endstk)=s then endstk:=endstk+strsize
+  else error('Cannot release string',' ');
 end;
 
 func fix(rf: real): integer;
 {**************************}
 begin
   if (rf>32767.5) then begin
-      write(invvid,'Integer value exceeds');
-      write(' upper limit, set to 32767');
-      writeln(norvid); fix:=$7fff;
+      error('Integer value exceeds',
+        'upper limit, set to 32767');
+      fix:=$7fff;
     end else if (rf<-32768.5) then begin
-      write(invvid,'Integer value exceeds');
-      write(' lower limit, set to -32768');
-      writeln(norvid); fix:=$8000;
+      error('Integer value exceeds',
+        ' lower limit, set to -32768');
+      fix:=$8000;
     end else
     fix:=trunc(rf);
 end;
 
 proc checkfor(c: char);
 {*********************}
+var s1,s2:cpnt;
 begin
   if ch<>c then begin
-    write(invvid,'SYNTAX ERROR: expected ');
-    if c=cr then write('<eol>')
-    else write(c);
-    write(' but found ');
-    if ch=cr then writeln('<eol>',norvid)
-    else writeln(ch,norvid);
+    s1:=strnew; s2:=strnew;
+    strcpy('Expected ',s1);
+    if c=cr then strcpy('Expected <eol>',s1)
+    else strinsc(c,9,s1);
+    strcpy('but found ',s2);
+    if ch=cr then strcpy('but found <eol>',s2)
+    else strinsc(ch,10,s2);
+    error(s1,s2);
+    release(s2); release(s1);
   end;
 end;
 
 proc skip(c:char);
 {****************}
 begin
-  checkfor(c); read(@input,ch);
+  checkfor(c); readch;
 end;
 
 func isnumber(cn:char):boolean;
@@ -111,12 +136,14 @@ begin
       if s1[i]='.' then
         mask:=128
       else begin
-        strins(chr(ord(s1[i]) or mask),0,s2);
+        strinsc(chr(ord(s1[i]) or mask),0,s2);
         mask:=0;
       end;
     end;
   end;
-  while strlen(s2)<8 do strins(' ',0,s2);
+  while strlen(s2)<8 do strinsc(' ',0,s2);
+  if (strlen(s2)>8) and (s2[7]='0') and
+    (s2[6]='-') and (s2[5]='e') then strdelc(7,s2);
   if strlen(s2)>8 then strcpy('--------',s2);
   ledstring(s2);
   release(s2);
@@ -165,6 +192,10 @@ begin
     m:=m+rnd; { round }
     write(@f,sign,trunc(m));
     m1:=m-conv(trunc(m));
+    if m1<=rnd then begin
+      for i1:=1 to d1+1 do write(@f,' ');
+      d1:=0;
+    end;
     if d1>0 then write(@f,'.');
     for i1:=1 to d1 do begin
       m1:=10.*m1; write(@f,trunc(m1));
@@ -213,9 +244,9 @@ var i: integer;
 begin
   lstring:=strnew;
   lstring[0]:=chr(0);
-  strins(ch,0,lstring); read(@input,ch); i:=1;
+  strinsc(ch,0,lstring); readch; i:=1;
   while isletter(ch) do begin
-    strins(ch,i,lstring); read(@input,ch); i:=i+1;
+    strinsc(ch,i,lstring); readch; i:=i+1;
   end;
   stop:=false;
   if strcmp(lstring,'R')=0 then begin
@@ -253,9 +284,30 @@ begin
   if strcmp(lstring,'LOG')=0 then begin
     function:=log(r); release(lstring); exit;
   end;
-  writeln(invvid,'Unknown function ',lstring,norvid);
+  error('Unknow function',lstring);
   function:=0.0;
   release(lstring);
+end;
+
+proc exponent(var r:real);
+{************************}
+var minus:boolean;
+    exp:integer;
+begin
+  minus:=false;
+  if ch='-' then begin minus:=true; readch end
+  else if ch='+' then readch;
+  exp:=0;
+  if isnumber(ch) then begin
+    exp:=ord(ch)-ord('0'); readch
+  end else error('Expecting','exponent');
+  if isnumber(ch) then begin
+    exp:=10*exp+(ord(ch)-ord('0')); readch;
+  end;
+  if minus then
+    while exp>0 do begin r:=0.1*r; exp:=exp-1 end
+  else
+    while exp>0 do begin r:=10.0*r; exp:=exp-1 end;
 end;
 
 func factor:real;
@@ -264,49 +316,48 @@ var negative:boolean;
     rf,rt: real;
     i,iv: integer;
 begin
-  negative:=false; rf:=0.;  read(@input,ch);
+  negative:=false; rf:=0.;  readch;
   if ch='-' then begin
-    negative:=true; read(@input,ch);
+    negative:=true; readch;
   end;
   if ch='(' then begin
     stop:=false; rf:=express;
-    checkfor(')'); read(@input,ch);
+    checkfor(')'); readch;
   end else if ch='%' then begin
-    stop:=false; read(@input,ch); iv:=0;
+    stop:=false; readch; iv:=0;
     while binval>=0 do begin
-      iv:=(iv shl 1)+binval; read(@input,ch);
+      iv:=(iv shl 1)+binval; readch;
     end;
     rf:=conv(iv);
   end else if ch='$' then begin
-    stop:=false; read(@input,ch); iv:=0;
+    stop:=false; readch; iv:=0;
     while hexval>=0 do begin
-      iv:=(iv shl 4)+hexval; read(@input,ch);
+      iv:=(iv shl 4)+hexval; readch;
     end;
     rf:=conv(iv);
-  end else if isletter(ch) then begin
-    write(invvid); rf:=function; write(norvid)
-  end else if ch<>chr(0) then begin
+  end else if isletter(ch) then rf:=function
+  else if ch<>chr(0) then begin
     if ch<>cr then begin
       if ch<>cr then stop:=false;
-      if ch='+' then read(@input,ch);
+      if ch='+' then readch;
       {if ch='-' then begin
-        negative:=true; read(@input,ch);
+        negative:=true; readch;
       end;}
       if not isnumber(ch) then
-        writeln(invvid,
-          'SYNTAX ERROR: NUMBER EXPECTED',norvid);
+        error('Expected','number');
       while isnumber(ch) do begin
         rt:=rf+rf; rt:=rt+rt;
         rf:=rt+rt+rf+rf+conv(ord(ch)-ord('0'));
-        read(@input,ch);
+        readch;
       end;
       if ch='.' then begin
-        dotused:=true; read(@input,ch); rt:=0.1;
+        dotused:=true; readch; rt:=0.1;
         while isnumber(ch) do begin
           rf:=rf+conv(ord(ch)-ord('0'))*rt;
-          rt:=rt/10.; read(@input,ch);
+          rt:=rt/10.; readch;
         end;
       end;
+      if ch='E' then begin readch; exponent(rf) end;
     end;
     if negative then rf:=-rf;
   end;
@@ -316,22 +367,28 @@ end;
 func simexp:real;
 {***************}
 var
-  rs: real;
+  rs,divisor: real;
 begin
   rs:=factor;
   while (ch='*') or (ch='/') or (ch='&') or (ch='<')
     or (ch='>') or (ch='^') do begin
     case ch of
       '*': begin rs:=rs*factor; end;
-      '/': begin rs:=rs/factor; end;
+      '/': begin
+             divisor:=factor;
+             if divisor=0.0 then
+               error('Division','by zero')
+             else
+               rs:=rs/divisor;
+           end;
       '&': rs:=conv(fix(rs) and fix(factor));
       '^': rs:=exp(factor*ln(rs));
       '<': begin
-             read(@input,ch); checkfor('<');
+             readch; checkfor('<');
              rs:=conv(fix(rs) shl fix(factor));
              end;
       '>': begin
-             read(@input,ch); checkfor('>');
+             readch; checkfor('>');
              rs:=conv(fix(rs) shr fix(factor));
            end
       end {case};
@@ -371,6 +428,8 @@ begin
   writeln(norvid);
   r:=0.0; lastr:=0.0; dotused:=false;
   repeat
+    firsterror:=true;
+    clearinput;
     stop:=true; writeauto(output,r); writeln;
     dotused:=false; lastr:=r; r:=express; checkfor(cr);
   until stop;
