@@ -92,7 +92,7 @@ var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
 
     token: packed char;
 
-    prt,libflg,icheck,ateof: boolean;
+    prt,libflg,icheck,ateof,lineflg: boolean;
 
     fno,ofno: file;
 
@@ -259,6 +259,13 @@ begin
   writeln;
 end {newpage};
 
+{        * code1 *      (global) }
+
+proc code1(x: %integer);  {set one byte p-code}
+begin
+  savebyte(x); pc:=succ(pc)
+end;
+
 {       * getchr *      (global) }
 
 proc getchr;
@@ -279,6 +286,11 @@ begin
     read(@fno,ch);
     if ch=cr then begin
       crlf;
+      if lineflg and (pc>2) then begin
+        code1($59);
+        code1((line-1) and 255);
+        code1((line-1) shr 8);
+      end;
       writenum(line); write(' (');
       if (pc+2)<9999 then write(' ');
       writenum(pc+2); write(') ');
@@ -355,12 +367,13 @@ begin {init}
 
   agetstring(request,default,dummy,dummy);
   icheck:=false;
-  prt:=true; ofno:=yesoutput;
+  prt:=true; ofno:=yesoutput; lineflg:=false;
   if not default then begin
     if request[0]<>'/' then argerror(103);
     for i:=1 to 8 do
       case request[i] of
-        'P','L': prt:=false;
+        'P': prt:=false;
+        'L': lineflg:=true;
         'I','R': icheck:=true;
         'N': ofno:=nooutput;
         ' ': begin end
@@ -666,13 +679,6 @@ begin
   end
   else
     findid:=(k-1) shr 3;
-end;
-
-{ * code1 *      (of block) }
-
-proc code1(x: %integer);  {set one byte p-code}
-begin
-  savebyte(x); pc:=succ(pc)
 end;
 
 { * code2 *    (of block) }
