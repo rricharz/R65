@@ -92,7 +92,7 @@ var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
 
     token: packed char;
 
-    prt,libflg,icheck,ateof,lineflg: boolean;
+    prt,libflg,icheck,ateof,lineflg,nlflg: boolean;
 
     fno,ofno: file;
 
@@ -286,11 +286,7 @@ begin
     read(@fno,ch);
     if ch=cr then begin
       crlf;
-      if lineflg and (pc>2) then begin
-        code1($59);
-        code1((line-1) and 255);
-        code1((line-1) shr 8);
-      end;
+      nlflg:=true;
       writenum(line); write(' (');
       if (pc+2)<9999 then write(' ');
       writenum(pc+2); write(') ');
@@ -519,6 +515,16 @@ end {setid};
 begin { ***** body of scan ***** }
   count:=1; while ch=' ' do getchr;
   tpos:=curpos;
+
+  { delayed because of token lookahead }
+  if nlflg then begin
+    if lineflg and (pc>2) then begin
+      code1($59);
+      code1((line) and 255);
+      code1((line) shr 8);
+    end;
+    nlflg:=false;
+  end;
 
   if (ch<'a') or (ch>'z') then begin {main if}
     if (ch<'0') or (ch>'9') then begin {symb}
@@ -2254,7 +2260,7 @@ begin { *** body of block *** }
 
   testto('be');     { * begin * }
   if forwpn<>0 then merror(13,'ur');
-  scan; fixup(t2[bottom]);
+  fixup(t2[bottom]); scan;
   t2[bottom]:=pc;
   code3(35,2*dpnt);
   repeat
@@ -2295,6 +2301,7 @@ end {savtable};
 { * main program * }
 
 begin {main}
+  nlflg:=false;
   init;scan;
   case token of
     'pg': begin

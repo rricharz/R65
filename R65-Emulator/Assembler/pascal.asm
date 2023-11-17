@@ -120,7 +120,10 @@ HARGUM  JMP $FCF2       #######
 ******************
 * NO ARGUMENTS
 *
-STOP    LDA =47
+STOP    LDA =0
+        STA LSTLIN      CLEAR LSTLIN
+        STA LSTLIN+1
+        LDA =47
         STA NUMCHR      FORCE 48 CHARS/LINE
         JSR CLOSAL      CLOSE ALL OPEN FILES
         LDA STPROG      IS ANOTHER PROGRAM
@@ -1340,7 +1343,10 @@ TINDERR LDX =$83        RUNTIME ERROR
 * P-CODE 41: RUNP       RUN PROGRAM
 *****************
 *
-RUNP    LDY =130
+RUNP    LDA =0
+        STA LSTLIN      CLEAR LSTLIN
+        STA LSTLIN+1
+		LDY =130
         LDA ACCU        SAVE ACCU
         LDX ACCU+1
         JSR SAVE
@@ -1819,11 +1825,17 @@ PERROR0 JSR PRTINF
         LDA PC+1
         SBC STPROG+1
         STA ACCU+1
-        BEQ PERROR1
         BMI PERROR1
         LDA LSTLIN
         ORA LSTLIN+1    LINE NUMB IS NOT 0?
         BNE PERROR2     YES,SKIP WRITE
+        SEC
+        LDA ACCU
+        SBC =1
+        STA ACCU
+        LDA ACCU+1
+        SBC =0
+        STA ACCU+1
         JSR PRTINF
         BYT ' at PC '+128
         JSR PRTN        WRITE PC
@@ -1979,7 +1991,7 @@ TABLE   WRD STOP,RETN,NEGA,ADDA,SUBA,MULA
 *
 COLDST  LDA =0
         STA LSTLIN              CLEAR LSTLIN
-         STA LSTLIN+1
+        STA LSTLIN+1
         CLI
         CLD
         LDA USERST
