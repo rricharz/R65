@@ -2260,8 +2260,9 @@ begin { *** body of block *** }
 
   testto('be');     { * begin * }
   if forwpn<>0 then merror(13,'ur');
-  fixup(t2[bottom]); scan;
+  fixup(t2[bottom]);
   t2[bottom]:=pc;
+  scan;
   code3(35,2*dpnt);
   repeat
     statmnt

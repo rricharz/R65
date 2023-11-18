@@ -6,8 +6,9 @@
 * VERSION 5.3   01/06/82 RRICHARZ,RBAUMANN
 * IMPROVED 2019-2023 RRICHARZ
 * VERSION 5.6   SOURCE LINES WITH /L IN COMPILER
+* VERSION 5.7   BREAKPOINT AT LINE BRKPNT
 *
-        TIT R65 PASCAL RUNTIME
+        TIT R65 PASCAL RUNTIME VERSION 5.7
 *
 * INCLUDES RANDOM ACCESS FILE HANDLING,
 * FLOATING POINT MATH, FILE HANDLING ERROR
@@ -38,7 +39,12 @@ X2      EQU ARG1        FLP REGISTER
 M2      EQU ARG1+1
 IOCHECK BSS 1   IO ERROR CHECKING FLAG
 LINBUF  BSS 56  INPUT LINE BUFFER
+*
+* SPACE FOR ARGNUM,ARGLIST AND ARGTYPE
+*
+                ORG $C0
 LSTLIN  BSS 2   LAST SOURCE LINE
+BRKPNT  BSS 2   BREAK POINT LINE NUMBER
 *
 FILFLG  EQU $DA
 FILERR  EQU $DB
@@ -1346,7 +1352,7 @@ TINDERR LDX =$83        RUNTIME ERROR
 RUNP    LDA =0
         STA LSTLIN      CLEAR LSTLIN
         STA LSTLIN+1
-		LDY =130
+                LDY =130
         LDA ACCU        SAVE ACCU
         LDX ACCU+1
         JSR SAVE
@@ -1721,15 +1727,86 @@ ADPS    CLC
         STA ACCU+1
         RTS
 *
-* P-CODE 58: LINE               SOURCE LINE
+* P-CODE 59: LINE      SOURCE LINE
 *****************
 *
 LINE    JSR FETCH
-                STA LSTLIN
-                JSR FETCH
-                STA LSTLIN+1
-                RTS
+        STA LSTLIN
+        JSR FETCH
+        STA LSTLIN+1
+        CMP BRKPNT+1
+        BNE LINE9
+        LDA LSTLIN
+        CMP BRKPNT
+        BNE LINE9
 *
+        JSR PRTINF
+        BYT $D,$A,'Breakpoint at line '+128
+        LDA LSTLIN
+        LDX LSTLIN+1
+        JSR PRTL
+        JSR PRTINF
+        BYT $D,$8A
+*
+LINE6   JSR GETKEY
+        CMP =0          ESC?
+        BEQ LINE8
+LINE5   LDY =0
+        LDA (PC),Y
+        CMP =$59
+        BNE LINE7
+        JSR FETCH
+        JSR LINE        EXECUTE LINE
+        JSR PRTINF
+        BYT 'Line '+$80
+        LDA LSTLIN
+        LDX LSTLIN+1
+        JSR PRTL
+        JSR PRTINF
+        BYT $D,$8A
+        JMP LINE6
+*
+LINE7   LDX SAVS
+        TXS
+        JSR EXCODE      EXECUTE NEXT CODE
+        JMP LINE5
+*
+LINE8   JMP STOP        STOP EXECUTION
+*
+LINE9   RTS
+*
+*
+* PRTL: PRINT A,X, KEEP ACCU,ARG2,ARG3
+**************************************
+*
+PRTL    TAY             PRESERVE ACCU
+        LDA ACCU
+        PHA
+        LDA ACCU+1
+        PHA
+        STY ACCU        SET ACCU TO A,X
+        STX ACCU+1
+*
+        LDX =5          PRESERVE ARG3,ARG2
+PRTL1   LDA ARG3,X
+        PHA
+        DEX
+        BPL PRTL1
+*
+        JSR PRTN
+*
+        LDX =0          RESTORE ARG3,ARG2
+PRTL2   PLA
+        STA ARG3,X
+        INX
+        CPX =6
+        BNE PRTL2
+*
+        PLA             RESTORE ACCU
+        STA ACCU+1
+        PLA
+        STA ACCU
+        JMP INCS2       WAS DECR BY PRTN
 *
 * GETCHR0: GET A CHAR FROM SPECIFIED FILE
 *****************************************
@@ -1948,7 +2025,6 @@ LOOP    LDX SAVS        RESTORE STACK POINTER
 *
 *
 EXCODE  JSR FETCH
-        STA =$F1
         CMP =$5A        TEST CODENUMBER
         BCC *+7
 ILLC    LDX =$86        PASCAL RUNTIME ERROR
@@ -1990,8 +2066,10 @@ TABLE   WRD STOP,RETN,NEGA,ADDA,SUBA,MULA
 ***********
 *
 COLDST  LDA =0
-        STA LSTLIN              CLEAR LSTLIN
+        STA LSTLIN      CLEAR LSTLIN
         STA LSTLIN+1
+        STA BRKPNT      CLEAR BRKPNT
+        STA BRKPNT+1
         CLI
         CLD
         LDA USERST

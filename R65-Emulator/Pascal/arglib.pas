@@ -14,18 +14,18 @@
 
 library arglib;
 
-mem numarg=$5f:   integer&;
-    arglist=$60:  array[3] of integer;
-    arglists=$60: array[63] of char&;
-    argtype=$a0:  array[31] of char&;
+mem numarg   =$005f: integer&;
+    arglist  =$0060: array[3] of integer;
+    arglists =$0060: array[63] of char&;
+    argtype  =$00a0: array[31] of char&;
 
-    filflg=$00da: integer&;
-    fildrv=$00dc: integer&;
-    filcyc=$0311: integer&;
-    filcy1=$0330: integer&;
-    filnam=$0301: array[15] of char&;
-    filnm1=$0320: array[15] of char&;
-    filstp=$0312: char&;
+    filflg   =$00da: integer&;
+    fildrv   =$00dc: integer&;
+    filcyc   =$0311: integer&;
+    filcy1   =$0330: integer&;
+    filnam   =$0301: array[15] of char&;
+    filnm1   =$0320: array[15] of char&;
+    filstp   =$0312: char&;
 
 var carg: integer;
 
