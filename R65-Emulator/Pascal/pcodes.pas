@@ -1,4 +1,4 @@
-program debug;
+program pcodes;
 uses syslib,arglib,strlib,ralib,mathlib;
 
 const npcodes=$59;
@@ -6,10 +6,10 @@ const npcodes=$59;
 var codename: array[npcodes] of cpnt;
     codebytes: array[npcodes] of integer;
     fcode,scode: file;
-    cdsize,i,code,line: integer;
+    cdsize,i,code,line,first,last: integer;
     name: array[15] of char;
     cyclus,drive:integer;
-    default: boolean;
+    default,silent: boolean;
     linestr:cpnt;
 
 func readline(f: file; pnt: cpnt): boolean;
@@ -71,7 +71,7 @@ proc showprog;
 {############}
 var pc,a,b,c,codesize:integer;
     r:real;
-    done:boolean;
+    done,normal:boolean;
 
   proc packreal(i1,i2:%integer;
     var r:array[1] of %integer);
@@ -88,18 +88,23 @@ begin
     b+1,' sectors');
   writeln;
   pc:=2;
+
   repeat
+    normal:=true;
+    silent:=(line<first);
     getbyte(fcode,pc,code);
     if code<0 then begin
       writeln('Negative code');
       exit;
     end;
-    write('  '); writeui(pc);
-    write(' '), writehex(code);
-    write(' ',codebytes[code],' ');
-    if (code<=npcodes) and (code>=0) then
-      write(codename[code])
-    else begin
+    if not silent then begin
+      write('  '); writeui(pc);
+      write(' '); writehex(code);
+      write(' ',codebytes[code],' ');
+    end;
+    if (code<=npcodes) and (code>=0) then begin
+      if not silent then write(codename[code])
+    end else begin
       writeln('pcode not known');
       exit;
     end;
@@ -107,67 +112,114 @@ begin
     case codebytes[code] of
       2: begin
              getbyte(fcode,pc+1,a);
-             write(' ',a);
+             if not silent then write(' ',a);
            end;
       3: begin
              getbyte(fcode,pc+1,a);
              getbyte(fcode,pc+2,b);
              c:=a+(b shl 8);
-             { exception for JUMP }
-             if code=$24 then write(' ',c+pc+1)
-             else write(' ',c);
+             if not silent then begin
+               { exception for JUMP }
+               if code=$24 then write(' ',c+pc+1)
+               else write(' ',c);
+             end;
            end;
       4: begin
              getbyte(fcode,pc+1,a);
-             write(' ',a,',');
+             if not silent then write(' ',a,',');
              getbyte(fcode,pc+2,a);
              getbyte(fcode,pc+3,b);
-             write(' ',a+(b shl 8));
+             if not silent then write(' ',a+(b shl 8));
            end;
       5: begin
              getbyte(fcode,pc+1,a);
              getbyte(fcode,pc+2,b);
-             write(' ',a+(b shl 8),' ');
+             if not silent then
+               write(' ',a+(b shl 8),' ');
              getbyte(fcode,pc+3,a);
              getbyte(fcode,pc+4,b);
-             write(' ',a+(b shl 8));
+             if not silent then
+               write(' ',a+(b shl 8));
          end;
       6: begin
-             getbyte(fcode,pc+1,a);
-             write(' ',a,',');
-             getbyte(fcode,pc+2,a);
-             getbyte(fcode,pc+3,b);
-             c:=a+(b shl 8); ;
-             getbyte(fcode,pc+4,a);
-             getbyte(fcode,pc+5,b);
+           getbyte(fcode,pc+1,a);
+           if not silent then write(' ',a,',');
+           getbyte(fcode,pc+2,a);
+           getbyte(fcode,pc+3,b);
+           c:=a+(b shl 8); ;
+           getbyte(fcode,pc+4,a);
+           getbyte(fcode,pc+5,b);
+           if not silent then begin
              if code=$3a then begin
                packreal(c, a+(b shl 8),r);
-               write(' '); writeflo(output,r);
+                 write(' '); writeflo(output,r);
              end else begin
                write(' ',c,' ');
                write(' ',a+(b shl 8));
              end;
+           end;
          end
       end; {case}
-    writeln;
-    if (code=$59) then begin
-      { LINE }
-      done:=false;
-      while (line<=c) and not done do begin
-        done:=readline(scode,linestr);
-        writeln(line, ' ',linestr);
-        line:=line+1;
-      end;
-    end;
-    {if (pc=2) and (code=$24) then begin
-      if c>8 then writeln('Skipping libraries');
-      pc:=pc+c;
-    end;}
+    case code of
+      $32: begin { PRTI, stops with bit 8 set }
+             normal:=false;
+             if not silent then write(' ',chr($27));
+             repeat
+               getbyte(fcode,pc,a);
+               if not silent then
+                 write(chr(a and $7f));
+               pc:=pc+1;
+               until (a and $80)<>0;
+             if not silent then write(chr($27));
+           end;
+      $39: begin { NBYT, first argument is n bytes }
+             normal:=false;
+             getbyte(fcode,pc,a);
+             if not silent then
+               write(' ',a,',',chr($27));
+             for i:=1 to a do begin
+               getbyte(fcode,pc,b);
+               if not silent then
+                 write(chr(b and $7f));
+               pc:=pc+1;
+             end;
+             if not silent then write(chr($27));
+           end;
+      $56: begin { CPNT, stops with endmark }
+             normal:=false;
+             if not silent then write(' ',chr($27));
+             repeat
+               getbyte(fcode,pc,a);
+               if (a<>0) and not silent then
+                 write(chr(a and $7f));
+               pc:=pc+1;
+               until a=0;
+             if not silent then write(chr($27));
+           end;
+      $59: begin { LINE }
+             done:=false;
+             while (line<=c) and not done do begin
+               if (line<=last) then begin
+                 if not silent then writeln;
+                 done:=readline(scode,linestr);
+                 if not silent then
+                   write(invvid,line,' ',
+                     linestr,norvid);
+               end;
+               line:=line+1;
+             end;
+           end
+      end {case};
+    if not silent then writeln;
+
     if codebytes[code]<>0 then
       pc:=pc+codebytes[code]
-    else writeln('codebytes not known');
-    until (pc>=codesize) or (codebytes[code]=0) or
-      (line>10);
+    else begin
+      if normal then writeln('codebytes not known')
+    end;
+    until (pc>=codesize) or
+      ((codebytes[code]=0) and normal) or
+      (line>last+1);
 end;
 
 proc init;
@@ -199,8 +251,8 @@ begin
   set($0f,'ANDA',1);
   set($10,'EORA',1);
   set($11,'NOTA',1);
-  set($12,'LEFT',3);
-  set($13,'RIGH',3);
+  set($12,'LEFT',1);
+  set($13,'RIGH',1);
   set($14,'INCA',1);
   set($15,'DECA',1);
   set($16,'COPY',1);
@@ -218,8 +270,8 @@ begin
   set($22,'LITW',3);
   set($23,'INCW',3);
   set($24,'JUMP',3);
-  set($25,'JMPZ',1);
-  set($26,'JMPO',1);
+  set($25,'JMPZ',3);
+  set($26,'JMPO',3);
   set($27,'LOAD',4);
   set($28,'LODX',4);
   set($29,'STOR',4);
@@ -231,7 +283,7 @@ begin
   set($2f,'OPNR',1);
   set($30,'OPNW',1);
   set($31,'CLOS',1);
-  set($32,'PRTI',2);
+  set($32,'PRTI',0);
   set($33,'GHGH',1);
   set($34,'GLOW',1);
   set($35,'PHGH',1);
@@ -266,7 +318,7 @@ begin
   set($52,'PTRA',1);
   set($53,'SWA2',1);
   set($54,'LDXI',1);
-  set($55,'STXI',3);
+  set($55,'STXI',4);
   set($56,'CPNT',0);
   set($57,'WRCP',1);
   set($58,'ADPS',1);
@@ -290,6 +342,10 @@ begin {main}
   writeln('Opening source file ');
   openr(scode);
   writeln; writeln('Source file opened');
+  first:=0; last:=32000;
+  agetval(first,default);
+  agetval(last,default);
+  writeln('display from ',first,' to ',last);
   showprog;
   close(fcode);
   close(scode);

@@ -1,0 +1,388 @@
+
+R65 COMPILE 4.2: program PCODES           19/11/23 page 1
+
+
+   1 (    4) program pcodes;
+   2 (    4) uses syslib,arglib,strlib,ralib,mathlib;
+   3 ( 6641) 
+   4 ( 6641) const npcodes=$59;
+   5 ( 6647) 
+   6 ( 6647) var codename: array[npcodes] of cpnt;
+   7 ( 6650)     codebytes: array[npcodes] of integer;
+   8 ( 6653)     fcode,scode: file;
+   9 ( 6656)     cdsize,i,code,line,first,last: integer;
+  10 ( 6659)     name: array[15] of char;
+  11 ( 6662)     cyclus,drive:integer;
+  12 ( 6665)     default,silent: boolean;
+  13 ( 6668)     linestr:cpnt;
+  14 ( 6671) 
+  15 ( 6671) func readline(f: file; pnt: cpnt): boolean;
+  16 ( 6674) {#########################################}
+  17 ( 6677) const alteof=chr(127);
+  18 ( 6683) var ch1: char;
+  19 ( 6686)     pos: integer;
+  20 ( 6689) begin
+  21 ( 6692)   pos := 0; read(@f,ch1);
+  22 ( 6713)   while (ch1>=' ') and (ch1<>alteof) and
+  23 ( 6731)       (pos<strsize-1) do begin
+  24 ( 6749)     pnt[pos]:=ch1; pos:=pos+1; read(@f,ch1);
+  25 ( 6785)     end;
+  26 ( 6789)   pnt[pos]:=endmark;
+  27 ( 6801)   readline:=(ch1=eof) or (ch1=alteof);
+  28 ( 6822) end;
+  29 ( 6830) 
+  30 ( 6831) proc setsubtype(var nm:array[15] of char;subtype:char);
+  31 ( 6834) {#####################################################}
+  32 ( 6837) var i:integer;
+  33 ( 6843) begin
+  34 ( 6846)   i:=0;
+  35 ( 6853)   repeat
+  36 ( 6860)     i:=i+1;
+  37 ( 6869)   until (nm[i]=':') or
+  38 ( 6888)     (nm[i]=' ') or (i>=14);
+  39 ( 6910)   nm[i]:=':';
+  40 ( 6923)   nm[i+1]:=subtype;
+  41 ( 6937) end;
+  42 ( 6948) 
+  43 ( 6949) proc writehex(a:integer);
+  44 ( 6952) {#######################}
+  45 ( 6955) var h:integer;
+  46 ( 6961)   func hexdigit(c:char):char;
+  47 ( 6964)   var d:integer;
+  48 ( 6970)   begin
+  49 ( 6973)     d:=ord(c) and 15;
+  50 ( 6984)     if d>9 then hexdigit:=chr(d-10+ord('A'))
+  51 ( 7011)     else hexdigit:=chr(d+ord('0'));
+  52 ( 7030)   end;
+  53 ( 7038) begin
+  54 ( 7042)   h:=a and 255;
+  55 ( 7053)   write(hexdigit(chr(h shr 4)));
+  56 ( 7078)   write(hexdigit(chr(h and 15)));
+  57 ( 7098) end;
+  58 ( 7101) 
+  59 ( 7102) proc writeui(n:integer);
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.2: program PCODES           19/11/23 page 2
+
+  60 ( 7105) {######################}
+  61 ( 7108) var limit:integer;
+  62 ( 7114) begin
+  63 ( 7117)   limit:=10000;
+  64 ( 7125)   while (limit>n) and (limit>0) do begin
+  65 ( 7152)     limit:=limit div 10; write(' ');
+  66 ( 7168)   end;
+  67 ( 7171)   write(n);
+  68 ( 7182) end;
+  69 ( 7185) 
+  70 ( 7186) proc showprog;
+  71 ( 7189) {############}
+  72 ( 7192) var pc,a,b,c,codesize:integer;
+  73 ( 7198)     r:real;
+  74 ( 7201)     done,normal:boolean;
+  75 ( 7204) 
+  76 ( 7204)   proc packreal(i1,i2:%integer;
+  77 ( 7207)     var r:array[1] of %integer);
+  78 ( 7210)   begin
+  79 ( 7213)     r[0]:=i1; r[1]:=i2;
+  80 ( 7233)   end;
+  81 ( 7244) 
+  82 ( 7245) begin
+  83 ( 7248)   line:=1;
+  84 ( 7255)   getbyte(fcode,0,a);
+  85 ( 7274)   getbyte(fcode,1,b);
+  86 ( 7289)   codesize:=a+(b shl 8);
+  87 ( 7303)   writeln('Program size: ', codesize,' bytes, ',
+  88 ( 7340)     b+1,' sectors');
+  89 ( 7366)   writeln;
+  90 ( 7369)   pc:=2;
+  91 ( 7380) 
+  92 ( 7384)   repeat
+  93 ( 7387)     normal:=true;
+  94 ( 7392)     silent:=(line<first);
+  95 ( 7408)     getbyte(fcode,pc,code);
+  96 ( 7429)     if code<0 then begin
+  97 ( 7439)       writeln('Negative code');
+  98 ( 7465)       exit;
+  99 ( 7469)     end;
+ 100 ( 7472)     if not silent then begin
+ 101 ( 7480)       write('  '); writeui(pc);
+ 102 ( 7499)       write(' '); writehex(code);
+ 103 ( 7514)       write(' ',codebytes[code],' ');
+ 104 ( 7530)     end;
+ 105 ( 7533)     if (code<=npcodes) and (code>=0) then begin
+ 106 ( 7551)       if not silent then write(codename[code])
+ 107 ( 7569)     end else begin
+ 108 ( 7580)       writeln('pcode not known');
+ 109 ( 7605)       exit;
+ 110 ( 7609)     end;
+ 111 ( 7612)     c:=0;
+ 112 ( 7617)     case codebytes[code] of
+ 113 ( 7628)       2: begin
+ 114 ( 7642)              getbyte(fcode,pc+1,a);
+ 115 ( 7662)              if not silent then write(' ',a);
+ 116 ( 7680)            end;
+ 117 ( 7683)       3: begin
+ 118 ( 7696)              getbyte(fcode,pc+1,a);
+ 119 ( 7716)              getbyte(fcode,pc+2,b);
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.2: program PCODES           19/11/23 page 3
+
+ 120 ( 7736)              c:=a+(b shl 8);
+ 121 ( 7750)              if not silent then begin
+ 122 ( 7763)                { exception for JUMP }
+ 123 ( 7769)                if code=$24 then write(' ',c+pc+1)
+ 124 ( 7795)                else write(' ',c);
+ 125 ( 7810)              end;
+ 126 ( 7813)            end;
+ 127 ( 7816)       4: begin
+ 128 ( 7829)              getbyte(fcode,pc+1,a);
+ 129 ( 7849)              if not silent then write(' ',a,',');
+ 130 ( 7869)              getbyte(fcode,pc+2,a);
+ 131 ( 7889)              getbyte(fcode,pc+3,b);
+ 132 ( 7909)              if not silent then write(' ',a+(b shl 8));
+ 133 ( 7935)            end;
+ 134 ( 7938)       5: begin
+ 135 ( 7951)              getbyte(fcode,pc+1,a);
+ 136 ( 7971)              getbyte(fcode,pc+2,b);
+ 137 ( 7991)              if not silent then
+ 138 ( 7994)                write(' ',a+(b shl 8),' ');
+ 139 ( 8022)              getbyte(fcode,pc+3,a);
+ 140 ( 8042)              getbyte(fcode,pc+4,b);
+ 141 ( 8062)              if not silent then
+ 142 ( 8065)                write(' ',a+(b shl 8));
+ 143 ( 8091)          end;
+ 144 ( 8094)       6: begin
+ 145 ( 8107)            getbyte(fcode,pc+1,a);
+ 146 ( 8127)            if not silent then write(' ',a,',');
+ 147 ( 8147)            getbyte(fcode,pc+2,a);
+ 148 ( 8167)            getbyte(fcode,pc+3,b);
+ 149 ( 8187)            c:=a+(b shl 8); ;
+ 150 ( 8206)            getbyte(fcode,pc+4,a);
+ 151 ( 8226)            getbyte(fcode,pc+5,b);
+ 152 ( 8246)            if not silent then begin
+ 153 ( 8254)              if code=$3a then begin
+ 154 ( 8267)                packreal(c, a+(b shl 8),r);
+ 155 ( 8307)                  write(' '); writeflo(output,r);
+ 156 ( 8326)              end else begin
+ 157 ( 8332)                write(' ',c,' ');
+ 158 ( 8344)                write(' ',a+(b shl 8));
+ 159 ( 8362)              end;
+ 160 ( 8365)            end;
+ 161 ( 8368)          end
+ 162 ( 8371)       end; {case}
+ 163 ( 8376)     case code of
+ 164 ( 8379)       $32: begin { PRTI, stops with bit 8 set }
+ 165 ( 8393)              normal:=false;
+ 166 ( 8398)              if not silent then write(' ',chr($27));
+ 167 ( 8419)              repeat
+ 168 ( 8422)                getbyte(fcode,pc,a);
+ 169 ( 8439)                if not silent then
+ 170 ( 8442)                  write(chr(a and $7f));
+ 171 ( 8462)                pc:=pc+1;
+ 172 ( 8471)                until (a and $80)<>0;
+ 173 ( 8488)              if not silent then write(chr($27));
+ 174 ( 8507)            end;
+ 175 ( 8510)       $39: begin { NBYT, first argument is n bytes }
+ 176 ( 8523)              normal:=false;
+ 177 ( 8528)              getbyte(fcode,pc,a);
+ 178 ( 8549)              if not silent then
+ 179 ( 8552)                write(' ',a,',',chr($27));
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.2: program PCODES           19/11/23 page 4
+
+ 180 ( 8576)              for i:=1 to a do begin
+ 181 ( 8598)                getbyte(fcode,pc,b);
+ 182 ( 8615)                if not silent then
+ 183 ( 8618)                  write(chr(b and $7f));
+ 184 ( 8638)                pc:=pc+1;
+ 185 ( 8647)              end;
+ 186 ( 8655)              if not silent then write(chr($27));
+ 187 ( 8684)            end;
+ 188 ( 8687)       $56: begin { CPNT, stops with endmark }
+ 189 ( 8700)              normal:=false;
+ 190 ( 8705)              if not silent then write(' ',chr($27));
+ 191 ( 8726)              repeat
+ 192 ( 8729)                getbyte(fcode,pc,a);
+ 193 ( 8746)                if (a<>0) and not silent then
+ 194 ( 8756)                  write(chr(a and $7f));
+ 195 ( 8777)                pc:=pc+1;
+ 196 ( 8786)                until a=0;
+ 197 ( 8800)              if not silent then write(chr($27));
+ 198 ( 8819)            end;
+ 199 ( 8822)       $59: begin { LINE }
+ 200 ( 8835)              done:=false;
+ 201 ( 8840)              while (line<=c) and not done do begin
+ 202 ( 8865)                if (line<=last) then begin
+ 203 ( 8877)                  if not silent then writeln;
+ 204 ( 8891)                  done:=readline(scode,linestr);
+ 205 ( 8916)                  if not silent then
+ 206 ( 8923)                    write(invvid,line,' ',
+ 207 ( 8944)                      linestr,norvid);
+ 208 ( 8955)                end;
+ 209 ( 8958)                line:=line+1;
+ 210 ( 8967)              end;
+ 211 ( 8975)            end
+ 212 ( 8981)       end {case};
+ 213 ( 8986)     if not silent then writeln;
+ 214 ( 8997) 
+ 215 ( 9003)     if codebytes[code]<>0 then
+ 216 ( 9016)       pc:=pc+codebytes[code]
+ 217 ( 9027)     else begin
+ 218 ( 9046)       if normal then writeln('codebytes not known')
+ 219 ( 9076)     end;
+ 220 ( 9085)     until (pc>=codesize) or
+ 221 ( 9097)       ((codebytes[code]=0) and normal) or
+ 222 ( 9116)       (line>last+1);
+ 223 ( 9132) end;
+ 224 ( 9139) 
+ 225 ( 9140) proc init;
+ 226 ( 9143) {########}
+ 227 ( 9146) var i:integer;
+ 228 ( 9152)   proc set(p:integer;n:cpnt;b:integer);
+ 229 ( 9155)   begin
+ 230 ( 9158)     codename[p]:=n; codebytes[p]:=b;
+ 231 ( 9182)   end;
+ 232 ( 9193) begin
+ 233 ( 9197)   for i:=0 to npcodes+1 do begin
+ 234 ( 9222)     codename[i]:=nil; codebytes[i]:=0;
+ 235 ( 9241)   end;
+ 236 ( 9248)   set($00,'STOP',1);
+ 237 ( 9282)   set($01,'RETN',1);
+ 238 ( 9302)   set($02,'NEGA',1);
+ 239 ( 9322)   set($03,'ADDA',1);
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.2: program PCODES           19/11/23 page 5
+
+ 240 ( 9342)   set($04,'SUBA',1);
+ 241 ( 9362)   set($05,'MULA',1);
+ 242 ( 9382)   set($06,'DIVA',1);
+ 243 ( 9402)   set($07,'LOWB',1);
+ 244 ( 9422)   set($08,'TEQU',1);
+ 245 ( 9442)   set($09,'TNEQ',1);
+ 246 ( 9462)   set($0a,'TLES',1);
+ 247 ( 9482)   set($0b,'TGRE',1);
+ 248 ( 9502)   set($0c,'TGRT',1);
+ 249 ( 9522)   set($0d,'TLEE',1);
+ 250 ( 9542)   set($0e,'ORAC',1);
+ 251 ( 9562)   set($0f,'ANDA',1);
+ 252 ( 9582)   set($10,'EORA',1);
+ 253 ( 9602)   set($11,'NOTA',1);
+ 254 ( 9622)   set($12,'LEFT',1);
+ 255 ( 9642)   set($13,'RIGH',1);
+ 256 ( 9662)   set($14,'INCA',1);
+ 257 ( 9682)   set($15,'DECA',1);
+ 258 ( 9702)   set($16,'COPY',1);
+ 259 ( 9722)   set($17,'PEEK',1);
+ 260 ( 9742)   set($18,'POKE',1);
+ 261 ( 9762)   set($19,'CALA',1);
+ 262 ( 9782)   set($1a,'RLIN',0);
+ 263 ( 9802)   set($1b,'GETC',1);
+ 264 ( 9822)   set($1c,'GETN',1);
+ 265 ( 9842)   set($1d,'PRTC',1);
+ 266 ( 9862)   set($1e,'PRTN',1);
+ 267 ( 9882)   set($1f,'PRTS',0);
+ 268 ( 9902)   set($20,'LITB',2);
+ 269 ( 9922)   set($21,'INCB',2);
+ 270 ( 9942)   set($22,'LITW',3);
+ 271 ( 9962)   set($23,'INCW',3);
+ 272 ( 9982)   set($24,'JUMP',3);
+ 273 (10002)   set($25,'JMPZ',3);
+ 274 (10022)   set($26,'JMPO',3);
+ 275 (10042)   set($27,'LOAD',4);
+ 276 (10062)   set($28,'LODX',4);
+ 277 (10082)   set($29,'STOR',4);
+ 278 (10102)   set($2a,'STOX',4);
+ 279 (10122)   set($2b,'CALL',4);
+ 280 (10142)   set($2c,'SDEV',1);
+ 281 (10162)   set($2d,'RDEV',1);
+ 282 (10182)   set($2e,'FNAM',1);
+ 283 (10202)   set($2f,'OPNR',1);
+ 284 (10222)   set($30,'OPNW',1);
+ 285 (10242)   set($31,'CLOS',1);
+ 286 (10262)   set($32,'PRTI',0);
+ 287 (10282)   set($33,'GHGH',1);
+ 288 (10302)   set($34,'GLOW',1);
+ 289 (10322)   set($35,'PHGH',1);
+ 290 (10342)   set($36,'PLOW',1);
+ 291 (10362)   set($37,'GSEQ',1);
+ 292 (10382)   set($38,'PSEQ',1);
+ 293 (10402)   set($39,'NBYT',0);
+ 294 (10422)   set($3a,'NWRD',6);
+ 295 (10442)   set($3b,'LODN',2);
+ 296 (10462)   set($3c,'STON',2);
+ 297 (10482)   set($3d,'LODI',1);
+ 298 (10502)   set($3e,'STOI',1);
+ 299 (10522)   set($3f,'EXST',1);
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.2: program PCODES           19/11/23 page 6
+
+ 300 (10542)   set($40,'TIND',5);
+ 301 (10562)   set($41,'RUNP',1);
+ 302 (10582)   set($42,'ADDF',1);
+ 303 (10602)   set($43,'SUBF',1);
+ 304 (10622)   set($44,'MULF',1);
+ 305 (10642)   set($45,'DIVF',1);
+ 306 (10662)   set($46,'FLOF',1);
+ 307 (10682)   set($47,'FIXF',1);
+ 308 (10702)   set($48,'FEQU',1);
+ 309 (10722)   set($49,'FNEQ',1);
+ 310 (10742)   set($4a,'FLES',1);
+ 311 (10762)   set($4b,'FGRE',1);
+ 312 (10782)   set($4c,'FGRT',1);
+ 313 (10802)   set($4d,'FLEE',1);
+ 314 (10822)   set($4e,'FCOM',1);
+ 315 (10842)   set($4f,'TFER',1);
+ 316 (10862)   set($50,'OPRA',1);
+ 317 (10882)   set($51,'GTRA',1);
+ 318 (10902)   set($52,'PTRA',1);
+ 319 (10922)   set($53,'SWA2',1);
+ 320 (10942)   set($54,'LDXI',1);
+ 321 (10962)   set($55,'STXI',4);
+ 322 (10982)   set($56,'CPNT',0);
+ 323 (11002)   set($57,'WRCP',1);
+ 324 (11022)   set($58,'ADPS',1);
+ 325 (11042)   set($59,'LINE',3);
+ 326 (11062) end;
+ 327 (11065) 
+ 328 (11066) begin {main}
+ 329 (11069)   init;
+ 330 (11079)   linestr:=strnew;
+ 331 (11088)   cyclus:=0; drive:=1;
+ 332 (11103)   agetstring(name,default,cyclus,drive);
+ 333 (11150)   setsubtype(name,'R');
+ 334 (11173)   writeln('Opening object file ');
+ 335 (11203)   fcode:=attach(name,0,1,fread,0,0,'R');
+ 336 (11232)   cdsize:=getsize;
+ 337 (11245)   writeln;
+ 338 (11252)   writeln('Object file opened, file size ',
+ 339 (11292)     cdsize div 256,' sectors');
+ 340 (11319)   setsubtype(name,'P');
+ 341 (11342)   asetfile(name,cyclus,drive,'P');
+ 342 (11367)   writeln('Opening source file ');
+ 343 (11397)   openr(scode);
+ 344 (11406)   writeln; writeln('Source file opened');
+ 345 (11440)   first:=0; last:=32000;
+ 346 (11452)   agetval(first,default);
+ 347 (11479)   agetval(last,default);
+ 348 (11502)   writeln('display from ',first,' to ',last);
+ 349 (11540)   showprog;
+ 350 (11547)   close(fcode);
+ 351 (11556)   close(scode);
+ 352 (11565) end.
+
+End compile
+
+Code lenght:          11567
+Compiler stack size:  165
+Ident stack size:     158
+Pascal errors:        0
