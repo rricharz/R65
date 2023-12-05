@@ -41,7 +41,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
+#include <sys/time.h>
 #include "time.h"
 #include "main.h"
 #include "R65.h"
@@ -201,24 +201,31 @@ uint8_t bcd(uint8_t value)
     return (16 * dig1 + dig0);
 }
 
+
 /*******************/
 void setDateAndTime()
 /*******************/
 {
+    
     // get system date and time
-    time_t sysTime = time(NULL);
-    struct tm systm = *localtime(&sysTime);
-    int year = systm.tm_year % 100;
-    int month = systm.tm_mon + 1;
-    int day = systm.tm_mday;
-    int hours = systm.tm_hour;
-    int minutes = systm.tm_min;
-    int seconds = systm.tm_sec;
+    struct timeval tv;
+    struct tm *tm;
+    gettimeofday(&tv, NULL);
+    tm = localtime(&tv.tv_sec);
+    
+    int year = tm->tm_year % 100;
+    int month = tm->tm_mon + 1;
+    int day = tm->tm_mday;
+    int hours = tm->tm_hour;
+    int minutes = tm->tm_min;
+    int seconds = tm->tm_sec;
+    int msec = (int)(tv.tv_usec/1000);
+    
     // make it available
     memory[M8_DATE] = bcd(day);
     memory[M8_DATE + 1] = bcd(month);
     memory[M8_DATE + 2] = bcd(year);
-    memory[M8_TIME] = 0;
+    memory[M8_TIME]     = bcd(msec/10);  // 0.01 sec
     memory[M8_TIME + 1] = bcd(seconds);
     memory[M8_TIME + 2] = bcd(minutes);
     memory[M8_TIME + 3] = bcd(hours);

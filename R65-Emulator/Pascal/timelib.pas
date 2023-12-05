@@ -8,7 +8,7 @@
 
 library timelib;
 
-var seconds,minutes,hours: integer;
+var tenmillis,seconds,minutes,hours: integer;
 
 proc gettime;
 { get time from host system }
@@ -27,6 +27,7 @@ begin
   { required to get date and time from host  }
   dummy:=getbcd0($17b9);
   { now get the data }
+  tenmillis:=getbcd0($17b5);
   seconds:=getbcd0($17b6);
   minutes:=getbcd0($17b7);
   hours:=getbcd0($17b8);
