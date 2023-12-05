@@ -1197,7 +1197,7 @@ PLOW    LDY =126
 * DEVICE HAS TO BE SET  ########
 *
 GSEC    JSR PREPSEC
-        JMP READ
+        JSR READ
         JMP ENDDO
 *
 * P-CODE 38: PSEC
