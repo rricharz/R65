@@ -53,13 +53,8 @@ end;
 proc strcpy(strin, strout:cpnt);
 var i: integer;
 begin
-  i:=0;
-  while (strin[i]<>endmark)
-                and (i<strsize-2) do begin
-    strout[i]:=strin[i];
-    i:=succ(i);
-  end;
-  strout[i]:=endmark;
+  strout[0]:=endmark;
+  write(@strout,strin);
 end;
 
 { **** stradd: add string to string ***** }
@@ -67,13 +62,7 @@ end;
 proc stradd(strin,strinout:cpnt);
 var i,j:integer;
 begin
-    i:=strlen(strinout); j:=0;
-    while (strin[j]<>endmark)
-                and (i<prec(strsize)) do begin
-      strinout[i]:=strin[j];
-      i:=succ(i); j:=succ(j);
-    end;
-    strinout[i]:=endmark;
+  write(@strinout,strin);
 end;
 
 { **** strcmp: compare two strings **** }
@@ -126,36 +115,6 @@ begin
   strread:=i;
 end;
 
-{ **** intstr: convert integer to string **** }
-{ right justified in a field of 6 chars }
-
-proc intstr(n:integer;s:cpnt;fsize:integer);
-var pos,n0,n1:integer;
-    isneg:boolean;
-begin
-  pos:=fsize-1; n0:=n; isneg:=false;
-  if (n0<0) then begin
-    isneg:=true; n0:=-n0;
-  end;
-  s[pos+1]:=chr(0); { end mark }
-  repeat
-    { avoid 2nd division for mod }
-    n1:=n0 div 10;
-    s[pos]:=chr(n0-10*n1+ord('0'));
-    n0:=n1; pos:=pos-1;
-    until (n0=0) or (pos<0);
-  if (n0<>0) or (isneg and (pos<0)) then begin
-    for pos:=0 to fsize-1 do s[pos]:=chr($23);
-  end else begin
-    if isneg then begin
-      s[pos]:='-'; pos:=pos-1;
-    end;
-    while pos>=0 do begin
-      s[pos]:=' '; pos:=pos-1;
-    end;
-  end;
-end;
-
 { hexstr: convert hex byte to hex string }
 
 proc hexstr(d:integer; s:cpnt);
@@ -199,6 +158,16 @@ begin
   for i:=pos to l-1 do
       { move includes end mark }
       s[i]:=s[i+1];
+end;
+
+{ **** intstr: convert integer to string **** }
+{ right justified in a field of 6 chars }
+
+proc intstr(n:integer;s:cpnt;fsize:integer);
+begin
+  s[0]:=endmark;
+  write(@s,n);
+  while strlen(s)<fsize do strinsc(' ',0,s);
 end;
 
 begin

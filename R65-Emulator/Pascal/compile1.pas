@@ -6,7 +6,7 @@
     ********************************
 
 First version 1978 by rricharz
-Original version 3.7 (20K)  01/08/82 rricharz
+Version 3.7 (20K)  01/08/82 rricharz
 
 Recovered 2018 by rricharz (r77@bluewin.ch)
 Improved 2018-2023 by rricharz
@@ -17,7 +17,7 @@ Kin-Man Chung and Herbert Yen in
 Byte, Volume 3, Number 9 and Number 10, 1978
 
 Adapted for the R65 computer system and
-substantially enhanced by rricharz 1978-1982
+substantially enhanced by rricharz 1978-2023
 
 This is a Pascal derivative optimized for 8-bit
 microprocessors (integer type is 16 bit) with
@@ -121,7 +121,7 @@ var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
 
          Low letter:
          i:integer, c:char, p:packed char
-         q:cpoint (pointer to char)
+         q:cpnt (pointer to chars)
          r:real(array multiple of two)
          s:const cpnt
          f:file, b:boolean, u:undefined  }
@@ -801,7 +801,8 @@ begin
             testtype('i'); restype:='q';
           end;
     ' @': begin scan; val:=getcon;
-            testtype('i'); restype:='f'
+            if restype<>'q' then testtype('i');
+            restype:='f'
           end
     else begin
       testto('id'); idpnt:=findid;
@@ -1612,7 +1613,7 @@ begin { *** body of factor *** }
     ' @': begin
             scan; factor(arsize3);
             if arsize3<>0 then error(15);
-            testtype('i');
+            if restype<>'q' then testtype('i');
             restype:='f'
           end;
     'tr': begin
@@ -1991,7 +1992,9 @@ begin {body of statement }
             if token=' (' then begin
               scan;
               if token=' @' then begin
-                scan; express; testtype('f');
+                scan; express;
+                if restype='q' then restype:='f';
+                testtype('f');
                 device:=true; code1(44);
                 testto(' ,');
               end else device:=false;

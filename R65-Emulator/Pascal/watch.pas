@@ -23,19 +23,19 @@ begin
 end;
 
 proc timetostr(c:cpnt; h,m,s,t:integer);
-  proc set2digits(i,pos:integer);
+  proc writebcd(i:integer);
   begin
-    c[pos]:=chr((i div 10)+ord('0'));
-    c[pos+1]:=chr(mod(i,10)+ord('0'));
+    write(@c,chr((i div 10)+ord('0')));
+    write(@c,chr(mod(i,10)+ord('0')));
   end;
 begin
-  strcpy('        ',c);
-  set2digits(h,0);
-  c[1]:=chr(ord(c[1])+128);
-  set2digits(m,2);
-  set2digits(s,5);
+  writebcd(h);
+  c[1]:=chr(ord(c[1])+128); { bit 8 for dot}
+  writebcd(m);
+  write(@c,' ');
+  writebcd(s);
   c[6]:=chr(ord(c[6])+128);
-  c[7]:=chr(t div 10 + ord('0'));
+  write(@c,chr(t div 10 + ord('0')));
 end;
 
 begin
@@ -48,6 +48,7 @@ begin
   mh:=0; mm:=0; ms:=0; mt:=0;
   mode:=mtime;
   repeat
+    s[0]:=endmark;
     gettime;
     case mode of
       mtime:    timetostr(s,hours,minutes,

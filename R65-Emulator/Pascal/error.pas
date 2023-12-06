@@ -4,25 +4,25 @@
         *     ERROR     *
         *               *
         *****************
- 
+
 Displays Pascal error codes as text
- 
+
 Usage: error errnum
- 
+
                                 }
- 
+
 program error;
 uses syslib,arglib;
- 
+
 var err:integer;
     default:boolean;
- 
+
 begin
- 
+
   err:=0;
   agetval(err,default);
   write('Error ',err,': ');
- 
+
   write(invvid);
   case err of
     05: writeln('File type error');
@@ -47,6 +47,7 @@ begin
     88: writeln('Heap overflow');
     89: writeln('Pointer not allocated (nil)');
     90: writeln('Writing to constant string');
+    91: writeln('String too long');
     101: writeln('Argument is not string or default');
     102: writeln('Argument is not number or default');
     103: writeln('Argument is not starting with /');
@@ -58,4 +59,3 @@ begin
     end;
   write(norvid);
 end.
- 
