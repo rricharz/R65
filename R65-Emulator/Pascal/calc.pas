@@ -41,16 +41,6 @@ begin
   else ch:=cr;
 end;
 
-proc release(s: cpnt);
-{********************}
-{ Only the last allocated string can be released }
-{ This is suitable for recursive functions }
-mem endstk=$000e: integer;
-begin
-  if cpnt(endstk)=s then endstk:=endstk+strsize
-  else error('Cannot release string',' ');
-end;
-
 func fix(rf: real): integer;
 {**************************}
 var rnd:real;
@@ -72,7 +62,7 @@ proc checkfor(c: char);
 var s1,s2:cpnt;
 begin
   if ch<>c then begin
-    s1:=strnew; s2:=strnew;
+    s1:=new; s2:=new;
     strcpy('Expected ',s1);
     if c=cr then strcpy('Expected <eol>',s1)
     else strinsc(c,9,s1);
@@ -129,7 +119,7 @@ proc showled(s1:cpnt);
 var s2:cpnt;
     pos,i,l:integer;
 begin
-  s2:=strnew;
+  s2:=new;
   strcpy(s1,s2);
   { remove any space }
   pos:=strpos(' ',s2,0);
@@ -218,7 +208,7 @@ proc showresult;
 var s1: cpnt;
     rnd: real;
 begin
-  s1:=strnew;
+  s1:=new;
   writeauto(@s1,r);
   write(s1);
   if (r>-32768.5) and (r<32767.5) then begin
@@ -266,7 +256,7 @@ var i: integer;
     r: real;
     lstring: cpnt;
 begin
-  lstring:=strnew;
+  lstring:=new;
   lstring[0]:=chr(0);
   strinsc(ch,0,lstring); readch; i:=1;
   while isletter(ch) do begin

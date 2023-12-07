@@ -44,7 +44,7 @@ begin
   writeln('  S: Start/stop stop watch');
   writeln('  T: Current time');
   writeln('  Q: Quit');
-  s:=strnew;
+  s:=new;
   mh:=0; mm:=0; ms:=0; mt:=0;
   mode:=mtime;
   repeat

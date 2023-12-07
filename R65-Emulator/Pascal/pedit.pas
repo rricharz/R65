@@ -95,15 +95,15 @@ begin
   clrmessage;
 end;
 
-func new:cpnt;
+func rnew:cpnt;
 var i:integer;
     s:cpnt;
 begin
   if relpnt<maxlines-1 then begin
     relpnt:=relpnt+1; s:=linepnt[relpnt];
-  end else if nlines<maxlines-1 then s:=strnew
+  end else if nlines<maxlines-1 then s:=new
   else s:=nil;
-  new:=s;
+  rnew:=s;
   if s<>nil then begin
     for i:=0 to xmax-1 do s[i]:=' ';
     s[xmax]:=endmark;
@@ -115,7 +115,7 @@ end;
 
 proc newline;
 begin
-  linepnt[nlines]:=new;
+  linepnt[nlines]:=rnew;
   nlines:=nlines+1;
 end;
 
@@ -365,7 +365,7 @@ begin
   maxl1:=maxlines-9;
   showtop;
   repeat
-    linepnt[nlines] := new;
+    linepnt[nlines] := rnew;
     iseof := readline(fno, linepnt[nlines]);
     nlines := nlines+1;
     if (nlines and $1f)=0 then showtop;
@@ -486,7 +486,7 @@ begin
       for i:=nlines-1 downto line+1 do
         linepnt[i+1]:=linepnt[i];
       end;
-    linepnt[line+1]:=new;
+    linepnt[line+1]:=rnew;
     s1:=linepnt[line+1]; s2:=linepnt[line];
     for i:=0 to xmax-1 do s1[i]:=' ';
     for i:=curpos to xmax-1 do begin
@@ -510,7 +510,7 @@ begin
           linepnt[i+1]:=linepnt[i];
         nlines:=nlines+1;
         if mark>line then mark:=mark+1;
-        linepnt[line]:=new;
+        linepnt[line]:=rnew;
         s1:=linepnt[line];
         s2:=linepnt[mark+l];
         for i:=0 to xmax do s1[i]:=s2[i];
@@ -630,7 +630,7 @@ end;
 
 proc newline;
 begin
-  linepnt[nlines]:=new; nlines:=nlines+1;
+  linepnt[nlines]:=rnew; nlines:=nlines+1;
 end;
 
 proc insert(ch:char;l:integer);
@@ -652,7 +652,7 @@ end;
 
 begin {main}
   for i:=0 to maxlines-1 do linepnt[i]:=nil;
-  stemp:=strnew; stemp2:=strnew; fs:=strnew; debug:=0;
+  stemp:=new; stemp2:=new; fs:=new; debug:=0;
   setnumlin($0f,$37); write(hom,clrscr);
   putontop('Line xxx of xxx',0,true);
   relpnt:=maxlines-1; mark:=0; savecx:=1;

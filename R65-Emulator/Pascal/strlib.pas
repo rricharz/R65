@@ -10,15 +10,23 @@ library strlib;
 const strsize=64;
       endmark=chr(0);
 
-{ ***** strnew: allocate heap memory for cpnt ***** }
+{ ***** runerr: stop with runtime error ***** }
 
-func strnew:cpnt;
+proc runerr(e:integer);
 const stopcode = $2010;
-        mem   endstk = $000e: integer;
-      runerr = $000c: integer&;
-      sp     = $0008: integer;
-var freewords,i:integer;
-    str:cpnt;
+mem   runerr = $000c: integer&;
+begin
+  runerr:=e;
+  call(stopcode);
+end;
+
+{ ***** new: allocate heap memory ***** }
+
+func new:cpnt;
+mem  sp     = $0008: integer;
+     endstk = $000e: integer;
+var  freewords,i:integer;
+     str:cpnt;
 begin
   { Pascal has no type unsigned integer. }
   { But the free space can be larger than 32767 }
@@ -26,15 +34,25 @@ begin
   freewords:=(endstk-sp) shr 1;
   if freewords < (strsize + 256) then begin
     { 256 words are left for the growing stack }
-    runerr:=$88;
-    call(stopcode);
+    runerr($88);
   end;
   { allocate heap memory }
   endstk:=endstk-strsize;
   str:=cpnt(endstk);
   { initialize the string }
   str[0]:=endmark;
-  strnew:=str;
+  new:=str;
+end;
+
+{ ***** release: release heap memory ***** }
+
+proc release(s: cpnt);
+{ Only the last allocated string can be released }
+{ This is suitable for recursive functions }
+mem endstk=$000e: integer;
+begin
+  if cpnt(endstk)=s then endstk:=endstk+strsize
+  else runerr($92);
 end;
 
 { ***** strlen: length of string ***** }
@@ -147,6 +165,7 @@ begin
     end;
     s[pos]:=ch;
   end
+  else runerr($91);
 end;
 
 { *** strdelc: delete char in string *** }

@@ -21,7 +21,9 @@ longest name is. Then computes the number
 of columns which can be displayed and
 displays the directory.
 
-Usage:  dir drive                   }
+option /s sorts the directory
+
+Usage:  dir drive [/s]                   }
 
 program dir;
 uses syslib,arglib,strlib;
@@ -140,7 +142,7 @@ begin {main}
     if filtyp<>chr(0) then begin
       { check for deleted flag }
       if (fillnk and 255)<128 then begin
-        entry[ti]:=strnew;
+        entry[ti]:=new;
         s:=entry[ti];
         for i:=0 to 15 do s[i]:=filnam[i];
         for i:=16 to 20 do s[i]:=' ';

@@ -327,7 +327,7 @@ end;
 
 begin {main}
   init;
-  linestr:=strnew;
+  linestr:=new;
   cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
   setsubtype(name,'R');
