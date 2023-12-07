@@ -35,6 +35,7 @@ begin
 end;
 
 proc readch;
+{**********}
 begin
   if firsterror then read(@input,ch)
   else ch:=cr;
@@ -52,17 +53,18 @@ end;
 
 func fix(rf: real): integer;
 {**************************}
+var rnd:real;
 begin
-  if (rf>32767.5) then begin
+  if rf>=0.0 then rnd:=0.5 else rnd:=-0.5;
+  if (rf>=32767.5) then begin
       error('Integer value exceeds',
         'upper limit, set to 32767');
       fix:=$7fff;
-    end else if (rf<-32768.5) then begin
+    end else if (rf<=-32768.5) then begin
       error('Integer value exceeds',
         ' lower limit, set to -32768');
       fix:=$8000;
-    end else
-    fix:=trunc(rf);
+    end else fix:=trunc(rf+rnd);
 end;
 
 proc checkfor(c: char);
@@ -125,26 +127,41 @@ end;
 proc showled(s1:cpnt);
 {********************}
 var s2:cpnt;
-    pos1,i,mask:integer;
+    pos,i,l:integer;
 begin
   s2:=strnew;
-  { s1 is left justfied (except space for minus}
-  { s1 has no end mark and should not be modified }
-  mask:=0;
-  for i:=11 downto 0 do begin
-    if (s1[i]<>' ') and (s1[i]<>'+') then begin
-      if s1[i]='.' then
-        mask:=128
-      else begin
-        strinsc(chr(ord(s1[i]) or mask),0,s2);
-        mask:=0;
-      end;
-    end;
+  strcpy(s1,s2);
+  { remove any space }
+  pos:=strpos(' ',s2,0);
+  while pos>=0 do begin
+    strdelc(pos,s2);
+    pos:=strpos(' ',s2,0);
   end;
+  { remove any plus sign }
+  pos:=strpos('+',s2,0);
+  while pos>=0 do begin
+    strdelc(pos,s2);
+    pos:=strpos('+',s2,0);
+  end;
+  { convert point to bit 8 }
+  pos:=strpos('.',s2,0);
+  while pos>0 do begin
+    strdelc(pos,s2);
+    s2[pos-1]:=chr(ord(s2[pos-1]) or 128);
+    pos:=strpos('.',s2,0);
+  end;
+  { remove unnecessary 0 in exponent, if necessary }
+  l:=strlen(s2);
+  if (l>8) and (s2[l-2]='0') and
+    (strpos('e',s2,0)>0) then strdelc(l-2,s2);
+  { remove e as a last resort (exp is negative) }
+  if strlen(s2)>8 then begin
+    pos:=strpos('e',s2,0);
+    if pos>0 then strdelc(pos,s2);
+  end;
+  { right justify }
   while strlen(s2)<8 do strinsc(' ',0,s2);
-  if (strlen(s2)>8) and (s2[7]='0') and
-    (s2[6]='-') and (s2[5]='e') then strdelc(7,s2);
-  if strlen(s2)>8 then strcpy('--------',s2);
+  { show converted string }
   ledstring(s2);
   release(s2);
 end;
@@ -155,23 +172,15 @@ proc writeauto(f:file;r:real);
 var m,m1,max,rnd: real;
     i1,d1:integer;
     sign: char;
-    s1:cpnt;
 begin
-  { 7-segment display is copy of video memory }
-  s1:=cpnt(vidpnt);
   sign:=' '; m:=r;
   if m<0. then begin
     sign:='-'; m:=-m;
   end;
   if dotused and (m>=10000.0) then writeflo(f,r)
-  else if m=0. then begin
-    write(@f,' 0',tab8,tab8); writehex(f,0);
-    write(@f,'  ',tab8); writebinary(f,0);
-  end else if r=conv($8000) then begin
-    write(@f,'-32768',tab8,tab8); write(@f,'$8000');
-    write(@f,'  ',tab8);
-    write(@f,'% 1000 0000 0000 0000');
-  end else if m>=32767.5 then writeflo(f,r)
+  else if m=0. then write(@f,' 0')
+  else if r=conv($8000) then write(@f,'-32768 ')
+  else if m>=32767.5 then writeflo(f,r)
   else if m<0.01 then writeflo(f,r)
   else begin
     if m>=10000. then begin
@@ -201,10 +210,25 @@ begin
       m1:=10.*m1; write(@f,trunc(m1));
       m1:=m1-conv(trunc(m1));
     end;
-    write(@f,'  ',tab8); writehex(f,trunc(r+rnd));
-    write(@f,'  ',tab8); writebinary(f,trunc(r+rnd))
   end;
+end;
+
+proc showresult;
+{**************}
+var s1: cpnt;
+    rnd: real;
+begin
+  s1:=strnew;
+  writeauto(@s1,r);
+  write(s1);
+  if (r>-32768.5) and (r<32767.5) then begin
+    if r>=0.0 then rnd:=0.5 else rnd:=-0.5;
+    tab(16); writehex(output,fix(r));
+    tab(24); writebinary(output,fix(r));
+  end;
+  writeln;
   showled(s1);
+  release(s1);
 end;
 
 func express:real;
@@ -430,7 +454,7 @@ begin
   repeat
     firsterror:=true;
     clearinput;
-    stop:=true; writeauto(output,r); writeln;
+    stop:=true; showresult;
     dotused:=false; lastr:=r; r:=express; checkfor(cr);
   until stop;
 end.
