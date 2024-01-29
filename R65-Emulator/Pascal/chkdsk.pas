@@ -93,9 +93,6 @@ proc check;
 var i:integer;
     ok:boolean;
 begin
-  scyfc:=entry;
-  call(agetentx);
-    checkfilerr;
   write(entry+1,' ');
   if (fillnk and 255) >= 128 then
     write('DELETED SPACE       ')
@@ -129,10 +126,16 @@ begin
     abort;
   end;
   notok:=false;
+  scyfc:=entry;
+  call(agetentx);
+  checkfilerr;
   repeat
     check;
     entry:=entry+1;
-  until (filtyp=chr(0)) or (entry>maxent);
+    scyfc:=entry;
+    call(agetentx);
+    checkfilerr;
+    until (filtyp=chr(0)) or (entry>maxent);
   if notok then
     writeln(invvid,'INCONSISTENCY FOUND',norvid);
   call(aenddo);
