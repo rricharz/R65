@@ -397,9 +397,12 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
 {
     // printf("key pressed, state =%04X, keyval=%04X\n", event->state, event->keyval);
     
-    // ignore option key event, required if vnc client is used on mac
-    // the keyval is already adjusted accordingly
-    if (event->keyval == 0xFE03) return;
+    // ignore shift, control and option key events, required if
+    // vnc client is used on mac.
+    // the keyval is already adjusted accordingly.
+    if ((event->keyval == 0xFE03) || (event->keyval == 0xFFE1)
+       || (event->keyval == 0xFFE3))
+    return;
         
     // control keys
     if (event->state & GDK_CONTROL_MASK) {
