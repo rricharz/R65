@@ -35,11 +35,11 @@ begin
   draw(20,65,white);
   j:=$8000;
   for i:=0 to 15 do begin
-    plot(45+5*i,110,white);
-    plot(45+5*i+1,110,white);
-    plot(45+5*i+2,110,white);
-    plot(45+5*i+3,110,white);
-    plotmap(45+5*i,112,j);
+    plot(45+4*i,110,white);
+    plot(45+4*i+1,110,white);
+    plot(45+4*i+2,110,white);
+    plot(45+4*i+3,110,white);
+    plotmap(45+4*i,112,j);
     j:=j shr 1;
   end;
   move(35,5);

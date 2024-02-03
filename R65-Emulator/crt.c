@@ -312,7 +312,7 @@ void crtUpdate()
                     for (double bit = xdot2 * xx; bit < xdot2 * (xx + 8); bit+= xdot2) {
                         if (val & mask) {
                             Rect(crtOffset + bit,  crtHeight + crtOffset - yy,
-                                    (int)xdot2 + 1, (int)ydot2 + 1);
+                                    (int)xdot2, (int)ydot2);
                         }
                         mask = mask >> 1;                         
                     }
