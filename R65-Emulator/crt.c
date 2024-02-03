@@ -36,8 +36,8 @@ int      global_graphicsFlag;
 int      hcell;
 int      vcell;
 int      csize;
-int      xdot2;
-int      ydot2;
+double   xdot2;
+double   ydot2;
 int      showCursor;
 
 int led[NUM_LEDS];
@@ -53,9 +53,9 @@ void crt_init()
     for (int i = 0; i < NUM_LEDS; i++)
         led[i] = 0;
     global_graphicsFlag = 0;
-    xdot2 = crtWidth / 112;
-    ydot2 = crtHeight / 59;
-    printf("Dot size = %0.1f x %0.1f\n", (double)xdot2/2.0, (double)ydot2/2.0);
+    xdot2 = (double)crtWidth / (double)NUMXDOTS;
+    ydot2 = (double)crtHeight / (double) NUMYDOTS;
+    printf("Dot size = %0.1f x %0.1f\n", xdot2, ydot2);
     // In order to handle the fractional expansion
     // factor on some displays, white (cyan) dots are one dot larger
     // than black ones. This allows to make all visible dots the same
@@ -304,16 +304,15 @@ void crtUpdate()
         int xx, yy;
         if (global_graphicsFlag) {
             int pnt = 0x0700;
-            for (yy = 0; yy < (118 * ydot2); yy += ydot2) {
-                for (xx = 0; xx < 224; xx += 8) {
+            for (double yy = 0.0; yy < ((double)NUMYDOTS * ydot2); yy += ydot2) {
+                for (int xx = 0; xx < NUMXDOTS; xx += 8) {
                     int mask = 128;
                     int val = read6502_8(pnt);
                     pnt++;
-                    for (int bit = xdot2 * xx; bit < xdot2 * (xx + 8); bit+= xdot2) {
+                    for (double bit = xdot2 * xx; bit < xdot2 * (xx + 8); bit+= xdot2) {
                         if (val & mask) {
-                            Rect((bit >> 1) + 9 + crtOffset, 
-                                crtHeight - (yy >> 1) - 15 + crtOffset,
-                                    (xdot2 - 3) >> 1, (ydot2 - 3) >> 1);
+                            Rect(crtOffset + bit,  crtHeight + crtOffset - yy,
+                                    (int)xdot2 + 1, (int)ydot2 + 1);
                         }
                         mask = mask >> 1;                         
                     }

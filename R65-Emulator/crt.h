@@ -23,6 +23,8 @@
 #define SDOWN_HPOS  (panelOffset + 2 * panelScale) // SHUTDOWN button
 #define SDOWN_HSIZE (63 * panelScale)
 
+#define NUMXDOTS    224     // size of graphics area in dots
+#define NUMYDOTS    118
 
 #define NUM_LEDS    2   // Number of leds
 #define LED_VPOS   (245 * panelScale)
