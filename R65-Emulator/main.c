@@ -534,12 +534,12 @@ int main (int argc, char *argv[])
 	
     gtk_window_set_title(GTK_WINDOW(global_window), WINDOW_NAME);
 	
+    gtk_widget_set_events(darea,gtk_widget_get_events(darea) | GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK);	
     g_signal_connect(G_OBJECT(darea), "draw",  G_CALLBACK(on_draw_event), NULL);
     g_signal_connect(G_OBJECT(global_window), "destroy", G_CALLBACK(on_quit_event), NULL);
-    g_signal_connect(G_OBJECT(global_window), "button-press-event", G_CALLBACK(clicked), NULL);
-    g_signal_connect(G_OBJECT(global_window), "button-release-event", G_CALLBACK(released), NULL);
+    g_signal_connect(G_OBJECT(darea), "button-press-event", G_CALLBACK(clicked), NULL);
+    g_signal_connect(G_OBJECT(darea), "button-release-event", G_CALLBACK(released), NULL);
     g_signal_connect(G_OBJECT(global_window), "key_press_event", G_CALLBACK(on_key_press), NULL);
-
 	
     if (strlen(ICON_NAME) > 0) {
 	gtk_window_set_icon_from_file(GTK_WINDOW(global_window), ICON_NAME, NULL);	

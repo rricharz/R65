@@ -15,14 +15,6 @@
 #define NUMCHAR     (read6502(0x178A)+1)
 #define NUMLINES    16   // number of lines
 
-#define QUIT_HPOS   (SDOWN_HPOS + SDOWN_HSIZE + panelScale * 7)  // Horizontal position of QUIT button
-#define QUIT_VPOS   (QUIT_VSIZE + (crtOffset / 2))                // Vertical position of QUIT button
-#define QUIT_HSIZE  (42 * panelScale)                             // horizontal size of QUIT button
-#define QUIT_VSIZE  (15 * panelScale)                             // vertical size of QUIT button
-#define STOP_HPOS   (SDOWN_HPOS + SDOWN_HSIZE + QUIT_HSIZE + panelScale * 14) // STOP button
-#define SDOWN_HPOS  (panelOffset + 2 * panelScale) // SHUTDOWN button
-#define SDOWN_HSIZE (63 * panelScale)
-
 #define NUMXDOTS    224     // size of graphics area in dots
 #define NUMYDOTS    118
 

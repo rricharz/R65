@@ -39,6 +39,14 @@ int      csize;
 double   xdot2;
 double   ydot2;
 int      showCursor;
+int      quit_hsize;     // horizontal size of QUIT button
+int      quit_vsize;     // vertical size of QUIT button
+int      quit_vpos;      // Vertical position of QUIT button
+int      sdown_hpos;     // SHUTDOWN button
+int      sdown_hsize;
+int      quit_hpos;      // Horizontal position of QUIT button
+int      stop_hpos;      // STOP button
+
 
 int led[NUM_LEDS];
 
@@ -61,6 +69,14 @@ void crt_init()
     // than black ones. This allows to make all visible dots the same
     // size. The alternative would be to have variable dot sizes,
     // but this would be very visible.
+    quit_hsize  = 42 * panelScale;
+    quit_vsize  = 15 * panelScale;
+    quit_vpos   = quit_vsize + (crtOffset / 2);
+    sdown_hpos  = panelOffset + 2 * panelScale;
+    sdown_hsize = 63 * panelScale;
+    quit_hpos   = sdown_hpos + sdown_hsize + panelScale * 7;
+    stop_hpos   = sdown_hpos + sdown_hsize + quit_hsize + panelScale * 14;
+
 }
 
 /*******************************/
@@ -82,6 +98,7 @@ void checkInfoBarButtons()
 // display the information bar
 {
     int x, y;
+    
     checkClick(&x, &y);
     
     if (exDisplay) {
@@ -98,23 +115,27 @@ void checkInfoBarButtons()
     }
     
     if (x > 0) {
+        
+        // printf("Check button click at %d,%d\n",x,y);
     
         // check for Quit button
-        if ((x >= QUIT_HPOS) && (x <= QUIT_HPOS + QUIT_HSIZE)
-            && (y <= QUIT_HPOS) && (y >= QUIT_VPOS - QUIT_VSIZE)) {
+        if ((x >= quit_hpos) && (x <= quit_hpos + quit_hsize)
+            && (y <= quit_vpos) && (y >= quit_vpos - quit_vsize)) {
+            printf("QUIT button clicked\n");
             QuitProgram(0);
         }
     
         // check for Stop button
-        if ((x >= STOP_HPOS) && (x <= STOP_HPOS + QUIT_HSIZE)
-           && (y <= QUIT_HPOS) && (y >= QUIT_VPOS - QUIT_VSIZE)) {        
-            printf("Executing NMI\n");
+        if ((x >= stop_hpos) && (x <= stop_hpos + quit_hsize)
+           && (y <= quit_vpos) && (y >= quit_vpos - quit_vsize)) {        
+            printf("BREAK button clicked\n");
             pendingNMI = 1;
         }
             
         // check for Shutdown button
-        if ((x >= SDOWN_HPOS) && (x <= SDOWN_HPOS + SDOWN_HSIZE)
-           && (y <= QUIT_HPOS) && (y >= QUIT_VPOS - QUIT_VSIZE)) {        
+        if ((x >= sdown_hpos) && (x <= sdown_hpos + sdown_hsize)
+           && (y <= quit_vpos) && (y >= quit_vpos - quit_vsize)) {
+            printf("SHUTDOWN button clicked\n");        
             QuitProgram(1);
         }
     }
@@ -152,21 +173,22 @@ void infoPanel()
 // display the information bar
 {
     char s1[16], s2[16], s3[16];
-    char * s; 
+    char * s;
+    
     // show Quit button
     SETBUTTONCOLOR;
-    Rect(QUIT_HPOS, QUIT_VPOS, QUIT_HSIZE, QUIT_VSIZE);
-    Text(QUIT_HPOS + (PANEL_FONTSIZE / 2), QUIT_VPOS - (PANEL_FONTSIZE / 3),
+    Rect(quit_hpos, quit_vpos, quit_hsize, quit_vsize);
+    Text(quit_hpos + (PANEL_FONTSIZE / 2), quit_vpos - (PANEL_FONTSIZE / 3),
       "QUIT", "Monospace", PANEL_FONTSIZE, 0, 0);
     
     // show STOP button
-    Rect(STOP_HPOS, QUIT_VPOS, QUIT_HSIZE, QUIT_VSIZE);
-    Text(STOP_HPOS + (PANEL_FONTSIZE / 3), QUIT_VPOS - (PANEL_FONTSIZE / 3),
+    Rect(stop_hpos, quit_vpos, quit_hsize, quit_vsize);
+    Text(stop_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 3),
       "BREAK", "Monospace", PANEL_FONTSIZE, 0, 0);
       
     // show SHUTDOWN button
-    Rect(SDOWN_HPOS, QUIT_VPOS, SDOWN_HSIZE, QUIT_VSIZE);
-    Text(SDOWN_HPOS + (PANEL_FONTSIZE / 3), QUIT_VPOS - (PANEL_FONTSIZE / 3),
+    Rect(sdown_hpos, quit_vpos, sdown_hsize, quit_vsize);
+    Text(sdown_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 3),
       "SHUTDOWN", "Monospace", PANEL_FONTSIZE, 0, 0);
       
     // show leds
@@ -254,11 +276,11 @@ void infoPanel()
         s = s3;
     }
     if (exDisplay) led_showstring(s, 0);
-    crt_show7segmentDisplay(s1, QUIT_VPOS + 2 * QUIT_VSIZE + 16 * panelScale,
+    crt_show7segmentDisplay(s1, quit_vpos + 2 * quit_vsize + 16 * panelScale,
         "KIM-1 display");
-    crt_show7segmentDisplay(s2, QUIT_VPOS + 2 * QUIT_VSIZE + 76 * panelScale,
+    crt_show7segmentDisplay(s2, quit_vpos + 2 * quit_vsize + 76 * panelScale,
         "6502 pc and s");
-    crt_show7segmentDisplay(s3, QUIT_VPOS + 2 * QUIT_VSIZE + 136 * panelScale,
+    crt_show7segmentDisplay(s3, quit_vpos + 2 * quit_vsize + 136 * panelScale,
         "Pascal pc and free pages");
 
     SETBUTTONCOLOR;
