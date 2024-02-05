@@ -1,4 +1,4 @@
-{ TEK3D:P R65 tiny Pascal math demo
+{ GR3d3D:P R65 Pascal math demo
   rricharz 2019 }
 
 program gr3d;
@@ -24,8 +24,6 @@ begin
 end;
 
 proc drawvec(x1,y1,x2,y2);
-{ draw vector, do not leave graphics mode }
-{ to avoid cursor showing up }
 begin
   move(x1,y1);
   draw(x2,y2,white);
@@ -106,9 +104,7 @@ begin
   dx:=6.0;
   dy:=3.0;
 
-  grinit; cleargr;
-
-{*******************************************}
+  grinit; cleargr; splitgraph;
 
   step:=20.0;
   max:=360.0;
@@ -281,10 +277,5 @@ begin
     end;
     y:=y+step;
   end;
-
-{*******************************************}
-
-  waitforkey;
-  grend;
 
 end.

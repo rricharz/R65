@@ -8,8 +8,7 @@ var a,b: real;
     ch: char;
 
 begin
-  grinit;
-  cleargr;
+  grinit; cleargr; splitgraph;
   move(0,ysize div 2);
   draw(xsize,ysize div 2,white);
   for x:=0 to xsize do begin
@@ -24,8 +23,6 @@ begin
     y:=trunc(b*conv(ysize)/2.1)+(ysize div 2);
     plot(x,y,white);
   end;
-  read(@key,ch);
-  grend;
 
   writeln(' angle',tab8,'  sin',tab8,'  cos');
   for i:=1 to 24 do begin
@@ -38,4 +35,3 @@ begin
     writeln;
   end;
 end.
- 

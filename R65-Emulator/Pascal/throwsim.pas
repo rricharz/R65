@@ -11,8 +11,7 @@ var angle,speed,xspeed,yspeed: real;
     ch: char;
 
 begin
-  grinit;
-  cleargr;
+  grinit;  cleargr; splitgraph;
   speed:=1.;
   for i:=1 to 11 do begin
     angle:=7.5*conv(i);
@@ -27,7 +26,4 @@ begin
       yspeed:=yspeed-0.005;
     until (trunc(x)>xsize) or (trunc(y)<0);
   end;
-  read(@key,ch);
-  grend;
 end.
- 
