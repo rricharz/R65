@@ -25,7 +25,7 @@ const aedit=$c80f; { exdos vector }
       cup = chr($1a);
 mem filerr=$db: integer&;
 
-var cyclus,drive,dummy: integer;
+var cyclus,drive,free: integer;
     name: array[15] of char;
     default: boolean;
 
@@ -48,14 +48,30 @@ begin
     emucom:=6;
 end;
 
+proc setsubtype(subtype:char);
+{ only set subtype if not already there }
+var i:integer;
+begin
+  i:=0;
+  repeat
+    i:=i+1;
+  until (name[i]=':') or
+    (name[i]=' ') or (i>=14);
+  if name[i]<>':' then begin
+    name[i]:=':';
+    name[i+1]:=subtype;
+  end;
+end;
+
 begin { main }
   cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
-  asetfile(name,cyclus,drive,'P');
+  setsubtype('P');
+  asetfile(name,cyclus,drive,' ');
   delay10msec(3); { allow R65 display to updatee }
   write(cup);
   call(aedit);
   if filerr<>0 then bcderror(filerr);
   writeln;
-  dummy:=freedsk(fildrv,true);
+  free:=freedsk(fildrv,true);
 end.

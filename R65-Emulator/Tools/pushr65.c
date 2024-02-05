@@ -16,6 +16,7 @@
 // .pa2   pascal binary files     B     R      :R
 // .pb1   pascal lib loader file  S     T      :T
 // .lib   pascal library table    S     L      :L
+// .help  pascal help files       S     H      :H
 //
 // (subnames are used to differentiate files for
 // commands such as DELETE, RENAME etc. They are
@@ -299,6 +300,12 @@ int main(int argc, char *argv[])
         subtype = 'T';      // Pascal library file
         maxCharPerLine = 32767;
         subname = 'T';
+    }
+    else if ((end = strstr(argv[1],".help")) != NULL) {
+        type = 'S';
+        subtype = 'H';      // Pascal library file
+        maxCharPerLine = 48;
+        subname = 'H';
     }
     else {
         printf("Filename must end with .asm,.txt,.pas,.pa2,.lib,.li1\n");

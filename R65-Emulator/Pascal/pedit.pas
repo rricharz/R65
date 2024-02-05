@@ -344,19 +344,35 @@ begin
     savecx:=curpos+1;
 end;
 
+proc setsubtype(subtype:char);
+{ only set subtype if not already there }
+var i:integer;
+begin
+  i:=0;
+  repeat
+    i:=i+1;
+  until (name[i]=':') or
+    (name[i]=' ') or (i>=14);
+  if name[i]<>':' then begin
+    name[i]:=':';
+    name[i+1]:=subtype;
+  end;
+end;
+
 proc readinput;
 var i,pend,maxl1:integer;
 begin
   cyclus:=0; drive:=1;
   goto(1,1); write(clrscr); goto(1,0);
   agetstring(name,default,cyclus,drive);
-  asetfile(name,cyclus,drive,'P');
+  setsubtype('P');
+  asetfile(name,cyclus,drive,' ');
   openr(fno);
   nlines := 1; line:=1; topline:=1;
   pend:=15; while name[pend]=' ' do pend:=pend-1;
   for i:=0 to pend do stemp[i]:=name[i];
   stemp[pend+1]:=endmark;
-  stradd(':P.',stemp);
+  stradd('.',stemp);
   hexstr(filcyc,stemp2);
   stradd(stemp2,stemp);
   while strlen(stemp)<17 do stradd(' ',stemp);
@@ -383,7 +399,7 @@ var pos,endpos,nlm1:integer;s,saveline:cpnt;
 begin
   cyclus:=0; drive:=1;
   goto(1,1); write(clrscr); goto(1,0);
-  asetfile(name,cyclus,drive,'P');
+  asetfile(name,cyclus,drive,' ');
   openw(fno);
   putontop('Writing',36,true);
   nlm1:=nlines-1;

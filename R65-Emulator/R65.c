@@ -390,6 +390,8 @@ int i, end, filtyp, filstp;
         extension = ".asm";
     else if (filstp == 'P')
         extension = ".pas";
+    else if (filstp == 'H')
+        extension = ".help";
     else
         extension = ".txt";
     

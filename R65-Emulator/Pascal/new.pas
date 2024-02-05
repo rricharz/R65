@@ -46,13 +46,29 @@ begin
       haswildcard:=true;
 end;
 
+proc setsubtype(subtype:char);
+{ only set subtype if not already there }
+var i:integer;
+begin
+  i:=0;
+  repeat
+    i:=i+1;
+  until (name[i]=':') or
+    (name[i]=' ') or (i>=14);
+  if name[i]<>':' then begin
+    name[i]:=':';
+    name[i+1]:=subtype;
+  end;
+end;
+
 begin
   cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
   if haswildcard(name) then
     writeln(invvid,'Wild cards not allowed',norvid)
   else begin
-    asetfile(name,cyclus,drive,'P');
+    setsubtype('P');
+    asetfile(name,cyclus,drive,' ');
     write(cup); { avoid empty line }
     call(anew);
     if filerr<>0 then bcderror(filerr);

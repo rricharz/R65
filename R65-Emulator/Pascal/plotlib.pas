@@ -43,7 +43,7 @@ mem emucom=$1430: integer&;
     emures=$1431: integer&;
 begin
   emucom := 7;
-  syncscreen := emures; 
+  syncscreen := emures;
 end;
 
 { grinit: initialize memory for }
@@ -233,12 +233,15 @@ end;
 
 proc waitforkey;
 const key=@1;
+      toggle=chr($0c);
 var ch:char;
 begin
-  read(@key,ch);
+  repeat
+    read(@key,ch);
+    if ch=toggle then write(ch);
+  until ch<>toggle;
 end;
 
 begin {initialization}
   grinit;
 end.
-              
