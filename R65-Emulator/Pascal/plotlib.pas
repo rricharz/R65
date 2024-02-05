@@ -77,7 +77,7 @@ end;
 
 { dgraphics: go to graphics display }
 
-proc dgraphics;
+proc fullgraph;
 const icrtgr=$e016;
 begin
   call(icrtgr);
@@ -85,7 +85,7 @@ end;
 
 { dalpha: go to alpha display }
 
-proc dalpha;
+proc splitgraph;
 const icrtal=$e015;
 begin
   call(icrtal);

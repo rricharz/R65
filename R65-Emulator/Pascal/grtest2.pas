@@ -23,7 +23,7 @@ begin
   ycenter:=ysize div 2;
   radius:=9*ysize div 20;
 
-  grinit; cleargr;
+  grinit; cleargr; splitgrap;
 
   drawcircle(xcenter, ycenter, radius);
 
@@ -35,7 +35,4 @@ begin
          trunc(sin(conv(4*ii))*conv(radius)),
          white);
   end;
-
-  waitforkey;
-  grend;
-end. 
+end.

@@ -74,9 +74,9 @@ begin
     findond('PROGRAMS        ',0);
     findond('SOURCE          ',0);
     findond('BASIC           ',0);
+    findond('HELP            ',0);
     findond('PSOURCE         ',0);
     findond('PASCAL          ',0);
   end;
 end.
 
-

@@ -495,6 +495,16 @@ void write6502(uint16_t address, uint8_t value)
         return;
     }
     
+    if (address == ANUMLIN) {
+        global_videoMemorySplitted = (value == 15);
+    }
+    
+    if (address == ANUMCHAR) {
+        if ((value > 48) || (memory[ANUMLIN] > 15)) {
+            global_videoMemorySplitted = 0;
+        }
+    }
+    
     // emulator command register
     
     if (address == R8_EMUCOM) {
@@ -619,7 +629,8 @@ void write6502(uint16_t address, uint8_t value)
         else if (savedCrtAdr == 0x6) {
             if (value == 118) {             // graphics mode
                 if (global_graphicsFlag == 0) global_pendingCrtUpdate = 1;
-                global_graphicsFlag = 1;
+                if (global_videoMemorySplitted)
+                    global_graphicsFlag = 1;
            }
             else {                          // alpha mode
                 if (global_graphicsFlag != 0) global_pendingCrtUpdate = 1;

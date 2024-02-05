@@ -8,6 +8,7 @@ var ch: char;
 
 begin
   grinit;
+  splitgraph;
   cleargr;
   plot(0,0,white);
   plot(223,0,white);
@@ -42,8 +43,8 @@ begin
     plotmap(45+4*i,112,j);
     j:=j shr 1;
   end;
-  move(35,5);
-  write(@plotdev,'Type any key to quit');
-  waitforkey;
-  grend;
+  move(25,5);
+  write(@plotdev,'Testing string display')
+  writeln('Use ctrl-l to toggle split/full graphics');
+  writeln('Use grend to turn off graphics');
 end.

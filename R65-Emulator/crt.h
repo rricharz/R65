@@ -12,7 +12,7 @@
 #define M8_OFFSET   0x1782      // display memory offset (lines)
 #define M8_CHAR     0x1785      // char register
 
-#define NUMCHAR     (read6502(0x178A)+1)
+#define NUMCHAR     (read6502(0x178a)+1)
 #define NUMLINES    16   // number of lines
 
 #define NUMXDOTS    224     // size of graphics area in dots
@@ -36,6 +36,7 @@ extern int      global_curlin;
 extern int      global_curpos;
 extern int      global_curloc;
 extern int      global_graphicsFlag;
+extern int      global_videoMemorySplitted;
 extern int      showCursor;
     
 void crt_init();

@@ -14,7 +14,8 @@
 
 
 #define SETNORMALTEXTCOLOR   Stroke(210,210,210)
-#define SETDOTCOLOR          Stroke(0,225,225); Fill(0,225,225,0)
+#define SETDOTCOLOR          Stroke(128,90,0); Fill(255,180,0,0)
+#define SETDOTBACKGROUNDCOLOR Stroke(255,180,0); Fill(36,26,0,0)
 #define SETPASCALCOLOR       Stroke(0,210,210)
 #define SETHIDETEXTCOLOR     Stroke(0,0,0) 
 #define SETINVERSETEXTCOLOR  Stroke(160,160,160); Fill(160,160,160,0)
@@ -33,6 +34,7 @@ int      global_curlin;
 int      global_curpos;
 int      global_curloc;
 int      global_graphicsFlag;
+int      global_videoMemorySplitted;
 int      hcell;
 int      vcell;
 int      csize;
@@ -61,8 +63,7 @@ void crt_init()
     for (int i = 0; i < NUM_LEDS; i++)
         led[i] = 0;
     global_graphicsFlag = 0;
-    xdot2 = (double)crtWidth / (double)NUMXDOTS;
-    ydot2 = (double)crtHeight / (double) NUMYDOTS;
+ 
     printf("Dot size = %0.1f x %0.1f\n", xdot2, ydot2);
     // In order to handle the fractional expansion
     // factor on some displays, white (cyan) dots are one dot larger
@@ -296,6 +297,8 @@ void crtUpdate()
 {
     char s[2];
     s[1] = 0;
+    int gcrtxoff;
+    int gcrtyoff;
 
     hcell = crtWidth / NUMCHAR;
     vcell = crtHeight / NUMLINES;
@@ -322,26 +325,9 @@ void crtUpdate()
         
         Crt_Background(0.0, 0.0, 0.0);
         
-        SETDOTCOLOR;
         int xx, yy;
-        if (global_graphicsFlag) {
-            int pnt = 0x0700;
-            for (double yy = 0.0; yy < ((double)NUMYDOTS * ydot2); yy += ydot2) {
-                for (int xx = 0; xx < NUMXDOTS; xx += 8) {
-                    int mask = 128;
-                    int val = read6502_8(pnt);
-                    pnt++;
-                    for (double bit = xdot2 * xx; bit < xdot2 * (xx + 8); bit+= xdot2) {
-                        if (val & mask) {
-                            Rect(crtOffset + bit,  crtHeight + crtOffset - yy,
-                                    (int)xdot2, (int)ydot2);
-                        }
-                        mask = mask >> 1;                         
-                    }
-                }                      
-            }
-        }
-        else {
+        
+        if (!global_graphicsFlag) {
             for (yy = 0; yy < 16; yy++) {
                 for (xx = 0; xx < NUMCHAR; xx++) {
                     s[0] = read6502(global_videoBaseAddress + (NUMCHAR * yy) + xx);
@@ -370,8 +356,7 @@ void crtUpdate()
                             s, "Monospace", csize, 0, 0);
                 }
             }
-        
-            // Display cursor
+                        // Display cursor
             int onscreenCurlin = (global_curloc - global_videoBaseAddress) / NUMCHAR;
             int onscreenCurpos = (global_curloc - global_videoBaseAddress) % NUMCHAR;
             
@@ -389,6 +374,42 @@ void crtUpdate()
                 Line(xx + crtOffset, yy  + crtOffset + hcell/3,
                     xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell/3);
                 StrokeWidth(2);
+            }
+        }   
+        if (global_videoMemorySplitted) {
+            SETDOTBACKGROUNDCOLOR;
+            if (global_graphicsFlag) {
+                xdot2 = (double)crtWidth / (double)NUMXDOTS;
+                ydot2 = xdot2; // preserve aspect ratio
+                int reducedHeight = (double)crtWidth * (double)NUMYDOTS / (double)NUMXDOTS;
+                gcrtxoff = crtOffset;
+                gcrtyoff =  crtHeight + crtOffset - (crtHeight - reducedHeight) / 2;
+                Rect(gcrtxoff,gcrtyoff,crtWidth+2,reducedHeight + 2);         
+            }
+            else {
+                xdot2=2;
+                ydot2=2;
+                gcrtxoff = crtOffset + crtWidth - NUMXDOTS * xdot2 - 1;
+                gcrtyoff = crtOffset + 1 + ydot2 * NUMYDOTS;
+                Rect(gcrtxoff,gcrtyoff,
+                    xdot2 * NUMXDOTS + 2,ydot2 * NUMYDOTS + 2);
+            }
+
+            SETDOTCOLOR;
+            int pnt = 0x0700;
+            for (double yy = 0.0; yy < ((double)NUMYDOTS * ydot2); yy += ydot2) {
+                for (int xx = 0; xx < NUMXDOTS; xx += 8) {
+                    int mask = 128;
+                    int val = read6502_8(pnt);
+                    pnt++;
+                    for (double bit = xdot2 * xx; bit < xdot2 * (xx + 8); bit+= xdot2) {
+                        if (val & mask) {
+                            Rect(gcrtxoff + bit,  gcrtyoff - yy,
+                                    (int)xdot2, (int)ydot2);
+                        }
+                        mask = mask >> 1;                         
+                    }
+                }                      
             }
         }
         
