@@ -1,18 +1,17 @@
-{ show filnam[.cy][,drive
+{ snap filnam[.cy][,drive
 
-  show a snapshot of the graphics canvas
-  default for drive is one                }
+  take a snapshot of the graphics canvas
+  default for drive is one
+  the graphics canvas must be enabled      }
 
-program show;
-
-uses syslib,arglib,plotlib;
+program snap;
+uses syslib,arglib;
 
 const startcanvas = $700;
       sizecanvas  = 3304; { 224x118/8 }
-      rdfile      = $e815;
+      wrfile      = $e81b;
 
-mem   filflg=$da:   char&;
-      filerr=$db:   integer&;
+mem   filerr=$db:   integer&;
       filsa=$031a:  integer;
       filea=$031c:  integer;
       filsa1=$0331: integer;
@@ -38,28 +37,32 @@ begin
   splitted := numlin <= 16;
 end;
 
-proc loadcanvas;
-{ load the canvas from disk }
+proc savecanvas;
+{ save the canvas on disk }
 begin
   asetfile(name,cyclus,drive,'I');
-  filflg:=chr(0);
   filsa:=startcanvas;
   filea:=startcanvas+sizecanvas;
   filsa1:=startcanvas;
   filtyp:='I';
   filerr:=0;
-  call(rdfile);
-  writeln;
+  call(wrfile);
   if filerr<>0 then
     writeln(invvid,'File error ',filerr shr 4,
       filerr and 15,norvid);
 end;
 
 begin
+  if not splitted then begin
+    writeln(invvid,'Video canvas not available',
+       norvid);
+    exit;
+  end;
+
   cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
   if default then begin
-    writeln(invvid,'Usage: showsnap filnam',norvid);
+    writeln(invvid,'Usage: snap filnam',norvid);
     exit;
   end;
   if haswildcard(name) then begin
@@ -67,7 +70,6 @@ begin
     exit;
   end;
 
-  grinit; splitgraph; cleargr;
-  loadcanvas;
+  savecanvas;
 
 end.

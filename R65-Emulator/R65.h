@@ -36,8 +36,6 @@
 #define R16_MULTR   0x14E2  // Multiplier result register
 
 #define R8_TMSEC    0x1747  // timer 1: count down msec
-#define ANUMLIN     0x1789  // number of lines in video text memory
-#define ANUMCHAR    0x178A  // number of chars/line 
 
 // Special memory locations
 
@@ -49,6 +47,8 @@
 #define M16_FILLOC  0x0313
 #define M16_FILSIZ  0x0315
 
+#define ANUMLIN     0x1789  // number of lines in video text memory
+#define ANUMCHAR    0x178A  // number of chars/line 
 #define M8_DATE     0x17B9
 #define M8_TIME     0x17B5
 

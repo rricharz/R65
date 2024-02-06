@@ -542,7 +542,7 @@ int main (int argc, char *argv[])
     g_signal_connect(G_OBJECT(global_window), "key_press_event", G_CALLBACK(on_key_press), NULL);
 	
     if (strlen(ICON_NAME) > 0) {
-	gtk_window_set_icon_from_file(GTK_WINDOW(global_window), ICON_NAME, NULL);	
+	gtk_window_set_icon_name(GTK_WINDOW(global_window), ICON_NAME);	
     }
 
     gtk_widget_show_all(global_window);

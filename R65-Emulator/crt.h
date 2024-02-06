@@ -28,7 +28,7 @@
 #define MIN_WINDOW_HEIGHT   660    // proposed minimal height of main window
 #define PANEL_FONTSIZE      (12.0 * panelScale)
 #define WINDOW_NAME     "R65 Emulator"    // name of main window
-#define ICON_NAME       ""                // path to icon for window
+#define ICON_NAME       "computer"        // path to icon for window
 
 extern int      global_pendingCrtUpdate;
 extern int      global_videoBaseAddress;
