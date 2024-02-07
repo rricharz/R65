@@ -11,7 +11,7 @@ var angle,speed,xspeed,yspeed: real;
     ch: char;
 
 begin
-  grinit;  cleargr; splitgraph;
+  grinit;  cleargr; splitview;
   speed:=1.;
   for i:=1 to 11 do begin
     angle:=7.5*conv(i);

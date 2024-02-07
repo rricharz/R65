@@ -67,7 +67,7 @@ begin
     exit;
   end;
 
-  grinit; splitgraph; cleargr;
+  grinit; splitview; cleargr;
   loadcanvas;
 
 end.

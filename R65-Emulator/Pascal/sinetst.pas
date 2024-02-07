@@ -8,7 +8,7 @@ var a,b: real;
     ch: char;
 
 begin
-  grinit; cleargr; splitgraph;
+  grinit; cleargr; splitview;
   move(0,ysize div 2);
   draw(xsize,ysize div 2,white);
   for x:=0 to xsize do begin

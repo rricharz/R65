@@ -104,7 +104,7 @@ begin
   dx:=6.0;
   dy:=3.0;
 
-  grinit; cleargr; splitgraph;
+  grinit; cleargr; splitview;
 
   step:=20.0;
   max:=360.0;

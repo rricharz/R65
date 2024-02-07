@@ -23,7 +23,7 @@ begin
   ycenter:=ysize div 2;
   radius:=9*ysize div 20;
 
-  grinit; cleargr; splitgrap;
+  grinit; cleargr; splitview;
 
   drawcircle(xcenter, ycenter, radius);
 

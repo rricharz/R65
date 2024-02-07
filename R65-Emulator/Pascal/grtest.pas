@@ -8,7 +8,7 @@ var ch: char;
 
 begin
   grinit;
-  splitgraph;
+  splitview;
   cleargr;
   plot(0,0,white);
   plot(223,0,white);
@@ -45,6 +45,4 @@ begin
   end;
   move(25,5);
   write(@plotdev,'Testing string display')
-  writeln('Use ctrl-l to toggle split/full graphics');
-  writeln('Use grend to turn off graphics');
 end.

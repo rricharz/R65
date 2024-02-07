@@ -15,8 +15,6 @@ var f:file;
 
 begin
 
-  dalpha; { go to alpha display }
-
   f:=attach('TABLE:X         ',0,1,fread,
     0,0,'X');
   getword(f,0,size);
@@ -36,20 +34,13 @@ begin
   write('Max: ');
   writefix(output,2,max);
   writeln;
-
+  grinit;
   cleargr;
-  dgraphics; {now go to graphics}
-  xs:=2;
-  xw:=xsize-4;
-  ys:=2;
-  yw:=ysize-4;
-
-  move(xs-1,ys-1);
-  draw(xs+xw+1,ys-1,white);
-  draw(xs+xw+1,ys+yw+1,white);
-  draw(xs-1,ys+yw+1,white);
-  draw(xs-1,ys-1,white);
-
+  splitview;
+  xs:=1;
+  xw:=xsize-1;
+  ys:=1;
+  yw:=ysize-1;
   getreal(f,3,v);
   y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
   move(xs,ys+y);
@@ -59,9 +50,5 @@ begin
     y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
     draw(xs+x,ys+y,white);
   end;
-
   close(f);
-  waitforkey;
-  grend;
-
-end.  
+end.

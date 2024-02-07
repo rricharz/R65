@@ -54,6 +54,8 @@ const igraph=$e01e;
       icrtgr=$e016;
 begin
   call(igraph); call(icrtgr);
+  writeln('CTRT-L to toggle canvas size,',
+   'GREND to close it');
 end;
 
 { grend: end of graphics, initialize }
@@ -75,17 +77,17 @@ begin
   call(clrgra);
 end;
 
-{ dgraphics: go to graphics display }
+{ fullview: go to full screen graphics display }
 
-proc fullgraph;
+proc fullview;
 const icrtgr=$e016;
 begin
   call(icrtgr);
 end;
 
-{ dalpha: go to alpha display }
+{ splitview: go to splitted graphics display }
 
-proc splitgraph;
+proc splitview;
 const icrtal=$e015;
 begin
   call(icrtal);
@@ -243,5 +245,4 @@ begin
 end;
 
 begin {initialization}
-  grinit;
 end.
