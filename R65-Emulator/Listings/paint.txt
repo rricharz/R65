@@ -1,5 +1,5 @@
 
-R65 COMPILE 4.2: program PAINT            7/2/24 page 1
+R65 COMPILE 4.2: program PAINT            8/2/24 page 1
 
 
    1 (    4) { paint - paint in a graphics canvas
@@ -11,106 +11,214 @@ R65 COMPILE 4.2: program PAINT            7/2/24 page 1
    7 (    4)     up arrow       move cursor up
    8 (    4)     down arrow     move cursor down
    9 (    4)     p              paint a dot at cursor position
-  10 (    4)     M              move start for draw to cursor pos
-  11 (    4)     D              draw a line
-  12 (    4)     R              draw a rectangle
-  13 (    4)     U              undo last operation
-  14 (    4)     S              start drawing a string
-  15 (    4)     esc            stop drawing a string
-  16 (    4)     W              write canvas to disk
-  17 (    4)     Q              write canvas to disk and quit
-  18 (    4)     K              kill program without writing to disk
-  19 (    4) 
-  20 (    4)   2024 rricharz                                   }
-  21 (    4) 
-  22 (    4) program paint;
-  23 (    4) uses syslib,arglib,wildlib,plotlib;
-  24 ( 3012) 
-  25 ( 3012) const startcanvas = $700;
-  26 ( 3015)       sizecanvas  = 3304; { 224x118/8 }
-  27 ( 3015)       rdfile      = $e815;
-  28 ( 3015)       wrfile      = $e81b;
-  29 ( 3015) 
-  30 ( 3015) mem   filflg=$da:   char&;
-  31 ( 3015)       filerr=$db:   integer&;
-  32 ( 3015)       filsa=$031a:  integer;
-  33 ( 3015)       filea=$031c:  integer;
-  34 ( 3015)       filsa1=$0331: integer;
-  35 ( 3015)       filtyp=$0300: char&;
-  36 ( 3015) 
-  37 ( 3015) var cyclus,drive:integer;
-  38 ( 3015)     name:array[15] of char;
-  39 ( 3015) 
-  40 ( 3015) proc forcesubtype(subtype:char);
-  41 ( 3015) var i:integer;
-  42 ( 3018) begin
-  43 ( 3018)   i:=0;
-  44 ( 3022)   repeat
-  45 ( 3026)     i:=i+1;
-  46 ( 3032)   until (name[i]=':') or
-  47 ( 3048)     (name[i]=' ') or (i>=14);
-  48 ( 3067)   name[i]:=':';
-  49 ( 3077)   name[i+1]:=subtype;
-  50 ( 3088) end;
-  51 ( 3096) 
-  52 ( 3097) proc loadcanvas;
-  53 ( 3097) var entry: integer;
-  54 ( 3100)     last,found,default:  boolean;
-  55 ( 3100) begin
-  56 ( 3100)   cyclus:=0; drive:=1;
-  57 ( 3110)   agetstring(name,default,cyclus,drive);
-  58 ( 3154)   if default then begin
-  59 ( 3158)     write('Usage: paint filename[.cyclus][,drive]');
+  10 (    4)     L              start drawing line
+  11 (    4)     R              start drawing rectangle
+  12 (    4)     U              undo last operation
+  13 (    4)     S              start drawing a string
+  14 (    4)     return         draw line,rect,string
+  15 (    4)     W              write canvas to disk
+  16 (    4)     Q              write canvas to disk and quit
+  17 (    4)     K              kill program without writing to disk
+  18 (    4) 
+  19 (    4)   2024 rricharz                                   }
+  20 (    4) 
+  21 (    4) program paint;
+  22 (    4) uses syslib,arglib,wildlib,plotlib;
+  23 ( 3012) 
+  24 ( 3012) const startcanvas=$700; sizecanvas=3304; {224x118/8}
+  25 ( 3015)       rdfile=$e815; wrfile=$e81b;
+  26 ( 3015)       toggle=chr($0c); {ctrl-l}
+  27 ( 3015)       cleft=chr($03); cright=chr($16);
+  28 ( 3015)       cup=chr($1a); cdown=chr($18);
+  29 ( 3015)       dreset=0; dline=1; drect=2;
+  30 ( 3015) 
+  31 ( 3015) mem   filflg=$da:   char&;
+  32 ( 3015)       filerr=$db:   integer&;
+  33 ( 3015)       filsa=$031a:  integer;
+  34 ( 3015)       filea=$031c:  integer;
+  35 ( 3015)       filsa1=$0331: integer;
+  36 ( 3015)       filtyp=$0300: char&;
+  37 ( 3015) 
+  38 ( 3015) var cyclus,drive:integer;
+  39 ( 3015)     x,y,c,startx,starty:integer;
+  40 ( 3015)     name:array[15] of char;
+  41 ( 3015)     ch:char;
+  42 ( 3015)     dmode:integer;
+  43 ( 3015) 
+  44 ( 3015) proc forcesubtype(subtype:char);
+  45 ( 3015) var i:integer;
+  46 ( 3018) begin
+  47 ( 3018)   i:=0;
+  48 ( 3022)   repeat
+  49 ( 3026)     i:=i+1;
+  50 ( 3032)   until (name[i]=':') or
+  51 ( 3048)     (name[i]=' ') or (i>=14);
+  52 ( 3067)   name[i]:=':';
+  53 ( 3077)   name[i+1]:=subtype;
+  54 ( 3088) end;
+  55 ( 3096) 
+  56 ( 3097) proc loadcanvas;
+  57 ( 3097) var entry: integer;
+  58 ( 3100)     last,found,default:  boolean;
+  59 ( 3100) begin
 
 ----------------------------------------------------------------------
 
-R65 COMPILE 4.2: program PAINT            7/2/24 page 2
+R65 COMPILE 4.2: program PAINT            8/2/24 page 2
 
-  60 ( 3200)     abort;
-  61 ( 3204)   end;
-  62 ( 3204)   { check whether file exists, wildcards allowed }
-  63 ( 3204)   entry:=0;
-  64 ( 3206)   forcesubtype('I');
-  65 ( 3218)   findentry(name,drive,entry,found,last);
-  66 ( 3264)   if (not found) or last then exit;
-  67 ( 3278)   asetfile(name,cyclus,drive,'I');
-  68 ( 3300)   filflg:=chr(0);
-  69 ( 3302)   filsa:=startcanvas;
-  70 ( 3310)   filea:=startcanvas+sizecanvas;
-  71 ( 3320)   filsa1:=startcanvas;
-  72 ( 3328)   filtyp:='I';
-  73 ( 3334)   filerr:=0;
-  74 ( 3341)   call(rdfile);
-  75 ( 3349)   writeln;
-  76 ( 3349)   if filerr<>0 then
-  77 ( 3360)     writeln(invvid,'File error ',filerr shr 4,
-  78 ( 3384)       filerr and 15,norvid);
-  79 ( 3402) end;
-  80 ( 3402) 
-  81 ( 3403) proc savecanvas;
-  82 ( 3403) { save the canvas on disk }
-  83 ( 3403) begin
-  84 ( 3403)   asetfile(name,cyclus,drive,'I');
-  85 ( 3430)   filsa:=startcanvas;
-  86 ( 3433)   filea:=startcanvas+sizecanvas;
-  87 ( 3443)   filsa1:=startcanvas;
-  88 ( 3451)   filtyp:='I';
-  89 ( 3457)   filerr:=0;
-  90 ( 3464)   call(wrfile);
-  91 ( 3472)   if filerr<>0 then
-  92 ( 3477)     writeln(invvid,'File error ',filerr shr 4,
-  93 ( 3501)       filerr and 15,norvid);
-  94 ( 3519) end;
-  95 ( 3519) 
-  96 ( 3520) begin
-  97 ( 3520)   grinit;  cleargr; splitview;
-  98 ( 3534)   loadcanvas;
-  99 ( 3538)   savecanvas;
- 100 ( 3542) end.
+  60 ( 3100)   cyclus:=0; drive:=1;
+  61 ( 3110)   agetstring(name,default,cyclus,drive);
+  62 ( 3154)   if default then begin
+  63 ( 3158)     write('Usage: paint filename[.cyclus][,drive]');
+  64 ( 3200)     abort;
+  65 ( 3204)   end;
+  66 ( 3204)   { check whether file exists, wildcards allowed }
+  67 ( 3204)   entry:=0;
+  68 ( 3206)   forcesubtype('I');
+  69 ( 3218)   findentry(name,drive,entry,found,last);
+  70 ( 3264)   if (not found) or last then exit;
+  71 ( 3278)   asetfile(name,cyclus,drive,'I');
+  72 ( 3300)   filflg:=chr(0);
+  73 ( 3302)   filsa:=startcanvas;
+  74 ( 3310)   filea:=startcanvas+sizecanvas;
+  75 ( 3320)   filsa1:=startcanvas;
+  76 ( 3328)   filtyp:='I';
+  77 ( 3334)   filerr:=0;
+  78 ( 3341)   call(rdfile);
+  79 ( 3349)   writeln;
+  80 ( 3349)   if filerr<>0 then
+  81 ( 3360)     writeln(invvid,'File error ',filerr shr 4,
+  82 ( 3384)       filerr and 15,norvid);
+  83 ( 3402) end;
+  84 ( 3402) 
+  85 ( 3403) proc savecanvas;
+  86 ( 3403) { save the canvas on disk }
+  87 ( 3403) begin
+  88 ( 3403)   asetfile(name,cyclus,drive,'I');
+  89 ( 3430)   filsa:=startcanvas;
+  90 ( 3433)   filea:=startcanvas+sizecanvas;
+  91 ( 3443)   filsa1:=startcanvas;
+  92 ( 3451)   filtyp:='I';
+  93 ( 3457)   filerr:=0;
+  94 ( 3464)   call(wrfile);
+  95 ( 3472)   if filerr<>0 then
+  96 ( 3477)     writeln(invvid,'File error ',filerr shr 4,
+  97 ( 3501)       filerr and 15,norvid);
+  98 ( 3519) end;
+  99 ( 3519) 
+ 100 ( 3520) proc showcursor(ax,ay:integer);
+ 101 ( 3520) begin
+ 102 ( 3520)   case dmode of
+ 103 ( 3525)     dreset: begin
+ 104 ( 3536)               plot(ax,ay,inverse);
+ 105 ( 3552)             end;
+ 106 ( 3552)     dline:  begin
+ 107 ( 3562)               move(startx,starty); draw(x,y,inverse);
+ 108 ( 3592)             end;
+ 109 ( 3592)     drect:  begin
+ 110 ( 3602)               move(startx,starty);
+ 111 ( 3616)               draw(x,starty,inverse);
+ 112 ( 3632)               draw(x,y,inverse);
+ 113 ( 3648)               draw(startx,y,inverse);
+ 114 ( 3664)               draw(startx,starty,inverse);
+ 115 ( 3680)             end
+ 116 ( 3680)   end {case};
+ 117 ( 3682) end;
+ 118 ( 3682) 
+ 119 ( 3683) proc blink;
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.2: program PAINT            8/2/24 page 3
+
+ 120 ( 3683) const bcount=50;
+ 121 ( 3686) var count:integer;
+ 122 ( 3686)     displayed:boolean;
+ 123 ( 3686) begin
+ 124 ( 3686)   count:=0; { start with cursor on }
+ 125 ( 3694)   displayed:=false;
+ 126 ( 3696)   repeat
+ 127 ( 3700)     ch:=keypressed;
+ 128 ( 3704)     count:=count-1;
+ 129 ( 3714)     if count<=0 then begin
+ 130 ( 3726)       showcursor(x,y);
+ 131 ( 3743)       displayed:=not displayed;
+ 132 ( 3743)       count:=bcount;
+ 133 ( 3754)     end;
+ 134 ( 3758)   until ch<>chr(0);
+ 135 ( 3764)   read(@key,ch);
+ 136 ( 3777)   if displayed then showcursor(x,y);
+ 137 ( 3799) end;
+ 138 ( 3799) 
+ 139 ( 3800) proc paint;
+ 140 ( 3800) { This is the main painting loop }
+ 141 ( 3800) begin
+ 142 ( 3800)   x:=xsize div 2; y:=ysize div 2; c:=1; dmode:=dreset;
+ 143 ( 3831)   repeat
+ 144 ( 3835)     blink; { blink cursor and get next key }
+ 145 ( 3839)     case ch of
+ 146 ( 3839)       toggle: write(ch);
+ 147 ( 3855)       cleft:  if x>0 then x:=x-1;
+ 148 ( 3881)       cright: if x<xsize then x:=x+1;
+ 149 ( 3912)       cup:    if (y<ysize) then y:=y+1;
+ 150 ( 3943)       cdown:  if (y>0) then y:=y-1;
+ 151 ( 3974)       'P':    begin
+ 152 ( 3989)                 writeln('plot(',x,',',y,')');
+ 153 ( 4015)                 plot(x,y,c);
+ 154 ( 4033)                 x:=x+1;
+ 155 ( 4039)                 if x>xsize then x:=0;
+ 156 ( 4056)               end;
+ 157 ( 4060)       'L':    begin
+ 158 ( 4070)                 startx:=x; starty:=y;
+ 159 ( 4078)                 dmode:=dline;
+ 160 ( 4088)               end;
+ 161 ( 4092)       'R':    begin
+ 162 ( 4102)                 startx:=x; starty:=y;
+ 163 ( 4110)                 dmode:=drect;
+ 164 ( 4120)                 if x>xsize then x:=0;
+ 165 ( 4136)                 if y>xsize then y:=0;
+ 166 ( 4152)               end;
+ 167 ( 4156)       cr:     begin
+ 168 ( 4166)                  case dmode of
+ 169 ( 4166)                    dline: begin
+ 170 ( 4177)                             move(startx,starty);
+ 171 ( 4191)                             draw(x,y,c);
+ 172 ( 4209)                             startx:=x; starty:=y;
+ 173 ( 4217)                             dmode:=dreset;
+ 174 ( 4227)                           end;
+ 175 ( 4231)                    drect: begin
+ 176 ( 4241)                             move(startx,starty);
+ 177 ( 4255)                             draw(x,starty,c);
+ 178 ( 4273)                             draw(x,y,c);
+ 179 ( 4291)                             draw(startx,y,c);
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.2: program PAINT            8/2/24 page 4
+
+ 180 ( 4309)                             draw(startx,starty,c);
+ 181 ( 4327)                             dmode:=dreset;
+ 182 ( 4329)                           end
+ 183 ( 4333)                 end {case};
+ 184 ( 4335)               end;
+ 185 ( 4335)       'W','Q':  begin
+ 186 ( 4352)                 writeln('saving canvas');
+ 187 ( 4372)                 savecanvas;
+ 188 ( 4376)              end
+ 189 ( 4376)     end; {case}
+ 190 ( 4378)   until (ch='Q') or (ch='K');
+ 191 ( 4392) end;
+ 192 ( 4396) 
+ 193 ( 4397) begin
+ 194 ( 4397)   grinit;  cleargr; splitview;
+ 195 ( 4411)   loadcanvas;
+ 196 ( 4415)   paint;
+ 197 ( 4419)   grend;
+ 198 ( 4423) end.
 
 End compile
 
-Code lenght:          3541
-Compiler stack size:  77
-Ident stack size:     117
+Code lenght:          4422
+Compiler stack size:  87
+Ident stack size:     134
 Pascal errors:        0

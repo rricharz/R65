@@ -327,7 +327,7 @@ void crtUpdate()
         
         int xx, yy;
         
-        if (!global_graphicsFlag) {
+        if (1) {  // always show text
             for (yy = 0; yy < 16; yy++) {
                 for (xx = 0; xx < NUMCHAR; xx++) {
                     s[0] = read6502(global_videoBaseAddress + (NUMCHAR * yy) + xx);
@@ -383,7 +383,7 @@ void crtUpdate()
                 ydot2 = xdot2; // preserve aspect ratio
                 int reducedHeight = (double)crtWidth * (double)NUMYDOTS / (double)NUMXDOTS;
                 gcrtxoff = crtOffset;
-                gcrtyoff =  crtHeight + crtOffset - (crtHeight - reducedHeight) / 2;
+                gcrtyoff =  crtOffset + 1 + reducedHeight;
                 Rect(gcrtxoff,gcrtyoff,crtWidth+2,reducedHeight + 2);         
             }
             else {
