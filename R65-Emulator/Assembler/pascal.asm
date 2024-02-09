@@ -144,7 +144,7 @@ STOP    LDA =0
         JSR PRTINF      NO, STOP PASCAL
         BYT $0D,$0A,'Quit Pascal'+$80
         LDA SFLAG
-        AND =$FE        CLEAR PASCAL RUNTIME BIT
+        AND =$7E        CLEAR PASCAL RUNTIME BIT
         STA SFLAG       IN SFLAG
         JMP (VMON)
 *
@@ -2060,8 +2060,6 @@ RUN     LDY =0          READ END ADDRESS
 LOOP    LDX SAVS        RESTORE STACK POINTER
         TXS
         JSR EXCODE
-        LDA SFLAG
-        BMI ESCERR
         JMP LOOP
 *
 *

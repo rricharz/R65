@@ -367,7 +367,7 @@ begin
   agetstring(name,default,cyclus,drive);
   setsubtype('P');
   asetfile(name,cyclus,drive,' ');
-  openr(fno);
+  { openr(fno); }
   nlines := 1; line:=1; topline:=1;
   pend:=15; while name[pend]=' ' do pend:=pend-1;
   for i:=0 to pend do stemp[i]:=name[i];
@@ -380,6 +380,7 @@ begin
   putontop('Reading',36,true);
   maxl1:=maxlines-9;
   showtop;
+  exit;
   repeat
     linepnt[nlines] := rnew;
     iseof := readline(fno, linepnt[nlines]);
