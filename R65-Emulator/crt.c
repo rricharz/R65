@@ -384,7 +384,7 @@ void crtUpdate()
                 int reducedHeight = (double)crtWidth * (double)NUMYDOTS / (double)NUMXDOTS;
                 gcrtxoff = crtOffset;
                 gcrtyoff =  crtOffset + 1 + reducedHeight;
-                Rect(gcrtxoff,gcrtyoff,crtWidth+2,reducedHeight + 2);         
+                Rect(gcrtxoff,gcrtyoff,crtWidth - 1,reducedHeight);         
             }
             else {
                 xdot2=2;
@@ -392,7 +392,7 @@ void crtUpdate()
                 gcrtxoff = crtOffset + crtWidth - NUMXDOTS * xdot2 - 1;
                 gcrtyoff = crtOffset + 1 + ydot2 * NUMYDOTS;
                 Rect(gcrtxoff,gcrtyoff,
-                    xdot2 * NUMXDOTS + 2,ydot2 * NUMYDOTS + 2);
+                    xdot2 * NUMXDOTS - 1,ydot2 * NUMYDOTS);
             }
 
             SETDOTCOLOR;
