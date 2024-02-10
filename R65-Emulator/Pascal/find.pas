@@ -50,7 +50,8 @@ begin
             writename(nm2)
           else
             writename(nm);
-          writeln(':',norvid);
+          write(':',norvid);
+          writeln('  (',freedsk(drv,false),'% free)');
           first:=false;
         end;
         call(prflab); writeln;

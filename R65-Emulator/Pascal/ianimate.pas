@@ -1,8 +1,8 @@
-{ animate - run animation in loop
-  Calls expaint to paint one picture
-  and apply motion.
-  Calls exkey to check for key in loop
-  and stops loop if true  }
+{ ianimate - run animation in loop
+  proc expaint;
+    Called to paint one picture and apply motion.
+  func exkey(ch:char):boolean;
+    Called to check for key and stop loop if true  }
 
 proc animate;
 const toggle=chr($0c);

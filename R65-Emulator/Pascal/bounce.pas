@@ -66,7 +66,7 @@ begin
   else if yspeed<-6.0 then yspeed:=-6.0;
 end;
 
-{$I ANIMATE:P }
+{$I IANIMATE:P}
 
 begin
   grinit;
@@ -91,6 +91,5 @@ begin
     'Use arrows to change speed');
 
   animate;
-
-  grend;
+  splitview;
 end.
