@@ -94,7 +94,7 @@ var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
 
     prt,libflg,icheck,ateof,lineflg,nlflg: boolean;
 
-    fno,ofno: file;
+    fno,ofno,savefno: file;
 
     filstk: array[maxfi] of file;
 
@@ -194,7 +194,9 @@ begin
     16: write('Array (8-bit)');
     17: write('Real');
     18: write('File table overflow');
-    19: write('Parameter')
+    19: write('Parameter');
+    20: write('Compiler directive syntax');
+    21: write('Nested include files')
   end {case};
   writeln;
   write('Continue?');
@@ -268,28 +270,46 @@ end;
 
 {       * getchr *      (global) }
 
-proc getchr;
+proc writenum(i: integer);
+begin
+  if i<=999 then write(' ');
+  if i<=99 then write(' ');
+  if i<=9 then write(' ');
+  write(i);
+end;
 
-  proc writenum(i: integer);
-  begin
-    if i<=999 then write(' ');
-    if i<=99 then write(' ');
-    if i<=9 then write(' ');
-    write(i);
+proc nextline;
+begin
+  nlflg:=true;
+  if savefno=@0 then writenum(line)
+  else begin
+    write('****');
+    line:=line-1; { do not count line }
   end;
+  write(' (');
+  if (pc+2)<9999 then write(' ');
+  writenum(pc+2); write(') ');
+end;
+
+proc getchr;
 
 begin
   if ateof then begin
-    writeln('Unexpected eof');
-    abort;
+    if savefno<>@0 then begin
+      { end of include file }
+      close(fno);
+      fno:=savefno;
+      savefno:=@0;
+      ateof:=false;
+    end else begin
+      writeln('Unexpected eof');
+      abort
+    end
   end else begin
     read(@fno,ch);
     if ch=cr then begin
       crlf;
-      nlflg:=true;
-      writenum(line); write(' (');
-      if (pc+2)<9999 then write(' ');
-      writenum(pc+2); write(') ');
+      nextline;
       ch:=' ';
     end {if}
     else if ch=eof then begin
@@ -326,7 +346,7 @@ var i,j,dummy: integer;
 begin {init}
   writeln('R65 PASCAL COMPILER version ', version,
     ', Pass  1');
-  ateof:=false;
+  ateof:=false; savefno:=@0;
   cdrive:=fildrv; { drive of compile program }
   fipnt:=-1;
   endstk:=idtabpos-144;
@@ -501,6 +521,36 @@ begin
   end
 end {setval};
 
+{       * directive *   (of scan               }
+
+proc directive;
+var i,icyclus:integer;
+    name: array[15] of char;
+begin
+  getchr;
+  case ch of
+    'I': begin
+           if savefno<>@0 then error(21);
+           getchr; if ch<>' ' then error(20);
+           i:=0; getchr;
+           while (ch<>'}') and (i<16) do begin
+             name[i]:=ch; i:=i+1; getchr;
+           end;
+           while (i<16) do begin
+             name[i]:=' '; i:=i+1;
+           end;
+           icyclus:=0;
+           asetfile(name,icyclus,sdrive,'P');
+           savefno:=fno;
+           openr(fno);
+           crlf;
+           nextline;
+           getchr; scan;
+         end
+    else error(20)
+  end {case}
+end;
+
 {       * setid *       (of scan)              }
 
 proc setid; {sets one char to ident}
@@ -532,8 +582,13 @@ begin { ***** body of scan ***** }
       case low(token) of
         '<': if (ch='=') or (ch='>') then pack;
         '>',':': if (ch='=') then pack;
-        '{': begin repeat
-               getchr until ch='}'; getchr; scan
+        '{': begin
+               if ch='$' then directive
+               else begin
+                 if ch<>'}' then
+                 repeat getchr until ch='}';
+                 getchr; scan
+               end
              end;
         '$': begin {hex constant}
                token:='nu'; value[0]:=0;
