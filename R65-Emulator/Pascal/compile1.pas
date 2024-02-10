@@ -79,8 +79,8 @@ mem endstk  =$000e: integer;
     idtab   =idtabpos: array[$800] of char&;
 
 var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
-    npara,i,stackpnt,stackmax,spntmax,numerr
-                              :integer;
+    npara,i,stackpnt,stackmax,spntmax,numerr,
+    lineinc,linepage                 :integer;
 
     scyclus,sdrive,cdrive: integer;
 
@@ -158,9 +158,10 @@ proc crlf;
   var i: integer;
 begin
   writeln;
-  line:=succ(line);
-  if (line div pagelenght)*pagelength=line
-    then newpage;
+  line:=succ(line); line1nc:=succ(lineinc);
+  linepage:=succ(linepage);
+  if ((linepage div pagelenght)
+    * pagelength)=linepage then newpage;
 end {crlf};
 
 {       error message   (global)        }
@@ -245,7 +246,7 @@ proc newpage;
 var i: integer;
 
 begin
-  if (line<>0) and prt then
+  if ((linepage)<>0) and prt then
     write(@printer,formfeed);
   writeln; { Do not count this line}
   if pname[0]<>'x' then begin
@@ -257,7 +258,8 @@ begin
   end;
   write(' ');
   prtdate(output);
-  writeln(' page ',(line div pagelenght)+1);
+  writeln(' page ',
+    (linepage div pagelenght)+1);
   writeln;
 end {newpage};
 
@@ -283,8 +285,9 @@ begin
   nlflg:=true;
   if savefno=@0 then writenum(line)
   else begin
-    write('****');
+    write('{I} ');
     line:=line-1; { do not count line }
+    writenum(lineinc);
   end;
   write(' (');
   if (pc+2)<9999 then write(' ');
@@ -411,7 +414,8 @@ begin {init}
     setemucom(8);
   end
 
-  line:=0; newpage; crlf; line:=1;
+  line:=0; lineinc:=0; linepage:=0;
+  newpage; crlf; line:=1; linepage:=1;
   write('   1 (    4) '); getchr
 end {init};
 
@@ -543,6 +547,7 @@ begin
            asetfile(name,icyclus,sdrive,'P');
            savefno:=fno;
            openr(fno);
+           lineinc:=0;
            crlf;
            nextline;
            getchr; scan;
