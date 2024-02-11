@@ -13,7 +13,7 @@ const afloppy=$c827;
 
 mem   filerr=$db: integer&;
 
-var   cyclus,drive,entry: integer;
+var   cyclus,drive,entry,saventry: integer;
       default,found,last: boolean;
       name: array[namesize] of char;
 
@@ -41,7 +41,7 @@ begin
   if filerr=0 then begin
     last:=false; entry:=0;
     while (entry<numentries) and not last do begin
-      cyclus:=0;
+      cyclus:=0; saventry:=entry;
       findentry(name,drv,entry,found,last);
       if found and (not last) then begin
         if first then begin
@@ -50,9 +50,12 @@ begin
             writename(nm2)
           else
             writename(nm);
-          write(':',norvid);
-          writeln('  (',freedsk(drv,false),'% free)');
+          write(':',norvid); tab(20);
+          writeln('(',freedsk(drv,false),'% free)');
           first:=false;
+          entry:=saventry;
+          { find again because of freedsk }
+          findentry(name,drv,entry,found,last);
         end;
         call(prflab); writeln;
         end;
