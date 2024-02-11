@@ -9,8 +9,9 @@ First version 1978 by rricharz
 Version 3.7 (20K)  01/08/82 rricharz
 
 Recovered 2018 by rricharz (r77@bluewin.ch)
-Improved 2018-2023 by rricharz
+Improved 2018-2024 by rricharz
 Version 4 with cpnt strings and exit statement
+Version 4.3 with include compiler directive
 
 Original derived from the publication by
 Kin-Man Chung and Herbert Yen in
@@ -57,7 +58,7 @@ program compile1;
 
 uses syslib, arglib;
 
-const version='4.2';
+const version='4.3';
 
     table     =$97ff; {user ident table -1}
     idtab     =$95ff; {resword table -1}
@@ -158,7 +159,7 @@ proc crlf;
   var i: integer;
 begin
   writeln;
-  line:=succ(line); line1nc:=succ(lineinc);
+  line:=succ(line); lineinc:=succ(lineinc);
   linepage:=succ(linepage);
   if ((linepage div pagelenght)
     * pagelength)=linepage then newpage;
@@ -197,7 +198,8 @@ begin
     18: write('File table overflow');
     19: write('Parameter');
     20: write('Compiler directive syntax');
-    21: write('Nested include files')
+    21: write('Nested include files');
+    22: write('Unexpected eof')
   end {case};
   writeln;
   write('Continue?');
@@ -270,7 +272,7 @@ begin
   savebyte(x); pc:=succ(pc)
 end;
 
-{       * getchr *      (global) }
+{       * writenum *      (global) }
 
 proc writenum(i: integer);
 begin
@@ -279,6 +281,8 @@ begin
   if i<=9 then write(' ');
   write(i);
 end;
+
+{       * nextline *      (global) }
 
 proc nextline;
 begin
@@ -294,18 +298,21 @@ begin
   writenum(pc+2); write(') ');
 end;
 
-proc getchr;
+{       * getchr *      (global) }
 
+proc getchr;
 begin
   if ateof then begin
     if savefno<>@0 then begin
-      { end of include file }
+      { end of include file, close it }
       close(fno);
       fno:=savefno;
+      { switch back to normal input file }
       savefno:=@0;
       ateof:=false;
+      if ch=cr then ch:=' ';
     end else begin
-      writeln('Unexpected eof');
+      error(22);
       abort
     end
   end else begin

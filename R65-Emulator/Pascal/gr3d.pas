@@ -98,6 +98,8 @@ begin
     mask[x2]:=y2;
 end;
 
+{$I ICHKESC:P}
+
 begin
   sx:=conv(xsize)/2.0;
   sy:=conv(ysize)/8.0;
@@ -137,6 +139,7 @@ begin
     x1:=dx*x-dx*y;
     y1:=dy*x+dy*y+f1(x,y)*scale;
     y:=0.0;
+    if chkesc(true) then begin splitview; exit end;
     while y<max do begin
       y:=y+step;
       x2:=dx*x-dx*y;
@@ -173,6 +176,8 @@ begin
     x1:=dx*x-dx*y;
     y1:=dy*x+dy*y+f1(x,y)*scale;
     x:=0.0;
+    if chkesc(true) then begin splitview; exit end;
+
     while x<max do begin
       x:=x+step;
       x2:=dx*x-dx*y;
@@ -225,6 +230,8 @@ begin
     y1:=dy*x+dy*y+
       f2(x-max/2.0,y-max/2.0)*scale;
     y:=0.0;
+    if chkesc(true) then begin splitview; exit end;
+
     while y<max do begin
       y:=y+step;
       x2:=dx*x-dx*y;
@@ -265,6 +272,8 @@ begin
     y1:=dy*x+dy*y+
       f2(x-max/2.0,y-max/2.0)*scale;
     x:=0.0;
+    if chkesc(true) then begin splitview; exit end;
+
     while x<max do begin
       x:=x+step;
       x2:=dx*x-dx*y;

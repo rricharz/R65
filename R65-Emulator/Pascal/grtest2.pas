@@ -18,6 +18,8 @@ begin
   end;
 end;
 
+{$I ICHKESC:P}
+
 begin
   xcenter:=xsize div 2;
   ycenter:=ysize div 2;
@@ -34,5 +36,8 @@ begin
          ycenter+
          trunc(sin(conv(4*ii))*conv(radius)),
          white);
+    if chkesc(true) then begin
+      splitview; exit;
+    end;
   end;
 end.
