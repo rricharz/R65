@@ -20,9 +20,10 @@ uses syslib,plotlib;
 
 const paddlesize = 24;
       xmin = 40;
-      erase=0; ball=$6ff6;
-      cup=chr($1a); cdown=chr($18);
-      startspeed=0.01;
+      erase = 0; ball = $6ff6;
+      cup= chr($1a); cdown = chr($18);
+      startspeed = 2.5;
+      autorepeat = true;
 
 var i,ypaddle,lastypaddle:integer;
     hit,miss: integer;
@@ -57,6 +58,8 @@ begin
     chr(ord('0')+mod(count,10)));
 end;
 
+{$I IRANDOM:P}
+
 proc init;
 begin
   grinit;
@@ -70,8 +73,8 @@ begin
   yball:=conv(ysize div 2 - 2);
   lastxball:=xball;
   lastyball:=yball;
-  xspeed:=1.0 + startspeed * conv(random);
-  yspeed:=1.0 + startspeed * conv(random);
+  xspeed:=rrandom(1.0, startspeed);
+  yspeed:=rrandom(1.0,startspeed);
   ypaddle:=(ysize-paddlesize) div 2;
   lastypaddle:=-1;
   hit:=0;
@@ -84,8 +87,9 @@ begin
   showcount(1,60,miss);
 end;
 
-proc expaint;
+func expaint: boolean;
 begin
+  expaint:=false;
   showpaddle;
   xball:=xball+xspeed;
   yball:=yball+yspeed;
@@ -95,7 +99,7 @@ begin
   end;
 
   if (yball<=conv(ypaddle+paddlesize+2)) and
-    (yball>=conv(ypaddle+2)) then begin
+    (yball>=conv(ypaddle)) then begin
     if xball>=conv(xsize-7) then begin
       hit:=hit+1;
       showcount(1,90,hit);
@@ -125,9 +129,9 @@ var ymax:integer;
 begin
   ymax:=ysize-paddlesize-4;
   if (key=cup) and (ypaddle<ymax)  then
-    ypaddle := ypaddle+4
+    ypaddle := ypaddle+2
   else if (key=cdown) and (ypaddle>5) then
-    ypaddle := ypaddle-5
+    ypaddle := ypaddle-2
   else if key=cr then init;
   exkey := key=chr(0);
 end;
@@ -137,6 +141,6 @@ end;
 begin
   init;
   writeln('Type RETURN to start new game.');
-  animate;
+  animate(autorepeat);
   splitview;
 end.

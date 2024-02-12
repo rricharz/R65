@@ -29,6 +29,8 @@
 #define KIM_PORTA2  0x1451  // 6552-2 Port A (keyboard)
 #define EMU_RAND    0x1706  // KIM timer, rand() in emulator
 
+#define EMU_FLAGS   0x1707  // emulator flags (bit 0: kex down)
+
 // Multiplier and timer
 
 #define R8_MULTX    0x14E0  // Multiplier x register

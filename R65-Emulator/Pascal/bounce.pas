@@ -18,12 +18,16 @@ uses syslib,plotlib;
 const gravity=0.15;
       keyfactor=1.05;
       erase=0; ball=$6ff6;
+      autorepeat=false;
 
 var x,y,xspeed,yspeed: real;
     xi,yi,xl,yl,keycode: integer;
 
-proc expaint;
+{$I IRANDOM:P}
+
+func expaint:boolean;
 begin
+  expaint:=false;
   yspeed:=yspeed-gravity;
   x:=x+xspeed;
   y:=y+yspeed;
@@ -71,8 +75,8 @@ end;
 begin
   grinit;
   cleargr;
-  xspeed:=4.0*conv(random)/conv(xsize)+0.25;
-  yspeed:=conv(random)/(conv(ysize))+0.5;
+  xspeed:=rrandom(0.4,4.0);
+  yspeed:=rrandom(0.4,3.0);
   x:=1.5;
   y:=conv(ysize)/2.0;
   xl:=trunc(x);
@@ -90,6 +94,6 @@ begin
   write(@plotdev,
     'Use arrows to change speed');
 
-  animate;
+  animate(autorepeat);
   splitview;
 end.

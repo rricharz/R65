@@ -24,13 +24,13 @@ const erase=0;
 var shipmap: array[1] of integer;
     birdmap: array[3] of integer;
 
-    shipx,shipy,sspeedx,sspeedy,
-    lastsx,lastsy,birdx,birdy,
-    lastbirdx,birdcount,sbird,
-    score,lastscore,dummy,
-    lasercount          : integer;
+    shipx,lastsx,lastsy,birdx,birdy,
+    lastbirdx,birdcount,sbird,score,lastscore,dummy,
+    lasercount            : integer;
+    landed                : boolean;
+    shipy,sspeedx,sspeedy : real;
 
-    stop,landed         : boolean;
+{$I IRANDOM:P}
 
 proc showship;
 begin
@@ -38,34 +38,33 @@ begin
     plotmap(lastsx-4,lastsy,erase);
     plotmap(lastsx,lastsy,erase);
   end;
-  if ((shipx>=4)and(shipx<=(xsize-4)))
+  if ((shipx>=4) and (shipx<=xsize-4))
     then begin
-    plotmap(shipx-4,shipy,shipmap[0]);
-    plotmap(shipx,shipy,shipmap[1]);
+    lastsy:=trunc(shipy);
+    plotmap(shipx-4,lastsy,shipmap[0]);
+    plotmap(shipx,lastsy,shipmap[1]);
     lastsx:=shipx;
-    lastsy:=shipy;
   end;
 end;
 
 proc moveship;
-var change: integer;
+var change: real;
 begin
-  shipx:=shipx+sspeedx;
-  shipy:=shipy+sspeedy;
-  change:=(xsize div 2) - shipx;
-  change:=change div 16;
-  change:=change+(random div 16)-8;
-  sspeedx:=(4*(sspeedx+change)) div 5;
+  shipx:=shipx + trunc(sspeedx);
+  shipy:=shipy + sspeedy;
+  change:=0.05 * conv(xsize div 2 - shipx);
+  change:=change * rrandom(-0.3,0.3);
+  sspeedx:=sspeedx+change;
   if shipx<4 then begin
     shipx:=4;
-    sspeedx:=random and 7;
+    sspeedx:=-sspeedx;
   end;
   if shipx>xsize-4 then begin
     shipx:=xsize-4;
-    sspeedx:=-(random and 7);
+    sspeedx:=-sspeedx;
   end;
-  if shipy<=0 then begin
-    stop:=true; landed:=true;
+  if shipy<=-0.5 then begin
+    landed:=true;
     move(0,ysize-9);
     write(@plotdev,'ALIENS LANDED   ');
   end;
@@ -147,66 +146,67 @@ begin
   birdx:=-1; lastbirdx:=-1;
   birdcount:=0; lasercount:=0;
   score:=0; lastscore:=-1;
-  stop:=false; landed:=false;
+  landed:=false;
   grinit;
   cleargr;
   move(0,ysize-9);
   write(@plotdev,'USE SPACE BAR   ');
 end;
 
+func expaint:boolean;
+begin
+  if lastscore<>score then showscore;
+  if (shipx < 0) and (birdx=-1) then begin
+    if random<16 then begin
+      shipx:=irandom(5,xsize-5);
+      shipy:=conv(ysize-14);
+      sspeedx:=rrandom(-2.0,2.0);
+      sspeedy:=-0.5;
+    end;
+  end;
+
+  if shipx>=0 then begin
+    moveship;
+    showship;
+  end;
+
+  if birdx=-1
+  then begin
+    if random<4 then begin
+      birdx:=0;
+      birdy:=irandom(ysize div 2,ysize-14);
+      sbird:=2;
+    end else if random>251 then begin
+      birdx:=xsize-4;
+      birdy:=irandom(ysize div 2,ysize-14);
+      sbird:=-2;
+    end
+  end;
+  if birdx>=0 then begin
+    birdx:=birdx+sbird;
+    if birdx<0 then birdx:=-1;
+    if birdx>xsize-4 then birdx:=-1;
+    showbird;
+  end;
+  if landed then expaint:=true
+  else expaint:=false;
+end;
+
+func exkey(ch:char):boolean;
+begin
+  if landed then writeln('landed');
+  if ch=' ' then laser;
+  exkey := (ch = chr(0));
+end;
+
+{$I IANIMATE:P}
+
 begin
   init;
-  repeat
-    if lastscore<>score then showscore;
-
-    if (shipx=-1) and (birdx=-1)
-    then begin
-      if random<8 then begin
-        shipx:=random;
-        if shipx<4 then shipx:=4;
-        if shipx>xsize-4 then
-          shipx:=xsize-4;
-        shipy:=ysize-14;
-        sspeedx:=((random-128) div 64);
-        sspeedy:=-1;
-      end;
-    end;
-    if shipx>=0 then begin
-      moveship;
-      showship;
-    end;
-
-    if (birdx=-1) and (shipy<(ysize-32))
-    then begin
-      if random<4 then begin
-        birdx:=0;
-        birdy:=ysize-(random div 16)-14;
-        sbird:=2;
-      end else if random>251 then begin
-        birdx:=xsize-4;
-        birdy:=ysize-(random div 16)-14;
-        sbird:=-2;
-      end
-    end;
-    if birdx>=0 then begin
-      birdx:=birdx+sbird;
-      if birdx<0 then birdx:=-1;
-      if birdx>xsize-4 then birdx:=-1;
-      showbird;
-    end;
-
-    dummy:=syncscreen;
-    delay10msec(5);
-    if (keypressed<>chr(0)) then begin
-      if keypressed=' ' then laser
-      else stop:=true;
-      keypressed:=chr(0);
-    end;
-    until stop or (score>99);
-  delay10msec(100);
-  grend;
+  animate(false);
+  splitview;
   if landed then
-    writeln('The aliens have landed!');
+    writeln('The aliens are landed!');
   writeln('You hit ',score,
       ' alien ships');
 end.

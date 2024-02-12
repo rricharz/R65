@@ -26,6 +26,7 @@ extern int panelSize, panelOffset;
 extern double panelScale;
 
 extern int global_char;
+extern int global_key_is_down;
 extern int exDisplay;
 extern int fullscreen,pixelated;
 

@@ -333,7 +333,12 @@ uint8_t read6502(uint16_t address)
         else if (address == EMU_RAND) {
             int rnd = (rand() & 255);
             return(rnd);
+            
         }
+        else if (address == EMU_FLAGS)  {
+            return(global_key_is_down); // bit 0 set if key is down           
+        }
+
         /*
         else if (address == KIM_IFR1) {
             printf ("Reading from KIM-1 IFR1 register, pc=%04X, value=%02X\n", pc - 3, memory[address]);

@@ -59,6 +59,7 @@ struct tClick {
 } global_click;
 
 int global_char;
+int global_key_is_down;
 
 int windowWidth, windowHeight;
 int crtWidth, crtHeight, crtOffset;
@@ -403,6 +404,8 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
     if ((event->keyval == 0xFE03) || (event->keyval == 0xFFE1)
        || (event->keyval == 0xFFE3))
     return;
+    
+    // printf("key pressed %4x\n",event->keyval);
         
     // control keys
     if (event->state & GDK_CONTROL_MASK) {
@@ -455,6 +458,15 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
         }
                 
     setKeyboardInterrupt();
+    global_key_is_down = 1;
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+static void on_key_release(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
+////////////////////////////////////////////////////////////////////////////////////
+{
+    // printf("key released\n");
+    global_key_is_down = 0;
 }
 
 /////////////////////////////////
@@ -540,7 +552,7 @@ int main (int argc, char *argv[])
     g_signal_connect(G_OBJECT(darea), "button-press-event", G_CALLBACK(clicked), NULL);
     g_signal_connect(G_OBJECT(darea), "button-release-event", G_CALLBACK(released), NULL);
     g_signal_connect(G_OBJECT(global_window), "key_press_event", G_CALLBACK(on_key_press), NULL);
-	
+    g_signal_connect(G_OBJECT(global_window), "key_release_event", G_CALLBACK(on_key_release), NULL);	
     if (strlen(ICON_NAME) > 0) {
 	gtk_window_set_icon_name(GTK_WINDOW(global_window), ICON_NAME);	
     }
