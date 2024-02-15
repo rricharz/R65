@@ -13,9 +13,10 @@ const erase=0; ball=$6ff6;
       face3=$034a; face4=$084a;
 
 var bx,by,bxs,bys,bxspeed,byspeed,fx,fxs: real;
-    fxspeed,jump: real;
+    fxspeed,jump,jumpspeed: real;
     floor,ffloor,fy,fys,fyspeed: integer;
     holes,ladders: array[nfloors] of integer;
+    score,count: integer;
 
 {$I IRANDOM:P}
 
@@ -32,14 +33,15 @@ end;
 
 func ondownladder(f:integer;x:real):boolean;
 begin
-  ondownladder:=(trunc(x+0.5)>=ladders[f-1]+2) and
-    (trunc(x+0.5)<=ladders[f-1]+4);
+  if f=0 then ondownladder:=false
+  else ondownladder:=(trunc(x)>=ladders[f-1]+1) and
+    (trunc(x+0.5)<=ladders[f-1]+2);
 end;
 
 func onhole(f:integer;x:real):boolean;
 begin
-  onhole:=(x>=conv(holes[f]+2)) and
-      (x<=conv(holes[f]+holesize-6));
+  onhole:=(x>=conv(holes[f]-5)) and
+      (x<=conv(holes[f]+holesize+1));
 end;
 
 proc showface;
@@ -72,11 +74,24 @@ begin
   end;
 end;
 
+proc init; forward;
+
 func expaint: boolean;
 { paint picture and apply motion }
 var f:integer;
 begin
   expaint:=false;
+  if (ffloor=nfloors) and (trunc(fx)>xsize-10) then
+  begin
+    score:=score+1; count:=count+1;
+    if count>=10 then begin
+      expaint:=true; exit;
+    end;
+    fx:=1.0; fy:=1; fxspeed:=0.0; ffloor:=0;
+    move(xsize div 2 - 5*4, ysize-9);
+    write(@plotdev,score,' of ',count);
+    exit;
+  end;
   { check for next floor on ladder }
   if ffloor<nfloors then
     if onfloor(ffloor+1,fy) then begin
@@ -104,9 +119,13 @@ begin
   { check for ladder }
   if onupladder(ffloor,fx) or ondownladder(ffloor,fx)
     then fxspeed:=0.0;
-  { check for hole (face) }
-  if (jump<=0.0) and onhole(ffloor,fx) then jump:=4.5
-  else jump:=jump-0.3;
+  { check for hole (face) and jump over it }
+  if (jump<=0.01) and onhole(ffloor,fx) then begin
+    jumpspeed:=1.3; jump:=jump+jumpspeed;
+  end else if jump>0.0 then begin
+    jump:=jump+jumpspeed;
+    jumpspeed:=jumpspeed+gravity;
+  end;
   if jump<=0.0 then jump:=0.0;
   { move ball }
   bx:=bx+bxspeed; by:=by+byspeed;
@@ -146,8 +165,11 @@ begin
   if (bx>=fx-4.0) and (bx<=fx+8.0) and
      (trunc(by)>=fy-4) and (trunc(by)<=fy+8)
     then begin
-     writeln('Hit');
-     expaint:=true;
+      count:=count+1;
+      move(xsize div 2 - 5*4, ysize-9);
+      write(@plotdev,score,' of ',count);
+      if count>=10 then expaint:=true;
+      init;
     end;
 end;
 
@@ -155,6 +177,7 @@ proc ladderup;
 begin
   if (ffloor<nfloors) and onupladder(ffloor,fx)
   then begin
+    fx:=conv(ladders[ffloor]+1);
     fyspeed:=1; fxspeed:=0.0;
   end;
 end;
@@ -163,6 +186,7 @@ proc ladderdown;
 begin
   if (ffloor>0) and ondownladder(ffloor,fx)
   then begin
+    fx:=conv(ladders[ffloor-1]+1);
     fyspeed:=-1; fxspeed:=0.0;
   end;
 end;
@@ -172,25 +196,31 @@ func exkey(key:char):boolean;
 begin
   exkey:=(key=esc);
   case key of
-   ' ':    write('*');
    cup:    ladderup;
    cdown:  ladderdown;
-   cleft:  if onfloor(ffloor,fy) then fxspeed:=-2.0;
-   cright: if onfloor(ffloor,fy) then fxspeed:=2.0
+   cleft:  if onfloor(ffloor,fy) then
+             if fxspeed>1.0 then fxspeed:=0.0
+             else fxspeed:=-2.0;
+   cright: if onfloor(ffloor,fy) then
+             if fxspeed<-1.0 then fxspeed:=0.0
+             else fxspeed:=2.0
    end {case};
 end;
 
 proc init;
 begin
   cleargr;
+  move(xsize div 2 - 5*4, ysize-9);
+  write(@plotdev,score,' of ',count);
   bx:=2.0; by:=conv(nfloors*vfloors+1);
   bxs:=bx; bys:=by;
   bxspeed:=2.0; byspeed:=0.0;
-  fx:=1.0; fy:=1; jump:=0.0;
+  fx:=1.0; fy:=1; jump:=0.0;  jumpspeed:=0.0;
   fxs:=fx; fys:=fy;
   fxspeed:=0.0; fyspeed:=0;
   { make and show holes }
-  holes[0]:=-holesize;
+  holes[0]:=-50;
+  move(0,0); draw(xsize,0,white);
   for floor:=1 to nfloors do begin
     holes[floor]:=irandom(1,xsize-holesize-1);
     move(0,floor*vfloors);
@@ -201,7 +231,7 @@ begin
   { make and show ladders }
   for floor:=0 to nfloors-1 do begin
     repeat
-      ladders[floor]:=irandom(2,xsize-laddersize);
+      ladders[floor]:=irandom(2,xsize-laddersize-2);
     until ((ladders[floor]+laddersize<holes[floor])
       or (ladders[floor]>holes[floor]+holesize)) and
       ((ladders[floor]+laddersize<holes[floor+1])
@@ -216,7 +246,12 @@ end;
 {$I IANIMATE:P}
 
 begin
-  grinit; fullview; init;
+  score:=0; count:=0;
+  grinit; fullview;
+  init;
   animate(autorepeat);
   splitview;
+  move(xsize div 2 - 5*4, ysize-9);
+  write(@plotdev,score,' of ',count);
+  writeln('Score ',score,' of ',count);
 end.
