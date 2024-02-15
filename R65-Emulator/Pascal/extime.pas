@@ -2,9 +2,10 @@
 { pascal program }
 
 program extime;
-uses syslib,arglib,timelib;
+uses syslib,arglib,timelib,mathlib;
 
-var cyclus,drive,i,etime: integer;
+var cyclus,drive,i: integer;
+    etime: real;
     name: array[15] of char;
     default: boolean;
 
@@ -29,5 +30,7 @@ begin
   writeln;
   write('extime stop - ');;
   prttime(output); writeln;
-  writeln('Execution time: ',etime,'s');
+  writeln('Execution time: ');
+  writefix(output,2,etime)
+  writeln(' s');
 end.

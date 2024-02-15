@@ -101,4 +101,4 @@ begin
      end {case};
     keypressed:=chr(0);
   until mode=mquit;
-end.
+end.

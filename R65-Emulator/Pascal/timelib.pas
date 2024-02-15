@@ -6,9 +6,13 @@
 {  *                                     *  }
 {  ***************************************  }
 
+{ 15/02/23 rricharz:                        }
+{      returns time difference as real      }
+
 library timelib;
 
-var tenmillis,seconds,minutes,hours: integer;
+var tenmillis,seconds,minutes,hours,
+    difftenmillis: integer;
 
 proc gettime;
 { get time from host system }
@@ -51,23 +55,22 @@ begin
   write2digs(device,seconds);
 end;
 
-func timediff: integer;
+func timediff: real;
 { time in seconds since last call to gettime, }
 { prttime, timediff or start of program       }
-{ returns -1 if time difference is too large  }
-var lastsec,lastmin,lasthrs,value: integer;
+var lasttmillis,lastsec,lastmin,lasthrs: integer;
+    value: real;
 begin
+  lasttmillis:=tenmillis;
   lastsec:=seconds;
   lastmin:=minutes;
   lasthrs:=hours;
   gettime;
-  value:=hours-lasthrs;
-  if value<0 then value:=value+24;
-  value:=60*value+minutes-lastmin;
-  if (value>546) then { overflow }
-    value:=-1
-  else
-    value:=60*value+seconds-lastsec;
+  value:=conv(hours-lasthrs);
+  if value<0.0 then value:=value+24.0;
+  value:=60.0*value+conv(minutes-lastmin);
+  value:=60.0*value+conv(seconds-lastsec);
+  value:=value+conv(tenmillis-lasttmillis)/100.0
   timediff:=value;
 end;
 
