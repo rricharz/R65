@@ -29,6 +29,8 @@ mem   filerr   = $00db:integer&;
 var entry, sector,drive: integer;
     done,fixit,default,notok: boolean;
 
+{$I IOPTION:P}
+
 proc checkfilerr;
 begin
   if filerr<>0 then begin
@@ -71,23 +73,6 @@ begin
   writeln;
 end;
 
-proc getoptions;
-var i,dummy:integer;
-    options:array[15] of char;
-begin
-  agetstring(options,default,dummy,dummy);
-  fixit:=false;
-  if not default then begin
-    if options[0]<>'/' then argerror(103);
-    for i:=1 to 15 do
-      case options[i] of
-        'F': fixit:=true;
-        ' ': begin end
-        else argerror(104)
-      end; {case}
-  end;
-end;
-
 proc check;
 { check one entry }
 var i:integer;
@@ -119,11 +104,16 @@ begin
   sector:=0;
   entry:=0;
   getdrive;
-  getoptions;
+  if option('H') then begin
+    writeln('/F    fix errors');
+    call(aenddo);
+    exit;
+  end;
+  fixit:=option('F');
   if fixit then begin
     writeln('Fix errors not yet implemented');
     call(aenddo);
-    abort;
+    exit;
   end;
   notok:=false;
   scyfc:=entry;

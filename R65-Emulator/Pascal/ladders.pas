@@ -24,6 +24,7 @@ var bx,by,bxs,bys,bxspeed,byspeed,fx,fxs: real;
     demomode:boolean;
 
 {$I IRANDOM:P}
+{$I IOPTION:P}
 
 func getoption(opt:char):boolean;
 var i,dummy,savecarg:integer;
@@ -305,7 +306,11 @@ end;
 
 begin
   score:=0; count:=0;
-  demomode:=getoption('D');
+  if option('H') then begin
+    writeln('/D   endless demo mode');
+    exit;
+  end;
+  demomode:=option('D');
   if demomode then writeln('Demo mode');
   grinit; fullview;
   init;

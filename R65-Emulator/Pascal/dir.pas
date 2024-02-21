@@ -21,7 +21,7 @@ longest name is. Then computes the number
 of columns which can be displayed and
 displays the directory.
 
-option /s sorts the directory
+option /S sorts the directory
 
 Usage:  dir drive [/s]                   }
 
@@ -52,6 +52,8 @@ var default,sortit: boolean;
     filstptab    : array[80] of char;
     s            : cpnt;
     entry        : array[maxent] of cpnt;
+
+{$I IOPTION:P}
 
 func hex(d:integer):char;
 { convert hex digit to hex char }
@@ -93,23 +95,6 @@ begin
        end;
 end;
 
-proc getoptions;
-var dummy:integer;
-    options:array[15] of char;
-begin
-  agetstring(options,default,dummy,dummy);
-  sortit:=false;
-  if not default then begin
-    if options[0]<>'/' then argerror(103);
-    for i:=1 to 15 do
-      case options[i] of
-        'S': sortit:=true;
-        ' ': begin end
-        else argerror(104)
-      end; {case}
-  end;
-end;
-
 begin {main}
   drive:=1; {default drive}
   filerr:=0;
@@ -118,7 +103,11 @@ begin {main}
     writeln('Drive must be 0 or 1');
     abort
   end;
-  getoptions;
+  if option('H') then begin
+    writeln('/S   sort directory');
+    exit;
+  end;
+  sortit:=option('S');
   fildrv:=drive;
   call(aprepdo);
   checkfilerr;
@@ -195,4 +184,3 @@ begin {main}
     trunc(100.0*fdel+0.5),'%),',
     'files:',index-1);
 end.
-
