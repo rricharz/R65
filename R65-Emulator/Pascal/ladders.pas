@@ -101,7 +101,7 @@ proc showresult;
 var s:cpnt;
 begin
   s:=new;
-  write(@s,score,' 0F ',count);
+  write(@s,' ',score,' 0F ',count);
   ledstring(s);
   release(s);
 end;
@@ -125,8 +125,7 @@ begin
     else if (ffloor<nfloors) and onupladder(ffloor,fx)
     then ladderup
     else if onfloor(ffloor,fy) then  begin
-      if (trunc(fx)>=ladders[ffloor]+laddersize div 2)
-      then begin
+      if (trunc(fx)>=ladders[ffloor]+1) then begin
         if fxspeed>1.0 then fxspeed:=0.0
         else fxspeed:=-2.0;
       end else begin
@@ -141,8 +140,13 @@ begin
   begin
     score:=score+1; count:=count+1;
     if count>=10 then begin
-      expaint:=true; exit;
+      if demomode then begin
+        score:=0; count:=0; init;
+      end else begin
+        expaint:=true; exit;
+      end;
     end;
+    init;
     fx:=1.0; fy:=1; fxspeed:=0.0; ffloor:=0;
     showresult;
     exit;
@@ -222,10 +226,7 @@ begin
     then begin
       count:=count+1;
       showresult;
-      if demomode and (count>=99) then begin
-        count:=0; score:=0;
-      end;
-      if (not demomode) and (count>=10) then
+      if count>=10 then
         expaint:=true;
       init;
     end;
@@ -305,7 +306,7 @@ end;
 begin
   score:=0; count:=0;
   demomode:=getoption('D');
-  if demomode then writeln('demo mode');
+  if demomode then writeln('Demo mode');
   grinit; fullview;
   init;
   animate(autorepeat);
