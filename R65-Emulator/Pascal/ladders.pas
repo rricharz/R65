@@ -1,7 +1,11 @@
-{ scramble: climb up the ladders }
+{ ladders: climb up the ladders
 
-program scramble;
-uses syslib,plotlib;
+  Demo mode: ladders /D
+
+  2024 rricharz                      }
+
+program ladders;
+uses syslib,plotlib,ledlib,arglib,strlib;
 
 const erase=0; ball=$6ff6;
       nfloors=5; vfloors=20; holesize=22;
@@ -17,8 +21,25 @@ var bx,by,bxs,bys,bxspeed,byspeed,fx,fxs: real;
     floor,ffloor,fy,fys,fyspeed: integer;
     holes,ladders: array[nfloors] of integer;
     score,count: integer;
+    demomode:boolean;
 
 {$I IRANDOM:P}
+
+func getoption(opt:char):boolean;
+var i,dummy,savecarg:integer;
+    options:array[15] of char;
+    default:boolean;
+begin
+  savecarg:=carg; { save for next call to getoption }
+  agetstring(options,default,dummy,dummy);
+  getoption:=false;
+  if not default then begin
+    if options[0]<>'/' then argerror(103);
+    for i:=1 to 15 do
+      if options[i]=opt then getoption:=true;
+  end;
+  carg:=savecarg;
+end;
 
 func onfloor(f,y:integer):boolean;
 begin
@@ -76,10 +97,45 @@ end;
 
 proc init; forward;
 
+proc showresult;
+var s:cpnt;
+begin
+  s:=new;
+  write(@s,score,' 0F ',count);
+  ledstring(s);
+  release(s);
+end;
+
+proc ladderup;
+begin
+  if (ffloor<nfloors) and onupladder(ffloor,fx)
+  then begin
+    fx:=conv(ladders[ffloor]+1);
+    fyspeed:=1; fxspeed:=0.0;
+  end;
+end;
+
 func expaint: boolean;
 { paint picture and apply motion }
 var f:integer;
+    s:cpnt;
 begin
+  if demomode then begin
+    if ffloor=nfloors then fxspeed:=2.0
+    else if (ffloor<nfloors) and onupladder(ffloor,fx)
+    then ladderup
+    else if onfloor(ffloor,fy) then  begin
+      if (trunc(fx)>=ladders[ffloor]+laddersize div 2)
+      then begin
+        if fxspeed>1.0 then fxspeed:=0.0
+        else fxspeed:=-2.0;
+      end else begin
+        if fxspeed<-1.0 then fxspeed:=0.0
+        else fxspeed:=2.0
+      end;
+    end;
+  end;
+
   expaint:=false;
   if (ffloor=nfloors) and (trunc(fx)>xsize-10) then
   begin
@@ -88,8 +144,7 @@ begin
       expaint:=true; exit;
     end;
     fx:=1.0; fy:=1; fxspeed:=0.0; ffloor:=0;
-    move(xsize div 2 - 5*4, ysize-9);
-    write(@plotdev,score,' of ',count);
+    showresult;
     exit;
   end;
   { check for next floor on ladder }
@@ -166,9 +221,12 @@ begin
      (trunc(by)>=fy-4) and (trunc(by)<=fy+8)
     then begin
       count:=count+1;
-      move(xsize div 2 - 5*4, ysize-9);
-      write(@plotdev,score,' of ',count);
-      if count>=10 then expaint:=true;
+      showresult;
+      if demomode and (count>=99) then begin
+        count:=0; score:=0;
+      end;
+      if (not demomode) and (count>=10) then
+        expaint:=true;
       init;
     end;
 end;
@@ -210,8 +268,7 @@ end;
 proc init;
 begin
   cleargr;
-  move(xsize div 2 - 5*4, ysize-9);
-  write(@plotdev,score,' of ',count);
+  showresult;
   bx:=2.0; by:=conv(nfloors*vfloors+1);
   bxs:=bx; bys:=by;
   bxspeed:=2.0; byspeed:=0.0;
@@ -247,11 +304,12 @@ end;
 
 begin
   score:=0; count:=0;
+  demomode:=getoption('D');
+  if demomode then writeln('demo mode');
   grinit; fullview;
   init;
   animate(autorepeat);
   splitview;
-  move(xsize div 2 - 5*4, ysize-9);
-  write(@plotdev,score,' of ',count);
+  showresult;
   writeln('Score ',score,' of ',count);
 end.
