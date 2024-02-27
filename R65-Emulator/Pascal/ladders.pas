@@ -228,7 +228,9 @@ begin
       count:=count+1;
       showresult;
       if count>=10 then
-        expaint:=true;
+        if demomode then begin
+          count:=0; init;
+        end else expaint:=true;
       init;
     end;
 end;
