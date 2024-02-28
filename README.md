@@ -10,10 +10,6 @@ Below is a screen shot of the R65-emulator front panel.
 
 ![Alt text](r65panel.jpg?raw=true "R65 Emulator front panel")
 
-I have built a fully functional replica 2018 based on a Raspberry Pi.
-
-![Alt text](replica.jpg?raw=true "R65 replica built 2018")
-
 The original program listings are in the folder Original-Program-Listings.
 
 Original Job computer built 1977-1979:

@@ -10,7 +10,6 @@
 #include "crt.h"
 #include "time.h"
 #include "fdc.h"
-#include "exdisp.h"
 
 
 #define SETNORMALTEXTCOLOR   Stroke(210,210,210)
@@ -102,19 +101,6 @@ void checkInfoBarButtons()
     
     checkClick(&x, &y);
     
-    if (exDisplay) {
-        if (checkButton(1) == 0) {
-            QuitProgram(0); // shutdown is handled by service
-        }
-        if (checkButton(2) == 0) {
-            QuitProgram(0);
-        }
-        if (checkButton(3) == 0) {
-            printf("Executing NMI\n");
-            pendingNMI = 1;
-        }
-    }
-    
     if (x > 0) {
         
         // printf("Check button click at %d,%d\n",x,y);
@@ -201,10 +187,6 @@ void infoPanel()
             SETLEDOFFCOLOR;
         Circle(LED_HPOS + LED_SIZE / 2, LED_VPOS  + i * LED_VDIST - LED_SIZE / 2, LED_SIZE);
     }
-    if (exDisplay) {
-        setDriveLed(0, led[0]);
-        setDriveLed(1, led[1]);
-    }
     
     // show disk names
     for (int drive = 0; drive <2; drive++) {
@@ -267,16 +249,6 @@ void infoPanel()
     if ((memory[M8_SFLAG] & 1) == 0)
         sprintf(s3,"%05d %02X",0,0);
     
-    if (read6502_8(RS8_LED)) {
-        s = s1;
-    }
-    else if ((memory[M8_SFLAG] & 1) == 0) {
-        s = s2;
-    }
-    else {
-        s = s3;
-    }
-    if (exDisplay) led_showstring(s, 0);
     crt_show7segmentDisplay(s1, quit_vpos + 2 * quit_vsize + 16 * panelScale,
         "KIM-1 display");
     crt_show7segmentDisplay(s2, quit_vpos + 2 * quit_vsize + 76 * panelScale,

@@ -48,7 +48,6 @@
 #include "fake6502.h"
 #include "crt.h"
 #include "fdc.h"
-#include "exdisp.h"
 
 int pendingNMI              = 0;
 int pendingIRQ              = 0;
@@ -864,8 +863,7 @@ int r65Setup()
     
     void reset6502();
     memset(memory, 0, 65536);
-    if (exDisplay)
-        init_exdisp();
+
     crt_init();
     
     // loadCodeFromListing("Assembler/assembler.txt", 1);
@@ -976,7 +974,5 @@ int r65Quit()
             fprintf(confFile, "disk=%s\n", floppy[drive].name);
         fclose(confFile);
     }
-    if (exDisplay)
-        quit_exdisp();
     fdc_quit();
 }
