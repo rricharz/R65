@@ -406,6 +406,11 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
     return;
     
     // printf("key pressed %4x\n",event->keyval);
+    if (event->keyval == 0xFFFF) {
+        printf("Making screen shot with grim (Wayland only)\n");
+        system("grim");
+        return;
+    }
         
     // control keys
     if (event->state & GDK_CONTROL_MASK) {

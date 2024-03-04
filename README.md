@@ -21,7 +21,7 @@ store chain Franz Carl Weber. The keyboard (bottom) and the TV screen (in the ba
 are visible. The very early reaction time test game played used the led's on the front panel.
  ![Alt text](original.jpg?raw=true "original")
 
-Running pong written in Tiny Pascal:
+Running ladders written in R65 Pascal:
 ![Alt text](screen-1.jpg?raw=true "screen-1")
 
 The graphic basic interpreter has just been started:
