@@ -63,7 +63,6 @@ void crt_init()
         led[i] = 0;
     global_graphicsFlag = 0;
  
-    printf("Dot size = %0.1f x %0.1f\n", xdot2, ydot2);
     // In order to handle the fractional expansion
     // factor on some displays, white (cyan) dots are one dot larger
     // than black ones. This allows to make all visible dots the same

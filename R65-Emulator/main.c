@@ -547,7 +547,6 @@ int main (int argc, char *argv[])
     
     panelOffset = crtWidth +  (2 * crtOffset); 
     panelSize   = windowWidth -panelOffset - ( crtOffset / 2);
-    printf("PanelOffset: %d\n", panelOffset, windowHeight);
 	
     gtk_window_set_title(GTK_WINDOW(global_window), WINDOW_NAME);
 	
