@@ -1,0 +1,387 @@
+
+R65 COMPILE 4.3: program NROFF            25/2/26 page 1
+
+
+   1 (    4) program nroff;
+   2 (    4) 
+   3 (    4) { mininroff            }
+   4 (    4) { Witten March 2026    }
+   5 (    4) { R. Richarz / ChatGPT }
+   6 (    4) 
+   7 (    4) uses syslib, arglib;
+   8 ( 1093) 
+   9 ( 1093) const
+  10 ( 1093)   maxline = 120;
+  11 ( 1096)   maxout  = 200;
+  12 ( 1096)   indstep = 4;
+  13 ( 1096) 
+  14 ( 1096) var
+  15 ( 1096)   src      : file;
+  16 ( 1096)   name     : array[15] of char;
+  17 ( 1096)   default  : boolean;
+  18 ( 1096)   cyclus, drive : integer;
+  19 ( 1096) 
+  20 ( 1096)   ch       : char;
+  21 ( 1096)   line     : array[maxline] of char;
+  22 ( 1096)   llen     : integer;
+  23 ( 1096) 
+  24 ( 1096)   outbuf   : array[maxout] of char;
+  25 ( 1096)   outlen   : integer;
+  26 ( 1096) 
+  27 ( 1096)   fillmode : boolean;
+  28 ( 1096)   indent   : integer;
+  29 ( 1096)   linewidth: integer;
+  30 ( 1096)   linecount: integer; { added by RR }
+  31 ( 1096) 
+  32 ( 1096) { --- helpers --- }
+  33 ( 1096) 
+  34 ( 1096) func mod(k,m:integer):integer;
+  35 ( 1096) begin mod:=k-((k div m)*m);
+  36 ( 1119) end;
+  37 ( 1124) 
+  38 ( 1125) func upc(c: char): char;
+  39 ( 1125) begin
+  40 ( 1125)   if (c>='a') and (c<='z') then upc := chr(ord(c)-32)
+  41 ( 1154)   else upc := c;
+  42 ( 1163) end;
+  43 ( 1171) 
+  44 ( 1172) proc putspaces(n: integer);
+  45 ( 1172) var i: integer;
+  46 ( 1175) begin
+  47 ( 1175)   for i:=1 to n do write(' ');
+  48 ( 1198) end;
+  49 ( 1212) 
+  50 ( 1213) proc flushline;
+  51 ( 1213) var i: integer;
+  52 ( 1216) begin
+  53 ( 1216)   if outlen>0 then begin
+  54 ( 1225)     putspaces(indent);
+  55 ( 1238)     for i:=0 to outlen-1 do write(outbuf[i]);
+  56 ( 1269)     writeln;
+  57 ( 1283)     outlen := 0;
+  58 ( 1291)   end;
+  59 ( 1295) end;
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.3: program NROFF            25/2/26 page 2
+
+  60 ( 1295) 
+  61 ( 1296) proc emitblank;
+  62 ( 1296) begin
+  63 ( 1296)   flushline;
+  64 ( 1305)   writeln;
+  65 ( 1305) end;
+  66 ( 1311) 
+  67 ( 1312) proc emittextnofill;
+  68 ( 1312) var i: integer;
+  69 ( 1315) begin
+  70 ( 1315)   flushline;
+  71 ( 1321)   putspaces(indent);
+  72 ( 1331)   for i:=0 to llen-1 do write(line[i]);
+  73 ( 1362)   writeln;
+  74 ( 1376) end;
+  75 ( 1382) 
+  76 ( 1383) func isspace(c: char): boolean;
+  77 ( 1383) begin
+  78 ( 1383)   isspace := (c=' ') or (c=tab8);
+  79 ( 1402) end;
+  80 ( 1407) 
+  81 ( 1408) { tab expansion to spaces (tab stops 8) }
+  82 ( 1408) { into the current input line buffer }
+  83 ( 1408) proc addchartoline(c: char);
+  84 ( 1408) var k,spaces: integer;
+  85 ( 1411) begin
+  86 ( 1411)   if llen>=maxline then exit;
+  87 ( 1424) 
+  88 ( 1424)   if c=tab8 then begin
+  89 ( 1431)     k := llen; { 0-based }
+  90 ( 1442)     spaces := 8 - (mod(k,8));
+  91 ( 1458)     while (spaces>0) and (llen<maxline) do begin
+  92 ( 1481)       line[llen] := ' ';
+  93 ( 1487)       llen := succ(llen);
+  94 ( 1495)       spaces := prec(spaces);
+  95 ( 1504)     end;
+  96 ( 1509)   end else begin
+  97 ( 1515)     line[llen] := c;
+  98 ( 1519)     llen := succ(llen);
+  99 ( 1531)   end;
+ 100 ( 1536) end;
+ 101 ( 1536) 
+ 102 ( 1537) { parse integer from line starting at pos (0-based), }
+ 103 ( 1537) { returns 0 if none }
+ 104 ( 1537) func parseintfrom(p: integer): integer;
+ 105 ( 1537) var v,pos: integer;
+ 106 ( 1540) begin
+ 107 ( 1540)   v := 0;
+ 108 ( 1544)   pos:=p;
+ 109 ( 1548)   while (pos<llen) and (line[pos]>='0')
+ 110 ( 1575)     and (line[pos]<='9')
+ 111 ( 1587)   do begin
+ 112 ( 1592)     v := v*10 + (ord(line[pos]) - ord('0'));
+ 113 ( 1610)     pos := succ(pos);
+ 114 ( 1619)   end;
+ 115 ( 1624)   parseintfrom := v;
+ 116 ( 1627) end;
+ 117 ( 1635) 
+ 118 ( 1636) { formatter: add a word to outbuf with wrapping }
+ 119 ( 1636) 
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.3: program NROFF            25/2/26 page 3
+
+ 120 ( 1636) proc addword(start, wlen: integer);
+ 121 ( 1636) var need, i: integer;
+ 122 ( 1639) begin
+ 123 ( 1639)   { space before word if not first }
+ 124 ( 1639)   need := wlen;
+ 125 ( 1641)   if outlen>0 then need := need + 1;
+ 126 ( 1665) 
+ 127 ( 1670)   if (indent + outlen + need) > linewidth then begin
+ 128 ( 1689)     flushline;
+ 129 ( 1696)   end;
+ 130 ( 1696) 
+ 131 ( 1696)   if outlen>0 then begin
+ 132 ( 1703)     outbuf[outlen] := ' ';
+ 133 ( 1712)     outlen := succ(outlen);
+ 134 ( 1720)   end;
+ 135 ( 1725) 
+ 136 ( 1725)   for i:=0 to wlen-1 do begin
+ 137 ( 1747)     if outlen<maxout then begin
+ 138 ( 1754)       outbuf[outlen] := line[start+i];
+ 139 ( 1770)       outlen := succ(outlen);
+ 140 ( 1782)     end;
+ 141 ( 1787)   end;
+ 142 ( 1787) end;
+ 143 ( 1801) 
+ 144 ( 1802) proc formatfillfromline;
+ 145 ( 1802) var i, wstart, wlen: integer;
+ 146 ( 1805) begin
+ 147 ( 1805)   i := 0;
+ 148 ( 1809)   while i<llen do begin
+ 149 ( 1825)     while (i<llen) and isspace(line[i]) do i:=succ(i);
+ 150 ( 1858) 
+ 151 ( 1866)     if i>=llen then exit;
+ 152 ( 1879)     wstart := i;
+ 153 ( 1879)     wlen := 0;
+ 154 ( 1889)     while (i<llen) and (not isspace(line[i])) do begin
+ 155 ( 1923)       i := succ(i);
+ 156 ( 1927)       wlen := succ(wlen);
+ 157 ( 1936)     end;
+ 158 ( 1941)     addword(wstart, wlen);
+ 159 ( 1958)   end;
+ 160 ( 1958) end;
+ 161 ( 1961) 
+ 162 ( 1962) { --- command handlers --- }
+ 163 ( 1962) 
+ 164 ( 1962) proc doSH;
+ 165 ( 1962) var i, pos: integer;
+ 166 ( 1965) begin
+ 167 ( 1965)   flushline;
+ 168 ( 1971)   writeln;
+ 169 ( 1971) 
+ 170 ( 1977)   { print rest of line after ".SH " in uppercase }
+ 171 ( 1977)   pos := 4; { expects: . S H space ... }
+ 172 ( 1983)   putspaces(indent);
+ 173 ( 1993)   i := pos;
+ 174 ( 1993)   while i<llen do begin
+ 175 ( 2013)     write(upc(line[i]));
+ 176 ( 2030)     i := succ(i);
+ 177 ( 2034)   end;
+ 178 ( 2039)   writeln;
+ 179 ( 2042)   writeln;
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.3: program NROFF            25/2/26 page 4
+
+ 180 ( 2048) end;
+ 181 ( 2054) 
+ 182 ( 2055) proc doPP;
+ 183 ( 2055) begin
+ 184 ( 2055)   emitblank;
+ 185 ( 2064) end;
+ 186 ( 2064) 
+ 187 ( 2065) proc doBR;
+ 188 ( 2065) begin
+ 189 ( 2065)   flushline;
+ 190 ( 2074) end;
+ 191 ( 2074) 
+ 192 ( 2075) proc doNF;
+ 193 ( 2075) begin
+ 194 ( 2075)   flushline;
+ 195 ( 2084)   fillmode := false;
+ 196 ( 2086) end;
+ 197 ( 2090) 
+ 198 ( 2091) proc doFI;
+ 199 ( 2091) begin
+ 200 ( 2091)   flushline;
+ 201 ( 2100)   fillmode := true;
+ 202 ( 2102) end;
+ 203 ( 2106) 
+ 204 ( 2107) proc doRS;
+ 205 ( 2107) begin
+ 206 ( 2107)   flushline;
+ 207 ( 2116)   indent := indent + indstep;
+ 208 ( 2122) end;
+ 209 ( 2127) 
+ 210 ( 2128) proc doRE;
+ 211 ( 2128) begin
+ 212 ( 2128)   flushline;
+ 213 ( 2137)   if indent>=indstep then
+ 214 ( 2143)     indent := indent - indstep;
+ 215 ( 2153) end;
+ 216 ( 2158) 
+ 217 ( 2159) proc doSP;
+ 218 ( 2159) var n, j, s: integer;
+ 219 ( 2162) begin
+ 220 ( 2162)   flushline;
+ 221 ( 2168)   { syntax: ".sp" or ".sp n" }
+ 222 ( 2168)   s := 3;
+ 223 ( 2170)   while (s<llen) and (line[s]=' ') do
+ 224 ( 2194)     s:=succ(s);
+ 225 ( 2202)   if llen>3 then n := parseintfrom(s) else n := 1;
+ 226 ( 2241)   if n<=0 then n := 1;
+ 227 ( 2257)   for j:=1 to n do writeln;
+ 228 ( 2280) end;
+ 229 ( 2300) 
+ 230 ( 2301) proc doB;
+ 231 ( 2301) var i: integer;
+ 232 ( 2304) begin
+ 233 ( 2304)   flushline;
+ 234 ( 2310)   putspaces(indent);
+ 235 ( 2320)   write(invvid); { inverse video as "bold" }
+ 236 ( 2323) 
+ 237 ( 2323)   i := 3; { ".B " }
+ 238 ( 2329)   while i<llen do begin
+ 239 ( 2341)     write(line[i]);
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.3: program NROFF            25/2/26 page 5
+
+ 240 ( 2350)     i := succ(i);
+ 241 ( 2354)   end;
+ 242 ( 2359)   write(norvid);
+ 243 ( 2365)   writeln;
+ 244 ( 2365) end;
+ 245 ( 2371) 
+ 246 ( 2372) proc doI;
+ 247 ( 2372) var i: integer;
+ 248 ( 2375) begin
+ 249 ( 2375)   flushline;
+ 250 ( 2381)   putspaces(indent);
+ 251 ( 2391)   i := 3; { ".I " }
+ 252 ( 2397)   while i<llen do begin
+ 253 ( 2409)     write(line[i]);
+ 254 ( 2418)     i := succ(i);
+ 255 ( 2422)   end;
+ 256 ( 2427)   writeln;
+ 257 ( 2430) end;
+ 258 ( 2436) 
+ 259 ( 2437) { --- line reader: reads CR-terminated lines; }
+ 260 ( 2437) {     returns false on EOF }
+ 261 ( 2437) 
+ 262 ( 2437) func readline: boolean;
+ 263 ( 2437) begin
+ 264 ( 2437)   llen := 0;
+ 265 ( 2444) 
+ 266 ( 2448)   repeat
+ 267 ( 2448)     read(@src, ch);
+ 268 ( 2458)     if ch=eof then begin
+ 269 ( 2466)       { if already collected chars, return them }
+ 270 ( 2469)       if llen>0  then readline:=true
+ 271 ( 2479)       else readline := false;
+ 272 ( 2490)       exit;
+ 273 ( 2495)     end;
+ 274 ( 2495) 
+ 275 ( 2495)     if ch=lf then begin
+ 276 ( 2502)     end else if ch=cr then begin
+ 277 ( 2515)       readline := true;
+ 278 ( 2520)       exit;
+ 279 ( 2525)     end else begin
+ 280 ( 2528)       addchartoline(ch);
+ 281 ( 2538)     end;
+ 282 ( 2538)   until false;
+ 283 ( 2540) end;
+ 284 ( 2543) 
+ 285 ( 2544) { --- dispatcher --- }
+ 286 ( 2544) 
+ 287 ( 2544) proc handleline;
+ 288 ( 2544) begin
+ 289 ( 2544)   if (llen>=1) and (line[0]='.') then begin
+ 290 ( 2566)     { recognize 2-letter commands }
+ 291 ( 2569)     if (llen>=3) and (line[1]='S') and (line[2]='H')
+ 292 ( 2594)       then doSH
+ 293 ( 2596)     else if (llen>=3) and (line[1]='P')
+ 294 ( 2621)       and (line[2]='P') then doPP
+ 295 ( 2633)     else if (llen>=3) and (line[1]='b')
+ 296 ( 2658)       and (line[2]='r') then doBR
+ 297 ( 2670)     else if (llen>=3) and (line[1]='n')
+ 298 ( 2695)        and (line[2]='f') then doNF
+ 299 ( 2707)     else if (llen>=3) and (line[1]='f')
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.3: program NROFF            25/2/26 page 6
+
+ 300 ( 2732)        and (line[2]='i') then doFI
+ 301 ( 2744)     else if (llen>=3) and (line[1]='R')
+ 302 ( 2769)        and (line[2]='S') then doRS
+ 303 ( 2781)     else if (llen>=3) and (line[1]='R')
+ 304 ( 2806)        and (line[2]='E') then doRE
+ 305 ( 2818)     else if (llen>=3) and (line[1]='s')
+ 306 ( 2843)        and (line[2]='p') then doSP
+ 307 ( 2855)     else if (llen>=2) and (line[1]='B') then doB
+ 308 ( 2882)     else if (llen>=2) and (line[1]='I') then doI
+ 309 ( 2909)     else begin
+ 310 ( 2919)       { unknown request: ignore }
+ 311 ( 2919)     end;
+ 312 ( 2919)   end else begin
+ 313 ( 2922)     { plain text }
+ 314 ( 2922)     if fillmode then formatfillfromline
+ 315 ( 2926)     else emittextnofill;
+ 316 ( 2940)   end;
+ 317 ( 2940) end;
+ 318 ( 2940) 
+ 319 ( 2941) { --- main --- }
+ 320 ( 2941) 
+ 321 ( 2941) begin
+ 322 ( 2941)   { defaults }
+ 323 ( 2941)   fillmode := true;
+ 324 ( 2946)   indent := 0;
+ 325 ( 2952)   linewidth := 40; { R65 display width (40 columns) }
+ 326 ( 2962)   linecount := 0;  { added by RR }
+ 327 ( 2968) 
+ 328 ( 2968)   { get filename from arguments }
+ 329 ( 2968)   { same pattern as compile }
+ 330 ( 2968)   cyclus := 0; drive := 1;
+ 331 ( 2976)   agetstring(name, default, cyclus, drive);
+ 332 ( 3020)   if default then begin
+ 333 ( 3024)     writeln('usage: nroff name[.cy[,drv]]');
+ 334 ( 3062)     abort;
+ 335 ( 3066)   end;
+ 336 ( 3066) 
+ 337 ( 3066)   asetfile(name, cyclus, drive, 'T'); { 'T' = text }
+ 338 ( 3088)   openr(src);
+ 339 ( 3094)   writeln;
+ 340 ( 3094) 
+ 341 ( 3100)   outlen := 0;
+ 342 ( 3102) 
+ 343 ( 3106)   while readline { and (linecount<20)} do begin
+ 344 ( 3115)     linecount := succ(linecount);
+ 345 ( 3119)     { writeln('line ', linecount); }
+ 346 ( 3124)     handleline;
+ 347 ( 3128)   end;
+ 348 ( 3128)   flushline;
+ 349 ( 3135) 
+ 350 ( 3135)  end.
+ 351 ( 3135) 
+
+End compile
+
+Code lenght:          3134
+Compiler stack size:  60
+Ident stack size:     114
+Pascal errors:        0

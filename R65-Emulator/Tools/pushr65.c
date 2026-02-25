@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
         diskName = argv[2];
     }
     else
-        diskName = "/home/pi/Projects/R65/R65-Emulator/Disks/WORK.disk";
+        diskName = "/home/rricharz/Projects/R65/R65-Emulator/Disks/WORK.disk";
         
     if (debug) printf("Disk file: %s\n", diskName);
     
