@@ -31,8 +31,18 @@ var
 
 { --- helpers --- }
 
+proc underline(n: integer; c: char);
+var m,i: integer;
+begin
+  m := n;
+  if m>linewidth then m := linewidth;
+  for i:=1 to m do write(c);
+  writeln;
+end;
+
 func mod(k,m:integer):integer;
-begin mod:=k-((k div m)*m);
+begin
+  mod := k-((k div m)*m);
 end;
 
 func upc(c: char): char;
@@ -176,6 +186,31 @@ begin
     i := succ(i);
   end;
   writeln;
+
+  putspaces(indent);
+  underline(llen - 4,'=');
+  writeln;
+  writeln;
+end;
+
+proc doSS;
+var i, pos: integer;
+begin
+  flushline;
+  writeln;
+
+  { print rest of line after ".SH " in uppercase }
+  pos := 4; { expects: . S H space ... }
+  putspaces(indent);
+  i := pos;
+  while i<llen do begin
+    write(upc(line[i]));
+    i := succ(i);
+  end;
+  writeln;
+  putspaces(indent);
+  underline(llen - 4,'-');
+  writeln;
   writeln;
 end;
 
@@ -288,6 +323,8 @@ begin
     { recognize 2-letter commands }
     if (llen>=3) and (line[1]='S') and (line[2]='H')
       then doSH
+    else if (llen>=3) and (line[1]='S')
+      and (line[2]='S') then doSS
     else if (llen>=3) and (line[1]='P')
       and (line[2]='P') then doPP
     else if (llen>=3) and (line[1]='b')
