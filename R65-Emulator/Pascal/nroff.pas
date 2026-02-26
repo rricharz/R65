@@ -10,6 +10,7 @@ const
   maxline = 40;
   maxout  = 200;
   indstep = 4;
+  maxtabs = 16;
 
 var
   src      : file;
@@ -27,9 +28,39 @@ var
   fillmode : boolean;
   indent   : integer;
   linewidth: integer;
-  linecount: integer; { added by RR }
+  titlemode: boolean;
+  linecount: integer;
+
+  tabstops : array[maxtabs] of integer;
+  ntab     : integer;
+  ipmode   : boolean;
+  ipindent : integer;
+  iphang   : integer;
+  preindent: boolean;
+
+  thname : array[40] of char;
+  thlen  : integer;
 
 { --- helpers --- }
+
+func nexttab(col: integer): integer;
+var i: integer;
+begin
+  if ntab>0 then begin
+    for i:=0 to ntab-1 do
+      if tabstops[i]>col then begin
+        nexttab := tabstops[i];
+        exit;
+      end;
+
+    { falls rechts von letztem tab }
+    nexttab := col + 8;
+  end
+  else begin
+    { default unix style }
+    nexttab := ((col div 8)+1)*8;
+  end;
+end;
 
 proc underline(n: integer; c: char);
 var m,i: integer;
@@ -38,11 +69,6 @@ begin
   if m>linewidth then m := linewidth;
   for i:=1 to m do write(c);
   writeln;
-end;
-
-func mod(k,m:integer):integer;
-begin
-  mod := k-((k div m)*m);
 end;
 
 func upc(c: char): char;
@@ -57,14 +83,38 @@ begin
   for i:=1 to n do write(' ');
 end;
 
+proc writewithtabs;
+var i,col,target: integer;
+begin
+  col := indent;
+
+  for i:=0 to outlen-1 do begin
+
+    if outbuf[i]=tab8 then begin
+      target := nexttab(col);
+      while col<target do begin
+        write(' ');
+        col := succ(col);
+      end;
+    end
+    else begin
+      write(outbuf[i]);
+      col := succ(col);
+    end;
+
+  end;
+end;
+
 proc flushline;
 var i: integer;
 begin
   if outlen>0 then begin
-    putspaces(indent);
-    for i:=0 to outlen-1 do write(outbuf[i]);
+    if not preindent then
+      putspaces(indent);
+    writewithtabs;
     writeln;
     outlen := 0;
+    preindent := false;
   end;
 end;
 
@@ -90,23 +140,13 @@ end;
 
 { tab expansion to spaces (tab stops 8) }
 { into the current input line buffer }
+
 proc addchartoline(c: char);
 var k,spaces: integer;
 begin
   if llen>=maxline then exit;
-
-  if c=tab8 then begin
-    k := llen; { 0-based }
-    spaces := 8 - (mod(k,8));
-    while (spaces>0) and (llen<maxline) do begin
-      line[llen] := ' ';
-      llen := succ(llen);
-      spaces := prec(spaces);
-    end;
-  end else begin
-    line[llen] := c;
-    llen := succ(llen);
-  end;
+  line[llen] := c;
+  llen := succ(llen);
 end;
 
 { parse integer from line starting at pos (0-based), }
@@ -155,6 +195,11 @@ proc formatfillfromline;
 var i, wstart, wlen: integer;
 begin
   i := 0;
+
+  { NEW: ignore leading whitespace }
+  while (i < llen) and isspace(line[i]) do
+    i := succ(i);
+
   while i<llen do begin
     while (i<llen) and isspace(line[i]) do i:=succ(i);
 
@@ -169,11 +214,111 @@ begin
   end;
 end;
 
+proc saveth(startpos: integer);
+var pos: integer;
+begin
+  pos:=startpos;
+  thlen := 0;
+
+  while (pos<llen) and (line[pos]=' ') do
+    pos := succ(pos);
+
+  while (pos<llen) and (line[pos]<>' ') do begin
+    thname[thlen] := line[pos];
+    thlen := succ(thlen);
+    pos := succ(pos);
+  end;
+
+  { section "(x)" anhC$ngen falls vorhanden }
+  while (pos<llen) and (line[pos]=' ') do
+    pos := succ(pos);
+
+  if pos<llen then begin
+    thname[thlen] := '('; thlen := succ(thlen);
+
+    thname[thlen] := line[pos];
+    thlen := succ(thlen);
+    pos := succ(pos);
+
+    thname[thlen] := ')'; thlen := succ(thlen);
+  end;
+end;
+
+proc printTH;
+var i,spaces: integer;
+begin
+  flushline;
+  writeln;
+  putspaces(indent);
+
+  { links }
+  for i:=0 to thlen-1 do
+    write(thname[i]);
+
+  if linewidth>40 then begin
+    spaces := linewidth - (2*thlen) - indent;
+    if spaces<1 then spaces := 1;
+    while spaces>0 do begin
+      write(' ');
+      spaces := prec(spaces);
+    end;
+
+    { rechts }
+    for i:=0 to thlen-1 do
+      write(thname[i]);
+  end;
+
+  writeln;
+  writeln;
+end;
+
+proc endip;
+begin
+  if ipmode then begin
+    indent := indent - iphang;
+    ipmode := false;
+    preindent := false;
+  end;
+end;
+
 { --- command handlers --- }
+
+proc doTH;
+begin
+  endip;
+  saveth(3);   { nach ".TH" }
+  printTH;
+end;
+
+proc doTA;
+var p,v: integer;
+begin
+  ntab := 0;
+  p := 3;   { nach ".ta" }
+
+  while p<llen do begin
+
+    while (p<llen) and (line[p]=' ') do
+      p := succ(p);
+
+    if p>=llen then exit;
+
+    v := parseintfrom(p);
+
+    if (v>0) and (ntab<maxtabs) then begin
+      tabstops[ntab] := v;
+      ntab := succ(ntab);
+    end;
+
+    while (p<llen) and (line[p]<>' ') do
+      p := succ(p);
+  end;
+end;
 
 proc doSH;
 var i, pos: integer;
 begin
+  endip;
   flushline;
   writeln;
 
@@ -189,13 +334,12 @@ begin
 
   putspaces(indent);
   underline(llen - 4,'=');
-  writeln;
-  writeln;
 end;
 
 proc doSS;
 var i, pos: integer;
 begin
+  endip;
   flushline;
   writeln;
 
@@ -210,12 +354,11 @@ begin
   writeln;
   putspaces(indent);
   underline(llen - 4,'-');
-  writeln;
-  writeln;
 end;
 
 proc doPP;
 begin
+  endip;
   emitblank;
 end;
 
@@ -226,24 +369,28 @@ end;
 
 proc doNF;
 begin
+  endip;
   flushline;
   fillmode := false;
 end;
 
 proc doFI;
 begin
+  endip;
   flushline;
   fillmode := true;
 end;
 
 proc doRS;
 begin
+  endip;
   flushline;
   indent := indent + indstep;
 end;
 
 proc doRE;
 begin
+  endip;
   flushline;
   if indent>=indstep then
     indent := indent - indstep;
@@ -289,6 +436,41 @@ begin
     i := succ(i);
   end;
   writeln;
+end;
+
+proc doIP;
+var pos,col: integer;
+begin
+  if ipmode then begin
+    indent := indent - iphang;
+    ipmode := false;
+  end;
+  flushline;
+  pos := 3;   { nach ".IP" }
+  while (pos<llen) and (line[pos]=' ') do
+    pos := succ(pos);
+
+  { label ausgeben }
+  putspaces(indent);
+  col := indent;
+
+  while pos<llen do begin
+    write(line[pos]);
+    pos := succ(pos);
+    col := succ(col);
+  end;
+
+  { bis zum haenging indent ausfuellen }
+  while col < (indent + iphang) do begin
+    write (' ');
+    col := succ(col);
+  end;
+
+  { jetzt folgt text gleich }
+
+  preindent := true;
+  indent := indent + iphang;
+  ipmode := true;
 end;
 
 { --- line reader: reads CR-terminated lines; }
@@ -339,6 +521,11 @@ begin
        and (line[2]='E') then doRE
     else if (llen>=3) and (line[1]='s')
        and (line[2]='p') then doSP
+    else if (line[1]='T') and
+        (line[2]='A') then doTA
+    else if (line[1]='I') and
+        (line[2]='P') then doIP
+    else if (line[1]='T') and (line[2]='H') then doTH
     else if (llen>=2) and (line[1]='B') then doB
     else if (llen>=2) and (line[1]='I') then doI
     else begin
@@ -358,6 +545,11 @@ begin
   fillmode := true;
   indent := 0;
   linewidth := 40; { printed output line width }
+  ntab := 0;
+  ipmode := false;
+  ipindent := 4;
+  iphang := 8;
+  preindent := false;
   linecount := 0;  { added by RR }
 
   { get filename from arguments }
