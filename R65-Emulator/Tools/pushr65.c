@@ -11,7 +11,7 @@
 // -------------------------------
 // linux:                       type subtype subname
 // .asm   assembler source file   S     A      :A
-// .txt   general text file       S     B
+// .txt   general text file       S     B      :B
 // .pas   pascal source file      S     P      :P
 // .pa2   pascal binary files     B     R      :R
 // .pb1   pascal lib loader file  S     T      :T
@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
     column = 0;
     line = 1;
     
-    printf("pushr65 version 1.3\n");
+    printf("pushr65 version 1.4\n");
     
     if ((argc < 2) || (argc > 3)) {
         printf("Usage: pushr65 filename diskfile\n");
@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
         type = 'S';
         subtype = 'B';      // Textfile
         maxCharPerLine = 56;
-        subname = ' ';
+        subname = 'B';
     }
     else if ((end = strstr(argv[1],".pas")) != NULL) {
         type = 'S';

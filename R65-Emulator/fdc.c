@@ -527,6 +527,8 @@ int export_file()
             extension = ".pas";
         else if (filstp == 'H')
             extension = ".help";
+       else if (filstp == 'B')
+            extension = ".txt";
         else
             extension = ".txt";
     }

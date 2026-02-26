@@ -7,7 +7,7 @@ program nroff;
 uses syslib, arglib;
 
 const
-  maxline = 120;
+  maxline = 40;
   maxout  = 200;
   indstep = 4;
 
@@ -266,9 +266,7 @@ begin
   repeat
     read(@src, ch);
     if ch=eof then begin
-      { if already collected chars, return them }
-      if llen>0  then readline:=true
-      else readline := false;
+      readline := false;
       exit;
     end;
 
@@ -322,7 +320,7 @@ begin
   { defaults }
   fillmode := true;
   indent := 0;
-  linewidth := 40; { R65 display width (40 columns) }
+  linewidth := 40; { printed output line width }
   linecount := 0;  { added by RR }
 
   { get filename from arguments }
@@ -334,9 +332,14 @@ begin
     abort;
   end;
 
-  asetfile(name, cyclus, drive, 'T'); { 'T' = text }
+  asetfile(name, cyclus, drive, 'B'); { 'B' = text }
   openr(src);
+
+  agetval(linewidth,default); {max chars/line}
+  if (linewidth<20) then linewidth := 20;
+  if (linewidth>128) then linewidth :=128;
   writeln;
+  write(prton);
 
   outlen := 0;
 
@@ -345,7 +348,9 @@ begin
     { writeln('line ', linecount); }
     handleline;
   end;
+  handleline;
   flushline;
+  write(prtoff);
 
  end.
 
