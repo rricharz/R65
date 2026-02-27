@@ -4,9 +4,9 @@ uses syslib, arglib,wildlib;
 const cup=chr($1a);
       clrlin=chr($17);
 
-var cyclus,drive,entry,i: integer;
+var cyclus,drive,entry,i,linecount: integer;
     found,last,default: boolean;
-    ch: char;
+    ch, answer: char;
     name: array[15] of char;
     fno: file;
 
@@ -26,6 +26,7 @@ begin
 end;
 
 begin
+  linecount:=0;
   cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
   entry := 0;
@@ -44,20 +45,37 @@ begin
     writeln; write(cup,clrlin);
     ch:='&';
     read(@fno,ch);
-    while (ch<>eof) and (ch<>chr(0)) do begin
-      if ch=cr then writeln
-      else write(ch);
+    while (ch<>eof) and (ch<>chr(0)) do
+    begin {main loop; while }
+      if ch=cr then begin { end of line }
+        linecount := succ(linecount);
+        writeln;
+        if (linecount>10) then
+        begin { new page }
+          writeln;
+          write(invvid,'Continue (cr)?',norvid);
+          read(@key,answer);
+          write(cr,chr($17));
+          if answer<>cr then begin
+            exit;
+          end;
+          linecount:=0;
+        end; {new page }
+      end; { end of line }
+      write(ch);
       read(@fno,ch);
-      end;
-  end else begin
-    writeln('Use "help topic". Available topics:');
+    end { main loop while }
+  end else begin { not fount }
+    writeln
+      ('Use "help topic". Available topics:');
     name:='*:H             ';
     drive:=0; entry:=0;
     repeat
       findentry(name,drive,entry,found,last);
       if found then begin
         i:=0;
-        while (i<16) and (filnam[i]<>':') do begin
+        while (i<16) and (filnam[i]<>':') do
+        begin
           write(filnam[i]);
           i:=i+1;
         end;
@@ -67,4 +85,3 @@ begin
     until last;
   end;
 end.
-
