@@ -129,4 +129,4 @@ begin
   if notok then
     writeln(invvid,'INCONSISTENCY FOUND',norvid);
   call(aenddo);
-end.
+end.

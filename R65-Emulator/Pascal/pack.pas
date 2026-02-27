@@ -47,3 +47,4 @@ begin
   if curpos>1 then writeln;
   dummy:=freedsk(drive,true);
 end.
+

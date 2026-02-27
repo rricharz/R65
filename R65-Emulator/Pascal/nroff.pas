@@ -11,6 +11,7 @@ const
   maxout  = 200;
   indstep = 4;
   maxtabs = 16;
+  debug   = false;
 
 var
   src      : file;
@@ -73,7 +74,8 @@ end;
 
 func upc(c: char): char;
 begin
-  if (c>='a') and (c<='z') then upc := chr(ord(c)-32)
+  if (c>='a') and (c<='z') then upc
+    := chr(ord(c)-32)
   else upc := c;
 end;
 
@@ -121,7 +123,7 @@ end;
 proc emitblank;
 begin
   flushline;
-  writeln;
+ if linewidth>47 then writeln;
 end;
 
 proc emittextnofill;
@@ -149,7 +151,7 @@ begin
   llen := succ(llen);
 end;
 
-{ parse integer from line starting at pos (0-based), }
+{ parse integer from line starting at pos }
 { returns 0 if none }
 func parseintfrom(p: integer): integer;
 var v,pos: integer;
@@ -165,7 +167,7 @@ begin
   parseintfrom := v;
 end;
 
-{ formatter: add a word to outbuf with wrapping }
+{formatter: add word to outbuf with wrapping}
 
 proc addword(start, wlen: integer);
 var need, i: integer;
@@ -174,7 +176,8 @@ begin
   need := wlen;
   if outlen>0 then need := need + 1;
 
-  if (indent + outlen + need) > linewidth then begin
+  if (indent + outlen + need) > linewidth
+  then begin
     flushline;
   end;
 
@@ -201,12 +204,14 @@ begin
     i := succ(i);
 
   while i<llen do begin
-    while (i<llen) and isspace(line[i]) do i:=succ(i);
+    while (i<llen) and isspace(line[i]) do
+      i:=succ(i);
 
     if i>=llen then exit;
     wstart := i;
     wlen := 0;
-    while (i<llen) and (not isspace(line[i])) do begin
+    while (i<llen) and (not isspace(line[i]))
+    do begin
       i := succ(i);
       wlen := succ(wlen);
     end;
@@ -223,7 +228,8 @@ begin
   while (pos<llen) and (line[pos]=' ') do
     pos := succ(pos);
 
-  while (pos<llen) and (line[pos]<>' ') do begin
+  while (pos<llen) and (line[pos]<>' ') do
+  begin
     thname[thlen] := line[pos];
     thlen := succ(thlen);
     pos := succ(pos);
@@ -234,7 +240,8 @@ begin
     pos := succ(pos);
 
   if pos<llen then begin
-    thname[thlen] := '('; thlen := succ(thlen);
+    thname[thlen] := '(';
+    thlen := succ(thlen);
 
     thname[thlen] := line[pos];
     thlen := succ(thlen);
@@ -255,7 +262,7 @@ begin
   for i:=0 to thlen-1 do
     write(thname[i]);
 
-  if linewidth>40 then begin
+  if linewidth>47 then begin
     spaces := linewidth - (2*thlen) - indent;
     if spaces<1 then spaces := 1;
     while spaces>0 do begin
@@ -293,6 +300,7 @@ end;
 proc doTA;
 var p,v: integer;
 begin
+  if debug then writeln('< DOING ta >');
   ntab := 0;
   p := 3;   { nach ".ta" }
 
@@ -306,6 +314,9 @@ begin
     v := parseintfrom(p);
 
     if (v>0) and (ntab<maxtabs) then begin
+      if debug then
+        writeln('< Setting tabstop ', ntab,
+        ' at ', v, '>');
       tabstops[ntab] := v;
       ntab := succ(ntab);
     end;
@@ -322,7 +333,8 @@ begin
   flushline;
   writeln;
 
-  { print rest of line after ".SH " in uppercase }
+  { print rest of line after ".SH " }
+  { in uppercase }
   pos := 4; { expects: . S H space ... }
   putspaces(indent);
   i := pos;
@@ -343,7 +355,8 @@ begin
   flushline;
   writeln;
 
-  { print rest of line after ".SH " in uppercase }
+  { print rest of line after ".SH " }
+  { in uppercase }
   pos := 4; { expects: . S H space ... }
   putspaces(indent);
   i := pos;
@@ -369,6 +382,7 @@ end;
 
 proc doNF;
 begin
+  if debug then writeln('< doing nf >');
   endip;
   flushline;
   fillmode := false;
@@ -376,6 +390,7 @@ end;
 
 proc doFI;
 begin
+  if debug then writeln('< DOING fi >');
   endip;
   flushline;
   fillmode := true;
@@ -404,7 +419,9 @@ begin
   s := 3;
   while (s<llen) and (line[s]=' ') do
     s:=succ(s);
-  if llen>3 then n := parseintfrom(s) else n := 1;
+  if llen>3 then
+    n := parseintfrom(s)
+  else n := 1;
   if n<=0 then n := 1;
   for j:=1 to n do writeln;
 end;
@@ -503,8 +520,8 @@ proc handleline;
 begin
   if (llen>=1) and (line[0]='.') then begin
     { recognize 2-letter commands }
-    if (llen>=3) and (line[1]='S') and (line[2]='H')
-      then doSH
+    if (llen>=3) and (line[1]='S')
+      and (line[2]='H') then doSH
     else if (llen>=3) and (line[1]='S')
       and (line[2]='S') then doSS
     else if (llen>=3) and (line[1]='P')
@@ -521,13 +538,16 @@ begin
        and (line[2]='E') then doRE
     else if (llen>=3) and (line[1]='s')
        and (line[2]='p') then doSP
-    else if (line[1]='T') and
-        (line[2]='A') then doTA
+    else if (line[1]='t') and
+        (line[2]='a') then doTA
     else if (line[1]='I') and
         (line[2]='P') then doIP
-    else if (line[1]='T') and (line[2]='H') then doTH
-    else if (llen>=2) and (line[1]='B') then doB
-    else if (llen>=2) and (line[1]='I') then doI
+    else if (line[1]='T') and (line[2]='H')
+      then doTH
+    else if (llen>=2) and (line[1]='B')
+      then doB
+    else if (llen>=2) and (line[1]='I')
+      then doI
     else begin
       { unknown request: ignore }
     end;
@@ -544,7 +564,7 @@ begin
   { defaults }
   fillmode := true;
   indent := 0;
-  linewidth := 40; { printed output line width }
+  linewidth := 47; { printed line width }
   ntab := 0;
   ipmode := false;
   ipindent := 4;
@@ -561,7 +581,8 @@ begin
     abort;
   end;
 
-  asetfile(name, cyclus, drive, 'B'); { 'B' = text }
+  asetfile(name, cyclus, drive, 'B');
+  { 'B' = text }
   openr(src);
 
   agetval(linewidth,default); {max chars/line}
@@ -582,5 +603,3 @@ begin
   write(prtoff);
 
  end.
-
-
