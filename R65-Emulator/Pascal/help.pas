@@ -1,4 +1,10 @@
 program help;
+
+{ Display help files (*:H)                }
+{ 2024-2026 rricharz                      }
+{ usage: help topic                       }
+{ where topic is the file name without :H }
+
 uses syslib, arglib,wildlib;
 
 const cup=chr($1a);
@@ -53,12 +59,12 @@ begin
         if (linecount>10) then
         begin { new page }
           writeln;
-          write(invvid,'Continue (cr)?',norvid);
+          write(invvid,
+          'Space: continue. Other key: stop.',
+          norvid);
           read(@key,answer);
           write(cr,chr($17));
-          if answer<>cr then begin
-            exit;
-          end;
+          if answer<>' ' then exit;
           linecount:=0;
         end; {new page }
       end; { end of line }

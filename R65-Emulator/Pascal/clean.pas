@@ -38,12 +38,11 @@ mem   filtyp  =$0300: char&;
 var default: boolean;
     drive,index,i,ti,maxlen,nument,sfree,
     sdel,sfound : integer;
-    { 1280 = 80 names of 16 chars }
     nametab     : array[1280] of char;
-    filstptab   : array[80] of char;
-    cyctab      : array[80] of integer;
-    foundtab    : array[80] of boolean;
-    sizetab     : array[80] of integer;
+    filstptab   : array[255] of char;
+    cyctab      : array[255] of integer;
+    foundtab    : array[255] of boolean;
+    sizetab     : array[255] of integer;
     name        : array[15] of char;
 
 proc bcderror(e:integer);

@@ -148,6 +148,8 @@ void pushByte(FILE *f, uint8_t value)
     char chr;
     char cr = 0x0D;
     
+    if (value == 0x7f) return;
+    
     byteInCounter++;                            // count input byte
 
     if (type == 'B') {                          // binary

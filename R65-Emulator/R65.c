@@ -724,6 +724,9 @@ int catchSubroutine(uint16_t ea)
             if (a == 0x14) {                   // ignore printer control character
                 return 1;
             }
+            if (a == 0x7F) {                   // ignore del character
+                return 1;
+            }
             if (a == 0x1B) {                   // ignore printer control character, also next one
                 lastPrintedCharacter = 0x1B;
                 return 1;
@@ -755,7 +758,7 @@ int catchSubroutine(uint16_t ea)
             fprintf(printFile, ">%02X<", a);
         }
         else {
-            fprintf(printFile, "%c", a);
+            if (a != 0x7F) fprintf(printFile, "%c", a);
             if (rawPrint /*&& (a < 0x20)*/) fflush(printFile);
             colNumber++;
         }

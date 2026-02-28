@@ -37,7 +37,6 @@ const aprepdo =$f4a7;
 
 mem   filtyp  =$0300: char&;
       filcyc  =$0311: integer&;
-      filstp  =$0312: char&;
       filloc  =$0313: integer;
       filsiz  =$0315: integer;
       fillnk  =$031e: integer;
@@ -49,7 +48,6 @@ var default,sortit: boolean;
     ncol,row,nspaces,sfree,sdel,
     lines        : integer;
     ffree,fdel   : real;
-    filstptab    : array[80] of char;
     s            : cpnt;
     entry        : array[maxent] of cpnt;
 
@@ -144,7 +142,6 @@ begin {main}
         s[i+2]:=hex(filcyc shr 4);
         s[i+3]:=hex(filcyc and 15);
         if maxlen<i+3 then maxlen:=i+3;
-        filstptab[ti]:=filstp;
         ti:=ti+1
       end else {deleted}
         sdel:=sdel+(filsiz shr 8);
@@ -184,3 +181,4 @@ begin {main}
     trunc(100.0*fdel+0.5),'%),',
     'files:',index-1);
 end.
+
