@@ -727,6 +727,10 @@ int catchSubroutine(uint16_t ea)
             if (a == 0x7F) {                   // ignore del character
                 return 1;
             }
+            if (a == 0x1F) {                   // ignore US character
+                return 1;
+            }
+
             if (a == 0x1B) {                   // ignore printer control character, also next one
                 lastPrintedCharacter = 0x1B;
                 return 1;

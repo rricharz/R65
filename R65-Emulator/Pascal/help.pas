@@ -58,7 +58,6 @@ begin
         writeln;
         if (linecount>10) then
         begin { new page }
-          writeln;
           write(invvid,
           'Space: continue. Other key: stop.',
           norvid);
@@ -66,11 +65,12 @@ begin
           write(cr,chr($17));
           if answer<>' ' then exit;
           linecount:=0;
-        end; {new page }
-      end; { end of line }
-      write(ch);
+        end {new page }
+      end { end of line }
+      else write(ch);
       read(@fno,ch);
-    end { main loop while }
+    end; { main loop while }
+    writeln;
   end else begin { not fount }
     writeln
       ('Use "help topic". Available topics:');
