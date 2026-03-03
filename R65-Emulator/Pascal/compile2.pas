@@ -28,7 +28,7 @@ uses syslib,arglib,disklib;
 const
     title='R65 PASCAL COMPILER Version 4.2, Pass 2';
     wrfile=$e81b;
-    sblock=$5000;
+    sblock=$6000;
     eblock=topmem;
 
 mem endstk=$e,
@@ -234,6 +234,22 @@ begin { * body of getbl * }
   end
 end {getbl};
 
+{ show used bytes }
+
+proc showused;
+var usedbytes, maxbytes,
+    usedpages, maxpages: integer;
+begin
+  usedbytes := pointer - sblock;
+  maxbytes  := maxsize + 2;
+
+  usedpages := (usedbytes + 255) div 256;
+  maxpages  := (maxbytes  + 255) div 256;
+
+  writeln('Load area used: ', usedpages, '/',
+    maxpages, ' pages (',
+    usedbytes, '/', maxbytes, ' bytes)');
+end;
 
 { * main * }
 
@@ -247,8 +263,10 @@ begin {main}
   pointer:=pointer+1;
   close(source);
   writeln;
+  showused;
   blocksave(sblock,pointer);
   writeln('Program has been stored');
   endstk:=topmem-144;
   dummy:=freedsk(sdrive,true);
 end.
+

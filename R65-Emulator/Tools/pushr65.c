@@ -139,16 +139,14 @@ uint8_t bcdbyte(int value)
     return ((value % 10) + ((value / 10) % 10) * 16);
 }
 
-/**********************************/
+/***********************************/
 void pushByte(FILE *f, uint8_t value)
-/**********************************/
+/***********************************/
 // push a byte to file
 // handles r65 blank packing, tab and disk overflow
 {
     char chr;
     char cr = 0x0D;
-    
-    if (value == 0x7f) return;
     
     byteInCounter++;                            // count input byte
 
@@ -161,11 +159,14 @@ void pushByte(FILE *f, uint8_t value)
         }
         return;        
     }
-    
-    if (value != EOF)
-        chr = value & 0x7F;                     // mask bit 8 off
-    else
-        chr = EOF;                              // but keep EOF
+    else {   
+      chr = value & 0x7F;               // mask bit 8 off
+      if (chr == 0x7f) { 
+		byteOutCounter--;
+	    return;			                // and ignore EOF
+  
+      }  
+   }
     
     if (chr == 0x09) {                          // tab
         do
@@ -423,7 +424,7 @@ int main(int argc, char *argv[])
         chr =fgetc(finput);
         pushByte(foutput, chr);     // push characters
     }
-    while (!feof(finput));
+    while ((!feof(finput))&&((chr != 0xff)));
     pushByte(foutput, 0x1f);        // R65 system EOF character
     numSectors = (byteOutCounter / 256) + 1;
     printf("Bytes read %d\n", byteInCounter);
@@ -435,8 +436,8 @@ int main(int argc, char *argv[])
     
     // Prepare and save the new file entry
     
-    if ((byteOutCounter & 0xFF) != 0) {      // round up byte counter to full sectors
-        byteOutCounter = (byteOutCounter + 256) & 0xFF00;
+    if (((byteOutCounter-1) & 0xFF) != 0) {      // round up byte counter to full sectors
+        byteOutCounter = ((byteOutCounter-1) + 256) & 0xFF00 + 1;
     }
     struct tm *clock;
     struct stat attr;

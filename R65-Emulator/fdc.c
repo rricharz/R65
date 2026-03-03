@@ -602,7 +602,7 @@ int export_file()
             int i = 0;
             
             if (filtyp=='S') {  // sequential file
-                while ((i < 256) && ((buffer[i] & 0x7F) != 0x7F)) {
+                while ((i < 256) && ((buffer[i] & 0x7F) != 0x1F)) {
                     if ((buffer[i] >= 0x80) && (buffer[i] <= 0xFe)) {
                         for (int ii = 0; ii < (buffer[i] & 0x7F); ii++)
                             fprintf(foutput, "%c", ' ');
@@ -615,7 +615,7 @@ int export_file()
                     }
                     i++;
                 }
-                if ((buffer[i] & 0x7F) == 0x7F) {
+                if ((buffer[i] & 0x7F) == 0x1F) {
                     fclose(foutput);
                     printf("Export complete\n");
                     return 0;
