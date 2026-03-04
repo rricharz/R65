@@ -536,7 +536,7 @@ int main (int argc, char *argv[])
 		MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
 	windowWidth  = MIN_WINDOW_WIDTH;
 	windowHeight = MIN_WINDOW_HEIGHT;
-	panelScale = 1.75;
+	panelScale = 1.15;
     }
     printf("Window dimensions: %d x %d\n", windowWidth, windowHeight);
     

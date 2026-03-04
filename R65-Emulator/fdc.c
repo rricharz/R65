@@ -496,7 +496,7 @@ void fdc_write(uint16_t address, uint8_t value)
 int export_file()
 /***************/
 {
-    int i, end, drive, filtyp, filstp, sectorPointer, size, chr;
+    int i, end, drive, filtyp, filstp, sectorPointer, size, chr, count;
     char buffer[256];
     char *extension;
     long int dataPnt;
@@ -506,6 +506,8 @@ int export_file()
     int pnt = 0;
     
     // printf("Export called\n")
+    
+    count = 0;
     
     // check whether directory "Files" exists
     DIR* dir = opendir("Files");
@@ -602,22 +604,25 @@ int export_file()
             int i = 0;
             
             if (filtyp=='S') {  // sequential file
-                while ((i < 256) && ((buffer[i] & 0x7F) != 0x1F)) {
+                while ((i < 256) && ((buffer[i] & 0x7F) != 0x1F)
+                    && ((buffer[i] & 0x7F) != 0x7F)) {
                     if ((buffer[i] >= 0x80) && (buffer[i] <= 0xFe)) {
-                        for (int ii = 0; ii < (buffer[i] & 0x7F); ii++)
+                        for (int ii = 0; ii < (buffer[i] & 0x7F); ii++) {
                             fprintf(foutput, "%c", ' ');
+						}
                     }
                     else if (buffer[i] == 0x0D) {
                         fprintf(foutput, "\n");
                     }
                     else {
                         fprintf(foutput, "%c",buffer[i]);
+                        count++;
                     }
                     i++;
                 }
                 if ((buffer[i] & 0x7F) == 0x1F) {
                     fclose(foutput);
-                    printf("Export complete\n");
+                    printf("Export complete, bytes written: %d\n",count);
                     return 0;
                 }
             }
