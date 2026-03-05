@@ -43,17 +43,7 @@ usage:
                  i,r: index bound checking
                  n: no loader file
   [] means not required
-
-The compiler uses 2 fixed memory areas to store
-the table of reserved words and the table of
-idents. The top of the Pascal stack (endstk) is
-adjusted accordingly. The reason for this hack
-is speed and convenience. A normal Pascal array
-of chars would store the chars as 16 bit
-numers and would therefore require twice the
-space. An array of packed chars would require
-more coding and slow the scanner module of the
-compiler down.                                }
+                                        }
 
 program compile1;
 

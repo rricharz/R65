@@ -10,16 +10,12 @@ const version='4.6';
     maxfi     =3;     {max number of ins fls}
     yesoutput=@255;
 
-{ Fixed memory area. Be carefull with changes }
-    nresw=63;   {number of res. words, max 64}
-    symbsize=256;     {id table entries}
-    reswtabpos=$c600; { up to $c7ff }
-    idtabpos=$be00;   { up to $c5ff }
-mem endstk  =$000e: integer;
-    reswtab =reswtabpos: array[$200] of char&;
-    idtab   =idtabpos: array[$800] of char&;
+    nresw      = 63;    {number of res. words, max 64}
+    symbsize   = 256;   {id table entries}
+var reswtab: array[ 512] of char; {8*(nresw+1)}
+    idtab:   array[2048] of char; {8*symbsize}
 
-var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
+    tpos,pc,level,line,offset,dpnt,spnt,fipnt,
     npara,i,stackpnt,stackmax,spntmax,numerr,
     lineinc,linepage: integer;
     scyclus,sdrive,cdrive: integer;
@@ -312,7 +308,6 @@ begin {init}
   ateof:=false; savefno:=@0;
   cdrive:=fildrv; { drive of compile program }
   fipnt:=-1;
-  endstk:=idtabpos-144;
   pc:=2; dpnt:=0; spnt:=0; offset:=2;
   npara:=0; level:=0;
   stackpnt:=0; libflg:=false;
