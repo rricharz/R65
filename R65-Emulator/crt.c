@@ -192,7 +192,7 @@ void infoPanel()
         Stroke(210,210,210); Fill(0, 0, 0, 0);
         Rect(LED_HPOS + 25 * panelScale, LED_VPOS  + drive * LED_VDIST + 5 * panelScale,
             132 * panelScale, 22 * panelScale);
-        Stroke(65, 65, 65);
+        Stroke(16, 16, 16);
         Text(LED_HPOS + 26 * panelScale, LED_VPOS + drive * LED_VDIST,
             "\x08\x08\x08\x08\x08\x08\x08\x08\x08\x08\x08\x08",
             "Led Panel Station On", 18 * panelScale, 0, 1);       

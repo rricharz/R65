@@ -1,6 +1,6 @@
 { include file iglobal.pas for compile1 }
-const version='4.4';
 
+const version='4.6';
     table     =$97ff; {user ident table -1}
     idtab     =$95ff; {resword table -1}
     idlength  =64;    {max. length of ident}
@@ -8,81 +8,74 @@ const version='4.4';
     pagelenght=60;    {no of lines per page}
     nooutput  =@0;
     maxfi     =3;     {max number of ins fls}
+    yesoutput=@255;
 
+{ Fixed memory area. Be carefull with changes }
     nresw=63;   {number of res. words, max 64}
     symbsize=256;     {id table entries}
     reswtabpos=$c600; { up to $c7ff }
     idtabpos=$be00;   { up to $c5ff }
-
-    yesoutput=@255;
-
 mem endstk  =$000e: integer;
     reswtab =reswtabpos: array[$200] of char&;
     idtab   =idtabpos: array[$800] of char&;
 
 var tpos,pc,level,line,offset,dpnt,spnt,fipnt,
     npara,i,stackpnt,stackmax,spntmax,numerr,
-    lineinc,linepage                 :integer;
-
+    lineinc,linepage: integer;
     scyclus,sdrive,cdrive: integer;
-
     pname: array[15] of char;
-
     value: array[1] of integer;
-
     ch,restype,vartype:char;
-
     token: packed char;
-
     prt,libflg,icheck,ateof,lineflg,nlflg: boolean;
-
     fno,ofno,savefno: file;
-
     incname: array[15] of char;
-
     filstk: array[maxfi] of file;
-
     ident: array[idlength] of char;
     { Only the first 8 characters are
-      used to find and differentiate ids }
+      used to find and differentiate ids! }
 
-    t0: array[symbsize] of packed char;
+    stype: array[symbsize] of packed char;
            {type of symbol}
-
-        {High letter:
-         a:array, c:constant, d;const parameter
-         e:constant array parameter, f:function
-         g:array function, h;8-bit memory var
-         i:8-bit array memory variable
-         m:16-bit memory variable
-         n:16-bit array memory variable
-         p:procedure
-         q:indexed cpnt
-         r,t:function result
-         s,u:array function result
-         v:variable, w:variable parameter
-         x:variable array parameter
-
+       { High letter:
+           a:array, c:constant, d;const parameter
+           e:constant array parameter, f:function
+           g:array function, h;8-bit memory var
+           i:8-bit array memory variable
+           m:16-bit memory variable
+           n:16-bit array memory variable
+           p:procedure
+           q:indexed cpnt
+           r,t:function result
+           s,u:array function result
+           v:variable, w:variable parameter
+           x:variable array parameter
          Low letter:
-         i:integer, c:char, p:packed char
-         q:cpnt (pointer to chars)
-         r:real(array multiple of two)
-         s:const cpnt
-         f:file, b:boolean, u:undefined  }
+           i:integer, c:char, p:packed char
+           q:cpnt (pointer to chars)
+           r:real(array multiple of two)
+           s:const cpnt
+           f:file, b:boolean, u:undefined  }
 
-    t1: array[symbsize] of integer;
+    slevel: array[symbsize] of integer;
          {level}
-    t2: array[symbsize] of integer;
+    svda: array[symbsize] of integer;
          {val,dis,addr}
-    t3: array[symbsize] of integer;
+    sspsz: array[symbsize] of integer;
          {stack pointer,size of array}
 
     reswcod:array[nresw] of packed char;
-
     stack: array[stacksize] of integer;
 
+{###########################}
+{ global forward references }
+{###########################}
 
-{       * savebyte *    (global)        }
+proc newpage; forward;
+
+{###################}
+{ savebyte (global) }
+{###################}
 
 proc savebyte(x: integer);
 
@@ -94,9 +87,9 @@ begin
     end
 end {savebyte};
 
-{       * crlf *        (global)        }
-
-proc newpage; forward;
+{###############}
+{ crlf (global) }
+{###############}
 
 proc crlf;
   var i: integer;
@@ -108,7 +101,9 @@ begin
     * pagelength)=linepage then newpage;
 end {crlf};
 
-{       error message   (global)        }
+{#################################}
+{ merror and error: error message }
+{#################################}
 
 proc merror(x: integer; code: packed char);
 
@@ -166,10 +161,11 @@ begin
   merror(x,'##')
 end;
 
-{       * push & pop *  (global) }
+{############}
+{ push & pop }
+{############}
 
 proc push(x: %integer);
-
 begin
   if stackpnt>=stacksize then error(8)
   else stackpnt:=succ(stackpnt);
@@ -178,18 +174,17 @@ begin
 end {push};
 
 func pop: integer;
-
 begin
   pop:=stack[stackpnt];
   stackpnt:=prec(stackpnt)
 end {pop};
 
-{       * newpage *     (global) }
+{#########}
+{ newpage }
+{#########}
 
 proc newpage;
-
 var i: integer;
-
 begin
   if ((linepage)<>0) and prt then
     write(@printer,formfeed);
@@ -208,14 +203,18 @@ begin
   writeln;
 end {newpage};
 
-{        * code1 *      (global) }
+{################}
+{ code1 (global) }
+{################}
 
 proc code1(x: %integer);  {set one byte p-code}
 begin
   savebyte(x); pc:=succ(pc)
 end;
 
-{       * writenum *      (global) }
+{###################}
+{ writenum (global) }
+{###################}
 
 proc writenum(i: integer);
 begin
@@ -225,7 +224,9 @@ begin
   write(i);
 end;
 
-{       * nextline *      (global) }
+{###################}
+{ nextline (global) }
+{###################}
 
 proc nextline;
 var i:integer;
@@ -244,7 +245,9 @@ begin
   writenum(pc+2); write(') ');
 end;
 
-{       * getchr *      (global) }
+{#################}
+{ getchr (global) }
+{#################}
 
 proc getchr;
 begin
@@ -278,7 +281,9 @@ begin
   end;
 end {getchr};
 
-{       * splitconv *   (global) }
+{####################}
+{ splitconv (global) }
+{####################}
 
 proc splitconv(a: array[1] of %integer;
   var b:array[1] of %integer);
@@ -287,7 +292,9 @@ begin
   b:=a;
 end;
 
-{       * init *        (global) }
+{###############}
+{ init (global) }
+{###############}
 
 proc init;
 
@@ -310,7 +317,8 @@ begin {init}
   npara:=0; level:=0;
   stackpnt:=0; libflg:=false;
   stackmax:=0;spntmax:=0; numerr:=0;
-  t0[0]:='vi'; t1[0]:=0; t2[0]:=0; t3[0]:=0;
+  stype[0]:='vi'; slevel[0]:=0;
+  svda[0]:=0; sspsz[0]:=0;
   { prepare resword table }
   writeln('Reading list of reserved words');
   asetfile('RESWORDS:W      ',0,cdrive,'W');

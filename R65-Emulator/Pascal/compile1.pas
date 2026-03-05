@@ -1,6 +1,6 @@
 {   ********************************
     *                              *
-    *  R65 "Tiny" Pascal Compiler  *
+    *   R65 Micro Pascal Compiler  *
     *            Pass 1            *
     *                              *
     ********************************
@@ -12,6 +12,7 @@ Recovered 2018 by rricharz (r77@bluewin.ch)
 Improved 2018-2024 by rricharz
 Version 4 with cpnt strings and exit statement
 Version 4.3 with include compiler directive
+Version 4.6 splits the source file into 4 files
 
 Original derived from the publication by
 Kin-Man Chung and Herbert Yen in
@@ -61,11 +62,9 @@ uses syslib, arglib;
 {$I IGLOBAL:P}
 {$I ISCANNER:P}
 
-
-{ #################################### }
-{       * block * (global): handle one block }
-{ #################################### }
-
+{ ################################ }
+{ block (global): handle one block }
+{ ################################ }
 
 proc block(bottom: integer);
 
@@ -73,16 +72,14 @@ var l,f9,i,n,stackpn1,forwpn,find,cproc,
     spnt1,dpnt1,parlevel: integer;
     fortab: array[8] of integer;
 
-{ * find ident *    (of block) }
-{ this is a fast version for compiler speed }
+{#################################}
+{ findid: {search in table for id }
+{#################################}
 
-func findid; {search in table for id }
-
+func findid;
 var k,i: integer;
     id1: char;
-
 begin
-
   i:=1; k:=8*spnt+9; id1:=ident[1];
 
   repeat
@@ -102,14 +99,18 @@ begin
     findid:=(k-1) shr 3;
 end;
 
-{ * code2 *    (of block) }
+{##################}
+{ code2 (of block) }
+{##################}
 
 proc code2(x,y: integer);
 begin
   code1(x); code1(y);
 end;
 
-{ * code3 *    (of block) }
+{##################}
+{ code3 (of block) }
+{##################}
 
 proc code3(x: integer; y1: %integer);
 
@@ -133,7 +134,9 @@ begin {code3}
   end
 end {code3};
 
-{ * testtype *      (of block) }
+{#####################}
+{ testtype (of block) }
+{#####################}
 
 proc testtype(ttype: char);
 
@@ -143,7 +146,9 @@ begin
       merror(14,packed(ttype,restype));
 end;
 
-{ * putsym *   (of block) }
+{###################}
+{ putsym (of block) }
+{###################}
 
 proc putsym(ltyp1,ltyp2: char);
 
@@ -152,17 +157,19 @@ begin
   if spnt>symbsize then error(7)
   else spnt:=succ(spnt);
   if spnt>spntmax then spntmax:=spnt;
-  t0[spnt]:=packed(ltyp1,ltyp2);
-  t3[spnt]:=0;
+  stype[spnt]:=packed(ltyp1,ltyp2);
+  sspsz[spnt]:=0;
   addr:=8*spnt;
   for i:=1 to 8 do idtab[addr+i]:=ident[i];
   if ltyp1='v' then begin
-    t2[spnt]:=dpnt; dpnt:=succ(dpnt);
+    svda[spnt]:=dpnt; dpnt:=succ(dpnt);
   end;
-  t1[spnt]:=level
+  slevel[spnt]:=level
 end {putsym};
 
-{ * checkindex *  (of block) }
+{#######################}
+{ checkindex (of block) }
+{#######################}
 
 proc checkindex(lowlim,highlim: integer);
 begin
@@ -172,7 +179,9 @@ begin
   end
 end;
 
-{ * getcon *      (of block) }
+{###################}
+{ getcon (of block) }
+{###################}
 
 func getcon;
 
@@ -221,12 +230,12 @@ begin
           end
     else begin
       testto('id'); idpnt:=findid;
-      if (idpnt>0) and (high(t0[idpnt])='c')
+      if (idpnt>0) and (high(stype[idpnt])='c')
       then begin
-        val:=t2[idpnt];
-        restype:=low(t0[idpnt]);
+        val:=svda[idpnt];
+        restype:=low(stype[idpnt]);
         if restype='r' then
-          value[1]:=t3[idpnt];
+          value[1]:=sspsz[idpnt];
       end
       else begin error(4); val:=0;
         restype:='i'
@@ -246,7 +255,9 @@ begin
   else getcon:=val;
 end {getcon};
 
-{ * deccon *         ( of block ) }
+{#####################}
+{ deccon ( of block ) }
+{#####################}
 
 proc deccon;    { declare constant }
 begin
@@ -254,14 +265,16 @@ begin
   testto('id');
   putsym('c','i');
   parse(' ='); scan;
-  t2[spnt]:=getcon;
-  if (restype='r') then t3[spnt]:=value[1];
+  svda[spnt]:=getcon;
+  if (restype='r') then sspsz[spnt]:=value[1];
   if restype<>'i' then
-    t0[spnt]:=packed('c',restype);
+    stype[spnt]:=packed('c',restype);
   scan
 end {deccon};
 
-{ * decvar *          ( of block ) }
+{#####################}
+{ decvar ( of block ) }
+{#####################}
 
 proc decvar(typ1,typ2: char);
 begin
@@ -271,7 +284,9 @@ begin
   scan;
 end {decvar};
 
-{ * gettype *         ( of block ) }
+{######################}
+{ gettype ( of block ) }
+{######################}
 
 proc gettype(var typ2: char;
   var aflag,uflag: boolean; var n: integer);
@@ -302,7 +317,9 @@ begin
   end {case}
 end {gettype};
 
-{ * variable *        ( of block) }
+{######################}
+{ variable ( of block) }
+{######################}
 
 proc variable;  { variable declarations }
 
@@ -323,17 +340,19 @@ begin
     if typ1='a' then begin {array}
        dpnt:=dpnt-l; {variable has been assumed}
        for i:=succ(spnt-l) to spnt do begin
-         t2[i]:=dpnt; t3[i]:=n;
+         svda[i]:=dpnt; sspsz[i]:=n;
          dpnt:=succ(dpnt+n);
       end
     end {array};
     for i:=succ(spnt-l) to spnt do
-      t0[i]:=packed(typ1,typ2);
+      stype[i]:=packed(typ1,typ2);
     parse(' ;');scan
   until token<>'id' {end main loop}
 end {variable};
 
-{ * fixup *           ( of block ) }
+{####################}
+{ fixup ( of block ) }
+{####################}
 
 proc fixup(x: integer);
 begin
@@ -346,7 +365,9 @@ begin
   end;
 end;
 
-{ * function *        ( of block ) }
+{#######################}
+{ function ( of block ) }
+{#######################}
 
 proc function;
 
@@ -361,18 +382,20 @@ begin
     scan
   end;
   if aflag then begin
-    typ1:='s'; t3[succ(cproc)]:=n;
-    t2[succ(cproc)]:=t2[succ(cproc)]-n
+    typ1:='s'; sspsz[succ(cproc)]:=n;
+    svda[succ(cproc)]:=svda[succ(cproc)]-n
   end
   else typ1:='r';
-  t0[succ(cproc)]:=packed(typ1,typ2);
+  stype[succ(cproc)]:=packed(typ1,typ2);
   if uflag then typ2:='u';
   if aflag then typ1:='g'
   else typ1:='f';
-  t0[cproc]:=packed(typ1,typ2);
+  stype[cproc]:=packed(typ1,typ2);
 end {function};
 
-{ * parameter *       ( of block ) }
+{########################}
+{ parameter ( of block ) }
+{########################}
 
 proc parameter;
 
@@ -383,7 +406,7 @@ var counter1,counter2,i,n,bs: integer;
 
 begin
   push(0); { dummy size, fixed later }
-  if find=0 then t3[spnt-npara]:=stackpnt
+  if find=0 then sspsz[spnt-npara]:=stackpnt
   else bs:=stackpnt;
   counter1:=0
   repeat {main loop}
@@ -396,7 +419,7 @@ begin
     end;
     repeat {inner loop}
       decvar(vtype1,vtype2);
-      t2[spnt]:=parlevel;
+      svda[spnt]:=parlevel;
       parlevel:=succ(parlevel);
       npara:=succ(npara);
       counter2:=succ(counter2);
@@ -418,21 +441,21 @@ begin
       if uflag then push(packed(vtype1,'u'))
       else push(vtype);
       if aflag then begin
-        push(n); t3[spnt-counter2+i]:=n;
-        t2[spnt-counter2+i]:=parlevel;
+        push(n); sspsz[spnt-counter2+i]:=n;
+        svda[spnt-counter2+i]:=parlevel;
         parlevel:=succ(parlevel)+n;
       end {then};
-      t0[spnt-counter2+i]:=vtype;
+      stype[spnt-counter2+i]:=vtype;
     end {for};
     if aflag then counter2:=2*counter2;
     counter1:=counter1+counter2;
     until token<>' ;'; {outer loop}
   testto(' )'); scan;
   if find=0 then
-    stack[t3[spnt-npara]]:=counter1
+    stack[sspsz[spnt-npara]]:=counter1
   else begin {information is allready there}
     stack[bs]:=counter1;
-    n:=t3[fortab[find]]; {existing stack data}
+    n:=sspsz[fortab[find]]; {existing stack data}
     for i:=0 to stackpnt-bs do
       if stack[bs+1]<>stack[n+1]
         then merror(13,'pa'); {parameter wrong}
@@ -440,7 +463,9 @@ begin
   end  {else}
 end {parameter};
 
-{ * memory *              ( of block) }
+{####################}
+{ memory ( of block) }
+{####################}
 
 proc memory;
 
@@ -456,7 +481,7 @@ begin
       decvar('m','i');
       l:=succ(l); testto(' ='); scan;
       n:=getcon; testtype('i');
-      scan; t2[spnt]:=n;
+      scan; svda[spnt]:=n;
     until token<>' ,';
     testto(' :');
     gettype(typ2,aflag,uflag,n);
@@ -468,8 +493,8 @@ begin
     else typ1:='m';
     if aflag then typ1:=succ(typ1);
     for i:=succ(spnt-l) to spnt do begin
-      t0[i]:=packed(typ1,typ2);
-      t3[i]:=n;
+      stype[i]:=packed(typ1,typ2);
+      sspsz[i]:=n;
     end;
     testto(' ;'); scan;
   until token<>'id';
@@ -477,7 +502,9 @@ end {memory};
 
 {$I ISTATEMENT:P}
 
-{ * findforw *          ( of block ) }
+{#######################}
+{ findforw ( of block ) }
+{#######################}
 
 func findforw;
 
@@ -517,9 +544,12 @@ begin {findforw}
     end
 end {findforw};
 
+{###############}
+{ body of block }
+{###############}
 
-begin { *** body of block *** }
-  dpnt:=3; t2[bottom]:=pc;
+begin
+  dpnt:=3; svda[bottom]:=pc;
   code3(36,0);
   stackpn1:=stackpnt; forwpn:=0;
 
@@ -547,7 +577,7 @@ begin { *** body of block *** }
             putsym('f','i');
             cproc:=spnt; level:=succ(level);
             putsym('f','i');
-            t2[spnt]:=parlevel;
+            svda[spnt]:=parlevel;
             parlevel:=succ(parlevel);
           end
     end; {case of token}
@@ -556,38 +586,38 @@ begin { *** body of block *** }
     if find<>0 then begin
       spnt:=spnt-npara-1;
       cproc:=fortab[find];
-      fixup(t2[cproc]);
+      fixup(svda[cproc]);
     end;
     scan; spnt1:=spnt;
     dpnt1:=dpnt;
     if token=' (' then parameter;
-    if t0[cproc]='fi' then function;
+    if stype[cproc]='fi' then function;
     testto(' ;');
     for i:=1 to npara do
-    t2[succ(spnt-i)]:=t2[succ(spnt-i)]
+    svda[succ(spnt-i)]:=svda[succ(spnt-i)]
           -parlevel;
     scan;
     if token='fw' then begin
       if forwpn=8 then merror(13,'ov');
       forwpn:=succ(forwpn);
       fortab[forwpn]:=cproc;
-      t2[cproc]:=pc;
+      svda[cproc]:=pc;
       code3(36,0);
       scan
     end else block(cproc);
     level:=prec(level);
     dpnt:=dpnt1; spnt:=spnt1;
-    case high(t0[spnt]) of
-      'r':  t0[spnt]:=packed('t',low(t0[spnt]));
-      's':  t0[spnt]:=packed('u',low(t0[spnt]))
+    case high(stype[spnt]) of
+      'r':  stype[spnt]:=packed('t',low(stype[spnt]));
+      's':  stype[spnt]:=packed('u',low(stype[spnt]))
     end {case};
     testto(' ;'); scan
   end {procedure of function};
 
   testto('be');     { * begin * }
   if forwpn<>0 then merror(13,'ur');
-  fixup(t2[bottom]);
-  t2[bottom]:=pc;
+  fixup(svda[bottom]);
+  svda[bottom]:=pc;
   scan;
   code3(35,2*dpnt);
   repeat
@@ -598,7 +628,9 @@ begin { *** body of block *** }
   stackpnt:=stackpn1;
 end {block};
 
-{ * savtable *    ( global) }
+{####################}
+{ savtable ( global) }
+{####################}
 
 proc savtable; { save lib table in @ofno }
 
@@ -611,21 +643,23 @@ begin
     for j:=1 to 8 do begin
       write(@ofno,idtab[8*i+j])
     end;
-    writeln(@ofno,',',t0[i],',',t1[i],',',
-      t2[i],',',t3[i]);
-    vtype1:=high(t0[i]);
+    writeln(@ofno,',',stype[i],',',slevel[i],',',
+      svda[i],',',sspsz[i]);
+    vtype1:=high(stype[i]);
     if ((vtype1='p') or (vtype1='f') or
-      (vtype1='g')) and (t3[i]<>0) then begin
-      num:=stack[t3[i]];
+      (vtype1='g')) and (sspsz[i]<>0) then begin
+      num:=stack[sspsz[i]];
       write(@ofno,num);
       for j:=1 to num do
-        write(@ofno,',',stack[t3[i]+j]);
+        write(@ofno,',',stack[sspsz[i]+j]);
       write(@ofno,cr,lf);
     end {then};
   end {for}
 end {savtable};
 
-{ * main program * }
+{##############}
+{ main program }
+{##############}
 
 begin {main}
   nlflg:=false;

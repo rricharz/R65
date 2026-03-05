@@ -1,23 +1,21 @@
-{######################################}
 { include file ISTATEMENT:P of compile1}
 
-{#####################################}
-{* statement *           ( of block ) }
-{#####################################}
+{######################}
+{ statmnt ( of block ) }
+{######################}
 
 proc statmnt;
-
 var idpnt,relad,k2,savpc,bottom1: integer;
     device,wln: boolean;
     savtp1,vartyp2: char;
     wl: boolean;
 
-{ * code4 *               ( of statement ) }
+{########################}
+{ code4 ( of statement ) }
+{########################}
 
 proc code4(x,y1,z1: integer); {set 4-byte code}
-
 var y,z: integer;
-
 begin
   y:=y1; z:=z1;
   if y<0 then y:=y+256;
@@ -26,14 +24,18 @@ begin
   code1(z shr 8)
 end {code4};
 
-{ * testferror *         ( of statement) ) }
+{##############################}
+{ testferror ( of statement) ) }
+{##############################}
 
 proc testferror;
 begin
   code1($4f);
 end;
 
-{ * gpval *              ( of statement ) }
+{########################}
+{ gpval ( of statement ) }
+{########################}
 
 proc gpval(idpnt: integer;
   dir: boolean; typ: char);
@@ -43,73 +45,77 @@ var d: integer;
 begin {gpval}
   if dir then d:=1 else d:=0;
   case typ of
-  'h':  begin code3($22,t2[idpnt]);
+  'h':  begin code3($22,svda[idpnt]);
           if dir then code1($3f);
           code1($17+d) end;
-  'm':  begin code3($22,t2[idpnt]);
+  'm':  begin code3($22,svda[idpnt]);
           code1($3d+d) end;
   'i':  begin
           if dir then code1($3f);
-          code3($22,t2[idpnt]);
+          code3($22,svda[idpnt]);
           code1(3);
           if dir then code1($3f);
           code1($17+d) end;
   'n':  begin if dir then code1($3f);
           code3($22,1); code1($12);
-          code3($22,t2[idpnt]);
+          code3($22,svda[idpnt]);
           code1(3); code1($3d+d) end
   else begin
     if typ='q' then begin
       { relad=1 bedeutet: s[i] Zugriff auf }
       { cpnt-string-byte }
       if relad=1 then begin
-        if t3[idpnt]=0 then
+        if sspsz[idpnt]=0 then
           checkindex(0,63)
         else
-          checkindex(0,t3[idpnt]);
+          checkindex(0,sspsz[idpnt]);
       end;
-      code4($55,level-t1[idpnt],2*t2[idpnt]);
+      code4($55,level-slevel[idpnt],2*svda[idpnt]);
     end else
-      code4($27+2*d+relad,level-t1[idpnt],
-        2*t2[idpnt]);
+      code4($27+2*d+relad,level-slevel[idpnt],
+        2*svda[idpnt]);
     end
   end {case}
 end;
 
-{ FORWARD decl. of mainexp (of statement) }
+{###############################################}
+{ FORWARD declaration of mainexp (of statement) }
+{###############################################}
 
 proc mainexp(reqtype: char;
   var arsize: integer); forward;
 
-{ * express *           ( of statement ) }
+{##########################}
+{ express ( of statement ) }
+{##########################}
 
 proc express; {requests a normal 16-bit result }
-
 var resultsize: integer;
-
 begin {express}
   mainexp('n',resultsize);
   if resultsize<>0 then error(15)
 end {express};
 
-{ * arrayexp *          ( of mainexp) }
+{########################}
+{ arrayexp ( of mainexp) }
+{########################}
 
 proc arrayexp(size: integer; eltype: char);
-
 var resultsize: integer;
-
 begin
   mainexp(eltype,resultsize);
   if resultsize<>size then error(15);
   testtype(eltype);
 end;
 
-{ * getvar *            ( of statement ) }
+{#########################}
+{ getvar ( of statement ) }
+{#########################}
 
 proc getvar;
 begin
-  vartyp2:=high(t0[idpnt]);
-  vartype:=low(t0[idpnt]);
+  vartyp2:=high(stype[idpnt]);
+  vartype:=low(stype[idpnt]);
   scan;
   if (vartype='q') and (token=' [') and
     ((vartyp2='v') or (vartyp2='d')) then begin
@@ -124,10 +130,10 @@ begin
             relad:=3;
             code3($22,1); code1($12)
           end;
-          if (vartyp2='q') and (t3[idpnt]=0) then
+          if (vartyp2='q') and (sspsz[idpnt]=0) then
             checkindex(0,63)
           else
-            checkindex(0,t3[idpnt]);
+            checkindex(0,sspsz[idpnt]);
           testtype('i'); testto(' ]'); scan;
         end else relad:=2;
       end;
@@ -137,7 +143,9 @@ begin
   end {case}
 end {getvar};
 
-{ * prcall *            ( of statement ) }
+{#########################}
+{ prcall ( of statement ) }
+{#########################}
 
 proc prcall (idpn1: integer);
 
@@ -145,12 +153,15 @@ var bstack,numpar,i,n,n2: integer;
 
 { body of prcall follows later }
 
-{ * prcall1 *           ( of prcall ) }
+{#######################}
+{ prcall1 ( of prcall ) }
+{#######################}
 
 proc prcall1;
 var ressize:integer;
 
   proc prcall3;
+  {###########}
   begin {prcall3}
     testto('id');
     idpnt:=findid;
@@ -187,18 +198,22 @@ begin {prcall1}
             if relad<>2 then merror(14,'03');
             if vartyp2='i' then error(16);
             i:=succ(i);
-            if stack[i]<>t3[idpnt] then
+            if stack[i]<>sspsz[idpnt] then
               error(15);
             if vartyp2='n' then begin
-              code3($22,t2[idpnt]);
+              code3($22,svda[idpnt]);
               code1($3d);
-            end else code4($27,level-t1[idpnt],
-              2*t2[idpnt]);
+            end else code4($27,level-slevel[idpnt],
+              2*svda[idpnt]);
             code2($3b,stack[i]);
           end
     else merror(14,'04')
   end {case}
 end {prcall1};
+
+{#####################}
+{ prcall2 (of prcall) }
+{#####################}
 
 proc prcall2;
 begin
@@ -206,9 +221,13 @@ begin
   n:=0
 end {prcall2};
 
+{################}
+{ body of prcall }
+{################}
+
 begin {body of prcall}
-  if t3[idpn1]<>0 then begin
-    bstack:=t3[idpn1];
+  if sspsz[idpn1]<>0 then begin
+    bstack:=sspsz[idpn1];
     numpar:=stack[bstack];
     parse(' ('); scan;
     for i:=succ(bstack) to bstack+numpar do
@@ -220,8 +239,8 @@ begin {body of prcall}
     end;
     testto(' )');
   end {then};
-  code4(43,level-t1[idpn1],t2[idpn1]);
-  if t3[idpn1]<>0 then begin
+  code4(43,level-slevel[idpn1],svda[idpn1]);
+  if sspsz[idpn1]<>0 then begin
     n:=0; i:=bstack+numpar;
     repeat
       case chr(stack[i] shr 8) of
@@ -229,7 +248,7 @@ begin {body of prcall}
       'w':  begin
               prcall2; idpnt:=pop;
               gpval(idpnt,true,
-                  high(t0[idpnt]));
+                  high(stype[idpnt]));
             end;
       chr(0): begin
             n2:=stack[i];
@@ -239,17 +258,17 @@ begin {body of prcall}
               'x':  begin
                       prcall2;
                       idpnt:=pop;
-                      if high(t0[idpnt])='n'
+                      if high(stype[idpnt])='n'
                       then begin
-                        code3($22,t2[idpnt]+
-                          2*t3[idpnt]);
+                        code3($22,svda[idpnt]+
+                          2*sspsz[idpnt]);
                         code1($3e)
                       end else
                         code4(41,
-                          level-t1[idpnt],
-                          2*(t2[idpnt]+
-                          t3[idpnt]));
-                      code2($3c,t3[idpnt])
+                          level-slevel[idpnt],
+                          2*(svda[idpnt]+
+                          sspsz[idpnt]));
+                      code2($3c,sspsz[idpnt])
                     end
               end {case}
             end
@@ -260,10 +279,9 @@ begin {body of prcall}
   end
 end {prcall};
 
-
-{###################################}
-{ * mainexp *       ( of statement) }
-{###################################}
+{########################}
+{ mainexp (of statement) }
+{########################}
 {  see forward declaration above    }
 
 proc mainexp(reqtype: char;
@@ -273,7 +291,9 @@ proc mainexp(reqtype: char;
 var opcode,roff: integer;
     savtype: char;
 
-{ * argument *         ( of mainexp ) }
+{########################}
+{ argument ( of mainexp ) }
+{#########################}
 
 proc argument(rtype: char);
 begin
@@ -282,20 +302,19 @@ begin
   testto(' )'); scan
 end; {argument}
 
-{#######################################}
-{ * simexp *             ( of mainexp ) }
-{#######################################}
+{#######################}
+{ simexp ( of mainexp ) }
+{#######################}
 
 proc simexp(var arsize1: integer);
-
 var opcode: integer;
     sign: char;
 
 {body of simexp  follows later }
 
-{#######################################}
-{ * term *               ( of simexp )  }
-{#######################################}
+{#####################}
+{ term ( of simexp )  }
+{#####################}
 
 proc term(var arsize2: integer);
 
@@ -303,21 +322,23 @@ var opcode: integer;
 
 { body of term follows later }
 
-{#######################################}
-{ * factor *             ( of term )    }
-{#######################################}
+{#######################}
+{ factor ( of term )    }
+{#######################}
 
 proc factor(var arsize3: integer);
 
 var i, idpnt: integer;
     h: char;
 
-{ * index *              ( of factor )  }
+{ body of factor follows later }
+
+{######################}
+{ index ( of factor )  }
+{######################}
 
 proc index(chk: boolean);
-
 var savtype: char;
-
 begin {index}
   scan; savtype:=restype;
   express; testtype('i'); testto(' ]');
@@ -325,42 +346,46 @@ begin {index}
     code3($22,1); code1($12);
   end;
   if chk then begin
-    if (savtype='q') and (t3[idpnt]=0) then
+    if (savtype='q') and (sspsz[idpnt]=0) then
       { is an arrayed cpnt }
       checkindex(0,63)
     else
-      checkindex(0,t3[idpnt]);
+      checkindex(0,sspsz[idpnt]);
   end;
   restype:=savtype; scan
 end;
 
-begin { *** body of factor *** }
+{################}
+{ body of factor }
+{################}
+
+begin
   arsize3:=0;
   case token of
     'id': begin {identifier }
             idpnt:=findid;
             if idpnt=0 then error(5);
-            restype:=low(t0[idpnt]);
-            h:=high(t0[idpnt]);
+            restype:=low(stype[idpnt]);
+            h:=high(stype[idpnt]);
             case h of
               'v','w','d':
                     begin
                       scan;
                       if (restype='q') and (token=' [')
                       then begin
-                        code4(39,level-t1[idpnt],
-                          2*t2[idpnt]);
+                        code4(39,level-slevel[idpnt],
+                          2*svda[idpnt]);
                         index(true);
                         code1($03);
                         code1($54);
                         restype:='c';
                       end else
-                        code4(39,level-t1[idpnt],
-                          2*t2[idpnt]);
+                        code4(39,level-slevel[idpnt],
+                          2*svda[idpnt]);
                     end;
-              'h':  begin code3($22,t2[idpnt]);
+              'h':  begin code3($22,svda[idpnt]);
                       code1($17); scan end;
-              'i':  begin code3($22,t2[idpnt]);
+              'i':  begin code3($22,svda[idpnt]);
                       scan;
                       if token=' [' then begin
                         index(true); code1($03);
@@ -369,10 +394,10 @@ begin { *** body of factor *** }
                         error(16)
                       end
                     end;
-              'm':  begin code3($22,t2[idpnt]);
+              'm':  begin code3($22,svda[idpnt]);
                       code1($3d); scan
                     end;
-              'n':  begin code3($22,t2[idpnt]);
+              'n':  begin code3($22,svda[idpnt]);
                       scan;
                       if token=' [' then begin
                         index(true);
@@ -385,18 +410,19 @@ begin { *** body of factor *** }
                         end
                       end else begin
                         code1($3d);
-                        code2($3b,t3[idpnt]);
-                        arsize3:=t3[idpnt];
+                        code2($3b,sspsz[idpnt]);
+                        arsize3:=sspsz[idpnt];
                       end
                     end;
               'r','t': begin
                       code3(35,2);
                       idpnt:=prec(idpnt);
                       prcall(idpnt); scan;
-                      restype:=low(t0[idpnt]);
+                      restype:=low(stype[idpnt]);
                     end;
-              'c':  if low(t0[idpnt])<>'r' then begin
-                      code3(34,t2[idpnt]);
+              'c':  if low(stype[idpnt])<>'r' then
+                    begin
+                      code3(34,svda[idpnt]);
                       scan;
                       if restype='s' then begin
                         if token=' [' then begin
@@ -413,10 +439,10 @@ begin { *** body of factor *** }
                       {scan;}
                     end else begin
                       code2($3a,2);
-                      code2(t2[idpnt] and 255,
-                        t2[idpnt] shr 8);
-                      code2(t3[idpnt] and 255,
-                        t3[idpnt] shr 8);
+                      code2(svda[idpnt] and 255,
+                        svda[idpnt] shr 8);
+                      code2(sspsz[idpnt] and 255,
+                        sspsz[idpnt] shr 8);
                       arsize3:=1; scan
                     end;
               'a','e','x':
@@ -424,8 +450,8 @@ begin { *** body of factor *** }
                       if token=' [' then begin
                         index(true);
                         code4($28,
-                            level-t1[idpnt],
-                            2*t2[idpnt]);
+                            level-slevel[idpnt],
+                            2*svda[idpnt]);
                         if restype='r' then
                         begin
                           code2($3b,1);
@@ -433,20 +459,20 @@ begin { *** body of factor *** }
                         end
                       end else begin
                         code4($27,
-                            level-t1[idpnt],
-                            2*t2[idpnt]);
-                        code2($3b,t3[idpnt]);
-                        arsize3:=t3[idpnt];
+                            level-slevel[idpnt],
+                            2*svda[idpnt]);
+                        code2($3b,sspsz[idpnt]);
+                        arsize3:=sspsz[idpnt];
                       end
                     end;
               's','u':
                     begin
-                      code3(35,2*t3[idpnt]+2);
+                      code3(35,2*sspsz[idpnt]+2);
                       idpnt:=prec(idpnt);
                       prcall(idpnt); scan;
-                      restype:=low(t0[idpnt]);
+                      restype:=low(stype[idpnt]);
                       idpnt:=succ(idpnt);
-                      arsize3:=t3[idpnt]
+                      arsize3:=sspsz[idpnt]
                     end
               else error(1)
             end {case}
@@ -595,7 +621,11 @@ begin { *** body of factor *** }
   end {case of token}
 end {factor};
 
-begin  { *** body of term *** }
+{##############}
+{ body of term }
+{##############}
+
+begin
   factor(arsize2);
   repeat
     case token of
@@ -636,10 +666,13 @@ begin  { *** body of term *** }
       end
     end;
   until opcode=0;
-end {term};
+end;
 
+{################}
+{ body of simexp }
+{################}
 
-begin { *** body of simexp *** }
+begin
   sign:=' ';
   if token=' +' then begin
     sign:='+'; scan
@@ -702,6 +735,9 @@ begin { *** body of simexp *** }
   until opcode=0
 end {simexp};
 
+{#################}
+{ body of mainexp }
+{#################}
 
 begin { *** body of mainexp *** }
   roff:=0;
@@ -729,16 +765,15 @@ begin { *** body of mainexp *** }
   end
 end {mainexp};
 
-
-{#########################################}
-{ * assign *             ( of statement ) }
-{#########################################}
+{#########################}
+{ assign ( of statement ) }
+{#########################}
 
 proc assign;
-
 var savetype: char;
 
   proc assign1;
+  {###########}
   begin
     testto(':='); scan; express;
     if (vartype='q') and (restype='s') then begin
@@ -750,7 +785,7 @@ var savetype: char;
 begin {assign}
   idpnt:=findid;
   if idpnt=0 then error(5);
-  if t0[idpnt]='pr' then begin
+  if stype[idpnt]='pr' then begin
     prcall(idpnt);scan end
   else begin
     getvar; savetype:=vartype;
@@ -765,36 +800,39 @@ begin {assign}
         if vartyp2='n' then begin
           code1($3f);
           code3($22,1);code1($12);
-          code3($22,t2[idpnt]+2);
+          code3($22,svda[idpnt]+2);
           code1($3);code1($3e)
         end else
-          code4($2a,level-t1[idpnt],
-            2*t2[idpnt]+2);
+          code4($2a,level-slevel[idpnt],
+            2*svda[idpnt]+2);
         code2($3c,1)
       end else begin
-        arrayexp(t3[idpnt],vartype);
+        arrayexp(sspsz[idpnt],vartype);
         if vartyp2='n' then begin
-          code3($22,t2[idpnt]+2*t3[idpnt]);
+          code3($22,svda[idpnt]+2*sspsz[idpnt]);
           code1($3e);
         end else
-          code4($29,level-t1[idpnt],
-            2*(t2[idpnt]+t3[idpnt]));
-        code2($3c,t3[idpnt]);
+          code4($29,level-slevel[idpnt],
+            2*(svda[idpnt]+sspsz[idpnt]));
+        code2($3c,sspsz[idpnt]);
       end
     end
   end
 end {assign};
 
-{ * case1 *             ( of statement ) }
+{########################}
+{ case1 ( of statement ) }
+{########################}
 
 proc case1;
-
 var i1,i2,casave: integer;
     savetype: char;
 
   proc case2;
+  {#########}
 
     proc case3;
+    {#########}
     begin
       scan; code1(22); code3(34,getcon);
       testtype(savetype);
@@ -828,7 +866,9 @@ begin {case1}
   code3(35,-2); scan
 end {case1};
 
-{ * openrw *              ( of statement ) }
+{#########################}
+{ openrw ( of statement ) }
+{#########################}
 
 proc openrw(x: integer);
 begin
@@ -843,11 +883,14 @@ begin
   testto(' )'); scan
 end {openrw};
 
-{ * gpsec *               ( of statement )  }
+{########################}
+{ gpsec ( of statement ) }
+{########################}
 
 proc gpsec(code);   { get/put sector }
 
   proc gpsec1;
+  {##########}
   begin
     scan; express; testtype('i');
     testto(' ,');
@@ -865,6 +908,9 @@ begin {gpsec}
   testto(' )');
 end {gpsec};
 
+{###################}
+{ body of statement }
+{###################}
 
 begin {body of statement }
   if token=' ;' then scan;
@@ -1007,8 +1053,8 @@ begin {body of statement }
 
     'fo': begin {for}
             parse('id'); assign;
-            if t0[idpnt]='pr' then error(1);
-            savtp1:=low(t0[idpnt]);
+            if stype[idpnt]='pr' then error(1);
+            savtp1:=low(stype[idpnt]);
             case token of
               'to': k2:=1;
               'dw': k2:=0

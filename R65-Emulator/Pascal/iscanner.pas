@@ -1,16 +1,17 @@
-{ ############################# }
 { include file ISCANNER:PAS for COMPILE }
 
-{       *scan*      (global)    }
-{ ############################# }
+{###############}
+{ scan (global) }
+{ ############# }
 { scan input and make tokens }
 
 proc scan;
-
 var count,ll,hh,i,i1,co: integer;
     name: array[7] of char;
 
-{       * compresw*     (of scan)       }
+{####################}
+{ compresw (of scan) }
+{####################}
 
 func compresw(index: integer);
 
@@ -25,7 +26,9 @@ begin
   compresw:=ci
 end {compresw};
 
-{       * clear *       (of scan)              }
+{#################}
+{ clear (of scan) }
+{#################}
 
 proc clear; {clears 8 chars of identifier}
 
@@ -35,23 +38,26 @@ begin
   for i:=1 to 8 do ident[i]:=' '
 end;
 
-{       * pack *        (of scan)              }
+{################}
+{ pack (of scan) }
+{################}
 
 proc pack;  {packs token and ch to token }
-
 begin
   token:=packed(low(token),ch); getchr
 end;
 
-{       * setval *      (of scan)              }
+{##################}
+{ setval (of scan) }
+{##################}
 
 proc setval;
-
 var r: real;
     n,n1: integer;
     ems: boolean;
 
   func times10(r:real):real;
+  {########################}
   { slightly more accurate than 10.0*r }
   var r2,r4:real;
   begin
@@ -105,11 +111,12 @@ begin
   end
 end {setval};
 
-{       * directive *   (of scan               }
+{#####################}
+{ directive (of scan) }
+{#####################}
 
 proc directive;
 var i,icyclus:integer;
-
 begin
   getchr;
   case ch of
@@ -136,10 +143,11 @@ begin
   end {case}
 end;
 
-{       * setid *       (of scan)              }
+{#################}
+{ setid (of scan) }
+{#################}
 
 proc setid; {sets one char to ident}
-
 begin
   if count<=idlength then begin
     ident[count]:=ch; count:=succ(count)
@@ -147,7 +155,11 @@ begin
   getchr;
 end {setid};
 
-begin { ***** body of scan ***** }
+{##############}
+{ body of scan }
+{##############}
+
+begin
   count:=1; while ch=' ' do getchr;
   tpos:=curpos;
 
@@ -220,7 +232,9 @@ begin { ***** body of scan ***** }
   end {odent}
 end {scan};
 
-{ * testto/parse * }
+{##############}
+{ testto/parse }
+{##############}
 
 { parce source for specific token; else error }
 
@@ -234,15 +248,15 @@ begin
   scan; testto(x);
 end;
 
-{ * getlib * }
+{########}
+{ getlib }
+{########}
 
 proc getlib;  { read library data }
-
 var i,j,nent,addr,size,num,x,base: integer;
     libfil: file;
     ch,ltyp2,dummy: char;
     name: array[7] of char;
-
 begin
   scan; if token=' ,' then scan;
   testto('id');
@@ -266,15 +280,16 @@ begin
       idtab[addr+j]:=ch
     end;
     read(@libfil,ch);
-    read(@libfil,t0[i],dummy,t1[i],t2[i],t3[i]);
-    t1[i]:=t1[i]+level;
-    ltyp2:=high(t0[i]);
+    read(@libfil,stype[i],dummy,slevel[i],
+      svda[i],sspsz[i]);
+    slevel[i]:=slevel[i]+level;
+    ltyp2:=high(stype[i]);
     if (ltyp2='p')or(ltyp2='f')
       or(ltyp2='g') then begin
-      t2[i]:=t2[i]+base;
-      if t3[i]<>0 then begin {stack data}
+      svda[i]:=svda[i]+base;
+      if sspsz[i]<>0 then begin {stack data}
         read(@libfil,num);
-        push(num); t3[i]:=stackpnt;
+        push(num); sspsz[i]:=stackpnt;
         for j:=1 to num do begin
           read(@libfil,x);
           push(x);
