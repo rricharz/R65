@@ -605,17 +605,20 @@ int export_file()
             
             if (filtyp=='S') {  // sequential file
                 while ((i < 256) && ((buffer[i] & 0x7F) != 0x1F)
-                    && ((buffer[i] & 0x7F) != 0x7F)) {
+                    && ((buffer[i] & 0xFF) != 0xFF)) {
                     if ((buffer[i] >= 0x80) && (buffer[i] <= 0xFe)) {
                         for (int ii = 0; ii < (buffer[i] & 0x7F); ii++) {
                             fprintf(foutput, "%c", ' ');
+                            printf("<BL>");
 						}
                     }
                     else if (buffer[i] == 0x0D) {
                         fprintf(foutput, "\n");
+                        printf("<RT>\n");
                     }
                     else {
                         fprintf(foutput, "%c",buffer[i]);
+                        printf("<%i>", buffer[i]);
                         count++;
                     }
                     i++;

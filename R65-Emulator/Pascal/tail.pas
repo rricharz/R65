@@ -28,7 +28,21 @@ begin
   end;
 end;
 
+proc show(ch:char);
 begin
+  write('<',ord(ch),'>');
+  if (ord(ch)>32) then write(' ',ch)
+  else if (ch = ' ') then write('blank')
+  else if (ord(ch) = 13) then write(' eol')
+  else if (ord(ch) = 31) then write(' eof');
+  writeln;
+end;
+
+begin
+  lastch4:=chr(0);
+  lastch3:=chr(0);
+  lastch2:=chr(0);
+  lastch1:=chr(0);
   linecount:=0;
   cyclus:=0; drive:=1;
   agetstring(name,default,cyclus,drive);
@@ -47,6 +61,13 @@ begin
     openr(fno);
     writeln; write(cup,clrlin);
     ch:='&';
+    writeln('First characters');
+    read(@fno,ch);
+    show(ch);
+    if (ch=eof) then exit;
+    read(@fno,ch);
+    show(ch);
+    if (ch=eof) then exit;
     read(@fno,ch);
     while (ch<>eof) and (ch<>chr(0)) do
     begin {main loop; while }
@@ -63,11 +84,10 @@ begin
     end; { main loop while }
     writeln;
     writeln('tail characters:');
-    writeln('<',ord(lastch4),'>');
-    writeln('<',ord(lastch3),'>');
-    writeln('<',ord(lastch2),'>');
-    writeln('<',ord(lastch1),'>');
-    writeln('<',ord(ch),'>');
+    show(lastch4);
+    show(lastch3);
+    show(lastch2);
+    show(lastch1);
   end
   else writeln('usage: tail filnam');
 end.

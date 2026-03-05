@@ -536,7 +536,7 @@ WRITCH  AND =$7F        MASK OFF BIT 7
         BEQ WRITC4
 *
 WRITC0  STA (POINT),Y
-        CMP =$FF                EOF?
+        CMP =$1F        EOF?
         BEQ WRITC1      YES, STORE BUFFER
 *
         INY             ELSE COUNT
@@ -619,9 +619,9 @@ CLOSE   LDA FIDRTB,X
         STX CURSEQ
         LDA FIDRTB,X
         AND =$80
-        BEQ CLOSE1      SKI, IF READ
+        BEQ CLOSE1      SKIP, IF READ
 *
-        LDA =$FF        WRITE LAST CHAR
+        LDA =$1F        EOF
         JSR WRITCH+2
         BNE CLOSE2+2    SKIP, IF ERROR
 *
