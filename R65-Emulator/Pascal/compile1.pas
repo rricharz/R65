@@ -642,7 +642,7 @@ begin
       write(@ofno,num);
       for j:=1 to num do
         write(@ofno,',',stack[sspsz[i]+j]);
-      write(@ofno,cr,lf);
+      write(@ofno,CR,LF);
     end {then};
   end {for}
 end {savtable};
@@ -657,11 +657,11 @@ begin {main}
   case token of
     'pg': begin
             libflg:=false;
-            asetfile(pname,scyclus,sdrive,'Q');
+            _asetfile(pname,scyclus,sdrive,'Q');
           end;
     'li': begin
             libflg:=true;
-            asetfile(pname,scyclus,sdrive,'T');
+            _asetfile(pname,scyclus,sdrive,'T');
           end
     else
       merror(2,'pg')
@@ -671,7 +671,7 @@ begin {main}
   repeat
     i:=succ(i);
   until (i>7) or (pname[i] = ':') or
-      (pname[i]<>uppercase(ident[i+1]));
+      (pname[i]<>_uppercase(ident[i+1]));
   if i<8 then
     merror(2,packed(pname[0],pname[1]));
     { name differs from filename }
@@ -691,13 +691,13 @@ begin {main}
     savebyte(pc shr 8);
     close(ofno);
     if libflg then begin
-      asetfile(pname,scyclus,sdrive,'L');
+      _asetfile(pname,scyclus,sdrive,'L');
       openw(ofno);
       savtable;
       close(ofno)
     end
   end else
-    runerr:=$87; {no loader file}
+    RUNERR:=$87; {no loader file}
   writeln;
   writeln;
   writeln('End compile');
@@ -706,13 +706,13 @@ begin {main}
   writeln('Compiler stack size:  ',stackmax);
   writeln('Ident stack size:     ',spntmax);
   write('Pascal errors:        ');
-  if numerr>0 then write(invvid);
-  writeln(numerr,norvid);
+  if numerr>0 then write(INVVID);
+  writeln(numerr,NORVID);
   if prt then begin
-    write(prtoff);
-    setemucom(9);
+    write(PRTOFF);
+    _setemucom(9);
   end;
   close(fno);
   { check whether second pass is not required }
-  if (runerr=0) and libflg then runerr:=-1;
+  if (RUNERR=0) and libflg then RUNERR:=-1;
 end {main}.

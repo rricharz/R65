@@ -8,7 +8,7 @@ const version='4.6';
     pagelenght=60;    {no of lines per page}
     nooutput  =@0;
     maxfi     =3;     {max number of ins fls}
-    yesoutput=@255;
+    yesOUTPUT=@255;
 
     nresw      = 63;    {number of res. words, max 64}
     symbsize   = 256;   {id table entries}
@@ -74,7 +74,6 @@ proc newpage; forward;
 {###################}
 
 proc savebyte(x: integer);
-
 begin
     if ofno<>nooutput then begin
       write(@ofno,
@@ -102,10 +101,8 @@ end {crlf};
 {#################################}
 
 proc merror(x: integer; code: packed char);
-
 var i: integer;
     answer: char;
-
 begin
   crlf; numerr:=succ(numerr);
   for i:=2 to tpos do write(' ');
@@ -133,26 +130,25 @@ begin
     19: write('Parameter');
     20: write('Compiler directive syntax');
     21: write('Nested include files');
-    22: write('Unexpected eof')
+    22: write('Unexpected EOF')
   end {case};
   writeln;
-  write('Continue?');
-  read(@key,answer);
+  write('Continue (Y)?');
+  read(@KEY,answer);
   if answer<>'Y' then begin
-    crlf; write(prtoff); setemucom(9); close(fno);
-    if (ofno<>nooutput) and (ofno<>yesoutput)
+    crlf; write(PRTOFF); _setemucom(9); close(fno);
+    if (ofno<>nooutput) and (ofno<>yesOUTPUT)
       then close(ofno);
     writeln('Aborting compile1 on request');
-    abort
+    _abort
   end
   else crlf;
-  if (ofno<>nooutput) and (ofno<>yesoutput)
+  if (ofno<>nooutput) and (ofno<>yesOUTPUT)
     then close(ofno);
   ofno:=nooutput;
 end {merror};
 
 proc error(x: integer);
-
 begin
   merror(x,'##')
 end;
@@ -183,17 +179,17 @@ proc newpage;
 var i: integer;
 begin
   if ((linepage)<>0) and prt then
-    write(@printer,formfeed);
+    write(@PRINTER,FF);
   writeln; { Do not count this line}
   if pname[0]<>'x' then begin
     write('R65 COMPILE ');
     write(version);
     if libflg then write(': library ')
     else write(': program ');
-    prtext16(output,pname);
+    _prtext16(OUTPUT,pname);
   end;
   write(' ');
-  prtdate(output);
+  _prtdate(OUTPUT);
   writeln(' page ',
     (linepage div pagelenght)+1);
   writeln;
@@ -202,7 +198,6 @@ end {newpage};
 {################}
 { code1 (global) }
 {################}
-
 proc code1(x: %integer);  {set one byte p-code}
 begin
   savebyte(x); pc:=succ(pc)
@@ -255,19 +250,19 @@ begin
       { switch back to normal input file }
       savefno:=@0;
       ateof:=false;
-      if ch=cr then ch:=' ';
+      if ch=CR then ch:=' ';
     end else begin
       error(22);
-      abort
+      _abort
     end
   end else begin
     read(@fno,ch);
-    if ch=cr then begin
+    if ch=CR then begin
       crlf;
       nextline;
       ch:=' ';
     end {if}
-    else if ch=eof then begin
+    else if ch=EOF then begin
       ateof:=true;
       { we need to suppy one more char }
       { for end. at end of file to work properly }
@@ -283,7 +278,6 @@ end {getchr};
 
 proc splitconv(a: array[1] of %integer;
   var b:array[1] of %integer);
-
 begin
   b:=a;
 end;
@@ -293,20 +287,17 @@ end;
 {###############}
 
 proc init;
-
 const char96=chr(20);
-
 var i,j,dummy: integer;
     dch: char;
     pch: packed char;
     request: array[15] of char;
     default: boolean;
-
 begin {init}
   writeln('R65 PASCAL COMPILER version ', version,
     ', Pass  1');
   ateof:=false; savefno:=@0;
-  cdrive:=fildrv; { drive of compile program }
+  cdrive:=FILDRV; { drive of compile program }
   fipnt:=-1;
   pc:=2; dpnt:=0; spnt:=0; offset:=2;
   npara:=0; level:=0;
@@ -316,20 +307,20 @@ begin {init}
   svda[0]:=0; sspsz[0]:=0;
   { prepare resword table }
   writeln('Reading list of reserved words');
-  asetfile('RESWORDS:W      ',0,cdrive,'W');
+  _asetfile('RESWORDS:W      ',0,cdrive,'W');
   openr(fno);
   for i:=0 to nresw do begin
     read(@fno,pch,dch);
     reswcod[i]:=pch;
     for j:=0 to 7 do reswtab[8*i+j]:=' ';
     j:=0;
-    while (j<8) and (dch<>cr) do begin
+    while (j<8) and (dch<>CR) do begin
       read(@fno,dch);
-      if (dch<>cr) then
+      if (dch<>CR) then
         reswtab[8*i+j]:=dch;
       j:=succ(j)
     end;
-    while (dch<>cr) and (dch<>eof) do
+    while (dch<>CR) and (dch<>EOF) do
       read(@fno,dch)
   end;
   close(fno);
@@ -338,13 +329,13 @@ begin {init}
 
   sdrive:=1; {default drive for source }
   scyclus:=0;
-  agetstring(pname,default,scyclus,sdrive);
+  _agetstring(pname,default,scyclus,sdrive);
 
-  agetstring(request,default,dummy,dummy);
+  _agetstring(request,default,dummy,dummy);
   icheck:=false;
-  prt:=true; ofno:=yesoutput; lineflg:=false;
+  prt:=true; ofno:=yesOUTPUT; lineflg:=false;
   if not default then begin
-    if request[0]<>'/' then argerror(103);
+    if request[0]<>'/' then _argerror(103);
     for i:=1 to 8 do
       case request[i] of
         'P': prt:=false;
@@ -352,22 +343,21 @@ begin {init}
         'I','R': icheck:=true;
         'N': ofno:=nooutput;
         ' ': begin end
-        else argerror(104)
+        else _argerror(104)
       end; {case}
   end;
 
-  asetfile(pname,scyclus,sdrive,'P');
+  _asetfile(pname,scyclus,sdrive,'P');
   openr(fno);
-  scyclus:=filcyc; { may have changed }
-
+  scyclus:=FILCYC; { may have changed }
   {save cyclus and drive for compile2}
-  arglist[8]:=scyclus;
-  arglist[9]:=sdrive;
-  numarg:=1;
+  ARGLIST[8]:=scyclus;
+  ARGLIST[9]:=sdrive;
+  NUMARG:=1;
 
   if prt then begin
-    write(prton);
-    setemucom(8);
+    write(PRTON);
+    _setemucom(8);
   end
 
   line:=0; lineinc:=0; linepage:=0;

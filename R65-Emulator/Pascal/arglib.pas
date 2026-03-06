@@ -14,129 +14,113 @@
 
 library arglib;
 
-mem numarg   =$005f: integer&;
-    arglist  =$0060: array[3] of integer;
-    arglists =$0060: array[63] of char&;
-    argtype  =$00a0: array[31] of char&;
+mem NUMARG   =$005f: integer&;
+    ARGLIST  =$0060: array[10] of integer;
+    ARGLISTS =$0060: array[63] of char&;
+    ARGTYPE  =$00a0: array[31] of char&;
+    FILFLG   =$00da: integer&;
+    FILDRV   =$00dc: integer&;
+    FILCYC   =$0311: integer&;
+    FILCY1   =$0330: integer&;
+    FILNAM   =$0301: array[15] of char&;
+    FILNM1   =$0320: array[15] of char&;
+    FILSTP   =$0312: char&;
 
-    filflg   =$00da: integer&;
-    fildrv   =$00dc: integer&;
-    filcyc   =$0311: integer&;
-    filcy1   =$0330: integer&;
-    filnam   =$0301: array[15] of char&;
-    filnm1   =$0320: array[15] of char&;
-    filstp   =$0312: char&;
+var _carg: integer;
 
-var carg: integer;
-
-{       * argerror *        }
-
-proc argerror(e: integer);
-
-const stop=$2010;
-mem runerr=$000c: integer&;
+proc _argerror(e: integer);
+const STOP=$2010;
+mem RUNERR=$000c: integer&;
 begin
     writeln;
     writeln('Argument error ',e);
-    runerr:=255;
-    call(stop)
+    RUNERR:=255;
+    call(STOP)
 end;
 
-{       * agetval *          }
-
-proc agetval(var value: integer;
-  var default: boolean);
+proc _agetval(var value:integer;var default:boolean);
 { does not change value, if no argument }
 begin
-  case argtype[carg] of
-    'i': begin value:=arglist[carg];
-           carg:=succ(carg); default:=false;
+  case ARGTYPE[_carg] of
+    'i': begin value:=ARGLIST[_carg];
+           _carg:=succ(_carg); default:=false;
          end;
     'd': begin
-           carg:=succ(carg); default:=true;
+           _carg:=succ(_carg); default:=true;
          end;
     chr(0):
          begin
            default:=true;
          end
-    else argerror(102)
+    else _argerror(102)
   end {case}
 end;
 
-{       * agetstring *       }
-
-proc agetstring(var string: array[15] of char;
-  var default: boolean;
-  var cyclus, drive: integer);
+proc _agetstring(var string: array[15] of char;
+        var default: boolean;
+        var cyclus, drive: integer);
 { set string to blank if no argument }
 var i: integer;
     dummy: boolean;
-
 begin
-  case argtype[carg] of
+  case ARGTYPE[_carg] of
     's': begin
            for i:=0 to 15 do
-             string[i]:=arglists[2*carg+i];
-           carg:=carg+8;
+             string[i]:=ARGLISTS[2 *_carg + i];
+           _carg:=_carg + 8;
            default:=false;
          end;
     'd': begin
            string:='                ';
-           default:=true; carg:= succ(carg);
+           default:=true; _carg:= succ(_carg);
          end;
     chr(0):
          begin
            string:='                ';
            default:=true;
          end
-    else argerror(101)
+    else _argerror(101)
   end {case}
-  agetval(cyclus,dummy);
-  agetval(drive,dummy);
+  _agetval(cyclus,dummy);
+  _agetval(drive,dummy);
 end;
 
-{ * uppercase * }
-
-func uppercase(ch1: char): char;
+func _uppercase(ch1: char): char;
 
 begin
   if (ch1 >= 'a') and (ch1 <= 'z') then
-    uppercase := chr(ord(ch1) - 32)
+    _uppercase := chr(ord(ch1) - 32)
   else
-    uppercase := ch1;
+    _uppercase := ch1;
 end;
 
 {       * asetfile *    }
 
-proc asetfile(name: array[15] of char;
+proc _asetfile(name: array[15] of char;
   cyclus,device: integer; subtype: char);
-
 var i,e: integer;
-
 begin
   e:=0;
   for i:=0 to 15 do begin
-    filnam[i]:=uppercase(name[i]);
-    filnm1[i]:=uppercase(name[i]);
+    FILNAM[i]:=_uppercase(name[i]);
+    FILNM1[i]:=_uppercase(name[i]);
     if (e=0) and ((name[i]=':')
         or (name[i]=' ')) then
       e:=i;
   end;
   if (subtype<>' ') and (e<>0)
       and (e<15) then begin
-    filstp :=subtype;
-    filnam[e]:=':'; filnm1[e]:=':';
-    filnam[e+1]:=subtype; filnm1[e+1]:=subtype
+    FILSTP :=subtype;
+    FILNAM[e]:=':'; FILNM1[e]:=':';
+    FILNAM[e+1]:=subtype; FILNM1[e+1]:=subtype
   end;
-  filcyc:=cyclus; filcy1:=cyclus;
-  fildrv:=device;
-  filflg:=$40; { Do not show file entry }
+  FILCYC:=cyclus; FILCY1:=cyclus;
+  FILDRV:=device;
+  FILFLG:=$40; { Do not show file entry }
 end;
 
-{       * initialization *  }
-
 begin
-  carg:=0;
+  _carg:=0;
 end.
 
 

@@ -20,149 +20,122 @@ library syslib;
 { R65 Pascal constants }
 
 const
-  tab8=chr(9);      {tabulate}
-  hom=chr(1);       {cursor home}
-  csc=chr($11);     {clear screen}
-  lf=chr($a);       {line feed}
-  formfeed=chr($c); {form feed}
-  cr=chr($d);       {carriage return}
-  eof=chr($1f);     {end of file}
-  norvid=chr($0b);  {normal video}
-  invvid=chr($0e);  {inverse video}
-  prton=chr($12);   {autoprint on}
-  prtoff=chr($14);  {autoprint off}
+  TAB8=chr(9);      {tabulate}
+  HOM=chr(1);       {cursor home}
+  CSC=chr($11);     {clear screen}
+  LF=chr($a);       {line feed}
+  FF=chr($c);       {form feed}
+  CR=chr($d);       {carriage return}
+  EOF=chr($1f);     {end of file}
+  NORVID=chr($0b);  {normal video}
+  INVVID=chr($0e);  {inverse video}
+  PRTON=chr($12);   {autoprint on}
+  PRTOFF=chr($14);  {autoprint off}
 
-  mmaxseq = 8;      {max no of seq. files}
+  MMAXSEQ = 8;      {max no of seq. files}
 
-  topmem = $c780;   {top of user memory}
-  maxint = $7fff;   {max integer value}
+  TOPMEM = $c780;   {top of user memory}
+  MAXINT = $7fff;   {max integer value}
 
-  input  = @0;      {line input}
-  output = @0;      {display output}
-  key    = @1;      {unbuffered kb input}
-  printer= @1;      {hardcopy output}
+  INPUT  = @0;      {line input}
+  OUTPUT = @0;      {display output}
+  KEY    = @1;      {unbuffered kb input}
+  PRINTER= @1;      {hardcopy output}
 
 { R65 Pascal system variables}
 
 mem  { The & below are required for 8-bit!}
-  runerr =$000c: integer&;
-  endstk =$000e: integer;
-  buffpn =$0015: integer&;
-  iocheck=$0023: boolean&;
+  RUNERR =$000c: integer&;
+  ENDSTK =$000e: integer;
+  BUFFPN =$0015: integer&;
+  IOCHECK=$0023: boolean&;
 
-  numarg =$005f: integer&;
-  arglist=$0060: array[31] of integer;
-  argtype=$00a0: array[31] of char&;
+  MUMARG =$005f: integer&;
+  ARGLIST=$0060: array[31] of integer;
+  ARGTYPE=$00a0: array[31] of char&;
 
-  filflg =$00da: integer&;
-  fildrv =$00dc: integer&;
-  curpos =$00ee: integer&;
+  FILFLG =$00da: integer&;
+  FILDRV =$00dc: integer&;
+  CURPOS =$00ee: integer&;
 
-  filnam =$0301: array[15] of char&;
-  filnm1 =$0320: array[15] of char&;
-  filcy1 =$0330: integer&;
-  maxseq =$0336: integer&;
-  fidrtb =$0339: array[mmaxseq] of integer&;
+  FILNUM =$0301: array[15] of char&;
+  FILNM1 =$0320: array[15] of char&;
+  FILCYC =$0330: integer&;
+  MAXSEQ =$0336: integer&;
+  FIDRTP =$0339: array[MMAXSEQ] of integer&;
 
-var day,month,year: integer;
+var _day,_month,_year: integer;
 
-proc setemucom(i:integer);
+proc _setemucom(i:integer);
 mem emucom=$1430:integer&;
 begin
   emucom:=i;
 end;
 
-{ * getbcd(address)          * }
+func _getbcd(address: integer): integer;
 { get 16-bit data from memory in bcd format }
-
-func getbcd(address: integer): integer;
 var data: integer;
 begin
   data:=mem[address];
-  getbcd:=data- 6*(data div 16);
+  _getbcd:=data- 6*(data div 16);
 end;
 
-{ * getdate                  * }
-proc getdate;
+proc _getdate;
 begin
-  day:=getbcd($17b9);
-  month:=getbcd($17ba);
-  year:=getbcd($17bb);
+  _day:=_getbcd($17b9);
+  _month:=_getbcd($17ba);
+  _year:=_getbcd($17bb);
 end;
 
-{ * prtdate(device)          * }
-proc prtdate(device: file);
+proc _prtdate(device: file);
 begin
-  getdate;
-  write(@device,day,'/',month,'/',year);
+  _getdate;
+  write(@device,_day,'/',_month,'/',_year);
 end;
 
-{ * abs(x)                   * }
-
-func abs(x: integer): integer;
+func _abs(x: integer): integer;
 begin
-  if x<0 then abs:=-x else  abs:=x
+  if x<0 then _abs:=-x else _abs:=x
 end;
 
-{ * mod(x,n) * }
-
-func mod(x,n: integer): integer;
+func _mod(x,n: integer): integer;
 begin
-  mod:=x - (x div n)*n;
+  _mod:=x - (x div n)*n;
 end;
 
-{ * tab(x: integer)          * }
-
-proc tab(x: integer);
+proc _tab(x: integer);
 begin
- while (x>curpos) do write(' ');
+ while (x>CURPOS) do write(' ');
 end;
 
-{ * abort * }
-{ stop execution and go to Pascal system }
-
-proc abort;
-const stopcode=$2010;
+proc _abort;
+const STOPCODE=$2010;
 begin
-  runerr:=$36;
-  call(stopcode);
+  RUNERR:=$36;
+  call(STOPCODE);
 end;
 
-{ * prttext8(device,text)     * }
-
-proc prtext8(device: file;
+proc _prtext8(device: file;
   text: array[7] of char);
-
 var i: integer;
-
 begin
   for i:=0 to 7 do write(@device,text[i]);
 end;
 
-{ * prttext16(device,text)     * }
-
-proc prtext16(device: file;
+proc _prtext16(device: file;
   text: array[15] of char);
-
 var i: integer;
-
 begin
   for i:=0 to 15 do write(@device,text[i]);
 end;
 
-{ * random                     * }
+func _random: integer;
 {uses the pseudo random generator}
 {provided by C, seeded at startup}
 {returned values in range 9 - 255}
-
-func random: integer;
 begin
-  random:=mem[$1706] and 255;
+  _random:=mem[$1706] and 255;
 end;
-
-
-{ * initialization * }
 
 begin {main}
 end.
-

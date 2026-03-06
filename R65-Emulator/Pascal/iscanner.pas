@@ -14,9 +14,7 @@ var count,ll,hh,i,i1,co: integer;
 {####################}
 
 func compresw(index: integer);
-
 var addr,ci,i: integer;
-
 begin
   addr:=8*index; i:=0;
   repeat
@@ -31,9 +29,7 @@ end {compresw};
 {#################}
 
 proc clear; {clears 8 chars of identifier}
-
 var i: integer;
-
 begin
   for i:=1 to 8 do ident[i]:=' '
 end;
@@ -131,7 +127,7 @@ begin
              incname[i]:=' '; i:=i+1;
            end;
            icyclus:=0;
-           asetfile(incname,icyclus,sdrive,'P');
+           _asetfile(incname,icyclus,sdrive,'P');
            savefno:=fno;
            openr(fno);
            lineinc:=0;
@@ -155,13 +151,27 @@ begin
   getchr;
 end {setid};
 
+{######################}
+{ isidletter (of scan) }
+{######################}
+
+func isidletter: boolean;
+{allowed letters in idents}
+begin
+  isidletter:=
+        ( ((ch>='a') and (ch<='z')) or
+          ((ch>='A') and (ch<='Z')) or
+          (ch='_')
+        );
+end;
+
 {##############}
 { body of scan }
 {##############}
 
 begin
   count:=1; while ch=' ' do getchr;
-  tpos:=curpos;
+  tpos:=CURPOS;
 
   { delayed because of token lookahead }
   if nlflg then begin
@@ -173,9 +183,7 @@ begin
     nlflg:=false;
   end;
 
-  if not (((ch>='a') and (ch<='z')) or
-         ((ch>='A') and (ch<='Z')) or
-         (ch='_')) then begin {main if}
+  if not isidletter then begin {main if}
 
     if (ch<'0') or (ch>'9') then begin {symb}
       token:=packed(' ',ch); getchr;
@@ -213,13 +221,12 @@ begin
     end {special symbols}
     else setval {numeric value}
   end {main if}
-  else begin {ident}
+  else begin { is_id_letter }
         clear;
     repeat
       setid
-    until (ch<'0') or (ch>'z') or
-      ((ch>'9') and (ch<'A')) or
-      ((ch>'Z') and (ch<'a'));
+    until not
+      (isidletter or ((ch>='0') and (ch<='9')));
     ll:=0; hh:=nresw; {look up in resword table}
     repeat
       i:=(ll+hh) shr 1; co:=compresw(i);
@@ -267,8 +274,8 @@ begin
     if ofno<>nooutput then
       write(@ofno,ident[succ(i)])
   end;
-  write(prtoff);
-  asetfile(name&'        ',0,cdrive,'L');
+  write(PRTOFF);
+  _asetfile(name&'        ',0,cdrive,'L');
   openr(libfil);  { get table file }
   read(@libfil,nent,size);
   {including cr,lf}
@@ -301,5 +308,5 @@ begin
   close(libfil);
   if spnt>spntmax then spntmax:=spnt;
   if stackpnt>stackmax then stackmax:=stackpnt;
-  if prt then write(prton);
+  if prt then write(PRTON);
 end {getlib};

@@ -48,9 +48,9 @@ var default: boolean;
 proc bcderror(e:integer);
 begin
   writeln;
-  write(invvid,'ERROR ');
+  write(INVVID,'ERROR ');
   write((e shr 4) and 15);
-  writeln(e and 15,norvid);
+  writeln(e and 15,NORVID);
 end;
 
 func hex(d:integer):char;
@@ -94,12 +94,12 @@ end;
 
 begin { mani }
   drive:=1; {default drive}
-  agetval(drive,default);
+  _agetval(drive,default);
   if (drive<0) or (drive>1) then begin
     writeln('Drive must be 0 or 1');
-    abort
+    _abort
   end;
-  fildrv:=drive;
+  FILDRV:=drive;
   call(aprepdo);
 
   scyfc:=255; { write disk name }
@@ -107,7 +107,7 @@ begin { mani }
   write('Cleaning drive ',
       drive,': ');
   for i:=0 to 15 do
-    write(filnam[i]);
+    write(FILNAM[i]);
   writeln;
 
   index:=0; ti:=0; maxlen:=0;
@@ -120,7 +120,7 @@ begin { mani }
       { check for deleted flag }
       if (fillnk and 255)<128 then begin
         for i:=0 to 15 do
-          nametab[16*ti+i]:=filnam[i];
+          nametab[16*ti+i]:=FILNAM[i];
         i:=16;
         repeat
           i:=i-1;
@@ -149,7 +149,7 @@ begin { mani }
     if foundtab[ti] then begin
       for i:=0 to 15 do
          name[i]:=nametab[16*ti+i];
-         asetfile(name,cyctab[ti],drive,
+         _asetfile(name,cyctab[ti],drive,
                ' ');
       filerr:=0;
       call(adelete);
@@ -162,4 +162,4 @@ begin { mani }
     ', now deleted: ',sdel+sfound);
 
 end.
- 
+ 
