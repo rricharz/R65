@@ -1,7 +1,8 @@
 program tail;
-{ displays text file and last 3 chars as ascii codes }
+{ displays text file and ascii codes of last 4 chars }
+{ stops at non printable character of text file }
 
-uses syslib, arglib,wildlib;
+uses syslib, arglib, wildlib;
 
 const cup=chr($1a);
       clrlin=chr($17);
@@ -33,9 +34,18 @@ begin
   write('<',ord(ch),'>');
   if (ord(ch)>32) then write(' ',ch)
   else if (ch = ' ') then write('blank')
-  else if (ord(ch) = 13) then write(' eol')
-  else if (ord(ch) = 31) then write(' eof');
+  else if (ord(ch) = 13) then write(' EOL')
+  else if (ord(ch) = 31) then write(' EOF');
   writeln;
+end;
+
+func check(ch: char): boolean;
+{ return true if non printable character except CR }
+begin
+  check:= false;
+  if (ch>=chr($20)) and (ch<=chr($7e)) then exit;
+  if ch=CR then exit;
+  check:=true;
 end;
 
 begin
@@ -45,18 +55,18 @@ begin
   lastch1:=chr(0);
   linecount:=0;
   cyclus:=0; drive:=1;
-  agetstring(name,default,cyclus,drive);
+  _agetstring(name,default,cyclus,drive);
   entry := 0;
   setsubtype('P');
-  findentry(name,drive,entry,found,last);
+  _findentry(name,drive,entry,found,last);
   if not found then begin
     drive:=0; entry:=0;
-    findentry(name,drive,entry,found,last);
+    _findentry(name,drive,entry,found,last);
   end;
   if found then begin
     for i:=0 to 15 do
-      name[i] := filnam[i];
-    asetfile(name,cyclus,drive,' ');
+      name[i] := FILNAM[i];
+    _asetfile(name,cyclus,drive,' ');
     write(cup); { avoid empty line }
     openr(fno);
     writeln; write(cup,clrlin);
@@ -64,18 +74,21 @@ begin
     writeln('First characters');
     read(@fno,ch);
     show(ch);
-    if (ch=eof) then exit;
+    if (ch=EOF) then exit;
     read(@fno,ch);
     show(ch);
-    if (ch=eof) then exit;
+    if (ch=EOF) then exit;
     read(@fno,ch);
-    while (ch<>eof) and (ch<>chr(0)) do
+    while (ch<>EOF) do
     begin {main loop; while }
-{     if ch=cr then begin
+      if ch=CR then begin
         linecount := succ(linecount);
-        writeln;
-      end
-      else write(ch);  }
+        writeln
+      end else if check(ch) then begin
+        { check for non printable character }
+        writeln(INVVID, 'non printable character: <',
+          ord(ch),'>',NORVID);
+      end else write(ch);
       lastch4:=lastch3;
       lastch3:=lastch2;
       lastch2:=lastch1;

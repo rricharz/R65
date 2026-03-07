@@ -26,36 +26,33 @@ var cyclus,drive: integer;
 {       * runprog *           }
 
 proc runprog(name: array[15] of char);
-
 var i: integer;
-
 begin
-  for i:=0 to 15 do filnm1[i]:=name[i];
-  filcy1:=0; fildrv:=0;
+  for i:=0 to 15 do FILNM1[i]:=name[i];
+  FILCYC:=0; FILDRV:=0;
   run
 end;
 
 {       * main *              }
 
 begin {main}
-
   {get file name to be able to delete :Q}
   cyclus:=0; drive:=1;
-  agetstring(name,default,cyclus,drive);
+  _agetstring(name,default,cyclus,drive);
 
   runprog('COMPILE1:R      ');
 
-  cyclus:=filcyc;
+  cyclus:=FILCYC;
   {make sure that load runs same cyclus}
-  argtype[8]:='i';
-  arglist[8]:=cyclus;
+  ARGTYPE[8]:='i';
+  ARGLIST[8]:=cyclus;
 
-  if runerr=0 then
+  if RUNERR=0 then
     runprog('COMPILE2:R      ');
 
-  asetfile(name,cyclus,drive,'Q');
+  _asetfile(name,cyclus,drive,'Q');
   call(adelete);
 
-  runerr:=0;
+  RUNERR:=0;
 end.
 

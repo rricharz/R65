@@ -267,7 +267,7 @@ begin
       { we need to suppy one more char }
       { for end. at end of file to work properly }
       ch:=' ';
-    end {else if}
+    end
     else write(ch);
   end;
 end {getchr};

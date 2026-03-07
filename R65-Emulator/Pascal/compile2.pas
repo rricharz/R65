@@ -1,12 +1,12 @@
 
-{   ********************************
-    *                              *
-    *  R65 "Tiny" Pascal Compiler  *
-    *      Pass 2  (Loader)        *
-    *                              *
-    ********************************
+{   ******************************
+    *                            *
+    *  R65 Mini Pascal Compiler  *
+    *      Pass 2  (Loader)      *
+    *                            *
+    ******************************
 
-First version 19978 by rricharz
+First version 1978 by rricharz
 Original version 3.1  01/08/82 rricharz
 
 Recovered 2018 by rricharz (r77@bluewin.ch)
@@ -29,15 +29,15 @@ const
     title='R65 PASCAL COMPILER Version 4.2, Pass 2';
     wrfile=$e81b;
     sblock=$6000;
-    eblock=topmem;
+    eblock=TOPMEM;
 
 mem endstk=$e,
     stprog=$11: integer;
-    filerr=$db: integer&;
-    filsa=$031a,
-    filea=$031c,
-    filsa1=$0331: integer;
-    filtyp=$0300: char&;
+    FILERR=$db: integer&;
+    FILSA=$031a,
+    FILEA=$031c,
+    FILSA1=$0331: integer;
+    FILTYP=$0300: char&;
 
 var pointer,address,maxsize,dummy,
     scyclus,sdrive,offset,cdrive: integer;
@@ -50,9 +50,6 @@ var pointer,address,maxsize,dummy,
 { * error * }
 
 proc error(x:integer);
-
-mem runerr=$0c: integer&;
-
 begin
   writeln;
   write('*** ');
@@ -63,39 +60,35 @@ begin
       101: writeln('Program too long');
       102: writeln('Data input format ',ch);
       105: writeln('Wrong address');
-      106: writeln('Unexpected eof');
+      106: writeln('Unexpected EOF');
       107: writeln('Pointer not matching')
       else writeln('Unknown error ',x)
     end {case}
   close(source);
-  runerr:=x;
-  abort;
+  RUNERR:=x;
+  _abort;
 end {error};
 
 
 { * testerror * }
 
 proc testerr;
-
 var i: integer;
-
 begin
-  if filerr<>0 then error(filerr)
+  if FILERR<>0 then error(FILERR)
 end;
 
 
 { * blocksave * }
 
 proc blocksave(lowlim,highlim: integer);
-
 var i: integer;
-
 begin
-  asetfile(name,scyclus,sdrive,'R');
-  filsa:=lowlim;
-  filea:=highlim;
-  filsa1:=lowlim;
-  filtyp:='B';
+  _asetfile(name,scyclus,sdrive,'R');
+  FILSA:=lowlim;
+  FILEA:=highlim;
+  FILSA1:=lowlim;
+  FILTYP:='B';
   call(wrfile);
   testerr
 end {blocksave};
@@ -109,16 +102,16 @@ var i: integer;
     default: boolean;
 
 begin
-  cdrive:=fildrv; { drive of compile program }
+  cdrive:=FILDRV; { drive of compile program }
   endstk:=sblock-144;   {reserve memory }
   writeln;
   writeln(title);
   scyclus:=0; sdrive:=1;
-  agetstring(name,default,scyclus,sdrive);
-  asetfile(name,scyclus,sdrive,'Q');
+  _agetstring(name,default,scyclus,sdrive);
+  _asetfile(name,scyclus,sdrive,'Q');
   openr(source);
   writeln;
-  scyclus:=filcyc;
+  scyclus:=FILCYC;
 end {init};
 
 
@@ -168,10 +161,10 @@ proc getbl(base:integer);  {get block }
     end;
     lcyclus:=0; ldrive:=cdrive;
     write('Loading library ');
-    prtext8(output,lname);
+    _prtext8(OUTPUT,lname);
     { loading library from same drive }
     { as program compile2 }
-    asetfile(lname&'        ',
+    _asetfile(lname&'        ',
       lcyclus,ldrive,'T');
     openr(source);
     getbl(offset-2);
@@ -214,7 +207,7 @@ begin { * body of getbl * }
 
       'E':  stop:=true;
 
-      eof:  error(106)
+      EOF:  error(106)
 
       else begin {data}
         mem[pointer]:=getbyte1;
@@ -266,7 +259,6 @@ begin {main}
   showused;
   blocksave(sblock,pointer);
   writeln('Program has been stored');
-  endstk:=topmem-144;
+  endstk:=TOPMEM-144;
   dummy:=freedsk(sdrive,true);
 end.
-

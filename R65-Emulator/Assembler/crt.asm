@@ -832,7 +832,7 @@ PRTCH1  LDA VIDKEY
         BPL *-6
 *
 PRTCH0  LDA VIDKEY
-        CMP =$5F        IF NOT FOUND, RUBOUT?
+        CMP =$7F        IF NOT FOUND, RUBOUT?
         BEQ *+6
         CMP =$7F
         BNE PRTCH4

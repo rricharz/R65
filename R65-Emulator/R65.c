@@ -161,7 +161,7 @@ int translateKey(int key)
 {
     int chr;
     switch (key) {
-        case 0xFF08: chr = 0x5F; break;     // backspace key
+        case 0xFF08: chr = 0x7F; break;     // rubout
         case 0xFF09: chr = 0x08; break;     // tab key
         case 0xFF51: chr = 0x03; break;     // cursor left key
         case 0xFF53: chr = 0x16; break;     // cursor right key
@@ -172,8 +172,8 @@ int translateKey(int key)
         case 0xFF0D: chr = 0x0D; break;     // return key
         case 0xFF1B: chr = 0x91; break;     // escape key
         case 0xFF50: chr = 0x01; break;     // home key
-        case 0xFF55: chr = 0x08; break;     // page up key: roll up
-        case 0xFF56: chr = 0x02; break;     // page down key: roll down
+        case 0xFF55: chr = 0x08; break;     // page up key: (scroll up)
+        case 0xFF56: chr = 0x02; break;     // page down key: (scroll down)
         case 0xFF57: chr = 0x10; break;     // end key
         default: {
             if (key & 0xFF00)                           // ignore all other special keys
