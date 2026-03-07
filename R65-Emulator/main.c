@@ -529,7 +529,7 @@ int main (int argc, char *argv[])
         if ((screenWidth==1280) && (screenHeight==800))
             panelScale = 0.74 * panelScale;
         if (screenWidth==1920)
-            panelScale = 1.2 * panelScale;
+            panelScale = 1.3 * panelScale;
     }	
     else {
 	    // DISPLAY DECORATED WINDOW
