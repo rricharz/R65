@@ -518,6 +518,11 @@ int main (int argc, char *argv[])
     int screenWidth = gdk_screen_get_width(screen);
     int screenHeight = gdk_screen_get_height(screen);
     printf("Screen dimensions: %d x %d\n", screenWidth, screenHeight);
+    double aspect = (double) screenWidth / (double) (screenHeight);
+    double target = 1920.0 / 1080.0;
+    if (aspect > target) screenWidth =  (int)((screenHeight  * target) + 0.5 );
+    if (aspect < target) screenHeight = (int)((screenWidth / target) + 0.5);
+    printf("Aspect ratio adjusted: %d x %d\n", screenWidth, screenHeight);
         
     if (fullscreen) {	    
 	    // DISPLAY UNDECORATED MAXIMIZED WINDOW
@@ -525,20 +530,16 @@ int main (int argc, char *argv[])
 	    gtk_window_fullscreen(GTK_WINDOW(global_window));
 	    windowWidth  = screenWidth;
 	    windowHeight = screenHeight;
-	    panelScale = (0.9 * (double)(windowWidth) / (double)(MIN_WINDOW_WIDTH));
-        if ((screenWidth==1280) && (screenHeight==800))
-            panelScale = 0.74 * panelScale;
-        if (screenWidth==1920)
-            panelScale = 1.3 * panelScale;
+	    panelScale = (double)screenHeight * 0.0028;
     }	
     else {
 	    // DISPLAY DECORATED WINDOW
 	    gtk_window_set_decorated(GTK_WINDOW(global_window), TRUE);
+	    windowWidth  = (int)(0.6 * (double)screenWidth);
+	    windowHeight = (int)(0.6 * (double)screenHeight);
+	    panelScale = (double)screenHeight * 0.00165;
 	    gtk_window_set_default_size(GTK_WINDOW(global_window),
-		MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
-	    windowWidth  = MIN_WINDOW_WIDTH;
-	    windowHeight = MIN_WINDOW_HEIGHT;
-	    panelScale = 1.15;
+		windowWidth, windowHeight);
     }
     printf("Window dimensions: %d x %d\n", windowWidth, windowHeight);
     
