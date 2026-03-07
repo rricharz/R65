@@ -27,19 +27,19 @@ var bx,by,bxs,bys,bxspeed,byspeed,fx,fxs: real;
 {$I IOPTION:P}
 
 func getoption(opt:char):boolean;
-var i,dummy,savecarg:integer;
+var i,dummy,save_carg:integer;
     options:array[15] of char;
     default:boolean;
 begin
-  savecarg:=carg; { save for next call to getoption }
-  agetstring(options,default,dummy,dummy);
+  save_carg:=_carg; { save for next call to getoption }
+  _agetstring(options,default,dummy,dummy);
   getoption:=false;
   if not default then begin
-    if options[0]<>'/' then argerror(103);
+    if options[0]<>'/' then _argerror(103);
     for i:=1 to 15 do
       if options[i]=opt then getoption:=true;
   end;
-  carg:=savecarg;
+  _carg:=save_carg;
 end;
 
 func onfloor(f,y:integer):boolean;
@@ -70,14 +70,14 @@ proc showface;
 var fysum:integer;
 begin
   fysum:=fy+trunc(jump);
-  plotmap(trunc(fxs),fys,erase);
-  plotmap(trunc(fxs)+4,fys,erase);
-  plotmap(trunc(fxs),fys+4,erase);
-  plotmap(trunc(fxs)+4,fys+4,erase);
-  plotmap(trunc(fx),fysum,face1);
-  plotmap(trunc(fx)+4,fysum,face2);
-  plotmap(trunc(fx),fysum+4,face3);
-  plotmap(trunc(fx)+4,fysum+4,face4);
+  _plotmap(trunc(fxs),fys,erase);
+  _plotmap(trunc(fxs)+4,fys,erase);
+  _plotmap(trunc(fxs),fys+4,erase);
+  _plotmap(trunc(fxs)+4,fys+4,erase);
+  _plotmap(trunc(fx),fysum,face1);
+  _plotmap(trunc(fx)+4,fysum,face2);
+  _plotmap(trunc(fx),fysum+4,face3);
+  _plotmap(trunc(fx)+4,fysum+4,face4);
   fxs:=fx; fys:=fysum;
 end;
 
@@ -87,11 +87,11 @@ begin
   if f<nfloors then begin
     x1:=ladders[f]; x2:=x1+laddersize;
     y1:=f*vfloors+1; y2:=y1+vfloors-1;
-    move(x1,y1); draw(x1,y2,white);
-    move(x2,y1); draw(x2,y2,white);
+    _move(x1,y1); _draw(x1,y2,WHITE);
+    _move(x2,y1); _draw(x2,y2,WHITE);
     i:=1;
     for i:=1 to 5 do begin
-      move(x1,y1+4*i-1); draw(x2,y1+4*i-1,white);
+      _move(x1,y1+4*i-1); _draw(x2,y1+4*i-1,WHITE);
     end;
   end;
 end;
@@ -101,10 +101,10 @@ proc init; forward;
 proc showresult;
 var s:cpnt;
 begin
-  s:=new;
+  s:=_new;
   write(@s,' ',score,' 0F ',count);
-  ledstring(s);
-  release(s);
+  _ledstring(s);
+  _release(s);
 end;
 
 proc ladderup;
@@ -137,7 +137,7 @@ begin
   end;
 
   expaint:=false;
-  if (ffloor=nfloors) and (trunc(fx)>xsize-10) then
+  if (ffloor=nfloors) and (trunc(fx)>XSIZE-10) then
   begin
     score:=score+1; count:=count+1;
     if count>=10 then begin
@@ -164,14 +164,14 @@ begin
   { paint face }
   showface;
   { paint ball }
-  plotmap(trunc(bxs),trunc(bys),erase);
-  plotmap(trunc(bx),trunc(by),ball);
+  _plotmap(trunc(bxs),trunc(bys),erase);
+  _plotmap(trunc(bx),trunc(by),ball);
   for f:=0 to nfloors-1 do showladder(f);
   bxs:=bx; bys:=by;
-  { move face }
+  { _move face }
   fx:=fx+fxspeed; fy:=fy+fyspeed;
-  if fx>conv(xsize-8) then begin
-    fx:=conv(xsize-8); fxspeed:=0.0;
+  if fx>conv(XSIZE-8) then begin
+    fx:=conv(XSIZE-8); fxspeed:=0.0;
   end;
   if (fx<1.0) then begin
     fx:=1.0; fxspeed:=-0.0;
@@ -187,11 +187,11 @@ begin
     jumpspeed:=jumpspeed+gravity;
   end;
   if jump<=0.0 then jump:=0.0;
-  { move ball }
+  { _move ball }
   bx:=bx+bxspeed; by:=by+byspeed;
   { check for borders }
-  if bx>=conv(xsize-4) then begin
-    bx:=conv(xsize-4); bxspeed:=-bxspeed;
+  if bx>=conv(XSIZE-4) then begin
+    bx:=conv(XSIZE-4); bxspeed:=-bxspeed;
   end else if bx<2.0 then begin
     bx:=2.0; bxspeed:=-bxspeed;
   end;
@@ -214,10 +214,10 @@ begin
   end else
     byspeed:=byspeed+gravity;
   { check for border on bottom floor }
-  if (by<4.0) and ((bx<=2.0) or (bx>=conv(xsize-4)))
+  if (by<4.0) and ((bx<=2.0) or (bx>=conv(XSIZE-4)))
   then begin
     if bx<2.0 then bx:=2.0
-    else if bx>=conv(xsize-4) then bx:=conv(xsize-4);
+    else if bx>=conv(XSIZE-4) then bx:=conv(XSIZE-4);
     by:=conv(nfloors*vfloors+1);
     byspeed:=0.0; floor:=nfloors;
   end;
@@ -271,7 +271,7 @@ end;
 
 proc init;
 begin
-  cleargr;
+  _cleargr;
   showresult;
   bx:=2.0; by:=conv(nfloors*vfloors+1);
   bxs:=bx; bys:=by;
@@ -281,18 +281,18 @@ begin
   fxspeed:=0.0; fyspeed:=0;
   { make and show holes }
   holes[0]:=-50;
-  move(0,0); draw(xsize,0,white);
+  _move(0,0); _draw(XSIZE,0,WHITE);
   for floor:=1 to nfloors do begin
-    holes[floor]:=irandom(1,xsize-holesize-1);
-    move(0,floor*vfloors);
-    draw(xsize-1,floor*vfloors,white);
-    move(holes[floor],floor*vfloors);
-    draw(holes[floor]+holesize,floor*vfloors,black);
+    holes[floor]:=irandom(1,XSIZE-holesize-1);
+    _move(0,floor*vfloors);
+    _draw(XSIZE-1,floor*vfloors,WHITE);
+    _move(holes[floor],floor*vfloors);
+    _draw(holes[floor]+holesize,floor*vfloors,BLACK);
   end;
   { make and show ladders }
   for floor:=0 to nfloors-1 do begin
     repeat
-      ladders[floor]:=irandom(2,xsize-laddersize-2);
+      ladders[floor]:=irandom(2,XSIZE-laddersize-2);
     until ((ladders[floor]+laddersize<holes[floor])
       or (ladders[floor]>holes[floor]+holesize)) and
       ((ladders[floor]+laddersize<holes[floor+1])
@@ -314,10 +314,10 @@ begin
   end;
   demomode:=option('D');
   if demomode then writeln('Demo mode');
-  grinit; fullview;
+  _grinit; _fullview;
   init;
-  animate(autorepeat);
-  splitview;
+  _animate(autorepeat);
+  _splitview;
   showresult;
   writeln('Score ',score,' of ',count);
 end.

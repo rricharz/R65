@@ -3,7 +3,7 @@
 
 func rrandom(min,max:real):real;
 begin
-  rrandom := min + (conv(random)/255.0) * (max - min);
+  rrandom := min + (conv(_random)/255.0) * (max - min);
 end;
 
 func irandom(min,max:integer):integer;

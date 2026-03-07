@@ -36,7 +36,7 @@ begin
   if filerr<>0 then begin
     call(aenddo);
     writeln('Cannot read directory');
-    abort;
+    _abort;
   end;
 end;
 
@@ -56,12 +56,12 @@ var i:integer;
 begin
   drive:=1; {default drive}
   filerr:=0;
-  if argtype[carg]='i' then agetval(drive,default);
+  if ARGTYPE[_carg]='i' then _agetval(drive,default);
   if (drive<0) or (drive>1) then begin
     writeln('Drive must be 0 or 1');
-    abort
+    _abort
   end;
-  fildrv:=drive;
+  FILDRV:=drive;
   write('Checking drive ',drive,': ');
   call(aprepdo);
   checkfilerr;
@@ -69,7 +69,7 @@ begin
   call(agetentx);
   checkfilerr;
   for i:=0 to 15 do
-    write(filnam[i]);
+    write(FILNAM[i]);
   writeln;
 end;
 
@@ -83,18 +83,18 @@ begin
     write('DELETED SPACE       ')
   else begin
     for i:=0 to 15 do
-      write(filnam[i]);
+      write(FILNAM[i]);
     write('.',hex(filcyc shr 4),
       hex(filcyc and 15),' ');
   end;
   ok:=(sector=filloc);
-  sector:=sector+(filsiz shr 8);
+  sector:=sector+((filsiz+1) shr 8);
   if sector>tsectors then begin
-    writeln(invvid,'FILE SIZE TOO LONG',norvid);
+    writeln(INVVID,'FILE SIZE TOO LONG',NORVID);
     notok:=true;
   end else if (ok) then writeln('OK')
   else begin
-    writeln(invvid,'SECTOR START INCONSISTENT',norvid);
+    writeln(INVVID,'SECTOR START INCONSISTENT',NORVID);
     notok:=true;
   end;
 end;
@@ -127,6 +127,6 @@ begin
     checkfilerr;
     until (filtyp=chr(0)) or (entry>maxent);
   if notok then
-    writeln(invvid,'INCONSISTENCY FOUND',norvid);
+    writeln(INVVID,'INCONSISTENCY FOUND',NORVID);
   call(aenddo);
-end.
+end.

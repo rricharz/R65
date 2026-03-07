@@ -34,38 +34,27 @@ end;
 begin
   linecount:=0;
   cyclus:=0; drive:=1;
-  agetstring(name,default,cyclus,drive);
+  _agetstring(name,default,cyclus,drive);
   entry := 0;
   setsubtype('H');
-  findentry(name,drive,entry,found,last);
+  _findentry(name,drive,entry,found,last);
   if not found then begin
     drive:=0; entry:=0;
-    findentry(name,drive,entry,found,last);
+    _findentry(name,drive,entry,found,last);
   end;
   if found then begin
     for i:=0 to 15 do
-      name[i] := filnam[i];
-    asetfile(name,cyclus,drive,' ');
+      name[i] := FILNAM[i];
+    _asetfile(name,cyclus,drive,' ');
     write(cup); { avoid empty line }
     openr(fno);
     writeln; write(cup,clrlin);
-    ch:='&';
     read(@fno,ch);
-    while (ch<>eof) and (ch<>chr(0)) do
+    while (ch<>EOF) and (ch<>chr(0)) do
     begin {main loop; while }
-      if ch=cr then begin { end of line }
+      if ch=CR then begin { end of line }
         linecount := succ(linecount);
         writeln;
-        if (linecount>10) then
-        begin { new page }
-          write(invvid,
-          'Space: continue. Other key: stop.',
-          norvid);
-          read(@key,answer);
-          write(cr,chr($17));
-          if answer<>' ' then exit;
-          linecount:=0;
-        end {new page }
       end { end of line }
       else write(ch);
       read(@fno,ch);
@@ -77,17 +66,16 @@ begin
     name:='*:H             ';
     drive:=0; entry:=0;
     repeat
-      findentry(name,drive,entry,found,last);
+      _findentry(name,drive,entry,found,last);
       if found then begin
         i:=0;
-        while (i<16) and (filnam[i]<>':') do
+        while (i<16) and (FILNAM[i]<>':') do
         begin
-          write(filnam[i]);
+          write(FILNAM[i]);
           i:=i+1;
         end;
         writeln;
       end;
-      entry:=entry+1;
     until last;
   end;
 end.

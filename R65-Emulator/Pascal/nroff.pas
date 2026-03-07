@@ -92,7 +92,7 @@ begin
 
   for i:=0 to outlen-1 do begin
 
-    if outbuf[i]=tab8 then begin
+    if outbuf[i]=TAB8 then begin
       target := nexttab(col);
       while col<target do begin
         write(' ');
@@ -137,7 +137,7 @@ end;
 
 func isspace(c: char): boolean;
 begin
-  isspace := (c=' ') or (c=tab8);
+  isspace := (c=' ') or (c=TAB8);
 end;
 
 { tab expansion to spaces (tab stops 8) }
@@ -199,7 +199,7 @@ var i, wstart, wlen: integer;
 begin
   i := 0;
 
-  { NEW: ignore leading whitespace }
+  { Ignore leading whitespace }
   while (i < llen) and isspace(line[i]) do
     i := succ(i);
 
@@ -431,14 +431,14 @@ var i: integer;
 begin
   flushline;
   putspaces(indent);
-  write(invvid); { inverse video as "bold" }
+  write(INVVID); { inverse video as "bold" }
 
   i := 3; { ".B " }
   while i<llen do begin
     write(line[i]);
     i := succ(i);
   end;
-  write(norvid);
+  write(NORVID);
   writeln;
 end;
 
@@ -499,13 +499,13 @@ begin
 
   repeat
     read(@src, ch);
-    if ch=eof then begin
+    if ch=EOF then begin
       readline := false;
       exit;
     end;
 
-    if ch=lf then begin
-    end else if ch=cr then begin
+    if ch=LF then begin
+    end else if ch=CR then begin
       readline := true;
       exit;
     end else begin
@@ -575,21 +575,21 @@ begin
   { get filename from arguments }
   { same pattern as compile }
   cyclus := 0; drive := 1;
-  agetstring(name, default, cyclus, drive);
+  _agetstring(name, default, cyclus, drive);
   if default then begin
     writeln('usage: nroff name[.cy[,drv]]');
-    abort;
+    _abort;
   end;
 
-  asetfile(name, cyclus, drive, 'B');
+  _asetfile(name, cyclus, drive, 'B');
   { 'B' = text }
   openr(src);
 
-  agetval(linewidth,default); {max chars/line}
+  _agetval(linewidth,default); {max chars/line}
   if (linewidth<20) then linewidth := 20;
   if (linewidth>128) then linewidth :=128;
   writeln;
-  write(prton);
+  write(PRTON);
 
   outlen := 0;
 
@@ -600,6 +600,6 @@ begin
   end;
   handleline;
   flushline;
-  write(prtoff);
+  write(PRTOFF);
 
  end.

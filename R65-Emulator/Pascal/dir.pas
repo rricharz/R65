@@ -67,7 +67,7 @@ proc checkfilerr;
 begin
   if filerr<>0 then begin
     writeln('Cannot read directory');
-    abort;
+    _abort;
   end;
 end;
 
@@ -96,17 +96,17 @@ end;
 begin {main}
   drive:=1; {default drive}
   filerr:=0;
-  if argtype[carg]='i' then agetval(drive,default);
+  if ARGTYPE[_carg]='i' then _agetval(drive,default);
   if (drive<0) or (drive>1) then begin
     writeln('Drive must be 0 or 1');
-    abort
+    _abort
   end;
   if option('H') then begin
     writeln('/S   sort directory');
     exit;
   end;
   sortit:=option('S');
-  fildrv:=drive;
+  FILDRV:=drive;
   call(aprepdo);
   checkfilerr;
 
@@ -114,10 +114,10 @@ begin {main}
   call(agetentx);
   checkfilerr;
 
-  write(invvid,'Directory drive ',drive,': ');
+  write(INVVID,'Directory drive ',drive,': ');
   for i:=0 to 15 do
-    write(filnam[i]);
-  writeln(norvid);
+    write(FILNAM[i]);
+  writeln(NORVID);
 
   index:=0; ti:=0; maxlen:=0;
   sdel:=0;
@@ -129,9 +129,9 @@ begin {main}
     if filtyp<>chr(0) then begin
       { check for deleted flag }
       if (fillnk and 255)<128 then begin
-        entry[ti]:=new;
+        entry[ti]:=_new;
         s:=entry[ti];
-        for i:=0 to 15 do s[i]:=filnam[i];
+        for i:=0 to 15 do s[i]:=FILNAM[i];
         for i:=16 to 20 do s[i]:=' ';
         i:=20;
         repeat
@@ -148,7 +148,7 @@ begin {main}
     end else {end mark}
       sfree:=tsectors-filloc;
     index:=index+1
-  until (index>=255) or (filtyp=chr(0));
+  until (index>=maxent) or (filtyp=chr(0));
   call(aenddo);
 
   nument:=ti-1;
@@ -179,6 +179,5 @@ begin {main}
     trunc(100.0*ffree+0.5),
     '%),deleted:',sdel,'(',
     trunc(100.0*fdel+0.5),'%),',
-    'files:',index-1);
+    'entries:',index-1,'/',maxent);
 end.
-

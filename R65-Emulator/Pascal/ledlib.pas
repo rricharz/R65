@@ -23,23 +23,23 @@ front panel.
 
 library ledlib;
 
-mem ledreg=$1432: array[7] of char&;
+mem LEDREG=$1432: array[7] of char&;
 
-proc ledstring(s:cpnt);
+proc _ledstring(s:cpnt);
 {*********************}
 var i: integer;
 begin
   for i:=0 to 7 do
-    ledreg[i]:=s[i];
+    LEDREG[i]:=s[i];
 end;
 
-proc ledstop;
+proc _ledstop;
 {***********}
 begin
-  ledreg[0]:=chr(0);
+  LEDREG[0]:=chr(0);
 end;
 
-proc ledhex(d,p,digits: integer);
+proc _ledhex(d,p,digits: integer);
 {*******************************}
 { d:     value to display
   p:     position of first digit
@@ -47,22 +47,22 @@ proc ledhex(d,p,digits: integer);
 var d1,i: integer;
 begin
   { turn on led display if necessary }
-  if (p>0) and (ledreg[0]=chr(0)) then
-    ledreg[0]:=' ';
+  if (p>0) and (LEDREG[0]=chr(0)) then
+    LEDREG[0]:=' ';
   if (p<0) or (digits<1) or (digits>4)
     or (p+digits>8) then
-    ledstring('????????')
+    _ledstring('????????')
   else
     begin
       d1:=d;
       for i:=1 to digits do
         begin
           if (d1 and $f) > 9 then
-            ledreg[p+digits-i]:=
+            LEDREG[p+digits-i]:=
                 chr(ord(d1 and $f)+
                 ord('A')-10)
           else
-            ledreg[p+digits-i]:=
+            LEDREG[p+digits-i]:=
                 chr(ord(d1 and $f)+
                 ord('0'));
           d1:=d1 shr 4;
@@ -70,7 +70,7 @@ begin
     end;
 end;
 
-proc ledbyte(d: integer);
+proc _ledbyte(d: integer);
 {***********************}
 var d1,i:integer;
 begin
@@ -78,13 +78,12 @@ begin
   for i:=7 downto 0 do
     begin
       if (d1 and 1) <> 0 then
-        ledreg[i]:='o'
+        LEDREG[i]:='o'
       else
-        ledreg[i]:=' ';
+        LEDREG[i]:=' ';
       d1:=d1 shr 1;
     end;
 end;
 
 begin
 end.
- 
