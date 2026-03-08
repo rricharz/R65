@@ -24,8 +24,8 @@ mem KEYPRESSED=$1785: char&;
 
 var _xcursor, _ycursor: integer;
 
-{ delay10msec: delay 10 msec }
-{ process is suspended during delay }
+{ _delay10msec: _delay 10 msec }
+{ process is suspended during _delay }
 
 proc _delay10msec(time:integer);
 mem emucom=$1430: integer&;
@@ -36,7 +36,7 @@ begin
 end;
 
 func _syncscreen;
-{ synchronize screen and sleep
+{ synchronize sCReen and sleep
   up to 30 msec since last sync.
   returns sleep time in msec    }
 mem emucom=$1430: integer&;
@@ -46,30 +46,30 @@ begin
   _syncscreen := emures;
 end;
 
-{ grinit: initialize memory for }
+{ _grinit: initialize memory for }
 { alpha/graphics display        }
 
 proc _grinit;
 const igraph=$e01e;
-      icrtgr=$e016;
+      iCRtgr=$e016;
 begin
-  call(igraph); call(icrtgr);
+  call(igraph); call(iCRtgr);
   writeln('CTRT-L to toggle canvas size,',
    'GREND to close it');
 end;
 
-{ grend: end of graphics, initialize }
+{ _grend: end of graphics, initialize }
 { memory for alpha display           }
 
 proc _grend;
-const initcr=$e01b;
+const initCR=$e01b;
 mem sflag=$1781: integer&;
 begin
-  call(initcr);
+  call(initCR);
   sflag:=sflag or 1; {Pascal flag on}
 end;
 
-{ cleargr: clear graphics display }
+{ _cleargr: clear graphics display }
 
 proc _cleargr;
 const clrgra=$e231; { not a vector! }
@@ -77,27 +77,27 @@ begin
   call(clrgra);
 end;
 
-{ fullview: go to full screen graphics display }
+{ _fullview: go to full sCReen graphics display }
 
 proc _fullview;
-const icrtgr=$e016;
+const iCRtgr=$e016;
 begin
-  call(icrtgr);
+  call(iCRtgr);
 end;
 
-{ splitview: go to splitted graphics display }
+{ _splitview: go to splitted graphics display }
 
 proc _splitview;
-const icrtal=$e015;
+const iCRtal=$e015;
 begin
-  call(icrtal);
+  call(iCRtal);
 end;
 
-{ plot(x,y,c)                }
-{ plot a dot at x,y, using c }
+{ _plot(x,y,c)                }
+{ _plot a dot at x,y, using c }
 
 proc _plot(x,y,c:integer);
-const aplot=$c815;
+const a_plot=$c815;
 mem grx=$03ae: integer&;
     gry=$03af: integer&;
     grc=$03b0: integer&;
@@ -111,11 +111,11 @@ begin
   grx:=x;
   gry:=y;
   grc:=c;
-  call(aplot);
+  call(a_plot);
 end;
 
-{ move(x,y)            }
-{ move graphics cursor }
+{ _move(x,y)            }
+{ _move graphics cursor }
 
 proc _move(x,y:integer);
 mem grx=$03ae: integer&;
@@ -131,8 +131,8 @@ begin
   gry:=_ycursor;
 end;
 
-{ draw(x,y,c)          }
-{ draw a straight line }
+{ _draw(x,y,c)          }
+{ _draw a straight line }
 { end points are clipped to graphics area }
 
 proc _draw(x,y,c:integer);
@@ -142,30 +142,30 @@ mem grxinc=$03b6: integer;
     gry=$03af: integer&;
     grc=$03b0: integer&;
     grn=$03b1: integer;
-var xnew,ynew,xstep,ystep,xl,yl,i,cnt:integer;
+var x_new,y_new,xstep,ystep,xl,yl,i,cnt:integer;
 
-  proc drawx(x,y,c,n:integer);
-  const adrawx=$c81e;
+  proc _drawx(x,y,c,n:integer);
+  const a_drawx=$c81e;
   begin
     grx:=x;
     gry:=y;
     grc:=c;
     grn:=n;
-    call(adrawx);
+    call(a_drawx);
   end;
 
-  proc drawy(x,y,c,n:integer);
-  const adrawy=$c821;
+  proc _drawy(x,y,c,n:integer);
+  const a_drawy=$c821;
   begin
     grx:=x;
     gry:=y;
     grc:=c;
     grn:=n;
-    call(adrawy);
+    call(a_drawy);
   end;
 
-  proc drawxy(x,y,c,n,xi,yi:integer);
-  const adrawxy=$c824;
+  proc _drawxy(x,y,c,n,xi,yi:integer);
+  const a_drawxy=$c824;
   begin
     grx:=x;
     gry:=y;
@@ -173,45 +173,45 @@ var xnew,ynew,xstep,ystep,xl,yl,i,cnt:integer;
     grn:=n;
     grxinc:=xi;
     gryinc:=yi
-    call(adrawxy);
+    call(a_drawxy);
   end;
 
 begin
-  xnew:=x;
-  ynew:=y;
-  if xnew<0 then xnew:=0;
-  if xnew>XSIZE then xnew:=XSIZE;
-  if ynew<0 then ynew:=0;
-  if ynew>YSIZE then ynew:=YSIZE;
-  { fast horizontal and vertical draw }
-  if ynew=_ycursor then begin
-    if xnew > _xcursor then
-      drawx(_xcursor,ynew,c,xnew-_xcursor+1)
+  x_new:=x;
+  y_new:=y;
+  if x_new<0 then x_new:=0;
+  if x_new>XSIZE then x_new:=XSIZE;
+  if y_new<0 then y_new:=0;
+  if y_new>YSIZE then y_new:=YSIZE;
+  { fast horizontal and vertical _draw }
+  if y_new=_ycursor then begin
+    if x_new > _xcursor then
+      _drawx(_xcursor,y_new,c,x_new-_xcursor+1)
     else
-      drawx(xnew,ynew,c,_xcursor-xnew+1)
-  end else if xnew=_xcursor then begin
-    if ynew > _ycursor then
-      drawy(xnew,_ycursor,c,ynew-_ycursor+1)
+      _drawx(x_new,y_new,c,_xcursor-x_new+1)
+  end else if x_new=_xcursor then begin
+    if y_new > _ycursor then
+      _drawy(x_new,_ycursor,c,y_new-_ycursor+1)
     else
-      drawy(xnew,ynew,c,_ycursor-ynew+1)
+      _drawy(x_new,y_new,c,_ycursor-y_new+1)
   end else begin
-    {compute abs lenght of longer axis}
-    xl:=xnew-_xcursor; if xl<0 then xl:=-xl;
-    yl:=ynew-_ycursor; if yl<0 then yl:=-yl;
+    {compute _abs lenght of longer axis}
+    xl:=x_new-_xcursor; if xl<0 then xl:=-xl;
+    yl:=y_new-_ycursor; if yl<0 then yl:=-yl;
     if xl>yl then cnt:=xl
     else cnt:=yl;
     if (cnt>0) then begin
-      xstep:=((xnew-_xcursor)*128) div cnt;
-      ystep:=((ynew-_ycursor)*128) div cnt;
-      drawxy(_xcursor,_ycursor,c,
+      xstep:=((x_new-_xcursor)*128) div cnt;
+      ystep:=((y_new-_ycursor)*128) div cnt;
+      _drawxy(_xcursor,_ycursor,c,
           cnt+1,xstep shl 1,ystep shl 1)
     end
   end;
-  _xcursor:=xnew; _ycursor:=ynew;
+  _xcursor:=x_new; _ycursor:=y_new;
 end;
 
-{ plotmap(x,y,map)              }
-{ plot 4x4 bitmap               }
+{ _plotmap(x,y,map)              }
+{ _plot 4x4 bitmap               }
 { the top left corner is bit 15 }
 
 proc _plotmap(x,y,m:integer);
@@ -230,16 +230,16 @@ begin
   call(abitmap);
 end;
 
-{ waitforkey                    }
-{ wait for a key to be typed    }
+{ waitforKEY                    }
+{ wait for a KEY to be typed    }
 
-proc _waitforkey;
-const key=@1;
+proc _waitforKEY;
+const KEY=@1;
       toggle=chr($0c);
 var ch:char;
 begin
   repeat
-    read(@key,ch);
+    read(@KEY,ch);
     if ch=toggle then write(ch);
   until ch<>toggle;
 end;

@@ -1,4 +1,4 @@
-{ irandom: real and integer random functions with limit
+{ irandom: real and integer _random functions with limit
 }
 
 func rrandom(min,max:real):real;

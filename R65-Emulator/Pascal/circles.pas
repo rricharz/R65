@@ -15,10 +15,10 @@ var   x,y,r:integer;
 func expaint:boolean;
 begin
   expaint:=false;
-  r := 3 + random div 5;
-  x := irandom(r div 2, xsize - r div 2);
-  y := irandom(r div 2, ysize - r div 2);
-  circle(x,y,r,white);
+  r := 3 + _random div 5;
+  x := irandom(r div 2, XSIZE - r div 2);
+  y := irandom(r div 2, YSIZE - r div 2);
+  circle(x,y,r,WHITE);
 end;
 
 func exkey(ch:char):boolean;
@@ -30,7 +30,7 @@ end;
 {$I IANIMATE:P}
 
 begin
-  grinit; cleargr; fullview;
+  _grinit; _cleargr; _fullview;
   animate(autorepeat);
-  splitview;
+  _splitview;
 end.

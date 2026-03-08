@@ -1,0 +1,330 @@
+
+R65 COMPILE 4.6: program FIXUP            8/3/26 page 1
+
+
+   1 (    4) program fixup;
+   2 (    4) { Fixup a pascal source file }
+   3 (    4) uses syslib,arglib,strlib;
+   4 ( 2170) 
+   5 ( 2170) var debug:           boolean;
+   6 ( 2173)     sline:           cpnt;
+   7 ( 2173)     numlines:        integer;
+   8 ( 2173)     linesfixed:      integer;
+   9 ( 2173)     iseof, iserror:  boolean;
+  10 ( 2173)     fno, ofno:       file;
+  11 ( 2173)     name:            array[15] of char;
+  12 ( 2173)     lline, lstring:  integer;
+  13 ( 2173)     modified:        boolean;
+  14 ( 2173) 
+  15 ( 2173) proc setsubtype(subtype:char);
+  16 ( 2173) { set subtype in name if not already there }
+  17 ( 2173) var i:integer;
+  18 ( 2176) begin
+  19 ( 2176)   i:=0;
+  20 ( 2180)   repeat
+  21 ( 2184)     i:=i+1;
+  22 ( 2190)   until (name[i]=':') or
+  23 ( 2206)     (name[i]=' ') or (i>=14);
+  24 ( 2225)   if name[i]<>':' then begin
+  25 ( 2240)     name[i]:=':';
+  26 ( 2249)     name[i+1]:=subtype;
+  27 ( 2260)   end;
+  28 ( 2268) end;
+  29 ( 2268) 
+  30 ( 2269) proc openfiles;
+  31 ( 2269) var default: boolean;
+  32 ( 2272)     i, cyclus, drive: integer;
+  33 ( 2272) begin
+  34 ( 2272)   drive   := 1;
+  35 ( 2276)   cyclus  := 0;
+  36 ( 2282)   default := true;
+  37 ( 2288)   _agetstring(name, default, cyclus, drive);
+  38 ( 2332)   setsubtype('P');
+  39 ( 2340)   _asetfile(name, cyclus, drive, ' ');
+  40 ( 2362)   openr(fno);
+  41 ( 2368)   writeln;
+  42 ( 2368)   if debug then writeln('$$$ Input file open $$$');
+  43 ( 2411)   cyclus := 0;
+  44 ( 2413)   if debug then begin
+  45 ( 2421)     for i := 1 to 14 do
+  46 ( 2432)       name[14 - i] := name [13 - i];
+  47 ( 2455)     name[0] := 'F';
+  48 ( 2481)   end;
+  49 ( 2485)   _asetfile(name, cyclus, drive, ' ');
+  50 ( 2507)   openw(ofno);
+  51 ( 2513)   if debug then writeln('$$$ Output file open $$$');
+  52 ( 2551) end;
+  53 ( 2551) 
+  54 ( 2552) proc closefiles;
+  55 ( 2552) begin
+  56 ( 2552)   close(fno);
+  57 ( 2563)   close(ofno);
+  58 ( 2569)   if debug then writeln('$$$ Files closed $$$');
+  59 ( 2603) end;
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.6: program FIXUP            8/3/26 page 2
+
+  60 ( 2603) 
+  61 ( 2604) func readline(input: file): boolean;
+  62 ( 2604) var ch1: char;
+  63 ( 2607)     pos: integer;
+  64 ( 2607) begin
+  65 ( 2607)   pos := 0;
+  66 ( 2611)   read(@fno,ch1);
+  67 ( 2625)   sline[0] := ENDMARK;
+  68 ( 2630)   while (ch1 >= ' ') and (pos<(STRSIZE - 2)) do begin
+  69 ( 2655)     sline[pos] := ch1;
+  70 ( 2659)     {write(pos, ': ', ch1);}
+  71 ( 2667)     pos := pos + 1;
+  72 ( 2673)     read(@fno, ch1);
+  73 ( 2688)   end;
+  74 ( 2689)   sline[pos] := ENDMARK;
+  75 ( 2698)   readline:= (ch1 = EOF);
+  76 ( 2709) end;
+  77 ( 2713) 
+  78 ( 2714) func find(s: cpnt; start: integer): boolean;
+  79 ( 2714) var i, st: integer;
+  80 ( 2717) begin
+  81 ( 2717)   st := start;
+  82 ( 2719)   if ((lline + start) >= lstring) then begin
+  83 ( 2741)     i := 0;
+  84 ( 2746)     while ((sline[st] = s[i]) and (i < lstring))
+  85 ( 2780)     do begin
+  86 ( 2784)       i  := succ(i);
+  87 ( 2788)       st := succ(st);
+  88 ( 2797)     end;
+  89 ( 2802)     find := (i = lstring);
+  90 ( 2814)   end else find := false;
+  91 ( 2823) end;
+  92 ( 2827) 
+  93 ( 2828) func isletter(ch:char): boolean;
+  94 ( 2828) begin
+  95 ( 2828)   isletter := ((ch>='A') and (ch<='Z')) or
+  96 ( 2848)               ((ch>='a') and (ch<='z'));
+  97 ( 2863) end;
+  98 ( 2868) 
+  99 ( 2869) proc upper(s: cpnt);
+ 100 ( 2869) var found: boolean;
+ 101 ( 2872)     i, start: integer;
+ 102 ( 2872) begin
+ 103 ( 2872)   lstring := _strlen(s);
+ 104 ( 2886)   i := 0;
+ 105 ( 2892)   repeat
+ 106 ( 2896)     if i>0 then
+ 107 ( 2902)       found := find(s, i)
+ 108 ( 2912)         and (not isletter(sline[i-1]))
+ 109 ( 2943)         and (not isletter(sline[i+lstring]))
+ 110 ( 2968)     else
+ 111 ( 2969)      found := find(s, i);
+ 112 ( 2993)     i := i+1;
+ 113 ( 3003)   until found or (i > lline - lstring);
+ 114 ( 3026)   if found then begin
+ 115 ( 3034)     start := i - 1;
+ 116 ( 3043)     modified := true;
+ 117 ( 3050)     for i:=0 to lstring - 1 do
+ 118 ( 3066)       sline[i + start] := chr(ord(s[i]) - 32);
+ 119 ( 3098)     upper(s); { recursive: fix more on same line }
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.6: program FIXUP            8/3/26 page 3
+
+ 120 ( 3127)   end;
+ 121 ( 3127) end;
+ 122 ( 3127) 
+ 123 ( 3128) proc underscore(s: cpnt);
+ 124 ( 3128) var found: boolean;
+ 125 ( 3131)     i, start: integer;
+ 126 ( 3131)     ch : char;
+ 127 ( 3131) begin
+ 128 ( 3131)   lstring := _strlen(s);
+ 129 ( 3145)   i := 0;
+ 130 ( 3151)   repeat
+ 131 ( 3155)     if i>0 then
+ 132 ( 3161)       found := (find(s, i) and (sline[i-1] <> '_'))
+ 133 ( 3197)         and (not isletter(sline[i-1]))
+ 134 ( 3219)         and (not isletter(sline[i+lstring]))
+ 135 ( 3244)     else
+ 136 ( 3245)       found := find(s, i);
+ 137 ( 3269)     i := i+1;
+ 138 ( 3279)   until found or (i > lline - lstring);
+ 139 ( 3302)   if found then begin
+ 140 ( 3310)     start := i - 1;
+ 141 ( 3319)     modified := true;
+ 142 ( 3326)     _strinsc('_', start, sline);
+ 143 ( 3346)     { recursive: fix more on same line }
+ 144 ( 3346)     underscore(s);
+ 145 ( 3356)   end;
+ 146 ( 3356) end;
+ 147 ( 3356) 
+ 148 ( 3357) proc fixup_line;
+ 149 ( 3357) begin
+ 150 ( 3357)   lline := _strlen(sline);
+ 151 ( 3374)   modified := false;
+ 152 ( 3380) 
+ 153 ( 3384)   { syslib }
+ 154 ( 3384)   upper('numarg');
+ 155 ( 3399)   upper('aglists');
+ 156 ( 3415)   upper('arglist');
+ 157 ( 3431)   upper('argtype');
+ 158 ( 3447)   upper('filflg');
+ 159 ( 3462)   upper('fildrv');
+ 160 ( 3477)   upper('filcyc');
+ 161 ( 3492)   upper('filcy1');
+ 162 ( 3507)   upper('filnam');
+ 163 ( 3522)   upper('filnm1');
+ 164 ( 3537)   upper('filstp');
+ 165 ( 3552)   upper('tab8');
+ 166 ( 3565)   upper('hom');
+ 167 ( 3577)   upper('csv');
+ 168 ( 3589)   upper('lf');
+ 169 ( 3600)   upper('ff');
+ 170 ( 3611)   upper('cr');
+ 171 ( 3622)   upper('lf');
+ 172 ( 3633)   upper('norvid');
+ 173 ( 3648)   upper('invvid');
+ 174 ( 3663)   upper('prton');
+ 175 ( 3677)   upper('prtoff');
+ 176 ( 3692)   upper('mmaxseq');
+ 177 ( 3708)   upper('topmem');
+ 178 ( 3723)   upper('maxint');
+ 179 ( 3738)   upper('input');
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.6: program FIXUP            8/3/26 page 4
+
+ 180 ( 3752)   upper('output');
+ 181 ( 3767)   upper('key');
+ 182 ( 3779)   upper('printer');
+ 183 ( 3795)   upper('runerr');
+ 184 ( 3810)   upper('endstk');
+ 185 ( 3825)   upper('buffpn');
+ 186 ( 3840)   upper('iocheck');
+ 187 ( 3856)   { arglib }
+ 188 ( 3856)   upper('numarg');
+ 189 ( 3871)   upper('arglist');
+ 190 ( 3887)   upper('argtype');
+ 191 ( 3903)   upper('curpos');
+ 192 ( 3918)   upper('maxseq');
+ 193 ( 3933)   upper('fidrtb');
+ 194 ( 3948)   { strlib }
+ 195 ( 3948)   upper('strsize');
+ 196 ( 3964)   upper('endmark');
+ 197 ( 3980)   { plotlib }
+ 198 ( 3980)   upper('xsize');
+ 199 ( 3994)   upper('ysize');
+ 200 ( 4008)   upper('xwords');
+ 201 ( 4023)   upper('white');
+ 202 ( 4037)   upper('inverse');
+ 203 ( 4053)   upper('black');
+ 204 ( 4067)   upper('plotdev');
+ 205 ( 4083)   upper('keypressed');
+ 206 ( 4102) 
+ 207 ( 4102)   { syslib }
+ 208 ( 4102)   underscore('setemucom');
+ 209 ( 4120)   underscore('getbcd');
+ 210 ( 4135)   underscore('getdate');
+ 211 ( 4151)   underscore('abs');
+ 212 ( 4163)   underscore('mod');
+ 213 ( 4175)   underscore('tab');
+ 214 ( 4187)   underscore('abort');
+ 215 ( 4201)   underscore('prtext8');
+ 216 ( 4217)   underscore('prtext16');
+ 217 ( 4234)   underscore('random');
+ 218 ( 4249)   { arglib }
+ 219 ( 4249)   underscore('argerror');
+ 220 ( 4266)   underscore('agetval');
+ 221 ( 4282)   underscore('agetstring');
+ 222 ( 4301)   underscore('uppercase');
+ 223 ( 4319)   underscore('asetfile');
+ 224 ( 4336)   underscore('runerr');
+ 225 ( 4351)   { strlib }
+ 226 ( 4351)   underscore('new');
+ 227 ( 4363)   underscore('release');
+ 228 ( 4379)   underscore('strlen');
+ 229 ( 4394)   underscore('strcopy');
+ 230 ( 4410)   underscore('stradd');
+ 231 ( 4425)   underscore('strcmp');
+ 232 ( 4440)   underscore('strpos');
+ 233 ( 4455)   underscore('strread');
+ 234 ( 4471)   underscore('hexstr');
+ 235 ( 4486)   underscore('strinsc');
+ 236 ( 4502)   underscore('strdelch');
+ 237 ( 4519)   underscore('intstr');
+ 238 ( 4534)   {plotlib }
+ 239 ( 4534)   underscore('delay');
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.6: program FIXUP            8/3/26 page 5
+
+ 240 ( 4548)   underscore('syncscreen');
+ 241 ( 4567)   underscore('grinit');
+ 242 ( 4582)   underscore('grend');
+ 243 ( 4596)   underscore('cleargr');
+ 244 ( 4612)   underscore('fullview');
+ 245 ( 4629)   underscore('splitview');
+ 246 ( 4647)   underscore('plot');
+ 247 ( 4660)   underscore('move');
+ 248 ( 4673)   underscore('draw');
+ 249 ( 4686)   underscore('plotmap');
+ 250 ( 4702)   underscore('waitforkey');
+ 251 ( 4721) 
+ 252 ( 4721) end;
+ 253 ( 4721) 
+ 254 ( 4722) proc putline;
+ 255 ( 4722) var pos: integer;
+ 256 ( 4725) begin
+ 257 ( 4725)   pos := 0;
+ 258 ( 4729)   while ((sline[pos] <> ENDMARK) and
+ 259 ( 4746)     (pos < STRSIZE)) do begin
+ 260 ( 4757)     write(@ofno, sline[pos]);
+ 261 ( 4774)     pos := pos + 1;
+ 262 ( 4780)   end;
+ 263 ( 4785)   if not iseof then write(@ofno, CR);
+ 264 ( 4805) end;
+ 265 ( 4805) 
+ 266 ( 4806) proc showline(show_number: boolean);
+ 267 ( 4806) begin
+ 268 ( 4806)   if show_number then write(numlines,' ');
+ 269 ( 4825)   writeln(sline);
+ 270 ( 4836) end;
+ 271 ( 4836) 
+ 272 ( 4837) begin
+ 273 ( 4837)   debug := false;
+ 274 ( 4841)   openfiles;
+ 275 ( 4849)   sline := _new;
+ 276 ( 4855)   numlines := 1;
+ 277 ( 4861)   linesfixed := 0;
+ 278 ( 4867)   iserror := false;
+ 279 ( 4873)   iseof := false;
+ 280 ( 4879)   while not (iseof or iserror) do begin
+ 281 ( 4896)     iseof := readline(fno);
+ 282 ( 4908)     showline(true);
+ 283 ( 4920)     fixup_line;
+ 284 ( 4924)     if modified then begin
+ 285 ( 4928)       write('>>>');
+ 286 ( 4935)       showline(false);
+ 287 ( 4943)       linesfixed := succ(linesfixed);
+ 288 ( 4947)     end;
+ 289 ( 4952)     putline;
+ 290 ( 4956)     numlines := succ(numlines);
+ 291 ( 4960)   end;
+ 292 ( 4965)   if iserror then begin
+ 293 ( 4972)     writeln(INVVID, 'ERROR on line ',
+ 294 ( 4993)       numlines - 1, NORVID);
+ 295 ( 5010)     showline(false);
+ 296 ( 5018)   end else
+ 297 ( 5018)     writeln('Lines fixed ', linesfixed);
+ 298 ( 5045)   closefiles;
+ 299 ( 5049) end. 
+
+End compile
+
+Code lenght:          5048
+Compiler stack size:  91
+Ident stack size:     117
+Pascal errors:        0
