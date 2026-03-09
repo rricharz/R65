@@ -9,7 +9,7 @@
 
 Pack a floppy disk
 
-Written 2018 to test the R65 emulator and
+Written 2018 to _test the R65 emulator and
 to demonstrate the power of Tiny Pascal.
 
 Usage:  pack [drive]
@@ -28,23 +28,22 @@ var drive,dummy: integer;
 
 proc bcderror(e:integer);
 begin
-  write(invvid,'ERROR ');
+  write(INVVID,'ERROR ');
   write((e shr 4) and 15);
-  write(e and 15,norvid);
+  write(e and 15,NORVID);
 end;
 
 begin
   drive:=1; {default drive}
-  agetval(drive,default);
+  _agetval(drive,default);
   if (drive<0) or (drive>1) then begin
     writeln('Drive must be 0 or 1');
-    abort
+    _abort
   end;
   writeln('Packing drive ',drive);
-  fildrv:=drive;
+  FILDRV:=drive;
   call(apack);
   if filerr<>0 then bcderror(filerr);
-  if curpos>1 then writeln;
+  if CURPOS>1 then writeln;
   dummy:=freedsk(drive,true);
 end.
-

@@ -15,7 +15,7 @@ mem   filerr=$db: integer&;
 
 var   cyclus,drive,entry,saventry: integer;
       default,found,last: boolean;
-      name: array[namesize] of char;
+      name: array[NAMESIZE] of char;
 
 proc findond(nm:array[15] of char; drv:integer);
 {********************************************}
@@ -24,38 +24,38 @@ const  prflab     = $ece3;
 
 var first: boolean;
     i: integer;
-    nm2: array[namesize] of char;
+    nm2: array[NAMESIZE] of char;
 
 begin
   filerr:=0;
   first:=true;
-  fildrv:=drv;
+  FILDRV:=drv;
   if nm[0]<>' ' then begin
     cyclus:=0; drive:=drv;
-    asetfile(nm,cyclus,drive,' ');
+    _asetfile(nm,cyclus,drive,' ');
     call(afloppy);
   end else begin
     dskname;
-    for i:=0 to namesize do nm2[i]:=filnam[i];
+    for i:=0 to NAMESIZE do nm2[i]:=FILNAM[i];
   end;
   if filerr=0 then begin
     last:=false; entry:=0;
-    while (entry<numentries) and not last do begin
+    while (entry<NUMENTRIES) and not last do begin
       cyclus:=0; saventry:=entry;
-      findentry(name,drv,entry,found,last);
+      _findentry(name,drv,entry,found,last);
       if found and (not last) then begin
         if first then begin
-          write(invvid,'Disk ');
+          write(INVVID,'Disk ');
           if nm[0]=' ' then
-            writename(nm2)
+            _writename(nm2)
           else
-            writename(nm);
-          write(':',norvid); tab(20);
+            _writename(nm);
+          write(':',NORVID); _tab(20);
           writeln('(',freedsk(drv,false),'% free)');
           first:=false;
           entry:=saventry;
           { find again because of freedsk }
-          findentry(name,drv,entry,found,last);
+          _findentry(name,drv,entry,found,last);
         end;
         call(prflab); writeln;
         end;
@@ -63,14 +63,14 @@ begin
     entry:=entry+1;
   end else begin
     write('disk ');
-    writename(nm);
+    _writename(nm);
     writeln(' not found');
   end;
 end;
 
 begin
   cyclus:=0; drive:=255;
-  agetstring(name,default,cyclus,drive);
+  _agetstring(name,default,cyclus,drive);
   if drive<>255 then
     findond('                ',drive)
   else begin
@@ -80,6 +80,7 @@ begin
     findond('BASIC           ',0);
     findond('HELP            ',0);
     findond('PSOURCE         ',0);
+    { PASCAL must be last entry }
     findond('PASCAL          ',0);
   end;
 end.

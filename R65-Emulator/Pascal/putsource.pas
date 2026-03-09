@@ -5,7 +5,7 @@
          *               *
          *****************
 
-    move the source file from the WORK disk
+    _move the source file from the WORK disk
     on the disk SOURCEPASCAL or SOURCECOMPIL
 
     usage: putsource filename
@@ -32,7 +32,7 @@ begin
   filerr:=0;
   { get the argument (file name) }
   cyclus:=0; drive:=0;
-  agetstring(fname,default,cyclus,drive);
+  _agetstring(fname,default,cyclus,drive);
   if default or not letter(fname[0]) then
     writeln('Usage: putsource filename')
   else begin
@@ -41,40 +41,40 @@ begin
     { make sure that WORK is on drive 1 }
     writeln('Putting disk WORK in drive 1');
     cyclus:=0; drive:=1;
-    asetfile('WORK            ',cyclus,drive,' ');
+    _asetfile('WORK            ',cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
     { make sure that dname is on drive 0 }
-    write('Putting disk ');  writename(dname);
+    write('Putting disk ');  _writename(dname);
     writeln(' in drive 0');
     cyclus:=0; drive:=0;
-    asetfile(dname,cyclus,drive,' ');
+    _asetfile(dname,cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
     { copy the source file }
     if ok then begin
       write('Copying the source file ');
-      writename(fname);
+      _writename(fname);
       writeln;
       setargs(fname,0,0,1);
-      argtype[10]:='i';
-      arglist[10]:=0; {copy to drive 0}
-      argtype[11]:=chr(0);
+      ARGTYPE[10]:='i';
+      ARGLIST[10]:=0; {copy to drive 0}
+      ARGTYPE[11]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
       runprog('COPY:R          ',cyclus,drive);
     end;
-    if (filerr<>0) or (runerr<>0) then begin
+    if (filerr<>0) or (RUNERR<>0) then begin
       ok:=false;
       if filerr=6 then
-        writeln(invvid,
-          'Source file not found',norvid)
+        writeln(INVVID,
+          'Source file not found',NORVID)
       else
-        writeln(invvid,'Copy failed',norvid);
+        writeln(INVVID,'Copy failed',NORVID);
     end else begin {if successfull}
-      setargi(filcyc,8);
+      setargi(FILCYC,8);
       { export the source file }
       write('Exporting the source file');
-      fildrv:=1;
+      FILDRV:=1;
       call(aexport);
       writeln;
 
@@ -83,27 +83,30 @@ begin
       drive:=0; filerr:=0;
       setargi(0,8);
       runprog('DELETE:R        ',cyclus,drive);
-      if (filerr<>0) or (runerr<>0) then  begin
+      if (filerr<>0) or (RUNERR<>0) then  begin
         ok:=false;
-        writeln(invvid,
-          'Deleting original failed',norvid);
+        writeln(INVVID,
+          'Deleting original failed',NORVID);
       end;
 
       { clean the destination drive }
       setargi(0,0);
-      argtype[1]:=chr(0);
-      cyclus:=0; drive:=0; filerr:=0;
+      ARGTYPE[1]:=chr(0);
+      cyclus:=0; drive:=0; filerr:=0; RUNERR:=0;
       runprog('CLEAN:R         ',cyclus,drive);
-      if (filerr<>0) or (runerr<>0) then
+      if (filerr<>0) or (RUNERR<>0) then begin
          ok:=false;
+         writeln(INVID,
+           'Cleaning PSOURCE failed',NORVID);
+      end;
 
       { pack the destination drive }
       writeln('Packing PSOURCE');
       setargi(0,0);
-      argtype[1]:=chr(0);
+      ARGTYPE[1]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
       runprog('PACK:R          ',cyclus,drive);
-      if (filerr<>0) or (runerr<>0) then
+      if (filerr<>0) or (RUNERR<>0) then
          ok:=false;
       dummy:=freedsk(0,true);
     end;
@@ -111,13 +114,13 @@ begin
     { make sure that PASCAL is on drive 0 }
     writeln('Putting disk PASCAL in drive 0');
     cyclus:=0; drive:=0;
-    asetfile('PASCAL          ',cyclus,drive,' ');
+    _asetfile('PASCAL          ',cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
   end;
   if not ok then begin
-    writeln(invvid,'Putsource failed',norvid);
-    filerr:=0; runerr:=0;
+    writeln(INVVID,'Putsource failed',NORVID);
+    filerr:=0; RUNERR:=0;
   end
 end.
 

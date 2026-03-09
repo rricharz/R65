@@ -10,10 +10,10 @@
 
 Delete a file.
 
-Written 2018 to test the R65 emulator and
-to demonstrate the power of Tiny Pascal.
+Written 2018 to _test the R65 emulator and
+to demonstrate the power of Micro Pascal.
 
-Usage:  delete filnam[:x][.cy][,drive]
+Usage:  delete FILNAM[:x][.cy][,drive]
 
   [:X]:    type of file,     default :P
   [drive]: disk drive (0,1), default 1
@@ -35,9 +35,9 @@ var cyclus,scyclus,drive,entry,fcount,i: integer;
 
 proc bcderror(e:integer);
 begin
-  write(invvid,'ERROR ');
+  write(INVVID,'ERROR ');
   write((e shr 4) and 15);
-  writeln(e and 15,norvid);
+  writeln(e and 15,NORVID);
 end;
 
 func haswildcard(nm1:array[15] of char): boolean;
@@ -50,20 +50,20 @@ begin
 end;
 
 begin
-  cyclus:=0; drive:=1;
-  agetstring(name,default,cyclus,drive);
+  cyclus:=0; drive:=1; filerr:=0;
+  _agetstring(name,default,cyclus,drive);
   scyclus:=cyclus;
   fcount:=0; last:=false; entry:= 0;
-  while (entry<numentries) and not last do begin
+  while (entry<NUMENTRIES) and not last do begin
     cyclus:=scyclus;
-    findentry(name,drive,entry,found,last);
+    _findentry(name,drive,entry,found,last);
     if found and (not last) and
-        ((scyclus=0) or (scyclus=filcyc)) then begin
+        ((scyclus=0) or (scyclus=FILCYC)) then begin
       for i:=0 to 15 do begin
         savename[i]:=name[i];
-        name[i]:=filnam[i];
+        name[i]:=FILNAM[i];
       end;
-      asetfile(name,filcyc,drive,' ');
+      _asetfile(name,FILCYC,drive,' ');
       call(prflab); writeln;
       call(adelete);
       if filerr<>0 then begin
@@ -77,7 +77,7 @@ begin
   end;
   if fcount=0 then begin
     if not haswildcard(name) then
-    writeln(invvid,'File not found',norvid)
+    writeln(INVVID,'File not found',NORVID)
     else writeln('No files deleted');
   end else
     writeln(fcount, ' file(s) deleted');

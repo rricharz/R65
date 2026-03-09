@@ -9,7 +9,7 @@
 
 Change floppy disk
 
-Written 2019 to test the R65 emulator and
+Written 2019 to _test the R65 emulator and
 to demonstrate the power of R65 Pascal.
 
 Usage:  floppy name drive
@@ -29,15 +29,14 @@ var cyclus,drive: integer;
 
 proc bcderror(e:integer);
 begin
-  write(invvid,'ERROR ',(e shr 4) and 15);
-  writeln(e and 15,norvid);
+  write(INVVID,'ERROR ',(e shr 4) and 15);
+  writeln(e and 15,NORVID);
 end;
 
 begin
   cyclus:=0; drive:=0;
-  agetstring(name,default,cyclus,drive);
-  asetfile(name,cyclus,drive,' ');
+  _agetstring(name,default,cyclus,drive);
+  _asetfile(name,cyclus,drive,' ');
   call(afloppy);
   if filerr<>0 then bcderror(filerr);
 end.
-

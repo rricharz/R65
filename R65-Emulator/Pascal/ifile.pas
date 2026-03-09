@@ -79,4 +79,4 @@ proc setargi(val,carg:integer);
 begin
   argtype[carg]:='i';
   arglist[carg]:=val;
-end;
+end;
