@@ -762,8 +762,8 @@ int catchSubroutine(uint16_t ea)
             fprintf(printFile, ">%02X<", a);
         }
         else {
-            if (a != 0x7F) fprintf(printFile, "%c", a);
-            if (rawPrint /*&& (a < 0x20)*/) fflush(printFile);
+            if ((a != 0x7F) || rawPrint)  fprintf(printFile, "%c", a);
+            if (rawPrint) fflush(printFile);
             colNumber++;
         }
         return 1;

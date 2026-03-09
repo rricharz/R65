@@ -1,11 +1,11 @@
 { TEK3D:P R65 tiny Pascal math demo for
-  Tektronix 4010 connected to printer  port
+  Tektronix 4010 connected to PRINTER  port
   rricharz 2019 }
 
 program tek3d;
 uses syslib,mathlib,teklib;
 
-var mask:array[maxx] of integer;
+var mask:array[MAXX] of integer;
     i:integer;
     x1,y1,x2,y2:real;
     x,y,step,max,scale:real;
@@ -25,11 +25,11 @@ begin
 end;
 
 proc drawvec(x1,y1,x2,y2);
-{ draw vector, do not leave graphics mode }
+{ _draw vector, do not leave graphics mode }
 { to avoid cursor showing up }
 begin
-  startdraw(x1,y1);
-  draw(x2,y2);
+  _startdraw(x1,y1);
+  _draw(x2,y2);
 end;
 
 proc drawmasked(x1,y1,x2,y2:integer;
@@ -53,7 +53,7 @@ begin
     if trunc(v)<=mask[i] then begin
       { hidden point }
       if dodraw then begin
-        { draw up to here }
+        { _draw up to here }
         if ((i-x1)>1) and visible then
           drawvec(start,vstart,i,trunc(v));
       end;
@@ -63,7 +63,7 @@ begin
       { visible point }
       mask[i]:=trunc(v);
       if not dodraw then begin
-        { draw from here }
+        { _draw from here }
         start:=i;
         vstart:=trunc(v);
       end;
@@ -76,7 +76,7 @@ begin
     if trunc(v)<=mask[i] then begin
       { hidden point }
       if dodraw then begin
-        { draw up to here }
+        { _draw up to here }
         if ((x1-i)>1) and visible then
           drawvec(start,vstart,i,trunc(v));
       end;
@@ -86,7 +86,7 @@ begin
       { visible point }
       mask[i]:=trunc(v);
       if not dodraw then begin
-        { draw from here }
+        { _draw from here }
         start:=i;
         vstart:=trunc(v);
       end;
@@ -102,27 +102,27 @@ begin
 end;
 
 begin
-  sx:=conv(maxx)/2.0;
-  sy:=conv(maxy)/8.0;
+  sx:=conv(MAXX)/2.0;
+  sy:=conv(MAXY)/8.0;
   dx:=6.0;
   dy:=3.0;
   writeln('Tektronix terminal required');
 
-  starttek;
-  startdraw(1,1);
+  _starttek;
+  _startdraw(1,1);
 
 {*******************************************}
 
-  clearscreen;
+  _clearscreen;
 
   step:=10.0;
   max:=360.0;
   scale:=50.0;
 
-  dx:=conv(maxx)/(2.2*max);
+  dx:=conv(MAXX)/(2.2*max);
   dy:=dx/2.0;
 
-  for i:=0 to maxx do mask[i]:=0;
+  for i:=0 to MAXX do mask[i]:=0;
 
   { Generate a first mask }
   x:=0.0;
@@ -158,7 +158,7 @@ begin
     x:=x+step;
   end;
 
-  for i:=0 to maxx do mask[i]:=0;
+  for i:=0 to MAXX do mask[i]:=0;
 
     { Generate a first mask }
   x:=0.0;
@@ -194,20 +194,20 @@ begin
     y:=y+step;
   end;
 
-  delay10msec(300);
+  _delay10msec(300);
 
 {*******************************************}
 
-  clearscreen;
+  _clearscreen;
 
   step:=40.0;
   max:=1440.0;
   scale:=10000.0;
 
-  dx:=conv(maxx)/(2.2*max);
+  dx:=conv(MAXX)/(2.2*max);
   dy:=dx/2.0;
 
-  for i:=0 to maxx do mask[i]:=0;
+  for i:=0 to MAXX do mask[i]:=0;
 
   { Generate a first mask }
   x:=0.0;
@@ -247,7 +247,7 @@ begin
     x:=x+step;
   end;
 
-  for i:=0 to maxx do mask[i]:=0;
+  for i:=0 to MAXX do mask[i]:=0;
 
     { Generate a first mask }
   x:=0.0;
@@ -289,8 +289,8 @@ begin
 
 {*******************************************}
 
-  moveto(1,1);
-  enddraw;
-  endtek;
+  _moveto(1,1);
+  _enddraw;
+  _endtek;
 
 end.

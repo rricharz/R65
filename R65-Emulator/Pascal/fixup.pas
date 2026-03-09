@@ -150,7 +150,7 @@ begin
   lline := _strlen(sline);
   modified := false;
 
-  { syslib }
+{ syslib }
   upper('numarg');
   upper('aglists');
   upper('arglist');
@@ -184,27 +184,40 @@ begin
   upper('endstk');
   upper('buffpn');
   upper('iocheck');
-  { arglib }
+{ arglib }
   upper('numarg');
   upper('arglist');
   upper('argtype');
   upper('curpos');
   upper('maxseq');
   upper('fidrtb');
-  { strlib }
+{ strlib }
   upper('strsize');
   upper('endmark');
-  { plotlib }
-  upper('xsize');
+{ plotlib }
+  { upper('xsize');
   upper('ysize');
   upper('xwords');
   upper('white');
   upper('inverse');
   upper('black');
   upper('plotdev');
-  upper('keypressed');
+  upper('keypressed');}
+{ teklib }
+{****
+  upper('maxx');
+  upper('maxy');
+  upper('maxcolumns');
+  upper('maxlines');
+  upper('solid');
+  upper('dotted');
+  upper('dotdash');
+  upper('shortdash');
+  upper('longdash');
+  upper('plotter');
+****}
 
-  { syslib }
+{ syslib }
   underscore('setemucom');
   underscore('getbcd');
   underscore('getdate');
@@ -215,14 +228,14 @@ begin
   underscore('prtext8');
   underscore('prtext16');
   underscore('random');
-  { arglib }
+{ arglib }
   underscore('argerror');
   underscore('agetval');
   underscore('agetstring');
   underscore('uppercase');
   underscore('asetfile');
   underscore('runerr');
-  { strlib }
+{ strlib }
   underscore('new');
   underscore('release');
   underscore('strlen');
@@ -235,7 +248,7 @@ begin
   underscore('strinsc');
   underscore('strdelch');
   underscore('intstr');
-  {plotlib }
+{plotlib }
   underscore('delay');
   underscore('syncscreen');
   underscore('grinit');
@@ -248,7 +261,23 @@ begin
   underscore('draw');
   underscore('plotmap');
   underscore('waitforkey');
-
+{ teklib }
+{****
+  underscore('xs');
+  underscore('ys');
+  underscore('clearscreen');
+  underscore('starttek');
+  underscore('endtek');
+  underscore('startdraw');
+  underscore('enddraw');
+  underscore('draw');
+  underscore('drawrectangle');
+  underscore('drawvector');
+  underscore('moveto');
+  underscore('delay10msec');
+  underscore('setchsize');
+  underscore('setlinemode');
+****}
 end;
 
 proc putline;
