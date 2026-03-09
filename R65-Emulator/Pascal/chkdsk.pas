@@ -15,12 +15,12 @@ uses syslib,arglib;
 const aprepdo  = $f4a7;
       aenddo   = $f625;
       agetentx = $f63a;
-      maxent   = 255;
+      maxent   = 127;
       tsectors = 2560;
 
 mem   filerr   = $00db:integer&;
       filtyp   = $0300:char&;
-      filcyc   = $0311:integer&;
+      FILCYC   = $0311:integer&;
       filloc   = $0313:integer;
       filsiz   = $0315:integer;
       fillnk   = $031e:integer;
@@ -84,17 +84,18 @@ begin
   else begin
     for i:=0 to 15 do
       write(FILNAM[i]);
-    write('.',hex(filcyc shr 4),
-      hex(filcyc and 15),' ');
+    write('.',hex(FILCYC shr 4),
+      hex(FILCYC and 15),' ');
   end;
   ok:=(sector=filloc);
+  write(sector,'-',sector+((filsiz+1) shr 8),'   ');
   sector:=sector+((filsiz+1) shr 8);
   if sector>tsectors then begin
-    writeln(INVVID,'FILE SIZE TOO LONG',NORVID);
+    writeln(INVVID,'END OF DISK SPACE',NORVID);
     notok:=true;
   end else if (ok) then writeln('OK')
   else begin
-    writeln(INVVID,'SECTOR START INCONSISTENT',NORVID);
+    writeln(INVVID,'SECTOR START',NORVID);
     notok:=true;
   end;
 end;
@@ -125,7 +126,11 @@ begin
     scyfc:=entry;
     call(agetentx);
     checkfilerr;
-    until (filtyp=chr(0)) or (entry>maxent);
+    until (filtyp=chr(0)) or (entry>=maxent);
+  writeln('Last sector used ', sector,' of ',tsectors);
+  writeln('Last entry used ', entry,' of ',maxent);
+  if (entry >= maxent) then
+    writeln(INVVID,'FILE TABLE ON DISK FULL',NORVID);
   if notok then
     writeln(INVVID,'INCONSISTENCY FOUND',NORVID);
   call(aenddo);

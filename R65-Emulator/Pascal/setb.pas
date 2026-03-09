@@ -13,12 +13,12 @@ var n: integer;
     default: boolean;
 
 begin
-  agetval(n,default);
+  _agetval(n,default);
   if default then begin
-    writeln(invvid,'Usage: setb linenumber',norvid);
+    writeln(INVVID,'Usage: setb linenumber',NORVID);
     brkpnt:=0; { clear break point }
   end else begin
     brkpnt:=n;
     writeln('Breakpoint set at line ',n);
   end;
-end. 
+end. 

@@ -15,40 +15,40 @@ var f:file;
 
 begin
 
-  f:=attach('TABLE:X         ',0,1,fread,
+  f:=_attach('TABLE:X         ',0,1,FREAD,
     0,0,'X');
-  getword(f,0,size);
+  _getword(f,0,size);
   writeln;
   writeln('Elements: ', size);
 
   min:=1.0e10;
   max:=-1.0e10;
   for i:=0 to size - 1 do begin
-    getreal(f,i+3,v);
+    _getreal(f,i+3,v);
     if v>max then max:=v;
     if v<min then min:=v;
   end;
   write('Min: ');
-  writefix(output,2,min);
+  writefix(OUTPUT,2,min);
   writeln;
   write('Max: ');
-  writefix(output,2,max);
+  writefix(OUTPUT,2,max);
   writeln;
-  grinit;
-  cleargr;
-  splitview;
+  _grinit;
+  _cleargr;
+  _splitview;
   xs:=1;
-  xw:=xsize-1;
+  xw:=XSIZE-1;
   ys:=1;
-  yw:=ysize-1;
-  getreal(f,3,v);
+  yw:=YSIZE-1;
+  _getreal(f,3,v);
   y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
-  move(xs,ys+y);
+  _move(xs,ys+y);
   for i:=1 to size-1 do begin
-    getreal(f,i+3,v);
+    _getreal(f,i+3,v);
     x:=trunc(conv(xw)/conv(size-1)*conv(i)+0.5);
     y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
-    draw(xs+x,ys+y,white);
+    _draw(xs+x,ys+y,WHITE);
   end;
   close(f);
 end.

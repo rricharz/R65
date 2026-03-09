@@ -10,4 +10,4 @@ mem brkpnt=$00c2: integer;
 
 begin
   brkpnt:=0; { clear break point }
-end. 
+end.

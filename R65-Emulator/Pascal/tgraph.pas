@@ -22,32 +22,32 @@ var f:file;
 
 begin
 
-  f:=attach('TABLE:X         ',0,1,fread,
+  f:=_attach('TABLE:X         ',0,1,FREAD,
     0,0,'X');
-  getword(f,0,size);
+  _getword(f,0,size);
   writeln;
   writeln('Elements: ', size);
-  getreal(f,1,xmin);
-  getreal(f,2,xmax);
+  _getreal(f,1,xmin);
+  _getreal(f,2,xmax);
 
   min:=1.0e10;
   max:=-1.0e10;
   for i:=0 to size - 1 do begin
-    getreal(f,i+3,v);
+    _getreal(f,i+3,v);
     if v>max then max:=v;
     if v<min then min:=v;
   end;
   write('Ymin:   ');
-  writefix(output,3,min);
+  writefix(OUTPUT,3,min);
   writeln;
   write('Ymax:   ');
-  writefix(output,3,max);
+  writefix(OUTPUT,3,max);
   writeln;
   write('Xmin:   ');
-  writefix(output,3,xmin);
+  writefix(OUTPUT,3,xmin);
   writeln;
   write('Xmax:   ');
-  writefix(output,3,xmax);
+  writefix(OUTPUT,3,xmax);
   writeln;
 
   daxis0:=(max-min)/2.;
@@ -84,29 +84,29 @@ begin
     xsaxis:=xmin;
   if xsaxis<xmin then xsaxis:=xsaxis+xaxis;
 
-  starttek;
+  _starttek;
   xs:=leftborder;
-  xw:=maxx-leftborder-border;
+  xw:=MAXX-leftborder-border;
   ys:=border;
-  yw:=maxy-2*border;
+  yw:=MAXY-2*border;
 
   drawrectange(xs,ys,xs+xw,ys+yw);
 
-  setlinemode(dotted);
-  setchsize(2);
+  _setlinemode(DOTTED);
+  _setchsize(2);
   repeat
     y:=trunc((axis-min)/(max-min)*conv(yw)+0.5);
     if (y>0) and (y<yw) then
-      drawvector(xs,ys+y,xs+xw,ys+y);
-    moveto(5,ys+y-5);
+      _drawvector(xs,ys+y,xs+xw,ys+y);
+    _moveto(5,ys+y-5);
     if daxis<0.001 then
-      writefix(plotter,4,axis)
+      writefix(PLOTTER,4,axis)
     else if daxis<0.01 then
-      writefix(plotter,3,axis)
+      writefix(PLOTTER,3,axis)
     else if daxis<0.1 then
-      writefix(plotter,2,axis)
+      writefix(PLOTTER,2,axis)
     else
-      writefix(plotter,1,axis);
+      writefix(PLOTTER,1,axis);
     axis:=axis+daxis;
     until axis>max;
 
@@ -114,34 +114,34 @@ begin
     x:=trunc((xsaxis-xmin)/
                  (xmax-xmin)*conv(xw)+0.5);
     if (x>0) and (x<xw) then
-      drawvector(xs+x,ys,xs+x,ys+yw);
-    moveto(xs+x-80,6);
+      _drawvector(xs+x,ys,xs+x,ys+yw);
+    _moveto(xs+x-80,6);
     if xaxis<0.001 then
-      writef0(plotter,4,xsaxis,12,true)
+      writef0(PLOTTER,4,xsaxis,12,true)
     else if xaxis<0.01 then
-      writef0(plotter,3,xsaxis,12,true)
+      writef0(PLOTTER,3,xsaxis,12,true)
     else if xaxis<0.1 then
-      writef0(plotter,2,xsaxis,12,true)
+      writef0(PLOTTER,2,xsaxis,12,true)
     else
-      writef0(plotter,1,xsaxis,12,true);
+      writef0(PLOTTER,1,xsaxis,12,true);
     xsaxis:=xsaxis+xaxis;
     until xsaxis>xmax;
-  setlinemode(solid);
-  setchsize(1);
+  _setlinemode(SOLID);
+  _setchsize(1);
 
-  getreal(f,3,v);
+  _getreal(f,3,v);
   y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
-  startdraw(xs,ys+y);
+  _startdraw(xs,ys+y);
   for i:=1 to size-1 do begin
-    getreal(f,i+3,v);
+    _getreal(f,i+3,v);
     x:=trunc(conv(xw)/conv(size-1)*conv(i)+0.5);
     y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
-    draw(xs+x,ys+y);
+    _draw(xs+x,ys+y);
   end;
-  enddraw;
+  _enddraw;
 
   close(f);
-  moveto(1,maxy-24);
-  endtek;
+  _moveto(1,MAXY-24);
+  _endtek;
 
 end.  

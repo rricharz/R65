@@ -4,5 +4,5 @@ program grend;
 uses plotlib;
 
 begin
-  grend;
-end. 
+  _grend;
+end.

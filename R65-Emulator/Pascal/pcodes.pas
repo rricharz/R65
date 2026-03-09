@@ -20,11 +20,11 @@ var ch1: char;
 begin
   pos := 0; read(@f,ch1);
   while (ch1>=' ') and (ch1<>alteof) and
-      (pos<strsize-1) do begin
+      (pos<STRSIZE-1) do begin
     pnt[pos]:=ch1; pos:=pos+1; read(@f,ch1);
     end;
-  pnt[pos]:=endmark;
-  readline:=(ch1=eof) or (ch1=alteof);
+  pnt[pos]:=ENDMARK;
+  readline:=(ch1=EOF) or (ch1=alteof);
 end;
 
 proc setsubtype(var nm:array[15] of char;subtype:char);
@@ -152,7 +152,7 @@ begin
            if not silent then begin
              if code=$3a then begin
                packreal(c, a+(b shl 8),r);
-                 write(' '); writeflo(output,r);
+                 write(' '); writeflo(OUTPUT,r);
              end else begin
                write(' ',c,' ');
                write(' ',a+(b shl 8));
@@ -185,7 +185,7 @@ begin
              end;
              if not silent then write(chr($27));
            end;
-      $56: begin { CPNT, stops with endmark }
+      $56: begin { CPNT, stops with ENDMARK }
              normal:=false;
              if not silent then write(' ',chr($27));
              repeat
@@ -203,8 +203,8 @@ begin
                  if not silent then writeln;
                  done:=readline(scode,linestr);
                  if not silent then
-                   write(invvid,line,' ',
-                     linestr,norvid);
+                   write(INVVID,line,' ',
+                     linestr,NORVID);
                end;
                line:=line+1;
              end;
@@ -327,24 +327,24 @@ end;
 
 begin {main}
   init;
-  linestr:=new;
+  linestr:=_new;
   cyclus:=0; drive:=1;
-  agetstring(name,default,cyclus,drive);
+  _agetstring(name,default,cyclus,drive);
   setsubtype(name,'R');
   writeln('Opening object file ');
-  fcode:=attach(name,0,1,fread,0,0,'R');
-  cdsize:=getsize;
+  fcode:=_attach(name,0,1,FREAD,0,0,'R');
+  cdsize:=_getsize;
   writeln;
   writeln('Object file opened, file size ',
     cdsize div 256,' sectors');
   setsubtype(name,'P');
-  asetfile(name,cyclus,drive,'P');
+  _asetfile(name,cyclus,drive,'P');
   writeln('Opening source file ');
   openr(scode);
   writeln; writeln('Source file opened');
   first:=0; last:=32000;
-  agetval(first,default);
-  agetval(last,default);
+  _agetval(first,default);
+  _agetval(last,default);
   writeln('display from ',first,' to ',last);
   showprog;
   close(fcode);

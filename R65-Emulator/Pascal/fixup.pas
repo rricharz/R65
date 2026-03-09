@@ -195,16 +195,15 @@ begin
   upper('strsize');
   upper('endmark');
 { plotlib }
-  { upper('xsize');
+  { upper('xsize'); }
   upper('ysize');
   upper('xwords');
   upper('white');
   upper('inverse');
   upper('black');
   upper('plotdev');
-  upper('keypressed');}
+  upper('keypressed');
 { teklib }
-{****
   upper('maxx');
   upper('maxy');
   upper('maxcolumns');
@@ -215,7 +214,10 @@ begin
   upper('shortdash');
   upper('longdash');
   upper('plotter');
-****}
+{ ralib }
+  upper('fread');
+  upper('fwrite');
+  upper('fnew');
 
 { syslib }
   underscore('setemucom');
@@ -262,9 +264,6 @@ begin
   underscore('plotmap');
   underscore('waitforkey');
 { teklib }
-{****
-  underscore('xs');
-  underscore('ys');
   underscore('clearscreen');
   underscore('starttek');
   underscore('endtek');
@@ -277,7 +276,15 @@ begin
   underscore('delay10msec');
   underscore('setchsize');
   underscore('setlinemode');
-****}
+{ ralib }
+  underscore('uppercase');
+  underscore('attach');
+  underscore('getsize');
+  underscore('getword');
+  underscore('putword');
+  underscore('getreal');
+  underscore('putreal');
+
 end;
 
 proc putline;

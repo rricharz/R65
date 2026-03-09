@@ -59,18 +59,18 @@ proc setlimits(l,r:real);
 begin
   xmin:=l;
   xsize:=r-l;
-  putword(f,0,fsize);
-  putreal(f,1,l);
-  putreal(f,2,r);
+  _putword(f,0,fsize);
+  _putreal(f,1,l);
+  _putreal(f,2,r);
 end;
 
 begin
 
   fading:=1.0;
 
-  f:=attach('TABLE:X         ',0,1,fnew,
+  f:=_attach('TABLE:X         ',0,1,FNEW,
     4*(fsize+3),0,'X');
-  bsize:=getsize;
+  bsize:=_getsize;
   writeln('Table opened, bsize=',
     bsize,' bytes');
 
@@ -81,7 +81,7 @@ begin
     writeln('3: natural logarithm');
     writeln('4: gaussian function');
     writeln('5: multiplied sine waves');
-    read(@key,ch);
+    read(@KEY,ch);
   until (ch>='1') and (ch<='5');
 
   writeln;
@@ -96,11 +96,11 @@ begin
   for i:=0 to fsize-1 do begin
     write('.');
     case ch of
-     '1': putreal(f,i+3,fu1(i));
-     '2': putreal(f,i+3,fu2(i));
-     '3': putreal(f,i+3,fu3(i));
-     '4': putreal(f,i+3,fu4(i));
-     '5': putreal(f,i+3,fu5(i))
+     '1': _putreal(f,i+3,fu1(i));
+     '2': _putreal(f,i+3,fu2(i));
+     '3': _putreal(f,i+3,fu3(i));
+     '4': _putreal(f,i+3,fu4(i));
+     '5': _putreal(f,i+3,fu5(i))
      end;
   end;
 
@@ -108,4 +108,4 @@ begin
   writeln;
   writeln('Table written');
 
-end. 
+end. 

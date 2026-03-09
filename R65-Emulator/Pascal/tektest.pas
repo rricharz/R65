@@ -20,6 +20,7 @@ begin
 end;
 
 begin
+  writeln('Tektronix terminal required');
   xcenter:=MAXX div 2;
   ycenter:=MAXY div 2;
   radius:=9*MAXY div 20;
