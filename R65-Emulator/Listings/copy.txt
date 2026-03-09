@@ -1,0 +1,242 @@
+
+R65 COMPILE 4.6: program COPY             9/3/26 page 1
+
+
+   1 (    4) {
+   2 (    4) *************************************
+   3 (    4) *                                   *
+   4 (    4) * Copy(filename,source,destination) *
+   5 (    4) *                                   *
+   6 (    4) *************************************
+   7 (    4) 
+   8 (    4)   2019 rricharz
+   9 (    4)   2023 Added wildcard handling
+  10 (    4) 
+  11 (    4) }
+  12 (    4) 
+  13 (    4) program copy;
+  14 (    4) uses syslib,arglib,wildlib;
+  15 ( 1819) 
+  16 ( 1819) const MAXLINES = 13;
+  17 ( 1822)       rdfile=$e815;
+  18 ( 1822)       wrfile=$eb2c; {keep date}
+  19 ( 1822)       sblock=$6000;
+  20 ( 1822)       eblock=TOPMEM;
+  21 ( 1822)       cup=chr($1a);
+  22 ( 1822) 
+  23 ( 1822) mem   ENDSTK=$e: integer;
+  24 ( 1822)       FILFLG=$da: char&;
+  25 ( 1822)       filerr=$db: integer&;
+  26 ( 1822)       filsa=$031a,
+  27 ( 1822)       filea=$031c,
+  28 ( 1822)       filsa1=$0331: integer;
+  29 ( 1822)       filtyp=$0300: char&;
+  30 ( 1822) 
+  31 ( 1822) var name,savename: array[15] of char;
+  32 ( 1822)     i,fcount:integer;
+  33 ( 1822)     fno,ofno: file;
+  34 ( 1822)     cyclus,scyclus,drive,ddrive: integer;
+  35 ( 1822)     default: boolean;
+  36 ( 1822)     ch,k: char;
+  37 ( 1822)     entry: integer;
+  38 ( 1822)     last, found: boolean;
+  39 ( 1822) 
+  40 ( 1822) { * isblockf * }
+  41 ( 1822) 
+  42 ( 1822) func isblockf(nm: array[15] of char): boolean;
+  43 ( 1822) var j: integer;
+  44 ( 1825) begin
+  45 ( 1825)   j:=0;
+  46 ( 1829)   while (nm[j]<>':') and (j<14) do j:=j+1;
+  47 ( 1861)   if nm[j]=':' then
+  48 ( 1879)     begin
+  49 ( 1880)       if nm[j+1]='R' then isblockf:=true
+  50 ( 1900)       else isblockf:=false
+  51 ( 1909)     end
+  52 ( 1911)   else
+  53 ( 1915)     begin
+  54 ( 1918)       writeln('Cannot copy file type',nm[j+1]);
+  55 ( 1958)       _abort;
+  56 ( 1962)     end;
+  57 ( 1962) end;
+  58 ( 1962) 
+  59 ( 1963) { * blockload * }
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.6: program COPY             9/3/26 page 2
+
+  60 ( 1963) 
+  61 ( 1963) proc blockload(lowlim: integer);
+  62 ( 1963) var i: integer;
+  63 ( 1966) begin
+  64 ( 1966)   _asetfile(name,cyclus,drive,' ');
+  65 ( 1990)   FILFLG:=chr(0);
+  66 ( 1992)   filsa:=lowlim;
+  67 ( 1997)   filsa1:=lowlim;
+  68 ( 2005)   filtyp:='B';
+  69 ( 2015)   filerr:=0;
+  70 ( 2022)   call(rdfile);
+  71 ( 2030) end {blockload};
+  72 ( 2030) 
+  73 ( 2031) { * blocksave * }
+  74 ( 2031) 
+  75 ( 2031) proc blocksave(lowlim,highlim: integer);
+  76 ( 2031) var i: integer;
+  77 ( 2034) begin
+  78 ( 2034)   _asetfile(name,cyclus,ddrive,' ');
+  79 ( 2058)   FILFLG:=chr(0);
+  80 ( 2060)   filsa:=lowlim;
+  81 ( 2065)   filea:=highlim;
+  82 ( 2073)   filsa1:=lowlim;
+  83 ( 2081)   filtyp:='B';
+  84 ( 2091)   filerr:=0;
+  85 ( 2098)   call(wrfile);
+  86 ( 2106) end {blocksave};
+  87 ( 2106) 
+  88 ( 2107) { * error * }
+  89 ( 2107) 
+  90 ( 2107) proc error(x:integer);
+  91 ( 2107) mem RUNERR=$0c: integer&;
+  92 ( 2110) begin
+  93 ( 2110)   writeln;
+  94 ( 2112)   writeln(INVVID,'File error ',
+  95 ( 2133)     (x shr 4),(x and 15),NORVID);
+  96 ( 2158) end {error};
+  97 ( 2158) 
+  98 ( 2159) { * copyfile * }
+  99 ( 2159) 
+ 100 ( 2159) proc copyfile;
+ 101 ( 2159) begin
+ 102 ( 2159)   if isblockf(name) then
+ 103 ( 2178)     begin
+ 104 ( 2178)       write(cup); { hack to avoid empty line }
+ 105 ( 2184)       ENDSTK:=sblock-144; {reserve memory}
+ 106 ( 2193)       blockload(sblock);
+ 107 ( 2202)       if ord(filerr)<>0 then
+ 108 ( 2207)         begin
+ 109 ( 2208)           error(filerr);
+ 110 ( 2220)           ENDSTK:=TOPMEM-144; {_release memory}
+ 111 ( 2229)           _abort;
+ 112 ( 2233)         end;
+ 113 ( 2233)       if filea>=TOPMEM then
+ 114 ( 2240)         begin
+ 115 ( 2241)           writeln('Error: File too large');
+ 116 ( 2272)           ENDSTK:=TOPMEM-144; {_release memory}
+ 117 ( 2281)           _abort;
+ 118 ( 2285)         end;
+ 119 ( 2285)       cyclus:=FILCYC;
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.6: program COPY             9/3/26 page 3
+
+ 120 ( 2289)       FILDRV:=ddrive;
+ 121 ( 2293)       blocksave(sblock,filea);
+ 122 ( 2314)       if ord(filerr)<>0 then
+ 123 ( 2319)           error(filerr);
+ 124 ( 2332)       ENDSTK:=TOPMEM-144; {_release memory}
+ 125 ( 2341)       writeln;
+ 126 ( 2341)     end
+ 127 ( 2347) 
+ 128 ( 2347)   else
+ 129 ( 2347)     begin
+ 130 ( 2350)       write(cup); { hack to avoid empty line }
+ 131 ( 2353)       _asetfile(name,cyclus,drive,' ');
+ 132 ( 2375)       openr(fno);
+ 133 ( 2381)       FILCY1:=FILCYC;
+ 134 ( 2385)       FILDRV:=ddrive;
+ 135 ( 2390)       openw(ofno);
+ 136 ( 2404)       write('.');
+ 137 ( 2406)       repeat
+ 138 ( 2406)         read(@fno,ch);
+ 139 ( 2416)         write(@ofno,ch);
+ 140 ( 2428)         if ch=CR then write('.');
+ 141 ( 2440)         until ch=EOF;
+ 142 ( 2446)       write(@ofno,EOF);
+ 143 ( 2459)       close(ofno);
+ 144 ( 2465)       close(fno);
+ 145 ( 2471)       writeln;
+ 146 ( 2471)     end;
+ 147 ( 2477) end;
+ 148 ( 2477) 
+ 149 ( 2478) func haswildcard(nm1:array[15] of char): boolean;
+ 150 ( 2478) var k:integer;
+ 151 ( 2481) begin
+ 152 ( 2481)   haswildcard:=false;
+ 153 ( 2485)   for k:=0 to 15 do
+ 154 ( 2497)     if (nm1[k]='*') or (nm1[k]='?') then
+ 155 ( 2528)       haswildcard:=true;
+ 156 ( 2534) end;
+ 157 ( 2552) {
+ 158 ( 2553)  * main * }
+ 159 ( 2553) 
+ 160 ( 2553) begin
+ 161 ( 2553)   cyclus:=0;
+ 162 ( 2557)   _agetstring(name,default,cyclus,drive);
+ 163 ( 2601)   scyclus:=cyclus;
+ 164 ( 2601)   if (drive<0) or (drive>1) then
+ 165 ( 2623)     begin
+ 166 ( 2624)       writeln(INVVID,
+ 167 ( 2629)         'Specify source drive (0 or 1)',NORVID);
+ 168 ( 2669)       _abort;
+ 169 ( 2673)     end;
+ 170 ( 2673) 
+ 171 ( 2673)   _agetval(ddrive,default); {destination drive}
+ 172 ( 2693)   if default then
+ 173 ( 2693)     begin
+ 174 ( 2697)       writeln(INVVID,
+ 175 ( 2702)         'Specify destination drive (0 or 1)');
+ 176 ( 2744)       writeln('Usage: copy name',
+ 177 ( 2761)         '[,source_drive] dest_drive',NORVID);
+ 178 ( 2797)       _abort;
+ 179 ( 2801)     end;
+
+----------------------------------------------------------------------
+
+R65 COMPILE 4.6: program COPY             9/3/26 page 4
+
+ 180 ( 2801)   if (ddrive<0) or (ddrive>1) then
+ 181 ( 2815)     begin
+ 182 ( 2816)       writeln(INVVID,
+ 183 ( 2821)         'Destination drive must be 0 or 1',NORVID);
+ 184 ( 2864)       _abort;
+ 185 ( 2868)     end;
+ 186 ( 2868)   if drive=ddrive then
+ 187 ( 2872)     begin
+ 188 ( 2877)       writeln(INVVID,'Source and destination',
+ 189 ( 2906)        ' drives must be different',NORVID);
+ 190 ( 2941)       _abort;
+ 191 ( 2945)     end;
+ 192 ( 2945) 
+ 193 ( 2945)   if haswildcard(name) then begin
+ 194 ( 2959)     fcount:=0; last:=false; entry:= 0;
+ 195 ( 2976)     while (entry<NUMENTRIES) and not last do begin
+ 196 ( 2996)       cyclus:=scyclus;
+ 197 ( 2996)       _findentry(name,drive,entry,found,last);
+ 198 ( 3050)       if found and (not last) and
+ 199 ( 3059)         ((scyclus=0) or (scyclus=FILCYC)) then begin
+ 200 ( 3078)         for i:=0 to 15 do begin
+ 201 ( 3098)           savename[i]:=name[i];
+ 202 ( 3106)           name[i]:=FILNAM[i];
+ 203 ( 3125)         end;
+ 204 ( 3131)         cyclus:=FILCYC;
+ 205 ( 3149)         copyfile;
+ 206 ( 3157)         fcount:=fcount+1;
+ 207 ( 3163)         for i:=0 to 15 do
+ 208 ( 3176)           name[i]:=savename[i];
+ 209 ( 3193)       end;
+ 210 ( 3215)     end;
+ 211 ( 3215)       if fcount=0 then writeln('no files found')
+ 212 ( 3243)       else writeln(fcount, ' files copied');
+ 213 ( 3277)   end else
+ 214 ( 3277)     copyfile;
+ 215 ( 3284) end.
+ 216 ( 3284) 
+
+End compile
+
+Code lenght:          3283
+Compiler stack size:  71
+Ident stack size:     114
+Pascal errors:        0

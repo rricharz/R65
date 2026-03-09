@@ -32,6 +32,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#define MAXENTRIES 127       // 16 sectors of 256 bytes, 32 bytes per entry
+
 #include "time.h"
 
 struct DirEntries {
@@ -393,9 +395,9 @@ int main(int argc, char *argv[])
         if (debug) printf("%4d: ", dirIndex);
         displayDirEntry();
     }
-    while ((dirEntry.filtyp != 0) && (dirIndex++ < 79));
+    while ((dirEntry.filtyp != 0) && (dirIndex++ < MAXENTRIES));
     
-    if (dirIndex >= 255) {
+    if (dirIndex >= MAXENTRIES) {
         printf("***** Directory full\n");
         closeAndExit();
     }
