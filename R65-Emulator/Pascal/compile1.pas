@@ -652,6 +652,7 @@ end {savtable};
 {##############}
 
 begin {main}
+  RUNERR := 0;
   nlflg:=false;
   init;scan;
   case token of

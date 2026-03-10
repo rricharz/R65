@@ -31,7 +31,7 @@ const
     sblock=$6000;
     eblock=TOPMEM;
 
-mem endstk=$e,
+mem ENDSTK=$e,
     stprog=$11: integer;
     FILERR=$db: integer&;
     FILSA=$031a,
@@ -58,7 +58,7 @@ begin
   else
     case x of
       101: writeln('Program too long');
-      102: writeln('Data input format ',ch);
+      102: writeln('Data INPUT format ',ch);
       105: writeln('Wrong address');
       106: writeln('Unexpected EOF');
       107: writeln('Pointer not matching')
@@ -103,7 +103,7 @@ var i: integer;
 
 begin
   cdrive:=FILDRV; { drive of compile program }
-  endstk:=sblock-144;   {reserve memory }
+  ENDSTK:=sblock-144;   {reserve memory }
   writeln;
   writeln(title);
   scyclus:=0; sdrive:=1;
@@ -259,6 +259,6 @@ begin {main}
   showused;
   blocksave(sblock,pointer);
   writeln('Program has been stored');
-  endstk:=TOPMEM-144;
-  dummy:=freedsk(sdrive,true);
+  ENDSTK:=TOPMEM-144;
+  dummy:=_freedrv(sdrive,true);
 end.

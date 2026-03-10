@@ -5,15 +5,14 @@ proc runprog
    cyc: integer; drv: integer);
 var i: integer;
 begin
-  for i:=0 to 15 do filnm1[i]:=name[i];
-  filcy1:=cyc; fildrv:=drv; filflg:=$40;
+  for i:=0 to 15 do FILNM1[i]:=name[i];
+  FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
   run
 end;
 
-proc writename(text: array[15] of char);
+proc _writename(text: array[15] of char);
 { write name without blanks }
 var i: integer;
-
 begin
   for i:=0 to 15 do
     if text[i]<>' ' then write(text[i]);
@@ -54,29 +53,28 @@ begin
   contains:=found;
 end;
 
-
 func letter(ch:char):boolean;
 begin
   letter:=(ch>='A') and (ch<='Z');
 end;
 
 proc setargs(name:array[15] of char;
-  carg,cyc,drv:integer);
+  _carg,cyc,drv:integer);
 var k:integer;
 begin
-  argtype[carg]:='s';
+  ARGTYPE[_carg]:='s';
     for k:=0 to 7 do
-      arglist[carg+k]:=
+      ARGLIST[_carg+k]:=
         ord(packed(fname[2*k+1],
                     fname[2*k]));
-    argtype[carg+8]:='i';
-    arglist[carg+8]:=cyc;
-    argtype[carg+9]:='i';
-    arglist[carg+9]:=drv;
+    ARGTYPE[_carg+8]:='i';
+    ARGLIST[_carg+8]:=cyc;
+    ARGTYPE[_carg+9]:='i';
+    ARGLIST[_carg+9]:=drv;
 end;
 
-proc setargi(val,carg:integer);
+proc setargi(val,_carg:integer);
 begin
-  argtype[carg]:='i';
-  arglist[carg]:=val;
+  ARGTYPE[_carg]:='i';
+  ARGLIST[_carg]:=val;
 end;

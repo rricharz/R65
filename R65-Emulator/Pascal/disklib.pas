@@ -1,46 +1,24 @@
 library disklib;
 { provides functions for the handling of disks }
 
-{ *** dskname: get name of disk **** }
-
-proc dskname;
-{ name is in filnam }
-const aprepdo  = $f4a7;
-      aenddo   = $f625;
-      agetentx = $f63a;
-      maxent   = 255;
-mem   scyfc    = $037c:integer&;
-      
-
-begin
-  call(aprepdo);
-  scyfc:=maxent; { disk name }
-  call(agetentx);
-  call(aenddo);
-end;
-
-{ *** freesec: get % of free sectors *** }
-
-func freedsk(drive:integer;showit:boolean);
-
+func _freedrv(drive:integer;showit:boolean);
+{*****************************************}
+{ freedrv: get % of free sectors *** }
 const aprepdo  = $f4a7;
       aenddo   = $f625;
       agetentx = $f63a;
       tsectors = 2560;
-      maxent   = 255;
-      invvid   = chr($0e);
-      norvid   = chr($0b);
-
-mem fildrv=$00dc:integer&;
+      maxent   = 127;
+      INVVID   = chr($0e);
+      NORVID   = chr($0b);
+mem FILDRV=$00dc:integer&;
     filtyp=$0300:char&;
     filloc=$0313:integer;
     scyfc =$037c:integer&;
-    filnam   = $0301: array[15] of char&;
-
-var s,i:integer;
+var s:integer;
     r:real;
 begin
-  fildrv:=drive;
+  FILDRV:=drive;
   call(aprepdo);
   s:=0;
   repeat
@@ -49,23 +27,14 @@ begin
     until (filtyp=chr(0)) or (s>=maxent);
   r:=conv(tsectors-filloc);
   s:=trunc(100.0*r/conv(tsectors)+0.5);
-  freedsk:=s;
+  _freedrv := s; { return no of free sectors }
   call(aenddo);
-  dskname;
   if showit then begin
-    if s<20 then write(invvid);
-    write( 'Free space on drive ');
-    i:=0;
-    while (filnam[i]<>' ') and (i<15) do begin
-      write(filnam[i]);
-      i:=i+1;
-    end;
-    writeln(': ',s,'%',norvid);
+    if s<20 then write(INVVID);
+    writeln( 'Free space on drive ', drive,
+      ': ',s,'%',NORVID);
   end;
 end;
 
 begin
 end.
-
-
-

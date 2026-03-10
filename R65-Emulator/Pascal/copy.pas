@@ -13,15 +13,15 @@
 program copy;
 uses syslib,arglib,wildlib;
 
-const maxlines = 13;
+const MAXLINES = 13;
       rdfile=$e815;
       wrfile=$eb2c; {keep date}
       sblock=$6000;
-      eblock=topmem;
+      eblock=TOPMEM;
       cup=chr($1a);
 
-mem   endstk=$e: integer;
-      filflg=$da: char&;
+mem   ENDSTK=$e: integer;
+      FILFLG=$da: char&;
       filerr=$db: integer&;
       filsa=$031a,
       filea=$031c,
@@ -52,7 +52,7 @@ begin
   else
     begin
       writeln('Cannot copy file type',nm[j+1]);
-      abort;
+      _abort;
     end;
 end;
 
@@ -61,8 +61,8 @@ end;
 proc blockload(lowlim: integer);
 var i: integer;
 begin
-  asetfile(name,cyclus,drive,' ');
-  filflg:=chr(0);
+  _asetfile(name,cyclus,drive,' ');
+  FILFLG:=chr(0);
   filsa:=lowlim;
   filsa1:=lowlim;
   filtyp:='B';
@@ -75,8 +75,8 @@ end {blockload};
 proc blocksave(lowlim,highlim: integer);
 var i: integer;
 begin
-  asetfile(name,cyclus,ddrive,' ');
-  filflg:=chr(0);
+  _asetfile(name,cyclus,ddrive,' ');
+  FILFLG:=chr(0);
   filsa:=lowlim;
   filea:=highlim;
   filsa1:=lowlim;
@@ -88,11 +88,11 @@ end {blocksave};
 { * error * }
 
 proc error(x:integer);
-mem runerr=$0c: integer&;
+mem RUNERR=$0c: integer&;
 begin
   writeln;
-  writeln(invvid,'File error ',
-    (x shr 4),(x and 15),norvid);
+  writeln(INVVID,'File error ',
+    (x shr 4),(x and 15),NORVID);
 end {error};
 
 { * copyfile * }
@@ -102,44 +102,45 @@ begin
   if isblockf(name) then
     begin
       write(cup); { hack to avoid empty line }
-      endstk:=sblock-144; {reserve memory}
+      ENDSTK:=sblock-144; {reserve memory}
       blockload(sblock);
       if ord(filerr)<>0 then
         begin
           error(filerr);
-          endstk:=topmem-144; {release memory}
-          abort;
+          ENDSTK:=TOPMEM-144; {_release memory}
+          _abort;
         end;
-      if filea>=topmem then
+      if filea>=TOPMEM then
         begin
           writeln('Error: File too large');
-          endstk:=topmem-144; {release memory}
-          abort;
+          ENDSTK:=TOPMEM-144; {_release memory}
+          _abort;
         end;
-      cyclus:=filcyc;
-      fildrv:=ddrive;
+      cyclus:=FILCYC;
+      FILDRV:=ddrive;
       blocksave(sblock,filea);
       if ord(filerr)<>0 then
           error(filerr);
-      endstk:=topmem-144; {release memory}
+      ENDSTK:=TOPMEM-144; {_release memory}
       writeln;
     end
 
   else
     begin
       write(cup); { hack to avoid empty line }
-      asetfile(name,cyclus,drive,' ');
+      _asetfile(name,cyclus,drive,' ');
       openr(fno);
-      filcy1:=filcyc;
-      fildrv:=ddrive;
+      FILCY1:=FILCYC;
+      FILDRV:=ddrive;
       openw(ofno);
-      write('.');
+      {write('.');}
       repeat
         read(@fno,ch);
         write(@ofno,ch);
-        if ch=cr then write('.');
-        until ch=eof;
-      write(@ofno,eof);
+        if ch=CR then write('.')
+        until (ch=EOF) or (ch=chr(31));
+        { chr(31) for compatibility with old files }
+      write(@ofno,EOF);
       close(ofno);
       close(fno);
       writeln;
@@ -159,49 +160,49 @@ end;
 
 begin
   cyclus:=0;
-  agetstring(name,default,cyclus,drive);
+  _agetstring(name,default,cyclus,drive);
   scyclus:=cyclus;
   if (drive<0) or (drive>1) then
     begin
-      writeln(invvid,
-        'Specify source drive (0 or 1)',norvid);
-      abort;
+      writeln(INVVID,
+        'Specify source drive (0 or 1)',NORVID);
+      _abort;
     end;
 
-  agetval(ddrive,default); {destination drive}
+  _agetval(ddrive,default); {destination drive}
   if default then
     begin
-      writeln(invvid,
+      writeln(INVVID,
         'Specify destination drive (0 or 1)');
       writeln('Usage: copy name',
-        '[,source_drive] dest_drive',norvid);
-      abort;
+        '[,source_drive] dest_drive',NORVID);
+      _abort;
     end;
   if (ddrive<0) or (ddrive>1) then
     begin
-      writeln(invvid,
-        'Destination drive must be 0 or 1',norvid);
-      abort;
+      writeln(INVVID,
+        'Destination drive must be 0 or 1',NORVID);
+      _abort;
     end;
   if drive=ddrive then
     begin
-      writeln(invvid,'Source and destination',
-       ' drives must be different',norvid);
-      abort;
+      writeln(INVVID,'Source and destination',
+       ' drives must be different',NORVID);
+      _abort;
     end;
 
   if haswildcard(name) then begin
     fcount:=0; last:=false; entry:= 0;
-    while (entry<numentries) and not last do begin
+    while (entry<NUMENTRIES) and not last do begin
       cyclus:=scyclus;
-      findentry(name,drive,entry,found,last);
+      _findentry(name,drive,entry,found,last);
       if found and (not last) and
-        ((scyclus=0) or (scyclus=filcyc)) then begin
+        ((scyclus=0) or (scyclus=FILCYC)) then begin
         for i:=0 to 15 do begin
           savename[i]:=name[i];
-          name[i]:=filnam[i];
+          name[i]:=FILNAM[i];
         end;
-        cyclus:=filcyc;
+        cyclus:=FILCYC;
         copyfile;
         fcount:=fcount+1;
         for i:=0 to 15 do
@@ -213,4 +214,4 @@ begin
   end else
     copyfile;
 end.
- 
+ 

@@ -5,7 +5,7 @@
          *               *
          *****************
 
-    _move the source file from the WORK disk
+    move the source file from the WORK disk
     on the disk SOURCEPASCAL or SOURCECOMPIL
 
     usage: putsource filename
@@ -96,7 +96,7 @@ begin
       runprog('CLEAN:R         ',cyclus,drive);
       if (filerr<>0) or (RUNERR<>0) then begin
          ok:=false;
-         writeln(INVID,
+         writeln(INVVID,
            'Cleaning PSOURCE failed',NORVID);
       end;
 
@@ -108,7 +108,6 @@ begin
       runprog('PACK:R          ',cyclus,drive);
       if (filerr<>0) or (RUNERR<>0) then
          ok:=false;
-      dummy:=freedsk(0,true);
     end;
 
     { make sure that PASCAL is on drive 0 }

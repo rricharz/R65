@@ -604,8 +604,8 @@ int export_file()
             int i = 0;
             
             if (filtyp=='S') {  // sequential file
-                while ((i < 256) && ((buffer[i] & 0x7F) != 0x1F)
-                    && ((buffer[i] & 0xFF) != 0xFF)) {
+                while ((i < 256) && ((buffer[i] & 0x7F) != 0x7F)
+                    && ((buffer[i] & 0x7F) != 0x1F)) {
                     if ((buffer[i] >= 0x80) && (buffer[i] <= 0xFe)) {
                         for (int ii = 0; ii < (buffer[i] & 0x7F); ii++) {
                             fprintf(foutput, "%c", ' ');
@@ -618,12 +618,17 @@ int export_file()
                     }
                     else {
                         fprintf(foutput, "%c",buffer[i]);
-                        printf("<%i>", buffer[i]);
+                        printf("%c", buffer[i]);
                         count++;
                     }
                     i++;
                 }
-                if ((buffer[i] & 0x7F) == 0x1F) {
+                if ((buffer[i] & 0x7F) == 0x7F) { // stop if 7F found
+                    fclose(foutput);
+                    printf("Export complete, bytes written: %d\n",count);
+                    return 0;
+                }
+                if ((buffer[i] & 0x7F) == 0x1F) { // stop if 1F found
                     fclose(foutput);
                     printf("Export complete, bytes written: %d\n",count);
                     return 0;

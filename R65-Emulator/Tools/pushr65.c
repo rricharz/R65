@@ -162,13 +162,8 @@ void pushByte(FILE *f, uint8_t value)
         return;        
     }
     else {   
-      chr = value & 0x7F;               // mask bit 8 off
-      if (chr == 0x7f) { 
-		byteOutCounter--;
-	    return;			                // and ignore EOF
-  
-      }  
-   }
+      chr = value & 0x7F;               // mask bit 8 off  
+    }
     
     if (chr == 0x09) {                          // tab
         do
@@ -427,7 +422,7 @@ int main(int argc, char *argv[])
         pushByte(foutput, chr);     // push characters
     }
     while ((!feof(finput))&&((chr != 0xff)));
-    pushByte(foutput, 0x1f);        // R65 system EOF character
+    pushByte(foutput, 0x7f);        // R65 system EOF character
     numSectors = (byteOutCounter / 256) + 1;
     printf("Bytes read %d\n", byteInCounter);
     printf("Bytes written %d\n", byteOutCounter);

@@ -65,6 +65,10 @@ begin
   pos := 0;
   read(@fno,ch1);
   sline[0] := ENDMARK;
+  if (ch1 = EOF) then begin
+    readline := true;
+    exit;
+  end;
   while (ch1 >= ' ') and (pos<(STRSIZE - 2)) do begin
     sline[pos] := ch1;
     {write(pos, ': ', ch1);}
@@ -115,7 +119,9 @@ begin
     start := i - 1;
     modified := true;
     for i:=0 to lstring - 1 do
-      sline[i + start] := chr(ord(s[i]) - 32);
+      if ((sline[i+start]>='a') and
+               (sline[i+start]<='z')) then
+        sline[i+start] := chr(ord(s[i]) - 32);
     upper(s); { recursive: fix more on same line }
   end;
 end;
@@ -187,6 +193,7 @@ begin
 { arglib }
   upper('numarg');
   upper('arglist');
+  upper('arglists');
   upper('argtype');
   upper('curpos');
   upper('maxseq');
@@ -218,6 +225,9 @@ begin
   upper('fread');
   upper('fwrite');
   upper('fnew');
+{ wildlib }
+  upper('numentries');
+  upper('namesize');
 
 { syslib }
   underscore('setemucom');
@@ -237,6 +247,7 @@ begin
   underscore('uppercase');
   underscore('asetfile');
   underscore('runerr');
+  underscore('carg');
 { strlib }
   underscore('new');
   underscore('release');
@@ -284,6 +295,12 @@ begin
   underscore('putword');
   underscore('getreal');
   underscore('putreal');
+{ wildlib }
+  underscore('test');
+  underscore('findentry');
+  underscore('writename');
+{ disklib }
+  underscore('freedsk');
 
 end;
 
@@ -332,8 +349,4 @@ begin
   end else
     writeln('Lines fixed ', linesfixed);
   closefiles;
-end. program test;
-begin
-  abcplot plot plotabc
-  abclf lf lfabc
 end.

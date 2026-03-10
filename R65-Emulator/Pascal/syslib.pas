@@ -26,7 +26,7 @@ const
   LF=chr($a);       {line feed}
   FF=chr($c);       {form feed}
   CR=chr($d);       {carriage return}
-  EOF=chr($1f);     {end of file}
+  EOF=chr($7f);     {end of file}
   NORVID=chr($0b);  {normal video}
   INVVID=chr($0e);  {inverse video}
   PRTON=chr($12);   {autoprint on}

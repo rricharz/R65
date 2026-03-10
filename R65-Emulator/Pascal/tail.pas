@@ -32,10 +32,10 @@ end;
 proc show(ch:char);
 begin
   write('<',ord(ch),'>');
-  if (ord(ch)>32) then write(' ',ch)
-  else if (ch = ' ') then write('blank')
-  else if (ord(ch) = 13) then write(' EOL')
-  else if (ord(ch) = 31) then write(' EOF');
+  if (ch = ' ') then write('blank')
+  else if (ch = chr(13)) then write(' EOL')
+  else if (ch = EOF) then write(' EOF')
+  else if (ord(ch)>32) then write(' ',ch)
   writeln;
 end;
 
@@ -79,15 +79,11 @@ begin
     show(ch);
     if (ch=EOF) then exit;
     read(@fno,ch);
-    while (ch<>EOF) do
+    while ((ch<>EOF) and (check(ch)=false)) do
     begin {main loop; while }
       if ch=CR then begin
         linecount := succ(linecount);
         writeln
-      end else if check(ch) then begin
-        { check for non printable character }
-        writeln(INVVID, 'non printable character: <',
-          ord(ch),'>',NORVID);
       end else write(ch);
       lastch4:=lastch3;
       lastch3:=lastch2;
@@ -101,6 +97,7 @@ begin
     show(lastch3);
     show(lastch2);
     show(lastch1);
+    show(ch);
   end
   else writeln('usage: tail filnam');
 end.
