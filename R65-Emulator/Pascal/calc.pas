@@ -23,22 +23,22 @@ var ch: char;
 proc clearinput;
 {**************}
 begin
-  buffpn:=-1;
+  BUFFPN:=-1;
 end;
 
 proc error(s1,s2:cpnt);
 {*********************}
 begin
   if firsterror then
-    writeln(invvid,'Error: ',s1,' ',s2,norvid);
+    writeln(INVVID,'Error: ',s1,' ',s2,NORVID);
   firsterror:=false;
 end;
 
 proc readch;
 {**********}
 begin
-  if firsterror then read(@input,ch)
-  else ch:=cr;
+  if firsterror then read(@INPUT,ch)
+  else ch:=CR;
 end;
 
 func fix(rf: real): integer;
@@ -62,15 +62,15 @@ proc checkfor(c: char);
 var s1,s2:cpnt;
 begin
   if ch<>c then begin
-    s1:=new; s2:=new;
-    strcpy('Expected ',s1);
-    if c=cr then strcpy('Expected <eol>',s1)
-    else strinsc(c,9,s1);
-    strcpy('but found ',s2);
-    if ch=cr then strcpy('but found <eol>',s2)
-    else strinsc(ch,10,s2);
+    s1:=_new; s2:=_new;
+    _strcpy('Expected ',s1);
+    if c=CR then _strcpy('Expected <eol>',s1)
+    else _strinsc(c,9,s1);
+    _strcpy('but found ',s2);
+    if ch=CR then _strcpy('but found <eol>',s2)
+    else _strinsc(ch,10,s2);
     error(s1,s2);
-    release(s2); release(s1);
+    _release(s2); _release(s1);
   end;
 end;
 
@@ -119,41 +119,41 @@ proc showled(s1:cpnt);
 var s2:cpnt;
     pos,i,l:integer;
 begin
-  s2:=new;
-  strcpy(s1,s2);
+  s2:=_new;
+  _strcpy(s1,s2);
   { remove any space }
-  pos:=strpos(' ',s2,0);
+  pos:=_strpos(' ',s2,0);
   while pos>=0 do begin
-    strdelc(pos,s2);
-    pos:=strpos(' ',s2,0);
+    _strdelc(pos,s2);
+    pos:=_strpos(' ',s2,0);
   end;
   { remove any plus sign }
-  pos:=strpos('+',s2,0);
+  pos:=_strpos('+',s2,0);
   while pos>=0 do begin
-    strdelc(pos,s2);
-    pos:=strpos('+',s2,0);
+    _strdelc(pos,s2);
+    pos:=_strpos('+',s2,0);
   end;
   { convert point to bit 8 }
-  pos:=strpos('.',s2,0);
+  pos:=_strpos('.',s2,0);
   while pos>0 do begin
-    strdelc(pos,s2);
+    _strdelc(pos,s2);
     s2[pos-1]:=chr(ord(s2[pos-1]) or 128);
-    pos:=strpos('.',s2,0);
+    pos:=_strpos('.',s2,0);
   end;
   { remove unnecessary 0 in exponent, if necessary }
-  l:=strlen(s2);
+  l:=_strlen(s2);
   if (l>8) and (s2[l-2]='0') and
-    (strpos('e',s2,0)>0) then strdelc(l-2,s2);
+    (_strpos('e',s2,0)>0) then _strdelc(l-2,s2);
   { remove e as a last resort (exp is negative) }
-  if strlen(s2)>8 then begin
-    pos:=strpos('e',s2,0);
-    if pos>0 then strdelc(pos,s2);
+  if _strlen(s2)>8 then begin
+    pos:=_strpos('e',s2,0);
+    if pos>0 then _strdelc(pos,s2);
   end;
   { right justify }
-  while strlen(s2)<8 do strinsc(' ',0,s2);
+  while _strlen(s2)<8 do _strinsc(' ',0,s2);
   { show converted string }
-  ledstring(s2);
-  release(s2);
+  _ledstring(s2);
+  _release(s2);
 end;
 
 proc writeauto(f:file;r:real);
@@ -208,17 +208,17 @@ proc showresult;
 var s1: cpnt;
     rnd: real;
 begin
-  s1:=new;
+  s1:=_new;
   writeauto(@s1,r);
   write(s1);
   if (r>-32768.5) and (r<32767.5) then begin
     if r>=0.0 then rnd:=0.5 else rnd:=-0.5;
-    tab(16); writehex(output,fix(r));
-    tab(24); writebinary(output,fix(r));
+    _tab(16); writehex(OUTPUT,fix(r));
+    _tab(24); writebinary(OUTPUT,fix(r));
   end;
   writeln;
   showled(s1);
-  release(s1);
+  _release(s1);
 end;
 
 func express:real;
@@ -256,51 +256,51 @@ var i: integer;
     r: real;
     lstring: cpnt;
 begin
-  lstring:=new;
+  lstring:=_new;
   lstring[0]:=chr(0);
-  strinsc(ch,0,lstring); readch; i:=1;
+  _strinsc(ch,0,lstring); readch; i:=1;
   while isletter(ch) do begin
-    strinsc(ch,i,lstring); readch; i:=i+1;
+    _strinsc(ch,i,lstring); readch; i:=i+1;
   end;
   stop:=false;
-  if strcmp(lstring,'R')=0 then begin
-    function:=lastr; release(lstring); exit;
+  if _strcmp(lstring,'R')=0 then begin
+    function:=lastr; _release(lstring); exit;
   end;
-  if strcmp(lstring,'PI')=0 then begin
-    function:=pi; release(lstring); exit;
+  if _strcmp(lstring,'PI')=0 then begin
+    function:=PI; _release(lstring); exit;
   end;
-  if strcmp(lstring,'E')=0 then begin
-    function:=e; release(lstring); exit;
+  if _strcmp(lstring,'E')=0 then begin
+    function:=E; _release(lstring); exit;
   end;
   { functions with single argument follow }
   checkfor('('); r:=express; skip(')');
-  if strcmp(lstring,'SQR')=0 then begin
-    function:=r*r; release(lstring); exit;
+  if _strcmp(lstring,'SQR')=0 then begin
+    function:=r*r; _release(lstring); exit;
   end;
-  if strcmp(lstring,'SQRT')=0 then begin
-    function:=sqrt(r); release(lstring); exit;
+  if _strcmp(lstring,'SQRT')=0 then begin
+    function:=sqrt(r); _release(lstring); exit;
   end;
-  if strcmp(lstring,'SIN')=0 then begin
-    function:=sin(r); release(lstring); exit;
+  if _strcmp(lstring,'SIN')=0 then begin
+    function:=sin(r); _release(lstring); exit;
   end;
-  if strcmp(lstring,'COS')=0 then begin
-    function:=cos(r); release(lstring); exit;
+  if _strcmp(lstring,'COS')=0 then begin
+    function:=cos(r); _release(lstring); exit;
   end;
-  if strcmp(lstring,'TAN')=0 then begin
-    function:=tan(r); release(lstring); exit;
+  if _strcmp(lstring,'TAN')=0 then begin
+    function:=tan(r); _release(lstring); exit;
   end;
-  if strcmp(lstring,'EXP')=0 then begin
-    function:=exp(r); release(lstring); exit;
+  if _strcmp(lstring,'EXP')=0 then begin
+    function:=exp(r); _release(lstring); exit;
   end;
-  if strcmp(lstring,'LN')=0 then begin
-    function:=ln(r); release(lstring); exit;
+  if _strcmp(lstring,'LN')=0 then begin
+    function:=ln(r); _release(lstring); exit;
   end;
-  if strcmp(lstring,'LOG')=0 then begin
-    function:=log(r); release(lstring); exit;
+  if _strcmp(lstring,'LOG')=0 then begin
+    function:=log(r); _release(lstring); exit;
   end;
   error('Unknow function',lstring);
   function:=0.0;
-  release(lstring);
+  _release(lstring);
 end;
 
 proc exponent(var r:real);
@@ -351,8 +351,8 @@ begin
     rf:=conv(iv);
   end else if isletter(ch) then rf:=function
   else if ch<>chr(0) then begin
-    if ch<>cr then begin
-      if ch<>cr then stop:=false;
+    if ch<>CR then begin
+      if ch<>CR then stop:=false;
       if ch='+' then readch;
       {if ch='-' then begin
         negative:=true; readch;
@@ -427,24 +427,24 @@ end;
 
 {*********main body********}
 begin
-  write(invvid);
+  write(INVVID);
   writeln('Enter an expression, for example:        ');
-  writeln('32767      input decimal number          ');
-  writeln('$FFF       input hex number              ');
-  writeln('%1101      input binary number           ');
-  writeln('-55.35     input negative number         ');
+  writeln('32767      INPUT decimal number          ');
+  writeln('$FFF       INPUT hex number              ');
+  writeln('%1101      INPUT binary number           ');
+  writeln('-55.35     INPUT negative number         ');
   writeln('2*(5+28)   math expression               ');
   writeln('R*3        last result                   ');
   writeln('<return>,<esc>    exit                   ');
   writeln('Operators: +,-,*,/,^,(),&,|,<<,>>        ');
   writeln('Functions: SQRT(),SQR(),SIN(),COS()      ');
   writeln('           TAN(),EXP(),LN(),LOG()        ');
-  writeln(norvid);
+  writeln(NORVID);
   r:=0.0; lastr:=0.0; dotused:=false;
   repeat
     firsterror:=true;
     clearinput;
     stop:=true; showresult;
-    dotused:=false; lastr:=r; r:=express; checkfor(cr);
+    dotused:=false; lastr:=r; r:=express; checkfor(CR);
   until stop;
 end.

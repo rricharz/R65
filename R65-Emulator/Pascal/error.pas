@@ -17,9 +17,9 @@ var err:integer;
 
 begin
   err:=0;
-  agetval(err,default);
+  _agetval(err,default);
   write('Error ',err,': ');
-  write(invvid);
+  write(INVVID);
   case err of
     05: writeln('File type error');
     06: writeln('File not found');
@@ -54,5 +54,5 @@ begin
     107: writeln('Too many arguments')
     else writeln('Undefined')
     end;
-  write(norvid);
+  write(NORVID);
 end.

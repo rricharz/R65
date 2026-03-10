@@ -20,8 +20,8 @@ end;
 
 begin
   repeat
-    read(@key,ch);
-    write('key value = ');
+    read(@KEY,ch);
+    write('KEY value = ');
     writehex(ch);
     writeln('  ',ord(ch));
     until ch=esc;

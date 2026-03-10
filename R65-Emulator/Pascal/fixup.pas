@@ -54,6 +54,7 @@ end;
 proc closefiles;
 begin
   close(fno);
+  write(@ofno,EOF);
   close(ofno);
   if debug then writeln('$$$ Files closed $$$');
 end;
@@ -65,17 +66,23 @@ begin
   pos := 0;
   read(@fno,ch1);
   sline[0] := ENDMARK;
+{
   if (ch1 = EOF) then begin
     readline := true;
     exit;
   end;
-  while (ch1 >= ' ') and (pos<(STRSIZE - 2)) do begin
+}
+  while (ch1 >= ' ') and (ch1 < EOF) and
+      (pos<(STRSIZE - 2)) do begin
     sline[pos] := ch1;
     {write(pos, ': ', ch1);}
     pos := pos + 1;
     read(@fno, ch1);
   end;
   sline[pos] := ENDMARK;
+{
+  if ch1 = chr(13) then read(@fno,ch1);
+}
   readline:= (ch1 = EOF);
 end;
 
@@ -252,7 +259,7 @@ begin
   underscore('new');
   underscore('release');
   underscore('strlen');
-  underscore('strcopy');
+  underscore('strcpy');
   underscore('stradd');
   underscore('strcmp');
   underscore('strpos');

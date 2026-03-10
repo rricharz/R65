@@ -16,16 +16,16 @@ Math real functions:
   exp(r)
 
 Real output functions:
-  writeflo(f,r)         exponential format
-  writefix(f,d,r)       fix point format
+  _writeflo(f,r)         exponential format
+  _writefix(f,d,r)       fix point format
   f     file to write to
   d     digits after decimal point
   r     real number to write             }
 
 library mathlib;
 
-const pi = 3.14159;
-      e  = 2.71828;
+const PI = 3.14159;
+      E  = 2.71828;
 
 func fabs(x:real):real;
 {*********************}
@@ -85,12 +85,12 @@ begin
   else if m=180. then cos:=-1.
   else if m > 180. then begin
     m:=m-180.;
-    if m>90. then cos:=cos0((180.-m)*pi/180.)
-    else cos:=-cos0(m*pi/180.);
+    if m>90. then cos:=cos0((180.-m)*PI/180.)
+    else cos:=-cos0(m*PI/180.);
   end
   else begin
-    if m>90. then cos:=-cos0((180.-m)*pi/180.)
-    else cos:=cos0(m*pi/180.);
+    if m>90. then cos:=-cos0((180.-m)*PI/180.)
+    else cos:=cos0(m*PI/180.);
   end;
 end;
 

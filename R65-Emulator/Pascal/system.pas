@@ -32,9 +32,14 @@ Default for arguments is drive 1.
 program system;
 uses syslib;
 
-const title='R65 PASCAL VERSION 5.4';
-
+const
+  title='R65 PASCAL VERSION 5.5';
   stopcode=$2010;
+
+mem
+  FILCY1 = $0330: integer&;
+  FIDRTB = $0339: array[8] of integer&;
+  NUMARG   =$005f: integer&;
 
 var
   i, m, n: integer;
@@ -54,20 +59,20 @@ proc runprog
 var i: integer;
 
 begin
-  for i:=0 to 15 do filnm1[i]:=name[i];
-  filcy1:=cyc; fildrv:=drv; filflg:=$40;
+  for i:=0 to 15 do FILNM1[i]:=name[i];
+  FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
   run
 end;
 
-{ * uppercase * }
+{ * _uppercase * }
 
-func uppercase(ch1: char): char;
+func _uppercase(ch1: char): char;
 
 begin
   if (ch1 >= 'a') and (ch1 <= 'z') then
-    uppercase := chr(ord(ch1) - 32)
+    _uppercase := chr(ord(ch1) - 32)
   else
-    uppercase := ch1;
+    _uppercase := ch1;
 end;
 
 { * next * }
@@ -75,8 +80,8 @@ end;
 proc next;
 
 begin
-  read(@input,ch);
-  ch:=uppercase(ch);
+  read(@INPUT,ch);
+  ch:=_uppercase(ch);
 end;
 
 { * getnum * }
@@ -132,7 +137,7 @@ begin
   repeat
     name[i]:=ch; i:=succ(i);
     next
-    until (i>12) or (ch=' ') or (ch=cr) or
+    until (i>12) or (ch=' ') or (ch=CR) or
       (ch=',') or (ch=':') or (ch='.');
   for j:=i to 15 do name[j]:=' ';
   if ch=':' then begin
@@ -162,14 +167,14 @@ end;
 proc clearinput;
 
 begin
-  buffpn:=-1;
+  BUFFPN:=-1;
 end;
 
 { * main * }
 
 begin {main}
-  maxseq:=mmaxseq-1;
-  for i:=0 to mmaxseq-1 do fidrtb[i]:=0;
+  MAXSEQ:=MMAXSEQ-1;
+  for i:=0 to MMAXSEQ-1 do FIDRTB[i]:=0;
   clearinput; writeln;
   writeln(title);
   ok:=true;
@@ -177,24 +182,24 @@ begin {main}
   repeat {main loop (endless)}
     write('P*');
     next;
-    if ch=cr then call(stopcode);
+    if ch=CR then call(stopcode);
     while (ch=' ') or (ch=chr(13)) do next;
     { default for program to run is drive 1,
       if not found, run from drive 0,
-      user input is ignored }
+      user INPUT is ignored }
     drive1:=0; cyclus1:=0;
     getfname(runname,'R',ok,drive1,cyclus1);
-    for i:=0 to 31 do argtype[i]:=chr(0);
+    for i:=0 to 31 do ARGTYPE[i]:=chr(0);
     if ok then begin
-      numarg:=0; n:=0; argerr:=0;
+      NUMARG:=0; n:=0; argerr:=0;
       if ch=' ' then begin  {arguments}
         repeat
           next;
           if (ch>='0') and (ch<='9') then
           begin {number}
             getnum(m);
-            arglist[n]:=m;
-            argtype[n]:='i';
+            ARGLIST[n]:=m;
+            ARGTYPE[n]:='i';
           end {number}
           else if ((ch>='A') and (ch<='Z'))
             or (ch='*') or (ch='?') or (ch='/')
@@ -204,63 +209,63 @@ begin {main}
               getfname(aname,' ',ok,
                 drive2,cyclus2);
               if not ok then argerr:=106;
-              argtype[n]:='s';
+              ARGTYPE[n]:='s';
               if n>22 then argerr:=107
               else begin
                 for i:=0 to 7 do
-                  arglist[n+i]:=
+                  ARGLIST[n+i]:=
                     ord(packed(aname[2*i+1],
                     aname[2*i]));
                 n:=n+7;
               end;
-            arglist[n+1]:=cyclus2;
-            argtype[n+1]:='i';
+            ARGLIST[n+1]:=cyclus2;
+            ARGTYPE[n+1]:='i';
             if drive2=255 then begin {default}
-              arglist[n+2]:=1;
-              argtype[n+2]:='d';
+              ARGLIST[n+2]:=1;
+              ARGTYPE[n+2]:='d';
             end else begin
-              arglist[n+2]:=drive2;
-              argtype[n+2]:='i';
+              ARGLIST[n+2]:=drive2;
+              ARGTYPE[n+2]:='i';
             end;
             n:=n+2;
           end {letter}
           else begin
-            arglist[n]:=0;
-            argtype[n]:='d';
+            ARGLIST[n]:=0;
+            ARGTYPE[n]:='d';
           end;
-          n:=n+1; numarg:=numarg+1;
+          n:=n+1; NUMARG:=NUMARG+1;
         until (argerr<>0) or (n>31)
             or ((ch<>' ') and (ch<>','));
-        if ch<>cr then argerr:=106;
+        if ch<>CR then argerr:=106;
       end; {arguments}
-      if ch<>cr then argerr:=106;
+      if ch<>CR then argerr:=106;
     end {ok}
     else argerr:=106;
 
     if argerr<>0 then begin
       writeln;
-      writeln(invvid,'Argument error ', argerr,norvid);
+      writeln(INVVID,'Argument error ', argerr,NORVID);
       clearinput;
     end
     else begin
       clearinput;
-      endstk:=topmem-144;
+      ENDSTK:=TOPMEM-144;
       { try to run program from drive 1 }
       runprog(runname,1,cyclus1);
-      if runerr=$84 then begin
+      if RUNERR=$84 then begin
         { if failed, run from drive 0 }
-        runerr:=0;
+        RUNERR:=0;
         runprog(runname,0,cyclus1);
-        if runerr=$84 then begin
-          writeln(invvid,'Program not found',norvid);
-          runerr:=0;
+        if RUNERR=$84 then begin
+          writeln(INVVID,'Program not found',NORVID);
+          RUNERR:=0;
         end;
       end;
-      endstk:=topmem-144;
-      iocheck:=true;
-      if runerr<>0 then begin
+      ENDSTK:=TOPMEM-144;
+      IOCHECK:=true;
+      if RUNERR<>0 then begin
         writeln;
-        writeln(invvid,'Program aborted',norvid);
+        writeln(INVVID,'Program aborted',NORVID);
       end
     end
   until false;
