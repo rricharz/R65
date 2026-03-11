@@ -4,7 +4,7 @@
 program gr3d;
 uses syslib,mathlib,plotlib;
 
-var mask:array[xsize] of integer;
+var mask:array[XSIZE] of integer;
     i:integer;
     x1,y1,x2,y2:real;
     x,y,step,max,scale:real;
@@ -25,8 +25,8 @@ end;
 
 proc drawvec(x1,y1,x2,y2);
 begin
-  move(x1,y1);
-  draw(x2,y2,white);
+  _move(x1,y1);
+  _draw(x2,y2,WHITE);
 end;
 
 proc drawmasked(x1,y1,x2,y2:integer;
@@ -50,7 +50,7 @@ begin
     if trunc(v)<=mask[i] then begin
       { hidden point }
       if dodraw then begin
-        { draw up to here }
+        { _draw up to here }
         if ((i-x1)>1) and visible then
           drawvec(start,vstart,i,trunc(v));
       end;
@@ -60,7 +60,7 @@ begin
       { visible point }
       mask[i]:=trunc(v);
       if not dodraw then begin
-        { draw from here }
+        { _draw from here }
         start:=i;
         vstart:=trunc(v);
       end;
@@ -73,7 +73,7 @@ begin
     if trunc(v)<=mask[i] then begin
       { hidden point }
       if dodraw then begin
-        { draw up to here }
+        { _draw up to here }
         if ((x1-i)>1) and visible then
           drawvec(start,vstart,i,trunc(v));
       end;
@@ -83,7 +83,7 @@ begin
       { visible point }
       mask[i]:=trunc(v);
       if not dodraw then begin
-        { draw from here }
+        { _draw from here }
         start:=i;
         vstart:=trunc(v);
       end;
@@ -101,21 +101,21 @@ end;
 {$I ICHKESC:P}
 
 begin
-  sx:=conv(xsize)/2.0;
-  sy:=conv(ysize)/8.0;
+  sx:=conv(XSIZE)/2.0;
+  sy:=conv(YSIZE)/8.0;
   dx:=6.0;
   dy:=3.0;
 
-  grinit; cleargr; splitview;
+  _grinit; _cleargr; _splitview;
 
   step:=20.0;
   max:=360.0;
   scale:=5.0;
 
-  dx:=conv(xsize)/(2.2*max);
+  dx:=conv(XSIZE)/(2.2*max);
   dy:=dx/2.0;
 
-  for i:=0 to xsize do mask[i]:=0;
+  for i:=0 to XSIZE do mask[i]:=0;
 
   { Generate a first mask }
   x:=0.0;
@@ -139,7 +139,7 @@ begin
     x1:=dx*x-dx*y;
     y1:=dy*x+dy*y+f1(x,y)*scale;
     y:=0.0;
-    if chkesc(true) then begin splitview; exit end;
+    if chkesc(true) then begin _splitview; exit end;
     while y<max do begin
       y:=y+step;
       x2:=dx*x-dx*y;
@@ -152,7 +152,7 @@ begin
     x:=x+step;
   end;
 
-  for i:=0 to xsize do mask[i]:=0;
+  for i:=0 to XSIZE do mask[i]:=0;
 
     { Generate a first mask }
   x:=0.0;
@@ -176,7 +176,7 @@ begin
     x1:=dx*x-dx*y;
     y1:=dy*x+dy*y+f1(x,y)*scale;
     x:=0.0;
-    if chkesc(true) then begin splitview; exit end;
+    if chkesc(true) then begin _splitview; exit end;
 
     while x<max do begin
       x:=x+step;
@@ -190,20 +190,20 @@ begin
     y:=y+step;
   end;
 
-  delay10msec(300);
+  _delay10msec(300);
 
 {*******************************************}
 
-  cleargr;
+  _cleargr;
 
   step:=80.0;
   max:=1440.0;
   scale:=2000.0;
 
-  dx:=conv(xsize)/(2.2*max);
+  dx:=conv(XSIZE)/(2.2*max);
   dy:=dx/2.0;
 
-  for i:=0 to xsize do mask[i]:=0;
+  for i:=0 to XSIZE do mask[i]:=0;
 
   { Generate a first mask }
   x:=0.0;
@@ -230,7 +230,7 @@ begin
     y1:=dy*x+dy*y+
       f2(x-max/2.0,y-max/2.0)*scale;
     y:=0.0;
-    if chkesc(true) then begin splitview; exit end;
+    if chkesc(true) then begin _splitview; exit end;
 
     while y<max do begin
       y:=y+step;
@@ -245,7 +245,7 @@ begin
     x:=x+step;
   end;
 
-  for i:=0 to xsize do mask[i]:=0;
+  for i:=0 to XSIZE do mask[i]:=0;
 
     { Generate a first mask }
   x:=0.0;
@@ -272,7 +272,7 @@ begin
     y1:=dy*x+dy*y+
       f2(x-max/2.0,y-max/2.0)*scale;
     x:=0.0;
-    if chkesc(true) then begin splitview; exit end;
+    if chkesc(true) then begin _splitview; exit end;
 
     while x<max do begin
       x:=x+step;

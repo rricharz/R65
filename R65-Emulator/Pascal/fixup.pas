@@ -307,7 +307,12 @@ begin
   underscore('findentry');
   underscore('writename');
 { disklib }
-  underscore('freedsk');
+  underscore('freedrv');
+{ ledlib }
+  underscore('ledstring');
+  underscore('ledstop');
+  underscore('ledhex');
+  underscore('ledbyte');
 
 end;
 

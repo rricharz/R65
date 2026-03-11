@@ -9,10 +9,10 @@
 
 Create a new empty text file
 
-Written 2018 to test the R65 emulator and
+Written 2018 to _test the R65 emulator and
 to demonstrate the power of Tiny Pascal.
 
-Usage:  new filnam[:x][.cy[,drive]]
+Usage:  new FILNAM[:x][.cy[,drive]]
 
   [:X]:    type of file,     default :P
   [drive]: disk drive (0,1), default 1
@@ -32,9 +32,9 @@ var cyclus,drive: integer;
 
 proc bcderror(e:integer);
 begin
-  write(invvid,'ERROR ');
+  write(INVVID,'ERROR ');
   write((e shr 4) and 15);
-  writeln(e and 15,norvid);
+  writeln(e and 15,NORVID);
 end;
 
 func haswildcard(nm1:array[15] of char): boolean;
@@ -63,12 +63,12 @@ end;
 
 begin
   cyclus:=0; drive:=1;
-  agetstring(name,default,cyclus,drive);
+  _agetstring(name,default,cyclus,drive);
   if haswildcard(name) then
-    writeln(invvid,'Wild cards not allowed',norvid)
+    writeln(INVVID,'Wild cards not allowed',NORVID)
   else begin
     setsubtype('P');
-    asetfile(name,cyclus,drive,' ');
+    _asetfile(name,cyclus,drive,' ');
     write(cup); { avoid empty line }
     call(anew);
     if filerr<>0 then bcderror(filerr);

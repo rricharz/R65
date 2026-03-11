@@ -18,23 +18,23 @@ proc gettime;
 { get time from host system }
 var dummy: integer;
 
-  func getbcd0(address: integer): integer;
+  func _getbcd0(address: integer): integer;
   { This function is available in syslib     }
   { But libraries cannot use other libraries }
   var data: integer;
   begin
     data:=mem[address];
-    getbcd0:=data- 6*(data div 16);
+    _getbcd0:=data- 6*(data div 16);
   end;
 
 begin
   { required to get date and time from host  }
-  dummy:=getbcd0($17b9);
+  dummy:=_getbcd0($17b9);
   { now get the data }
-  tenmillis:=getbcd0($17b5);
-  seconds:=getbcd0($17b6);
-  minutes:=getbcd0($17b7);
-  hours:=getbcd0($17b8);
+  tenmillis:=_getbcd0($17b5);
+  seconds:=_getbcd0($17b6);
+  minutes:=_getbcd0($17b7);
+  hours:=_getbcd0($17b8);
 end;
 
 proc prttime(device: file);

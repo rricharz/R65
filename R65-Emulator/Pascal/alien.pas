@@ -35,14 +35,14 @@ var shipmap: array[1] of integer;
 proc showship;
 begin
   if lastsx>=4 then begin
-    plotmap(lastsx-4,lastsy,erase);
-    plotmap(lastsx,lastsy,erase);
+    _plotmap(lastsx-4,lastsy,erase);
+    _plotmap(lastsx,lastsy,erase);
   end;
-  if ((shipx>=4) and (shipx<=xsize-4))
+  if ((shipx>=4) and (shipx<=XSIZE-4))
     then begin
     lastsy:=trunc(shipy);
-    plotmap(shipx-4,lastsy,shipmap[0]);
-    plotmap(shipx,lastsy,shipmap[1]);
+    _plotmap(shipx-4,lastsy,shipmap[0]);
+    _plotmap(shipx,lastsy,shipmap[1]);
     lastsx:=shipx;
   end;
 end;
@@ -52,30 +52,30 @@ var change: real;
 begin
   shipx:=shipx + trunc(sspeedx);
   shipy:=shipy + sspeedy;
-  change:=0.05 * conv(xsize div 2 - shipx);
+  change:=0.05 * conv(XSIZE div 2 - shipx);
   change:=change * rrandom(-0.3,0.3);
   sspeedx:=sspeedx+change;
   if shipx<4 then begin
     shipx:=4;
     sspeedx:=-sspeedx;
   end;
-  if shipx>xsize-4 then begin
-    shipx:=xsize-4;
+  if shipx>XSIZE-4 then begin
+    shipx:=XSIZE-4;
     sspeedx:=-sspeedx;
   end;
   if shipy<=-0.5 then begin
     landed:=true;
-    move(0,ysize-9);
-    write(@plotdev,'ALIENS LANDED   ');
+    _move(0,YSIZE-9);
+    write(@PLOTDEV,'ALIENS LANDED   ');
   end;
 end;
 
 proc showbird;
 begin
   if lastbirdx>=0 then
-    plotmap(lastbirdx,birdy,erase);
+    _plotmap(lastbirdx,birdy,erase);
   if birdx>=0 then begin
-    plotmap(birdx,birdy,
+    _plotmap(birdx,birdy,
       birdmap[(birdcount shr 1) and 3]);
     lastbirdx:=birdx;
     birdcount:=birdcount+1;
@@ -84,16 +84,16 @@ end;
 
 proc showscore;
 begin
-  move(xsize-17,ysize-9);
-  write(@plotdev,
+  _move(XSIZE-17,YSIZE-9);
+  write(@PLOTDEV,
     chr(score div 10 + ord('0')),
-    chr(mod(score,10) + ord('0')));
+    chr(_mod(score,10) + ord('0')));
 end;
 
 proc hitbird;
 begin
-  move(0,ysize-9);
-  write(@plotdev,'YOU HIT A BIRD! ');
+  _move(0,YSIZE-9);
+  write(@PLOTDEV,'YOU HIT A BIRD! ');
   score:=0;
   birdx:=-1;
   showbird;
@@ -101,8 +101,8 @@ end;
 
 proc hitship;
 begin
-  move(0,ysize-9);
-  write(@plotdev,'YOU HIT A SHIP! ');
+  _move(0,YSIZE-9);
+  write(@PLOTDEV,'YOU HIT A SHIP! ');
   score:=score+1;
   shipx:=-1;
   showship;
@@ -113,10 +113,10 @@ var laserx: integer;
 begin
   showship;
   if lasercount>=0 then begin
-    laserx:=xsize div 2;
-    move(laserx,1);
-    draw(laserx,ysize-8,white);
-    delay10msec(5);
+    laserx:=XSIZE div 2;
+    _move(laserx,1);
+    _draw(laserx,YSIZE-8,WHITE);
+    _delay10msec(5);
     if (laserx>=(shipx-4)) and
        (laserx<=(shipx+3)) then
        hitship
@@ -124,11 +124,11 @@ begin
        (laserx<=(birdx+3)) then
        hitbird
     else begin
-       move(0,ysize-9);
-       write(@plotdev,'                ');
+       _move(0,YSIZE-9);
+       write(@PLOTDEV,'                ');
     end;
-    move(laserx,1);
-    draw(laserx,ysize-8,black);
+    _move(laserx,1);
+    _draw(laserx,YSIZE-8,BLACK);
     lasercount:=50;
   end else
     lasercount:=lasercount-1;
@@ -147,19 +147,19 @@ begin
   birdcount:=0; lasercount:=0;
   score:=0; lastscore:=-1;
   landed:=false;
-  grinit;
-  cleargr;
-  move(0,ysize-9);
-  write(@plotdev,'USE SPACE BAR   ');
+  _grinit;
+  _cleargr;
+  _move(0,YSIZE-9);
+  write(@PLOTDEV,'USE SPACE BAR   ');
 end;
 
 func expaint:boolean;
 begin
   if lastscore<>score then showscore;
   if (shipx < 0) and (birdx=-1) then begin
-    if random<16 then begin
-      shipx:=irandom(5,xsize-5);
-      shipy:=conv(ysize-14);
+    if _random<16 then begin
+      shipx:=irandom(5,XSIZE-5);
+      shipy:=conv(YSIZE-14);
       sspeedx:=rrandom(-2.0,2.0);
       sspeedy:=-0.5;
     end;
@@ -172,20 +172,20 @@ begin
 
   if birdx=-1
   then begin
-    if random<4 then begin
+    if _random<4 then begin
       birdx:=0;
-      birdy:=irandom(ysize div 2,ysize-14);
+      birdy:=irandom(YSIZE div 2,YSIZE-14);
       sbird:=2;
-    end else if random>251 then begin
-      birdx:=xsize-4;
-      birdy:=irandom(ysize div 2,ysize-14);
+    end else if _random>251 then begin
+      birdx:=XSIZE-4;
+      birdy:=irandom(YSIZE div 2,YSIZE-14);
       sbird:=-2;
     end
   end;
   if birdx>=0 then begin
     birdx:=birdx+sbird;
     if birdx<0 then birdx:=-1;
-    if birdx>xsize-4 then birdx:=-1;
+    if birdx>XSIZE-4 then birdx:=-1;
     showbird;
   end;
   if landed then expaint:=true
@@ -204,7 +204,7 @@ end;
 begin
   init;
   animate(false);
-  splitview;
+  _splitview;
   if landed then
     writeln('The aliens are landed!');
   writeln('You hit ',score,

@@ -6,7 +6,7 @@ const mquit = 0;        { values for mode }
       mstopped = 2;
       mrunning = 3;
 
-mem keypressed=$1785: char&;
+mem KEYPRESSED=$1785: char&;
 
 var s:cpnt;
     ch: char;
@@ -14,7 +14,7 @@ var s:cpnt;
     mh,mm,ms,mt: integer;
     sh,sm,ss,st: integer;
 
-proc delay10msec(time:integer);
+proc _delay10msec(time:integer);
 mem emucom=$1430: integer&;
 var i:integer;
 begin
@@ -26,7 +26,7 @@ proc timetostr(c:cpnt; h,m,s,t:integer);
   proc writebcd(i:integer);
   begin
     write(@c,chr((i div 10)+ord('0')));
-    write(@c,chr(mod(i,10)+ord('0')));
+    write(@c,chr(_mod(i,10)+ord('0')));
   end;
 begin
   writebcd(h);
@@ -44,11 +44,11 @@ begin
   writeln('  S: Start/stop stop watch');
   writeln('  T: Current time');
   writeln('  Q: Quit');
-  s:=new;
+  s:=_new;
   mh:=0; mm:=0; ms:=0; mt:=0;
   mode:=mtime;
   repeat
-    s[0]:=endmark;
+    s[0]:=ENDMARK;
     gettime;
     case mode of
       mtime:    timetostr(s,hours,minutes,
@@ -82,9 +82,9 @@ begin
                   timetostr(s,mh,mm,ms,mt);
                 end
       end {case};
-    ledstring(s);
-    delay10msec(9);
-    ch:=keypressed;
+    _ledstring(s);
+    _delay10msec(9);
+    ch:=KEYPRESSED;
     case ch of
       'S': if mode=mrunning then mode:=mstopped
            else begin
@@ -99,6 +99,6 @@ begin
       'T': mode:=mtime;
       'Q': mode:=mquit
      end {case};
-    keypressed:=chr(0);
+    KEYPRESSED:=chr(0);
   until mode=mquit;
-end.
+end.

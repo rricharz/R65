@@ -32,8 +32,8 @@ var i,ypaddle,lastypaddle:integer;
 
 proc showball;
 begin
-  plotmap(trunc(lastxball),trunc(lastyball),erase);
-  plotmap(trunc(xball),trunc(yball),ball);
+  _plotmap(trunc(lastxball),trunc(lastyball),erase);
+  _plotmap(trunc(xball),trunc(yball),ball);
   lastxball:=xball;
   lastyball:=yball;
 end;
@@ -41,11 +41,11 @@ end;
 proc showpaddle;
 begin
   if lastypaddle<>-1 then begin
-    move(xsize-3,lastypaddle);
-    draw(xsize-3, lastypaddle+paddlesize, black);
+    _move(XSIZE-3,lastypaddle);
+    _draw(XSIZE-3, lastypaddle+paddlesize, BLACK);
   end;
-  move(xsize-3,ypaddle);
-  draw(xsize-3, ypaddle+paddlesize, white);
+  _move(XSIZE-3,ypaddle);
+  _draw(XSIZE-3, ypaddle+paddlesize, WHITE);
   lastypadde:=ypaddle;
 end;
 
@@ -53,37 +53,37 @@ proc showcount(x,y,count:integer);
 var digit: integer;
 begin
   digit:=count div 10;
-  move(x,y);
-  write(@plotdev,chr(ord('0')+digit),
-    chr(ord('0')+mod(count,10)));
+  _move(x,y);
+  write(@PLOTDEV,chr(ord('0')+digit),
+    chr(ord('0')+_mod(count,10)));
 end;
 
 {$I IRANDOM:P}
 
 proc init;
 begin
-  grinit;
-  cleargr;
-  move(xmin,0);
-  draw(xsize,0,white);
-  draw(xsize,ysize,white);
-  draw(xmin,ysize,white);
-  draw(xmin,0,white);
+  _grinit;
+  _cleargr;
+  _move(xmin,0);
+  _draw(XSIZE,0,WHITE);
+  _draw(XSIZE,YSIZE,WHITE);
+  _draw(xmin,YSIZE,WHITE);
+  _draw(xmin,0,WHITE);
   xball:=1.0;
-  yball:=conv(ysize div 2 - 2);
+  yball:=conv(YSIZE div 2 - 2);
   lastxball:=xball;
   lastyball:=yball;
   xspeed:=rrandom(1.0, startspeed);
   yspeed:=rrandom(1.0,startspeed);
-  ypaddle:=(ysize-paddlesize) div 2;
+  ypaddle:=(YSIZE-paddlesize) div 2;
   lastypaddle:=-1;
   hit:=0;
   miss:=0;
-  move(1,100);
-  write(@plotdev,'Hit ');
+  _move(1,100);
+  write(@PLOTDEV,'Hit ');
   showcount(1,90,hit);
-  move(1,70);
-  write(@plotdev,'Miss');
+  _move(1,70);
+  write(@PLOTDEV,'Miss');
   showcount(1,60,miss);
 end;
 
@@ -100,47 +100,47 @@ begin
 
   if (yball<=conv(ypaddle+paddlesize+2)) and
     (yball>=conv(ypaddle)) then begin
-    if xball>=conv(xsize-7) then begin
+    if xball>=conv(XSIZE-7) then begin
       hit:=hit+1;
       showcount(1,90,hit);
       xspeed:=-xspeed;
-      xball:=conv(xsize-7);
+      xball:=conv(XSIZE-7);
     end;
   end else begin
-    if xball>=conv(xsize-4) then begin
+    if xball>=conv(XSIZE-4) then begin
       miss:=miss+1;
       showcount(1,60,miss);
       xspeed:=-xspeed;
-      xball:=conv(xsize-4);
+      xball:=conv(XSIZE-4);
     end;
   end;
   if yball<2.0 then begin
     yspeed:=-yspeed;
     yball:=2.0
-  end else if yball>=conv(ysize-4) then begin
+  end else if yball>=conv(YSIZE-4) then begin
     yspeed:=-yspeed;
-    yball:=conv(ysize-4);
+    yball:=conv(YSIZE-4);
   end;
   showball;
 end;
 
-func exkey(key:char):boolean;
+func exkey(KEY:char):boolean;
 var ymax:integer;
 begin
-  ymax:=ysize-paddlesize-4;
-  if (key=cup) and (ypaddle<ymax)  then
+  ymax:=YSIZE-paddlesize-4;
+  if (KEY=cup) and (ypaddle<ymax)  then
     ypaddle := ypaddle+2
-  else if (key=cdown) and (ypaddle>5) then
+  else if (KEY=cdown) and (ypaddle>5) then
     ypaddle := ypaddle-2
-  else if key=cr then init;
-  exkey := key=chr(0);
+  else if KEY=CR then init;
+  exkey := KEY=chr(0);
 end;
 
 {$I IANIMATE:P}
 
 begin
   init;
-  writeln('Type RETURN to start new game.');
+  writeln('Type RETURN to start _new game.');
   animate(autorepeat);
-  splitview;
+  _splitview;
 end.

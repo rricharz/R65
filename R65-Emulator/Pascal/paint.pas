@@ -2,17 +2,17 @@
   usage: paint filename[.cyclus][,drive]
 
   Paint with following keys:
-    right arrow    move cursor right
-    left arror     move cursor left
-    up arrow       move cursor up
-    down arrow     move cursor down
+    right arrow    _move cursor right
+    left arror     _move cursor left
+    up arrow       _move cursor up
+    down arrow     _move cursor down
     C              clear canvas
     p              paint a dot at cursor position
 
     L              drawing line mode
     R              drawing rectange mode
     S              drawing character mode
-    return         draw object and exit mode
+    return         _draw object and exit mode
     esc            exit mode without drawing
 
     W              write canvas to disk
@@ -31,7 +31,7 @@ const startcanvas=$700; sizecanvas=3304; {224x118/8}
       cup=chr($1a); cdown=chr($18); esc=chr(0);
       dreset=0; dline=1; drect=2; dchar=3;
 
-mem   filflg=$da:   char&;
+mem   FILFLG=$da:   char&;
       filerr=$db:   integer&;
       filsa=$031a:  integer;
       filea=$031c:  integer;
@@ -61,20 +61,20 @@ var entry: integer;
     last,found,default:  boolean;
 begin
   cyclus:=0; drive:=1;
-  agetstring(name,default,cyclus,drive);
+  _agetstring(name,default,cyclus,drive);
   if default then begin
-    grend;
-    writeln(invvid,'No file specified',norvid);
+    _grend;
+    writeln(INVVID,'No file specified',NORVID);
     write('Usage: paint filename[.cyclus][,drive]');
-    abort;
+    _abort;
   end;
   { check whether file exists, wildcards allowed }
   entry:=0;
   forcesubtype('I');
-  findentry(name,drive,entry,found,last);
+  _findentry(name,drive,entry,found,last);
   if (not found) or last then exit;
-  asetfile(name,cyclus,drive,'I');
-  filflg:=chr(0);
+  _asetfile(name,cyclus,drive,'I');
+  FILFLG:=chr(0);
   filsa:=startcanvas;
   filea:=startcanvas+sizecanvas;
   filsa1:=startcanvas;
@@ -83,14 +83,14 @@ begin
   call(rdfile);
   writeln;
   if filerr<>0 then
-    writeln(invvid,'File error ',filerr shr 4,
-      filerr and 15,norvid);
+    writeln(INVVID,'File error ',filerr shr 4,
+      filerr and 15,NORVID);
 end;
 
 proc savecanvas;
 { save the canvas on disk }
 begin
-  asetfile(name,cyclus,drive,'I');
+  _asetfile(name,cyclus,drive,'I');
   filsa:=startcanvas;
   filea:=startcanvas+sizecanvas;
   filsa1:=startcanvas;
@@ -98,8 +98,8 @@ begin
   filerr:=0;
   call(wrfile);
   if filerr<>0 then
-    writeln(invvid,'File error ',filerr shr 4,
-      filerr and 15,norvid);
+    writeln(INVVID,'File error ',filerr shr 4,
+      filerr and 15,NORVID);
 end;
 
 proc showcursor(ax,ay:integer);
@@ -107,24 +107,24 @@ var i:integer;
 begin
   case dmode of
     dreset: begin
-              plot(ax,ay,inverse);
+              _plot(ax,ay,INVERSE);
             end;
     dline:  begin
-              move(startx,starty); draw(x,y,inverse);
+              _move(startx,starty); _draw(x,y,INVERSE);
             end;
     drect:  begin
-              move(startx,starty);
-              draw(x,starty,inverse);
-              draw(x,y,inverse);
-              draw(startx,y,inverse);
-              draw(startx,starty,inverse);
+              _move(startx,starty);
+              _draw(x,starty,INVERSE);
+              _draw(x,y,INVERSE);
+              _draw(startx,y,INVERSE);
+              _draw(startx,starty,INVERSE);
             end;
     dchar: begin
-               if (x>xsize-8) then x:=xsize-8;
+               if (x>XSIZE-8) then x:=XSIZE-8;
                if (y<2) then y:=2;
-               if (y>ysize-9) then y:=y-9;
-               move(x+2,y-2);
-               draw(x+8,y-2,inverse);
+               if (y>YSIZE-9) then y:=y-9;
+               _move(x+2,y-2);
+               _draw(x+8,y-2,INVERSE);
              end
   end {case};
 end;
@@ -138,7 +138,7 @@ begin
   count:=0; { start with cursor on }
   displayed:=false;
   repeat
-    ch:=keypressed; { sleeps for 10 msec }
+    ch:=KEYPRESSED; { sleeps for 10 msec }
     count:=count-1;
     if count<=0 then begin
       showcursor(x,y);
@@ -147,31 +147,31 @@ begin
     end;
   { sflag bit 8 is escape flag. Pass it through }
   until (ord(ch)<>0) or ((sflag and $80)<>0);
-  read(@key,ch);
+  read(@KEY,ch);
   sflag:=sflag and $7f; { clear escape flag }
   if displayed then showcursor(x,y);
 end;
 
 proc drawline;
 begin
-  move(startx,starty); draw(x,y,cmode);
+  _move(startx,starty); _draw(x,y,cmode);
   startx:=x; starty:=y;
 end;
 
 proc drawrect;
 begin
-   move(startx,starty); draw(x,starty,cmode);
-   draw(x,y,cmode); draw(startx,y,cmode);
-   draw(startx,starty,cmode);
+   _move(startx,starty); _draw(x,starty,cmode);
+   _draw(x,y,cmode); _draw(startx,y,cmode);
+   _draw(startx,starty,cmode);
 end;
 
 proc drawchar;
 begin
-  move(x,y); write(@plotdev,ch);
+  _move(x,y); write(@PLOTDEV,ch);
   x:=x+8;
-  if (x>xsize-8) then begin
+  if (x>XSIZE-8) then begin
     x:=0; y:=y-10;
-    if y<2 then y:=ysize-10;
+    if y<2 then y:=YSIZE-10;
   end;
 end;
 
@@ -186,33 +186,33 @@ end;
 proc paint;
 { This is the main painting loop }
 begin
-  x:=xsize div 2; y:=ysize div 2;
-  cmode:=white; dmode:=dreset;
+  x:=XSIZE div 2; y:=YSIZE div 2;
+  cmode:=WHITE; dmode:=dreset;
   writeln('Drawing point mode');
   repeat
-    blink; { blink cursor and get next key }
+    blink; { blink cursor and get next KEY }
     if (dmode=dchar) and printable then drawchar
     else case ch of
       toggle: write(ch);
       cleft:  if x>0 then x:=x-1;
-      cright: if x<xsize then x:=x+1;
-      cup:    if (y<ysize) then y:=y+1;
+      cright: if x<XSIZE then x:=x+1;
+      cup:    if (y<YSIZE) then y:=y+1;
       cdown:  if (y>0) then y:=y-1;
-      'C':    cleargr;
+      'C':    _cleargr;
       'M':    begin
                 cmode:=cmode+1;
                 if cmode>2 then cmode:=0;
                 case cmode of
-                  white: writeln('Drawing white');
-                  black: writeln('Drawing black');
-                  inverse: writeln('Drawing inverse')
+                  WHITE: writeln('Drawing WHITE');
+                  BLACK: writeln('Drawing BLACK');
+                  INVERSE: writeln('Drawing INVERSE')
                 end {case};
               end;
       'P':    begin
                 writeln('Drawing point mode');
-                plot(x,y,cmode);
+                _plot(x,y,cmode);
                 x:=x+1;
-                if x>xsize then x:=0;
+                if x>XSIZE then x:=0;
               end;
       'L':    begin
                 writeln('Drawing line mode');
@@ -221,8 +221,8 @@ begin
                 dmode:=dline;
                 x:=x+4; {minimum size for visibility}
                 y:=y+4;
-                if x>xsize then x:=x-4;
-                if y>ysize then y:=y-4;
+                if x>XSIZE then x:=x-4;
+                if y>YSIZE then y:=y-4;
               end;
       'R':    begin
                 writeln('Drawing rectange mode');
@@ -231,15 +231,15 @@ begin
                 dmode:=drect;
                 x:=x+4; {minimum size for visibility}
                 y:=y+4;
-                if x>xsize then x:=xsize-4;
-                if y>ysize then y:=ysize-4;
+                if x>XSIZE then x:=XSIZE-4;
+                if y>YSIZE then y:=YSIZE-4;
               end;
       'S':    begin
                 writeln('Drawing character mode');
                 dmode:=dchar;
                 startx:=x; starty:=y;
               end;
-      cr:     begin
+      CR:     begin
                  case dmode of
                    dline:   drawline;
                    drect:   drawrect;
@@ -258,8 +258,8 @@ begin
 end;
 
 begin
-  grinit; cleargr; fullview;
+  _grinit; _cleargr; _fullview;
   loadcanvas;
   paint;
-  grend;
-end.
+  _grend;
+end.

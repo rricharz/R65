@@ -8,8 +8,8 @@ begin
   chkesc:=((sflag and $80) <> 0);
   sflag:=sflag and $7f;
   if checktoggle then
-    if keypressed=toggle then begin
+    if KEYPRESSED=toggle then begin
       write(toggle);
-      keypressed:=chr(0);
+      KEYPRESSED:=chr(0);
     end;
 end;

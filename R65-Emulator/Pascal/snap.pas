@@ -1,4 +1,4 @@
-{ snap filnam[.cy][,drive
+{ snap FILNAM[.cy][,drive
 
   take a snapshot of the graphics canvas
   default for drive is one
@@ -40,7 +40,7 @@ end;
 proc savecanvas;
 { save the canvas on disk }
 begin
-  asetfile(name,cyclus,drive,'I');
+  _asetfile(name,cyclus,drive,'I');
   filsa:=startcanvas;
   filea:=startcanvas+sizecanvas;
   filsa1:=startcanvas;
@@ -48,25 +48,25 @@ begin
   filerr:=0;
   call(wrfile);
   if filerr<>0 then
-    writeln(invvid,'File error ',filerr shr 4,
-      filerr and 15,norvid);
+    writeln(INVVID,'File error ',filerr shr 4,
+      filerr and 15,NORVID);
 end;
 
 begin
   if not splitted then begin
-    writeln(invvid,'Video canvas not available',
-       norvid);
+    writeln(INVVID,'Video canvas not available',
+       NORVID);
     exit;
   end;
 
   cyclus:=0; drive:=1;
-  agetstring(name,default,cyclus,drive);
+  _agetstring(name,default,cyclus,drive);
   if default then begin
-    writeln(invvid,'Usage: snap filnam',norvid);
+    writeln(INVVID,'Usage: snap FILNAM',NORVID);
     exit;
   end;
   if haswildcard(name) then begin
-    writeln(invvid,'Wild cards not allowed',norvid);
+    writeln(INVVID,'Wild cards not allowed',NORVID);
     exit;
   end;
 

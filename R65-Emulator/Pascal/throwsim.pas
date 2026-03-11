@@ -11,7 +11,7 @@ var angle,speed,xspeed,yspeed: real;
     ch: char;
 
 begin
-  grinit;  cleargr; splitview;
+  _grinit;  _cleargr; _splitview;
   speed:=1.;
   for i:=1 to 11 do begin
     angle:=7.5*conv(i);
@@ -19,11 +19,11 @@ begin
     yspeed:=speed*sin(angle);
     x:=0.; y:=0.;
     repeat
-      if (trunc(y)<ysize) then
-        plot(trunc(x),trunc(y),white);
+      if (trunc(y)<YSIZE) then
+        _plot(trunc(x),trunc(y),WHITE);
       x:=x+xspeed;
       y:=y+yspeed;
       yspeed:=yspeed-0.005;
-    until (trunc(x)>xsize) or (trunc(y)<0);
+    until (trunc(x)>XSIZE) or (trunc(y)<0);
   end;
 end.

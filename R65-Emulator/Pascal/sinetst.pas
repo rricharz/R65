@@ -8,29 +8,29 @@ var a,b: real;
     ch: char;
 
 begin
-  grinit; cleargr; splitview;
-  move(0,ysize div 2);
-  draw(xsize,ysize div 2,white);
-  for x:=0 to xsize do begin
-    a:=conv(x)*360./conv(xsize);
+  _grinit; _cleargr; _splitview;
+  _move(0,YSIZE div 2);
+  _draw(XSIZE,YSIZE div 2,WHITE);
+  for x:=0 to XSIZE do begin
+    a:=conv(x)*360./conv(XSIZE);
     b:=sin(a);
-    y:=trunc(b*conv(ysize)/2.1)+(ysize div 2);
-    plot(x,y,white);
+    y:=trunc(b*conv(YSIZE)/2.1)+(YSIZE div 2);
+    _plot(x,y,WHITE);
   end;
-  for x:=0 to xsize do begin
-    a:=conv(x)*360./conv(xsize);
+  for x:=0 to XSIZE do begin
+    a:=conv(x)*360./conv(XSIZE);
     b:=cos(a);
-    y:=trunc(b*conv(ysize)/2.1)+(ysize div 2);
-    plot(x,y,white);
+    y:=trunc(b*conv(YSIZE)/2.1)+(YSIZE div 2);
+    _plot(x,y,WHITE);
   end;
 
-  writeln(' angle',tab8,'  sin',tab8,'  cos');
+  writeln(' angle',TAB8,'  sin',TAB8,'  cos');
   for i:=1 to 24 do begin
     a:=conv(i*15);
     writefix(@0,0,a);
-    write(tab8);
+    write(TAB8);
     writefix(@0,3,sin(a));
-    write(tab8);
+    write(TAB8);
     writefix(@0,3,cos(a));
     writeln;
   end;

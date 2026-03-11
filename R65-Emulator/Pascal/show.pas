@@ -1,4 +1,4 @@
-{ show filnam[.cy][,drive
+{ show FILNAM[.cy][,drive
 
   show a snapshot of the graphics canvas
   default for drive is one                }
@@ -11,7 +11,7 @@ const startcanvas = $700;
       sizecanvas  = 3304; { 224x118/8 }
       rdfile      = $e815;
 
-mem   filflg=$da:   char&;
+mem   FILFLG=$da:   char&;
       filerr=$db:   integer&;
       filsa=$031a:  integer;
       filea=$031c:  integer;
@@ -41,8 +41,8 @@ end;
 proc loadcanvas;
 { load the canvas from disk }
 begin
-  asetfile(name,cyclus,drive,'I');
-  filflg:=chr(0);
+  _asetfile(name,cyclus,drive,'I');
+  FILFLG:=chr(0);
   filsa:=startcanvas;
   filea:=startcanvas+sizecanvas;
   filsa1:=startcanvas;
@@ -51,23 +51,23 @@ begin
   call(rdfile);
   writeln;
   if filerr<>0 then
-    writeln(invvid,'File error ',filerr shr 4,
-      filerr and 15,norvid);
+    writeln(INVVID,'File error ',filerr shr 4,
+      filerr and 15,NORVID);
 end;
 
 begin
   cyclus:=0; drive:=1;
-  agetstring(name,default,cyclus,drive);
+  _agetstring(name,default,cyclus,drive);
   if default then begin
-    writeln(invvid,'Usage: showsnap filnam',norvid);
+    writeln(INVVID,'Usage: showsnap FILNAM',NORVID);
     exit;
   end;
   if haswildcard(name) then begin
-    writeln(invvid,'Wild cards not allowed',norvid);
+    writeln(INVVID,'Wild cards not allowed',NORVID);
     exit;
   end;
 
-  grinit; splitview; cleargr;
+  _grinit; _splitview; _cleargr;
   loadcanvas;
 
 end.
