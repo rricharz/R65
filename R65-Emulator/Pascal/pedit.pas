@@ -710,5 +710,5 @@ begin {main}
     until stop;
   setnumlin($29,$2f);
   writeln(HOM, clrscr);
-  dummy:=freedsk(FILDRV,true);
+  dummy:=_freedrv(FILDRV,true);
 end.

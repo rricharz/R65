@@ -22,8 +22,11 @@ displays the directory.
 
 option /S sorts the directory
 
-Usage:  dir drive [/s]
-  where drive is the drive number 1 (default) or 0
+Usage:
+  DIR drive [/s]
+     where drive is the drive number 1 (default) or 0
+  DIR name
+     where name is the name of a floppy disk
 
 The directory table has 256 entries of 32 bytes
 The disk name is stored in the last entry (255)
@@ -49,7 +52,8 @@ mem   filtyp  =$0300: char&;
       scyfc   =$037c: integer&;
       filerr  =$00db: integer&;
 
-var default, sortit:     boolean;
+var default, name_given,
+    sortit:              boolean;
     drive, index, i, ti,
     maxlen, nument, col,
     ncol, row, nspaces,
@@ -57,8 +61,11 @@ var default, sortit:     boolean;
     ffree, fdel:         real;
     s:                   cpnt;
     entry:               array[MAXENT] of cpnt;
+    afloppy:             array[15] of char;
+    cfloppy, newname:    cpnt;
 
 {$I IOPTION:P}
+{$I IARGCPNT:p}
 
 func hex(d:integer):char;
 { convert hex digit to hex char }
@@ -101,26 +108,59 @@ begin
 end;
 
 begin {main}
-  drive:=1; {default drive}
+  cfloppy:=_new;
+  newname:=_new;
+  name_given:=false;
+  drive:=1;
   filerr:=0;
-  if ARGTYPE[_carg]='i' then _agetval(drive,default);
-  if (drive<0) or (drive>1) then begin
-    writeln('Drive must be 0 or 1');
-    _abort
+  sortit:=false;
+  _carg:=0;
+{ Process arguments }
+  if ARGTYPE[_carg]=chr(0) then begin
+    { no argument }
+    drive:=1;
+  end else if ARGTYPE[_carg]='i' then begin
+    { drive number given }
+    name_given:=false;
+    _agetval(drive,default);
+    _carg:=1;
+    if (drive<0) or (drive>1) then begin
+      writeln('Drive must be 0 or 1');
+      _abort
+    end
+  end else if ARGTYPE[_carg]='s' then begin
+    { name of disk or option }
+    aget_cpnt(newname);
+    if newname[0]<>'/' then begin
+      name_given:=true;
+      _carg:=10;
+    end else _carg:=0;
   end;
-  if option('H') then begin
-    writeln('/S   sort directory');
-    exit;
+  if ARGTYPE[_carg]='s' then begin
+      { check for option }
+      sortit:=option('S');
   end;
-  sortit:=option('S');
+
+{ read disk name (FILNAM in last directory entry) }
   FILDRV:=drive;
   call(aprepdo);
   checkfilerr;
-
-{ read disk name (FILNAMB in last directory entry) }
   scyfc:=MAXENT;
   call(agetentx);
   checkfilerr;
+  for i:=0 to 15 do afloppy[i]:=FILNAM[i];
+  conv_to_cpnt(afloppy,cfloppy);
+  if name_given then begin
+    change_disk(newname, 1);
+    drive:= 1;
+    { read FILNAM again after disk has been changed }
+    FILDRV:=drive;
+    call(aprepdo);
+    checkfilerr;
+    scyfc:=MAXENT;
+    call(agetentx);
+    checkfilerr;
+  end;
 
 { display info at top of table }
   write('Directory drive ',drive,': ');
@@ -192,4 +232,8 @@ begin {main}
   writeln('Free:', sfree, '(', trunc(100.0*ffree+0.5),
     '%),deleted:', sdel, '(',trunc(100.0*fdel+0.5),
     '%),', 'entries:', index-1, '/', MAXENT);
+
+{ Change back to original disk }
+  if name_given then
+    change_disk(cfloppy,1);
 end.
