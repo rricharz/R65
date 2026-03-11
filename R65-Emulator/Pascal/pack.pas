@@ -45,5 +45,5 @@ begin
   call(apack);
   if filerr<>0 then bcderror(filerr);
   if CURPOS>1 then writeln;
-  dummy:=freedsk(drive,true);
+  dummy:=_freedrv(drive,true);
 end.

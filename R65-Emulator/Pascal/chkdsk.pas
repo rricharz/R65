@@ -7,7 +7,12 @@
 
          Default for d is disk 1
 
-  2024   rricharz                        }
+  2024   rricharz
+
+  The directory table has 256 entries of 32 bytes
+  The disk name is stored in the last entry (255)
+  The last currently used entry has filtyp=TEND
+}
 
 program chkdsk;
 uses syslib,arglib;
@@ -15,8 +20,9 @@ uses syslib,arglib;
 const aprepdo  = $f4a7;
       aenddo   = $f625;
       agetentx = $f63a;
-      maxent   = 127;
-      tsectors = 2560;
+      MAXENT   = 255;   { number of entries in table }
+      TSECTORS = 2560;  { number of sectors on disk }
+      TEND     = chr(0);{ end mark for last used entry}
 
 mem   filerr   = $00db:integer&;
       filtyp   = $0300:char&;
@@ -90,7 +96,7 @@ begin
   ok:=(sector=filloc);
   write(sector,'-',sector+((filsiz+1) shr 8),'   ');
   sector:=sector+((filsiz+1) shr 8);
-  if sector>tsectors then begin
+  if sector>TSECTORS then begin
     writeln(INVVID,'END OF DISK SPACE',NORVID);
     notok:=true;
   end else if (ok) then writeln('OK')
@@ -126,10 +132,10 @@ begin
     scyfc:=entry;
     call(agetentx);
     checkfilerr;
-    until (filtyp=chr(0)) or (entry>=maxent);
-  writeln('Last sector used ', sector,' of ',tsectors);
-  writeln('Last entry used ', entry,' of ',maxent);
-  if (entry >= maxent) then
+    until (filtyp=TEND) or (entry>=MAXENT);
+  writeln('Last sector used ', sector,' of ',TSECTORS);
+  writeln('Last entry used ', entry,' of ',MAXENT);
+  if (entry >= MAXENT) then
     writeln(INVVID,'FILE TABLE ON DISK FULL',NORVID);
   if notok then
     writeln(INVVID,'INCONSISTENCY FOUND',NORVID);

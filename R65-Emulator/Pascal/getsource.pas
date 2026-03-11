@@ -33,7 +33,7 @@ begin
   filerr:=0;
   { get the argument (file name) }
   cyclus:=0; drive:=0;
-  agetstring(fname,default,cyclus,drive);
+  _agetstring(fname,default,cyclus,drive);
   if default or not letter(fname[0]) then
     writeln('Usage: getsource filename')
   else begin
@@ -42,43 +42,43 @@ begin
     { make sure that WORK is on drive 1 }
     writeln('Putting disk WORK in drive 1');
     cyclus:=0; drive:=1;
-    asetfile('WORK            ',cyclus,drive,' ');
+    _asetfile('WORK            ',cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
     { make sure that dname is on drive 0 }
-    write('Putting disk ');  writename(dname);
+    write('Putting disk ');  _writename(dname);
     writeln(' in drive 0');
     cyclus:=0; drive:=0;
-    asetfile(dname,cyclus,drive,' ');
+    _asetfile(dname,cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
     { copy the source file }
     write('Copying ');
-    writename(fname);
+    _writename(fname);
     writeln(',0,1');
     setargs(fname,0,0,0);
-    argtype[10]:='i';
-    arglist[10]:=1; {copy to drive 1}
+    ARGTYPE[10]:='i';
+    ARGLIST[10]:=1; {copy to drive 1}
     cyclus:=0; drive:=0;
     filerr:=0;
     runprog('COPY:R          ',cyclus,drive);
-    if (filerr<>0) or (runerr<>0) then begin
+    if (filerr<>0) or (RUNERR<>0) then begin
       ok:=false;
-      if filerr=6 then writeln(invvid,
-        'Source file not found',norvid)
-      else writeln(invvid,
-        'Copy failed',norvid);
+      if filerr=6 then writeln(INVVID,
+        'Source file not found',NORVID)
+      else writeln(INVVID,
+        'Copy failed',NORVID);
     end;
     { make sure that PASCAL is on drive 0 }
     writeln('Putting disk PASCAL in drive 0');
     cyclus:=0; drive:=0;
-    asetfile('PASCAL          ',cyclus,drive,' ');
+    _asetfile('PASCAL          ',cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
   end;
-  if (not ok) or (runerr<>0) then begin
-    writeln(invvid,'Getsource failed',norvid);
-    filerr:=0; runerr:=0;
+  if (not ok) or (RUNERR<>0) then begin
+    writeln(INVVID,'Getsource failed',NORVID);
+    filerr:=0; RUNERR:=0;
   end;
-  dummy:=freedsk(1,true);
+  dummy:=_freedrv(1,true);
 end.

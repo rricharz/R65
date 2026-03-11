@@ -6,15 +6,14 @@
          *******************
 
     2018,2019 rricharz (r77@bluewin.ch)
-    2023 removed inverse video display
+    2023 removed INVERSE video display
     2023 default drive 1
 
 Display the directory of a disk drive.
 Uses EPROM (disk.asm) calls to get info
 from disk directory.
 
-Written 2018 to test the R65 emulator and
-to demonstrate the power of Tiny Pascal.
+Written 2018 for Micro Pascal.
 
 Makes a table to find out how long the
 longest name is. Then computes the number
@@ -23,33 +22,41 @@ displays the directory.
 
 option /S sorts the directory
 
-Usage:  dir drive [/s]                   }
+Usage:  dir drive [/s]
+  where drive is the drive number 1 (default) or 0
+
+The directory table has 256 entries of 32 bytes
+The disk name is stored in the last entry (255)
+The last currently used entry has filtyp=TEND
+}
 
 program dir;
 uses syslib,arglib,strlib;
 
-{R65 disk eprom calls and params: }
 const aprepdo =$f4a7;
       agetentx=$f63a;
       aenddo  =$f625;
-      tsectors = 2560;
-      maxent  = 255;
+
+      TSECTORS = 2560;   { size of disk in pages }
+      MAXENT   = 255;    { max number of entries }
+      TEND     = chr(0); { end mark of table }
 
 mem   filtyp  =$0300: char&;
-      filcyc  =$0311: integer&;
+      FILCYC  =$0311: integer&;
       filloc  =$0313: integer;
       filsiz  =$0315: integer;
       fillnk  =$031e: integer;
       scyfc   =$037c: integer&;
       filerr  =$00db: integer&;
 
-var default,sortit: boolean;
-    drive,index,i,ti,maxlen,nument,col,
-    ncol,row,nspaces,sfree,sdel,
-    lines        : integer;
-    ffree,fdel   : real;
-    s            : cpnt;
-    entry        : array[maxent] of cpnt;
+var default, sortit:     boolean;
+    drive, index, i, ti,
+    maxlen, nument, col,
+    ncol, row, nspaces,
+    sfree,sdel, lines:   integer;
+    ffree, fdel:         real;
+    s:                   cpnt;
+    entry:               array[MAXENT] of cpnt;
 
 {$I IOPTION:P}
 
@@ -110,25 +117,26 @@ begin {main}
   call(aprepdo);
   checkfilerr;
 
-  scyfc:=255; { write disk name }
+{ read disk name (FILNAMB in last directory entry) }
+  scyfc:=MAXENT;
   call(agetentx);
   checkfilerr;
 
-  write(INVVID,'Directory drive ',drive,': ');
+{ display info at top of table }
+  write('Directory drive ',drive,': ');
   for i:=0 to 15 do
     write(FILNAM[i]);
-  writeln(NORVID);
+  writeln;
 
+{ read file table }
   index:=0; ti:=0; maxlen:=0;
   sdel:=0;
-  repeat
+  repeat { for each entry in table }
     scyfc:=index;
     call(agetentx);
     checkfilerr;
-    { check for end mark }
-    if filtyp<>chr(0) then begin
-      { check for deleted flag }
-      if (fillnk and 255)<128 then begin
+    if filtyp<>chr(0) then begin { not end mark }
+      if (fillnk and 255)<128 then begin {not deleted}
         entry[ti]:=_new;
         s:=entry[ti];
         for i:=0 to 15 do s[i]:=FILNAM[i];
@@ -139,26 +147,30 @@ begin {main}
         until (i=0) or
           (s[i]<>' ');
         s[i+1]:='.';
-        s[i+2]:=hex(filcyc shr 4);
-        s[i+3]:=hex(filcyc and 15);
+        s[i+2]:=hex(FILCYC shr 4);
+        s[i+3]:=hex(FILCYC and 15);
         if maxlen<i+3 then maxlen:=i+3;
         ti:=ti+1
-      end else {deleted}
+      end else { deleted }
         sdel:=sdel+(filsiz shr 8);
-    end else {end mark}
-      sfree:=tsectors-filloc;
+    end else { end mark }
+      sfree:=TSECTORS-filloc;
     index:=index+1
-  until (index>=maxent) or (filtyp=chr(0));
+  until (index>MAXENT) or (filtyp=TEND); {end of table}
   call(aenddo);
-
   nument:=ti-1;
+
+{ sort table if requested }
   if sortit then sort;
+
+{ compute number of columns and spaces between them }
   ncol:=48 div (maxlen+2);
   if nument<8 then ncol:=2
   else if nument<8 then ncol:=1;
   nspaces:=(48 div ncol)-maxlen-1;
   lines:=nument div ncol;
 
+{ display table with columns and rows }
   for col:=0 to lines do
   begin
     for row:=0 to ncol-1 do begin
@@ -173,11 +185,11 @@ begin {main}
     end;
     writeln
   end;
-  ffree:=conv(sfree)/conv(tsectors);
-  fdel:=conv(sdel)/conv(tsectors);
-  writeln('Free:',sfree,'(',
-    trunc(100.0*ffree+0.5),
-    '%),deleted:',sdel,'(',
-    trunc(100.0*fdel+0.5),'%),',
-    'entries:',index-1,'/',maxent);
+
+{ display info at bottom of table }
+  ffree:=conv(sfree)/conv(TSECTORS);
+  fdel:=conv(sdel)/conv(TSECTORS);
+  writeln('Free:', sfree, '(', trunc(100.0*ffree+0.5),
+    '%),deleted:', sdel, '(',trunc(100.0*fdel+0.5),
+    '%),', 'entries:', index-1, '/', MAXENT);
 end.

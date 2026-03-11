@@ -10,12 +10,23 @@ program find;
 uses syslib,arglib,wildlib,disklib;
 
 const afloppy=$c827;
+      agetentx=$f63a;
 
 mem   filerr=$db: integer&;
+      scyfc   =$037c: integer&;
 
-var   cyclus,drive,entry,saventry: integer;
+var   cyclus,drive,entry,saventry,nfound: integer;
       default,found,last: boolean;
       name: array[NAMESIZE] of char;
+
+proc checkfilerr;
+{***************}
+begin
+  if filerr<>0 then begin
+    writeln('Cannot read directory');
+    _abort;
+  end;
+end;
 
 proc findond(nm:array[15] of char; drv:integer);
 {********************************************}
@@ -35,7 +46,9 @@ begin
     _asetfile(nm,cyclus,drive,' ');
     call(afloppy);
   end else begin
-    dskname;
+    scyfc:=MAXENT;
+    call(agetentx);
+    checkfilerr;
     for i:=0 to NAMESIZE do nm2[i]:=FILNAM[i];
   end;
   if filerr=0 then begin
@@ -51,13 +64,15 @@ begin
           else
             _writename(nm);
           write(':',NORVID); _tab(20);
-          writeln('(',freedsk(drv,false),'% free)');
+          writeln('(',_freedrv(drv,false),'% free)');
           first:=false;
           entry:=saventry;
-          { find again because of freedsk }
+          { find again because of _freedrv }
           _findentry(name,drv,entry,found,last);
         end;
-        call(prflab); writeln;
+        call(prflab);
+        writeln;
+        nfound := succ(nfound);
         end;
       end;
     entry:=entry+1;
@@ -69,7 +84,7 @@ begin
 end;
 
 begin
-  cyclus:=0; drive:=255;
+  cyclus:=0; drive:=255; nfound:=0;
   _agetstring(name,default,cyclus,drive);
   if drive<>255 then
     findond('                ',drive)
@@ -83,5 +98,9 @@ begin
     { PASCAL must be last entry }
     findond('PASCAL          ',0);
   end;
+  if nfound = 0 then
+    writeln('Nothing found, try FIND name*')
+  else
+    writeln('Files found: ',nfound);
 end.
 
