@@ -60,7 +60,8 @@ mem  { The & below are required for 8-bit!}
 
   FILNUM =$0301: array[15] of char&;
   FILNM1 =$0320: array[15] of char&;
-  FILCYC =$0330: integer&;
+  FILCYC =$0311: integer&;
+  FILCY1 =$0330: integer&;
   MAXSEQ =$0336: integer&;
   FIDRTP =$0339: array[MMAXSEQ] of integer&;
 

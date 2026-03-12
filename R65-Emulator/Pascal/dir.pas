@@ -163,10 +163,8 @@ begin {main}
   end;
 
 { display info at top of table }
-  write('Directory drive ',drive,': ');
-  for i:=0 to 15 do
-    write(FILNAM[i]);
-  writeln;
+  writeln(INVVID,'Directory drive ',drive,': ',
+    cfloppy,NORVID);
 
 { read file table }
   index:=0; ti:=0; maxlen:=0;
@@ -229,9 +227,9 @@ begin {main}
 { display info at bottom of table }
   ffree:=conv(sfree)/conv(TSECTORS);
   fdel:=conv(sdel)/conv(TSECTORS);
-  writeln('Free:', sfree, '(', trunc(100.0*ffree+0.5),
-    '%),deleted:', sdel, '(',trunc(100.0*fdel+0.5),
-    '%),', 'entries:', index-1, '/', MAXENT);
+  writeln('Free:', trunc(100.0*ffree+0.5),
+    '%, deleted:',trunc(100.0*fdel+0.5),
+    '%,',' entries:', index-1, '/',MAXENT);
 
 { Change back to original disk }
   if name_given then
