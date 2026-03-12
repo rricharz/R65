@@ -163,7 +163,11 @@ begin {main}
   end;
 
 { display info at top of table }
-  writeln(INVVID,'Directory drive ',drive,': ',
+  if name_given then
+    writeln(INVVID,'Directory drive ',drive,': ',
+    newname,NORVID)
+  else
+    writeln(INVVID,'Directory drive ',drive,': ',
     cfloppy,NORVID);
 
 { read file table }
