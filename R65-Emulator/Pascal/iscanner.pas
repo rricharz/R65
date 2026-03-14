@@ -110,6 +110,7 @@ end {setval};
 {#####################}
 { directive (of scan) }
 {#####################}
+{ compiler directives }
 
 proc directive;
 var i,icyclus:integer;
@@ -118,10 +119,15 @@ begin
   case ch of
     'I': begin
            if savefno<>@0 then error(21);
-           getchr; if ch<>' ' then error(20);
-           i:=0; getchr;
+           getchr0; if ch<>' ' then error(20);
+           i:=0; getchr0;
+           if ch=CR then error(23);
            while (ch<>'}') and (i<16) do begin
-             incname[i]:=ch; i:=i+1; getchr;
+             if ch=CR then error(23);
+             incname[i]:=ch; i:=i+1; getchr0;
+           end;
+           while ch<>'}' do begin
+              if ch=CR then error(23);
            end;
            while (i<16) do begin
              incname[i]:=' '; i:=i+1;
@@ -194,7 +200,10 @@ begin
                if ch='$' then directive
                else begin
                  if ch<>'}' then
-                 repeat getchr until ch='}';
+                 repeat
+                   getchr0;
+                   if ch=CR then error(23)
+                   until ch='}';
                  getchr; scan
                end
              end;

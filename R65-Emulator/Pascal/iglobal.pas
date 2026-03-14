@@ -28,30 +28,30 @@ var reswtab: array[ 512] of char; {8*(nresw+1)}
     incname: array[15] of char;
     filstk: array[maxfi] of file;
     ident: array[idlength] of char;
-    { Only the first 8 characters are
-      used to find and differentiate ids! }
+    { Only the first 8 characters are        }
+    { used to find and differentiate ids!    }
 
     stype: array[symbsize] of packed char;
-           {type of symbol}
-       { High letter:
-           a:array, c:constant, d;const parameter
-           e:constant array parameter, f:function
-           g:array function, h;8-bit memory var
-           i:8-bit array memory variable
-           m:16-bit memory variable
-           n:16-bit array memory variable
-           p:procedure
-           q:indexed cpnt
-           r,t:function result
-           s,u:array function result
-           v:variable, w:variable parameter
-           x:variable array parameter
-         Low letter:
-           i:integer, c:char, p:packed char
-           q:cpnt (pointer to chars)
-           r:real(array multiple of two)
-           s:const cpnt
-           f:file, b:boolean, u:undefined  }
+{   type of symbol                           }
+{   High letter:                             }
+{     a:array, c:constant, d;const parameter }
+{     e:constant array parameter, f:function }
+{     g:array function, h;8-bit memory var   }
+{     i:8-bit array memory variable          }
+{     m:16-bit memory variable               }
+{     n:16-bit array memory variable         }
+{     p:procedure                            }
+{     q:indexed cpnt                         }
+{     r,t:function result                    }
+{     s,u:array function result              }
+{     v:variable, w:variable parameter       }
+{     x:variable array parameter             }
+{   Low letter:                              }
+{     i:integer, c:char, p:packed char       }
+{     q:cpnt (pointer to chars)              }
+{     r:real(array multiple of two)          }
+{     s:const cpnt                           }
+{     f:file, b:boolean, u:undefined         }
 
     slevel: array[symbsize] of integer;
          {level}
@@ -107,7 +107,7 @@ begin
   crlf; numerr:=succ(numerr);
   for i:=2 to tpos do write(' ');
   write('^'); crlf;
-  write('*** (',numerr,',',pc,')   ');
+  write(INVVID,'*** (',numerr,',',pc,')   ');
   case x of
     01: write('Ident');
     02: write('Ident ',code,' expected');
@@ -130,22 +130,14 @@ begin
     19: write('Parameter');
     20: write('Compiler directive syntax');
     21: write('Nested include files');
-    22: write('Unexpected EOF')
+    22: write('Unexpected EOF');
+    23: write('Missing } in comment')
   end {case};
-  writeln;
-  write('Continue (Y)?');
-  read(@KEY,answer);
-  if answer<>'Y' then begin
-    crlf; write(PRTOFF); _setemucom(9); close(fno);
-    if (ofno<>nooutput) and (ofno<>yesOUTPUT)
-      then close(ofno);
-    writeln('Aborting compile1 on request');
-    _abort
-  end
-  else crlf;
+  writeln(NORVID);
   if (ofno<>nooutput) and (ofno<>yesOUTPUT)
     then close(ofno);
   ofno:=nooutput;
+  _abort;
 end {merror};
 
 proc error(x: integer);
@@ -236,11 +228,12 @@ begin
   writenum(pc+2); write(') ');
 end;
 
-{#################}
-{ getchr (global) }
-{#################}
+{#############################}
+{ getchr and getchr0 (global) }
+{#############################}
 
-proc getchr;
+proc getchr0;
+{ does not eliminate CR }
 begin
   if ateof then begin
     if savefno<>@0 then begin
@@ -260,7 +253,6 @@ begin
     if ch=CR then begin
       crlf;
       nextline;
-      ch:=' ';
     end {if}
     else if ch=EOF then begin
       ateof:=true;
@@ -271,6 +263,13 @@ begin
     else write(ch);
   end;
 end {getchr};
+
+proc getchr;
+{ replaces CR with ' ' to make parsing easier }
+begin
+  getchr0;
+  if ch=CR then ch:=' ';
+end;
 
 {####################}
 { splitconv (global) }

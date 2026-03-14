@@ -1,49 +1,24 @@
-{   ********************************
-    *                              *
-    *   R65 Micro Pascal Compiler  *
-    *            Pass 1            *
-    *                              *
-    ********************************
+{   ********************************            }
+{   *                              *            }
+{   *   R65 Micro Pascal Compiler  *            }
+{   *            Pass 1            *            }
+{   *                              *            }
+{   ********************************            }
 
-First version 1978 by rricharz
-Version 3.7 (20K)  01/08/82 rricharz
+{ First version 1978 by rricharz                }
+{ Version 3.7 (20K)  01/08/82 rricharz          }
+{ Recovered 2018 by rricharz (r77@bluewin.ch)   }
+{ Improved 2018-2026 by rricharz                }
 
-Recovered 2018 by rricharz (r77@bluewin.ch)
-Improved 2018-2024 by rricharz
-Version 4 with cpnt strings and exit statement
-Version 4.3 with include compiler directive
-Version 4.6 splits the source file into 4 files
+{ Original derived from the publication by      }
+{ Kin-Man Chung and Herbert Yen in              }
+{ Byte, Volume 3, Number 9 and Number 10, 1978  }
 
-Original derived from the publication by
-Kin-Man Chung and Herbert Yen in
-Byte, Volume 3, Number 9 and Number 10, 1978
-
-Adapted for the R65 computer system and
-substantially enhanced by rricharz 1978-2023
-
-This is a Pascal derivative optimized for 8-bit
-microprocessors (integer type is 16 bit) with
-additional features (mem) to interact directly
-with the microprocessor hardware. Only one
-dimensional arrays and no records or user
-defined types. Floating point numbers (real)
-and file io to floppy disks are supported.
-
-Precompiled libraries are merged in the loader.
-The table of reserved words and the library
-tables are loaded from the same drive as
-the compiler.
-
-The output of the program is a loader file for
-the Pascal loader (compile2).
-
-usage:
- compile1 name[.cy[,drv]] [xxx]
-  where x:       l,p: no hard copy print
-                 i,r: index bound checking
-                 n: no loader file
-  [] means not required
-                                        }
+{ usage:                                        }
+{ compile1 name[.cy[,drv]] [xxx]                }
+{  where x:       l,p: no hard copy print       }
+{                 i,r: index bound checking     }
+{                 n: no loader file             }
 
 program compile1;
 
