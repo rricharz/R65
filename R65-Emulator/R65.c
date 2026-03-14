@@ -712,7 +712,7 @@ int catchSubroutine(uint16_t ea)
             lastPrintedCharacter = 0;
             return 1;
         }
-        if ((a < 0x20) && (!rawPrint)) {       // produce a linux style text file
+        if ((a < 0x20) && (!rawPrint) && ( a != 0x0C)) { // FF is allowed to pass
             if (a == 0x0D) {                   // linux text files have no cr, change for windows
                 return 1;
             }
@@ -746,11 +746,6 @@ int catchSubroutine(uint16_t ea)
                 return 1;
             }
             if ((a == 0x0e) || (a == 0x0b)) {  // invvid,norvid, do nothing
-                return 1;
-            }
-            if (a == 0x0C) {                   // new page: simulate page break
-                fprintf(printFile, "\n-----------------------------------");
-                fprintf(printFile, "-----------------------------------\n");
                 return 1;
             }
             if (a == 0x0A) {                   // new line
