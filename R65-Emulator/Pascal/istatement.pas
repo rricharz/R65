@@ -908,6 +908,39 @@ begin {gpsec}
   testto(' )');
 end {gpsec};
 
+{#############}
+proc writebool;
+{#############}
+var savpc, k2: integer;
+begin
+  { boolean value is already on stack }
+
+  savpc := pc;
+  code3(37,0);   { jump if false }
+
+  { TRUE }
+  code1(50);
+  code1(ord('T') and 127);
+  code1(ord('R') and 127);
+  code1(ord('U') and 127);
+  code1(ord('E') or 128);
+
+  k2 := pc;
+  code3(36,0);   { unconditional jump }
+
+  fixup(savpc);
+
+  { FALSE }
+  code1(50);
+  code1(ord('F') and 127);
+  code1(ord('A') and 127);
+  code1(ord('L') and 127);
+  code1(ord('S') and 127);
+  code1(ord('E') or 128);
+
+  fixup(k2);
+end;
+
 {###################}
 { body of statement }
 {###################}
@@ -989,11 +1022,14 @@ begin {body of statement }
                 if restype='q' then restype:='f';
                 testtype('f');
                 device:=true; code1(44);
+                testto(' ,');
               end else device:=false;
               repeat
                 if token=' ,' then scan;
-                if (token=' )') then
-                   begin end {do nothing}
+                if (token=' )') and device
+                       and wln then
+                   {empty writeln except device}
+                   k2:=k2 {do nothing}
                 else if token='st' then begin
                   {string}
                   code1(50);
@@ -1014,6 +1050,7 @@ begin {body of statement }
                             code1($58);
                             code1($57);
                           end;
+                    'b':  writebool;
                     'p':  begin
                             code1(22);
                             code1(51);

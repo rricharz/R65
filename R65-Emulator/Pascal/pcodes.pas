@@ -163,14 +163,17 @@ begin
     case code of
       $32: begin { PRTI, stops with bit 8 set }
              normal:=false;
-             if not silent then write(' ',chr($27));
+             pc:=pc+1;
              repeat
                getbyte(fcode,pc,a);
-               if not silent then
-                 write(chr(a and $7f));
+               if not silent then begin
+                 write('<');
+                 writehex(a);
+                 write('>');
+                 write(chr(a and $7f), ' ');
+               end;
                pc:=pc+1;
                until (a and $80)<>0;
-             if not silent then write(chr($27));
            end;
       $39: begin { NBYT, first argument is n bytes }
              normal:=false;
