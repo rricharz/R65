@@ -1,4 +1,4 @@
-{ include file iglobal.pas for compile1 }
+{ include file IGLOBAL:P for compile1 }
 
 const version='4.6';
     table     =$97ff; {user ident table -1}
@@ -107,7 +107,7 @@ begin
   crlf; numerr:=succ(numerr);
   for i:=2 to tpos do write(' ');
   write('^'); crlf;
-  write(INVVID,'*** (',numerr,',',pc,')   ');
+  write(INVVID,'ERROR: ');
   case x of
     01: write('Ident');
     02: write('Ident ',code,' expected');
@@ -131,7 +131,7 @@ begin
     20: write('Compiler directive syntax');
     21: write('Nested include files');
     22: write('Unexpected EOF');
-    23: write('Missing } in comment')
+    23: write('End mark for comment or string')
   end {case};
   writeln(NORVID);
   if (ofno<>nooutput) and (ofno<>yesOUTPUT)

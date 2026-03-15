@@ -110,7 +110,6 @@ end {setval};
 {#####################}
 { directive (of scan) }
 {#####################}
-{ compiler directives }
 
 proc directive;
 var i,icyclus:integer;
@@ -119,16 +118,15 @@ begin
   case ch of
     'I': begin
            if savefno<>@0 then error(21);
-           getchr0; if ch<>' ' then error(20);
-           i:=0; getchr0;
-           if ch=CR then error(23);
+           getchr0; if ch=CR then error(23);
+           if ch<>' ' then error(20);
+           i:=0;
+           getchr0; if ch=CR then error(23);
            while (ch<>'}') and (i<16) do begin
-             if ch=CR then error(23);
-             incname[i]:=ch; i:=i+1; getchr0;
+             incname[i]:=ch; i:=i+1;
+             getchr0; if ch=CR then error(23);
            end;
-           while ch<>'}' do begin
-              if ch=CR then error(23);
-           end;
+           if ch<>'}' then error(23);
            while (i<16) do begin
              incname[i]:=' '; i:=i+1;
            end;
@@ -154,7 +152,7 @@ begin
   if count<=idlength then begin
     ident[count]:=ch; count:=succ(count)
   end;
-  getchr;
+  getchr0;
 end {setid};
 
 {######################}
@@ -201,8 +199,7 @@ begin
                else begin
                  if ch<>'}' then
                  repeat
-                   getchr0;
-                   if ch=CR then error(23)
+                   getchr0; if ch=CR then error(23);
                    until ch='}';
                  getchr; scan
                end
@@ -223,7 +220,9 @@ begin
              end; {hex constant}
         chr(39): begin {string}
                token:='st';
-               repeat setid until ch=chr(39);
+               repeat
+                 setid; if ch=CR then error(23);
+               until ch=chr(39);
                value[0]:=prec(count); getchr
               end
       end {case of token}
@@ -233,7 +232,7 @@ begin
   else begin { is_id_letter }
         clear;
     repeat
-      setid
+      setid; if ch=CR then ch:=' ';
     until not
       (isidletter or ((ch>='0') and (ch<='9')));
     ll:=0; hh:=nresw; {look up in resword table}

@@ -989,14 +989,11 @@ begin {body of statement }
                 if restype='q' then restype:='f';
                 testtype('f');
                 device:=true; code1(44);
-                testto(' ,');
               end else device:=false;
               repeat
                 if token=' ,' then scan;
-                if (token=' )') and device
-                       and wln then
-                   {empty writeln except device}
-                   k2:=k2 {do nothing}
+                if (token=' )') then
+                   begin end {do nothing}
                 else if token='st' then begin
                   {string}
                   code1(50);
