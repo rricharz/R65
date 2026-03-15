@@ -1,26 +1,10 @@
 
-{   ******************************
-    *                            *
-    *  R65 Mini Pascal Compiler  *
-    *      Pass 2  (Loader)      *
-    *                            *
-    ******************************
-
-First version 1978 by rricharz
-Original version 3.1  01/08/82 rricharz
-
-Recovered 2018 by rricharz (r77@bluewin.ch)
-
-Original derived from the publication by
-Kin-Man Chung and Herbert Yen in
-Byte, Volume 3, Number 9 and Number 10, 1978
-
-Adapted for the R65 computer system and
-substantially enhanced by rricharz 1978-1982
-
-usage:
- compile2 name[.cy[,drv]]
-  [] means not required                    }
+{  ******************************  }
+{  *                            *  }
+{  *  R65 Mini Pascal Compiler  *  }
+{  *      Pass 2  (Loader)      *  }
+{  *                            *  }
+{  ******************************  }
 
 program compile2;
 uses syslib,arglib,disklib;

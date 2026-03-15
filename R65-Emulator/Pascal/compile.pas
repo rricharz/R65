@@ -1,18 +1,6 @@
-{
-        *****************
-        * C O M P I L E *
-        *****************
-
-    Version 01/08/82 rricharz
-
-R65 Pascal Pascal Compiler main compiler.
-Calls compile1 and compile2
-
-Usage:
-compile filename [xx]
-  where x     l: hard copy print
-              r: index bound checking
-  [] means not required                }
+{        *****************        }
+{        * C O M P I L E *        }
+{        *****************        }
 
 program compile;
 uses syslib,arglib;
@@ -29,7 +17,7 @@ proc runprog(name: array[15] of char);
 var i: integer;
 begin
   for i:=0 to 15 do FILNM1[i]:=name[i];
-  FILCYC:=0; FILDRV:=0;
+  FILCY1:=0; FILCYC:=0; FILDRV:=0;
   run
 end;
 
@@ -40,6 +28,7 @@ begin {main}
   cyclus:=0; drive:=1;
   _agetstring(name,default,cyclus,drive);
 
+  RUNERR:=0;
   runprog('COMPILE1:R      ');
 
   cyclus:=FILCYC;
@@ -47,8 +36,9 @@ begin {main}
   ARGTYPE[8]:='i';
   ARGLIST[8]:=cyclus;
 
-  if RUNERR=0 then
+  if RUNERR=0 then begin
     runprog('COMPILE2:R      ');
+  end;
 
   _asetfile(name,cyclus,drive,'Q');
   call(adelete);

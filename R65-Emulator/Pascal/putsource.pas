@@ -1,17 +1,17 @@
- {
-         *****************
-         *               *
-         *   putsource   *
-         *               *
-         *****************
 
-    move the source file from the WORK disk
-    on the disk SOURCEPASCAL or SOURCECOMPIL
+{             *****************               }
+{             *               *               }
+{             *   putsource   *               }
+{             *               *               }
+{             *****************               }
 
-    usage: putsource filename
+{   move the source file from the WORK disk   }
+{   on the disk SOURCEPASCAL or SOURCECOMPIL  }
 
-    2019 rricharz (r77@bluewin.ch)
-}
+{   usage: putsource filename                 }
+
+{   2019 rricharz (r77@bluewin.ch)            }
+
 
 program putsource;
 uses syslib,arglib,disklib;

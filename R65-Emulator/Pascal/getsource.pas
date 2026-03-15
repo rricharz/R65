@@ -1,19 +1,19 @@
- {
-         *****************
-         *               *
-         *   getsource   *
-         *               *
-         *****************
 
-    make a copy of a source file from
-    from the disk SOURCEPASCAL or
-    SOURCECOMPIL on the disk WORK in
-    drive 1.
+{        *****************             }
+{        *               *             }
+{        *   getsource   *             }
+{        *               *             }
+{        *****************             }
 
-    usage: getsource filename
+{   make a copy of a source file from  }
+{    from the disk SOURCEPASCAL or     }
+{   SOURCECOMPIL on the disk WORK in   }
+{    drive 1.                          }
 
-    2019 rricharz (r77@bluewin.ch)
-}
+{   usage: getsource filename          }
+
+{   2019 rricharz (r77@bluewin.ch)     }
+
 
 program getsource;
 uses syslib,arglib,disklib;

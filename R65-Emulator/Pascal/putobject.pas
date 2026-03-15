@@ -1,17 +1,17 @@
 {
-         *****************
-         *               *
-         *   putobject   *
-         *               *
-         *****************
+{         *****************            }
+{         *               *            }
+{         *   putobject   *            }
+{         *               *            }
+{         *****************            }
 
-    _move a object file from
-    the WORK disk on the disk PASCAL
+{    move a object file from           }
+{    the WORK disk on the disk PASCAL  }
 
-    usage: putobject filename
+{    usage: putobject filename         }
 
-    2019 rricharz (r77@bluewin.ch)
-}
+{    2019 rricharz (r77@bluewin.ch)    }
+
 
 program putobject;
 uses syslib,arglib;
