@@ -437,7 +437,15 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
 
     // control keys
     if (event->state & GDK_CONTROL_MASK) {
-        if (event->keyval == 0xFF08)      // control rubout -> delete
+        if (event->keyval == 0xFF53)      // control cursor right -> insert
+            global_char = 0x15;
+        else if (event->keyval == 0xFF52) // control cursor up -> roll up
+            global_char = 0x08;
+        else if (event->keyval == 0xFF54) // control cursor down -> roll down
+            global_char = 0x02;
+        else if (event->keyval == 0xFF51) // control cursor left -> delete
+            global_char = 0x19;
+        else if (event->keyval == 0xFF08) // control rubout -> delete
             global_char = 0x19;
         else if (event->keyval == 0xFF0D) // control return -> clear to end of screen
             global_char = 0x11;
