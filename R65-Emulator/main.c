@@ -396,72 +396,86 @@ void QuitProgram(int shutDownFlag)
 static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 ///////////////////////////////////////////////////////////////////////////////////
 {
-    // printf("key pressed, state =%04X, keyval=%04X\n", event->state, event->keyval);
-    
-    // ignore shift, control and option key events, required if
-    // vnc client is used on mac.
-    // the keyval is already adjusted accordingly.
-    if ((event->keyval == 0xFE03) || (event->keyval == 0xFFE1)
-       || (event->keyval == 0xFFE3))
-    return;
-    
-    // printf("key pressed %4x\n",event->keyval);
+    // printf("key pressed, state=%08X, keyval=%08X\n", event->state, event->keyval);
+
+    // left option on Mac/VNC/Raspi arrives with state bit 0x80
+    #define LEFT_OPTION_MASK 0x80
+
+    // Ignore pure modifier key events.
+    // Right option is intentionally ignored completely.
+    if ((event->keyval == 0xFFE1) || (event->keyval == 0xFFE2) ||   // Shift L/R
+        (event->keyval == 0xFFE3) || (event->keyval == 0xFFE4) ||   // Control L/R
+        (event->keyval == 0xFFE9) ||                                // Left Alt/Option key itself
+        (event->keyval == 0xFFEA) ||                                // Right Alt key itself
+        (event->keyval == 0xFE03))                                  // ISO_Level3_Shift / right option-ish
+        return;
+
     if (event->keyval == 0xFFFF) {
         printf("Making screen shot with grim (Wayland only)\n");
         system("grim");
         return;
     }
-        
+
+    // left option + cursor keys
+    if ((event->state & LEFT_OPTION_MASK) &&
+        (event->keyval == 0xFF51 || event->keyval == 0xFF52 ||
+         event->keyval == 0xFF53 || event->keyval == 0xFF54)) {
+
+        if (event->keyval == 0xFF53)      // left option cursor right -> insert
+            global_char = 0x15;
+        else if (event->keyval == 0xFF52) // left option cursor up -> roll up
+            global_char = 0x08;
+        else if (event->keyval == 0xFF54) // left option cursor down -> roll down
+            global_char = 0x02;
+        else if (event->keyval == 0xFF51) // left option cursor left -> delete
+            global_char = 0x19;
+
+        setKeyboardInterrupt();
+        global_key_is_down = 1;
+        return;
+    }
+
     // control keys
     if (event->state & GDK_CONTROL_MASK) {
-        if (event->keyval == 0xFF53)      // control cursor right -> insert
-            global_char = 0x15;
-        else if (event->keyval == 0xFF52) // control cursor up -> roll up
-            global_char = 0x08;
-        else if (event->keyval == 0xFF54) // control cursor down -> roll down
-            global_char = 0x02;
-        else if (event->keyval == 0xFF08) // control rubout -> delete
+        if (event->keyval == 0xFF08)      // control rubout -> delete
             global_char = 0x19;
         else if (event->keyval == 0xFF0D) // control return -> clear to end of screen
             global_char = 0x11;
-        else if (event->keyval == 0xFF51) // control cursor left-> delete
-            global_char = 0x19;
-            
-        else global_char = event->keyval & 0x1F;
+        else
+            global_char = event->keyval & 0x1F;
     }
-                
+
     // shift special keys
-    else if ((event->state & GDK_SHIFT_MASK) && ((event->keyval &  0xFF00) == 0xFF00)) {
+    else if ((event->state & GDK_SHIFT_MASK) && ((event->keyval & 0xFF00) == 0xFF00)) {
         global_char = event->keyval & 0xFEFF;
         // printf("Shift key %04x\n",global_char);
         if (global_char == 0xFE1B)  {    // <shift> ESC: execute NMI
-            pendingNMI = 1;      
+            pendingNMI = 1;
             global_char = 0;
             return;
         }
         else if (global_char == 0xFEEB)  {    // <shift> menu: execute QUIT
-            QuitProgram(0);      
+            QuitProgram(0);
             return;
         }
         else if (global_char == 0xFEE7)  {    // <shift> ALT: execute QUIT and SHUTDOWN
             QuitProgram(1);
-            system("sudo shutdown -h now");     
+            system("sudo shutdown -h now");
             return;
         }
         else global_char = event->keyval & 0x1F;
     }
-                
+
     // normal keys
     else if (event->keyval == 0x1008ff2f) {
         QuitProgram(1);
-        system("sudo shutdown -h now");    
-        return;     
+        system("sudo shutdown -h now");
+        return;
     }
     else {
-        if ((event->keyval == 0xFFE1) || (event->keyval == 0xFFE3)) return;
         global_char = event->keyval;
-        }
-                
+    }
+
     setKeyboardInterrupt();
     global_key_is_down = 1;
 }
