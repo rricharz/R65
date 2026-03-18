@@ -396,18 +396,18 @@ void QuitProgram(int shutDownFlag)
 static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 ///////////////////////////////////////////////////////////////////////////////////
 {
-    // printf("key pressed, state=%08X, keyval=%08X\n", event->state, event->keyval);
+    // printf("key pressed, state=%04X, keyval=%04X\n", event->state, event->keyval);
 
-    // left option on Mac/VNC/Raspi arrives with state bit 0x80
-    #define LEFT_OPTION_MASK 0x80
+    #define LEFT_OPTION_MASK_VNC 0x80
+    #define LEFT_OPTION_MASK_UTM 0x08
 
-    // Ignore pure modifier key events.
-    // Right option is intentionally ignored completely.
+    // ignore pure modifier key events
+    // right option / AltGr related keyvals are intentionally ignored
     if ((event->keyval == 0xFFE1) || (event->keyval == 0xFFE2) ||   // Shift L/R
         (event->keyval == 0xFFE3) || (event->keyval == 0xFFE4) ||   // Control L/R
         (event->keyval == 0xFFE9) ||                                // Left Alt/Option key itself
         (event->keyval == 0xFFEA) ||                                // Right Alt key itself
-        (event->keyval == 0xFE03))                                  // ISO_Level3_Shift / right option-ish
+        (event->keyval == 0xFE03))                                  // ISO_Level3_Shift / AltGr-ish
         return;
 
     if (event->keyval == 0xFFFF) {
@@ -417,17 +417,18 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
     }
 
     // left option + cursor keys
-    if ((event->state & LEFT_OPTION_MASK) &&
+    // Mac/VNC uses state 0x80, Mac/UTM uses state 0x08
+    if (((event->state & LEFT_OPTION_MASK_VNC) || (event->state & LEFT_OPTION_MASK_UTM)) &&
         (event->keyval == 0xFF51 || event->keyval == 0xFF52 ||
          event->keyval == 0xFF53 || event->keyval == 0xFF54)) {
 
-        if (event->keyval == 0xFF53)      // left option cursor right -> insert
+        if (event->keyval == 0xFF53)      // option cursor right -> insert
             global_char = 0x15;
-        else if (event->keyval == 0xFF52) // left option cursor up -> roll up
+        else if (event->keyval == 0xFF52) // option cursor up -> roll up
             global_char = 0x08;
-        else if (event->keyval == 0xFF54) // left option cursor down -> roll down
+        else if (event->keyval == 0xFF54) // option cursor down -> roll down
             global_char = 0x02;
-        else if (event->keyval == 0xFF51) // left option cursor left -> delete
+        else if (event->keyval == 0xFF51) // option cursor left -> delete
             global_char = 0x19;
 
         setKeyboardInterrupt();
@@ -435,7 +436,7 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
         return;
     }
 
-    // control keys
+    // control keys (direct Pi use etc.)
     if (event->state & GDK_CONTROL_MASK) {
         if (event->keyval == 0xFF53)      // control cursor right -> insert
             global_char = 0x15;
