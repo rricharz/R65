@@ -1022,7 +1022,8 @@ begin {body of statement }
                 if restype='q' then restype:='f';
                 testtype('f');
                 device:=true; code1(44);
-                testto(' ,');
+                if not ((token = ' ,') or
+                  (token = ' )')) then merror(2,' ,');
               end else device:=false;
               repeat
                 if token=' ,' then scan;
