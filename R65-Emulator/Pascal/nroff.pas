@@ -13,10 +13,19 @@ const
   PAGEDEF = 58;  { default lines per page for A5}
   MAXSRC  = 56;  { max source chars per input line }
   MAXOUT  = 200; { max chars in formatted output }
-  MARGIN  = 10;  { left margin on printer output }
+  LMARGIN = 3;   { left margint }
+  TMARGIN = 3;   { top margin }
   INDSTEP = 4;   { indent step for .RS / .RE }
   MAXTABS = 16;  { max number of explicit tab stops }
-  DEBUG1  = false;
+
+  ERR_MISS  = 1;  { missing argument }
+  ERR_NUM   = 2;  { invalid number }
+  ERR_EXTRA = 3;  { extra text }
+  ERR_RANGE = 4;  { value out of range }
+  ERR_REQ   = 5;  { invalid request }
+  ERRMAX    = 4;  { max number of errors on screen }
+
+  DEBUG1  = true;
   DEBUG2  = false;
 
 var
@@ -52,6 +61,8 @@ var
   iphang   : integer;
   ipcur    : integer;
   preind   : boolean;
+  errcount : integer;
+  srcline  : integer;
 
   pagepos  : integer; { current line number on page }
   pageno   : integer; { current page number }
@@ -59,22 +70,64 @@ var
   textseen : boolean;
         { true after first real text output }
 
-  thname   : array[40] of char; { title text from .TH }
+  thname   : array[LINEMAX] of char; { title from .TH }
   thlen    : integer; { length of title text }
+
+{ --- forward referencies --- }
+
+proc newpage; forward;
 
 { --- helpers --- }
 
+proc errec(pos,code:integer);
+{===========================}
+var i: integer;
+begin
+  errcount := succ(errcount);
+  write('Error in line ',srcline ,': ');
+  case code of
+    ERR_MISS : writeln('missing argument');
+    ERR_NUM  : writeln('invalid number');
+    ERR_EXTRA: writeln('extra text');
+    ERR_RANGE: writeln('value out of range');
+    ERR_REQ  : writeln('invalid request')
+  else
+    writeln('bad request to errec')
+  end;
+
+  for i:=0 to llen-1 do
+    write(line[i]);
+  writeln;
+
+  for i:=1 to pos do
+    write(' ');
+  writeln('^');
+
+  if errcount>=ERRMAX then begin
+    write('Too many errors');
+    _abort;
+  end;
+
+end;
+
 proc printernewline;
+{==================}
 begin
   write(@PRINTER, CR);
   write(@PRINTER, LF);
 end;
 
 proc startline;
+{=============}
 var i: integer;
 begin
+
+  if DEBUG1 then
+    writeln('< startline: pageno=',pageno,
+          ' pagepos=',pagepos,' >');
+
   { printer margin only on printer output }
-  for i := 1 to MARGIN do
+  for i := 1 to LMARGIN do
     write(@PRINTER, ' ');
 
   { optional debug line number }
@@ -84,28 +137,23 @@ begin
   end;
 end;
 
-func istrue(bool: boolean): char;
-begin
-  if bool then istrue := 'T'
-  else istrue := 'F';
-end;
-
 proc printheader;
+{===============}
 var i, spaces, n: integer;
 begin
   if DEBUG1 then begin
-    writeln('< doTH: before, pageno=', pageno,
-            ' textseen=', istrue(textseen),
+    writeln('< printheader: before, pageno=', pageno,
+            ' textseen=', textseen,
             ' pagepos=', pagepos, ' >');
   end;
 
-  { 3 top margin lines }
-  printernewline;
-  printernewline;
-  printernewline;
+  { top margin }
+  for i := 1 to 3 do begin
+    printernewline;
+  end;
 
   { left margin }
-  for i := 1 to MARGIN do
+  for i := 1 to LMARGIN do
     write(@PRINTER, ' ');
 
   { title left }
@@ -134,14 +182,29 @@ begin
 end;
 
 proc newpage;
+{===========}
 begin
-  write(@PRINTER, FF);
+  if DEBUG1 then
+    writeln('< newpage: before pageno=',pageno,
+          ' headeron=',headeron,
+          ' pagepos=',pagepos,' >');
+  if pageno>0 then
+    write(@PRINTER, FF);
+
+  pageno := succ(pageno);
+
+  if DEBUG1 then
+    writeln('< newpage: after pageno=',pageno,' >');
 
   if headeron then begin
-    pageno := succ(pageno);
+    if DEBUG1 then
+      writeln('< newpage: calling printheader >');
     printheader;
-    pagepos := 6;
-          { page line after 3 blanks + header + blank }
+    if DEBUG1 then
+    writeln('< newpage: after printheader pagepos=',
+          pagepos,' >');
+    pagepos := TMARGIN + 3;
+        { line after margin, header, blank }
   end
   else
     pagepos := 1;
@@ -150,12 +213,15 @@ begin
 end;
 
 proc clearprintout;
+{=================}
 begin
   { erase the current printout.txt file }
+  { this is a command to the emulator }
   _setemucom(9);
 end;
 
 func nexttab(col: integer): integer;
+{==================================}
 var i: integer;
 begin
   if ntab > 0 then begin
@@ -174,19 +240,11 @@ begin
   end;
 end;
 
-func upc(c: char): char;
-begin
-  if (c >= 'a') and (c <= 'z') then
-    upc := chr(ord(c) - 32)
-  else
-    upc := c;
-end;
-
 proc putspaces(n: integer);
 var i: integer;
 begin
   for i := 1 to n do
-    write(' ');
+    write(@PRINTER,' ');
 end;
 
 proc writewithtabs;
@@ -198,12 +256,12 @@ begin
     if outbuf[i] = TAB8 then begin
       target := nexttab(col);
       while col < target do begin
-        write(' ');
+        write(@PRINTER,' ');
         col := succ(col);
       end;
     end
     else begin
-      write(outbuf[i]);
+      write(@PRINTER,outbuf[i]);
       col := succ(col);
     end;
   end;
@@ -211,7 +269,7 @@ end;
 
 proc newline;
 begin
-  writeln;
+  writeln(@PRINTER);
   pagepos := succ(pagepos);
 
   if pagepos > pagelen then
@@ -226,12 +284,14 @@ begin
   m := n;
   if m > linelen then m := linelen;
   for i := 1 to m do
-    write(c);
+    write(@PRINTER,c);
   newline;
 end;
 
 proc flushline;
 begin
+  if pageno=0 then
+    newpage;
   if outlen > 0 then begin
     textseen := true;
     if not preind then
@@ -264,7 +324,7 @@ begin
   textseen := true;
   putspaces(indent);
   for i := 0 to llen - 1 do
-    write(line[i]);
+    write(@PRINTER, line[i]);
   newline;
 end;
 
@@ -399,18 +459,18 @@ begin
   putspaces(indent);
 
   for i := 0 to thlen - 1 do
-    write(thname[i]);
+    write(@PRINTER,thname[i]);
 
   if linelen > 47 then begin
     spaces := linelen - (2 * thlen) - indent;
     if spaces < 1 then spaces := 1;
     while spaces > 0 do begin
-      write(' ');
+      write(@PRINTER,' ');
       spaces := prec(spaces);
     end;
 
     for i := 0 to thlen - 1 do
-      write(thname[i]);
+      write(@PRINTER,thname[i]);
   end;
 
   newline;
@@ -423,15 +483,13 @@ begin
   flushline;
   textseen := true;
   putspaces(indent);
-  write(INVVID);
 
   i := 3;
   while i < llen do begin
-    write(line[i]);
+    write(@PRINTER,line[i]);
     i := succ(i);
   end;
 
-  write(NORVID);
   newline;
 end;
 
@@ -444,7 +502,7 @@ begin
 
   i := 3;
   while i < llen do begin
-    write(line[i]);
+    write(@PRINTER,line[i]);
     i := succ(i);
   end;
 
@@ -465,14 +523,14 @@ begin
   col := indent;
 
   while pos < llen do begin
-    write(line[pos]);
+    write(@PRINTER,line[pos]);
     pos := succ(pos);
     col := succ(col);
   end;
 
   if col < (indent + iphang) then begin
     while col < (indent + iphang) do begin
-      write(' ');
+      write(@PRINTER,' ');
       col := succ(col);
     end;
     ipcur := iphang;
@@ -490,38 +548,35 @@ begin
 end;
 
 proc doTH;
+var i: integer;
 begin
-  if DEBUG1 then
-    writeln('< doTH: before, pageno=', pageno,
-            ' pagepos=', pagepos,
-            ' textseen=', istrue(textseen), ' >');
-
   closeip;
-  saveth(3);
-  headeron := true;
 
-  if DEBUG1 then
-    writeln('< doTH: headeron set, thlen=',
-          thlen, ' >');
+  i := 3;
+  while (i<llen) and (line[i]=' ') do
+    i := i+1;
 
-  { page 1 gets header only if no real text seen yet }
-  if (pageno = 0) and (not textseen) then begin
-    if DEBUG1 then
-      writeln('< doTH: printing header for page 1 >');
-
-    pageno := 1;
-    printheader;
-    pagepos := 6;
-    startline;
+  if i>=llen then begin
+    headeron := false;
+    thlen := 0;
+  end
+  else begin
+    saveth(i);
+    headeron := true;
   end;
 
-  { printth; }
+  if DEBUG1 then
+    writeln('< doTH: pageno=', pageno,
+            ' pagepos=', pagepos,
+            ' textseen=', textseen,
+            ' headeron=', headeron,
+            ' thlen=', thlen, ' >');
 end;
 
 proc doTA;
 var p, v: integer;
 begin
-  if DEBUG1 then writeln('< doing ta >');
+  if DEBUG2 then writeln('< doing ta >');
   ntab := 0;
   p := 3;
 
@@ -534,7 +589,7 @@ begin
     v := parseintfrom(p);
 
     if (v > 0) and (ntab < MAXTABS) then begin
-      if DEBUG1 then
+      if DEBUG2 then
         writeln('< setting tabstop ', ntab, ' at ',
               v, ' >');
       tabstops[ntab] := v;
@@ -558,7 +613,7 @@ begin
   putspaces(indent);
   i := pos;
   while i < llen do begin
-    write(upc(line[i]));
+    write(@PRINTER,_uppercase(line[i]));
     i := succ(i);
   end;
   newline;
@@ -579,7 +634,7 @@ begin
   putspaces(indent);
   i := pos;
   while i < llen do begin
-    write(upc(line[i]));
+    write(@PRINTER, _uppercase(line[i]));
     i := succ(i);
   end;
   newline;
@@ -601,7 +656,7 @@ end;
 
 proc doNF;
 begin
-  if DEBUG1 then writeln('< doing nf >');
+  if DEBUG2 then writeln('< doing nf >');
   closeip;
   flushline;
   needspace(5);
@@ -610,7 +665,7 @@ end;
 
 proc doFI;
 begin
-  if DEBUG1 then writeln('< doing fi >');
+  if DEBUG2 then writeln('< doing fi >');
   closeip;
   flushline;
   fillmode := true;
@@ -650,8 +705,56 @@ begin
     newline;
 end;
 
-func readline: boolean;
+proc doLL;
+{========}
+var i,j,n: integer;
 begin
+  flushline;                  { end current line }
+
+  i := 3;                   { after .ll }
+
+  while (i<llen) and (line[i]=' ') do
+    i := i+1;
+
+  if i>=llen then begin
+    linelen := LINEDEF;
+    exit;
+  end;
+
+  if (line[i]<'0') or (line[i]>'9') then begin
+    errec(i,ERR_NUM);
+    exit;
+  end;
+
+  j := i;                   { start of number }
+
+  n := 0;
+  while (i<llen) and (line[i]>='0')
+                  and (line[i]<='9') do begin
+    n := n*10 + ord(line[i]) - ord('0');
+    i := i+1;
+  end;
+
+  while (i<llen) and (line[i]=' ') do
+    i := i+1;
+
+  if i<llen then begin
+    errec(i,ERR_EXTRA);
+    exit;
+  end;
+
+  if (n<1) or (n>LINEMAX) then begin
+    errec(j,ERR_RANGE);
+    exit;
+  end;
+
+  linelen := n;
+end;
+
+func readline: boolean;
+{=====================}
+begin
+  srcline := succ(srcline);
   llen := 0;
 
   repeat
@@ -678,37 +781,35 @@ begin
 end;
 
 proc handleline;
+{==============}
+var cmd: packed char;
 begin
-  if (llen >= 1) and (line[0] = '.') then begin
-    if (llen >= 3) and (line[1] = 'S')
-      and (line[2] = 'H') then doSH
-    else if (llen >= 3) and (line[1] = 'S')
-      and (line[2] = 'S') then doSS
-    else if (llen >= 3) and (line[1] = 'P')
-      and (line[2] = 'P') then doPP
-    else if (llen >= 3) and (line[1] = 'b')
-      and (line[2] = 'r') then doBR
-    else if (llen >= 3) and (line[1] = 'n')
-      and (line[2] = 'f') then doNF
-    else if (llen >= 3) and (line[1] = 'f')
-      and (line[2] = 'i') then doFI
-    else if (llen >= 3) and (line[1] = 'R')
-      and (line[2] = 'S') then doRS
-    else if (llen >= 3) and (line[1] = 'R')
-      and (line[2] = 'E') then doRE
-    else if (llen >= 3) and (line[1] = 's')
-      and (line[2] = 'p') then doSP
-    else if (llen >= 3) and (line[1] = 't')
-      and (line[2] = 'a') then doTA
-    else if (llen >= 3) and (line[1] = 'I')
-      and (line[2] = 'P') then doIP
-    else if (llen >= 3) and (line[1] = 'T')
-      and (line[2] = 'H') then doTH
-    else if (llen >= 2) and (line[1] = 'B') then doB
-    else if (llen >= 2) and (line[1] = 'I') then doI
-    else begin
-      { unknown request: ignore }
-    end;
+  if (llen >= 2) and (line[0] = '.') then begin
+    if llen>=3 then
+      cmd := packed(_uppercase(line[1]),
+                              _uppercase(line[2]))
+    else
+      cmd := packed(_uppercase(line[1]), ' ');
+
+    case cmd of
+      'SS': doSS;  { subsection }
+      'SH': doSH;  { section }
+      'PP': doPP;  { paragraph }
+      'BR': doBR;  { break line }
+      'NF': doNF;  { no fill }
+      'FI': doFI;  { fill }
+      'RS': doRS;  { indent start }
+      'RE': doRE;  { indent end }
+      'SP': doSP;  { space lines }
+      'TA': doTA;  { tabs }
+      'IP': doIP;  { indented para }
+      'TH': doTH;  { title header }
+      'LL': doLL;  { line len (todo) }
+      'B ': doB;   { bold }
+      'I ': doI    { italic }
+    else
+      errec(1,ERR_REQ)
+    end { case }
   end
   else begin
     if fillmode then formatfillfromline
@@ -716,6 +817,8 @@ begin
   end;
 end;
 
+{ main }
+{======}
 begin
   clearprintout;
 
@@ -738,6 +841,8 @@ begin
   textseen := false;
   titlemod := false;
   linecnt  := 0;
+  errcount := 0;
+  srcline  := 0;
 
   { get filename from arguments }
   cyclus := 0;
@@ -751,6 +856,7 @@ begin
 
   _asetfile(name, cyclus, drive, 'B');
   openr(src);
+  writeln;
 
   _agetval(linelen, default);
   if default then linelen := LINEDEF;
@@ -758,12 +864,11 @@ begin
   if linelen < 20 then linelen := 36;
   if linelen > LINEMAX then linelen := LINEMAX;
 
-  write(PRTON);
   startline;
 
   while readline do
     handleline;
-
+  closeip;
   flushline;
-  write(PRTOFF);
+
 end.
