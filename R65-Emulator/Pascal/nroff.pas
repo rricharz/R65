@@ -25,7 +25,7 @@ const
   ERR_REQ   = 5;  { invalid request }
   ERRMAX    = 4;  { max number of errors on screen }
 
-  DEBUG1  = true;
+  DEBUG1  = false;
   DEBUG2  = false;
 
 var
@@ -72,10 +72,6 @@ var
 
   thname   : array[LINEMAX] of char; { title from .TH }
   thlen    : integer; { length of title text }
-
-{ --- forward referencies --- }
-
-proc newpage; forward;
 
 { --- helpers --- }
 
@@ -184,25 +180,13 @@ end;
 proc newpage;
 {===========}
 begin
-  if DEBUG1 then
-    writeln('< newpage: before pageno=',pageno,
-          ' headeron=',headeron,
-          ' pagepos=',pagepos,' >');
   if pageno>0 then
     write(@PRINTER, FF);
 
   pageno := succ(pageno);
 
-  if DEBUG1 then
-    writeln('< newpage: after pageno=',pageno,' >');
-
   if headeron then begin
-    if DEBUG1 then
-      writeln('< newpage: calling printheader >');
     printheader;
-    if DEBUG1 then
-    writeln('< newpage: after printheader pagepos=',
-          pagepos,' >');
     pagepos := TMARGIN + 3;
         { line after margin, header, blank }
   end
@@ -290,8 +274,6 @@ end;
 
 proc flushline;
 begin
-  if pageno=0 then
-    newpage;
   if outlen > 0 then begin
     textseen := true;
     if not preind then
@@ -548,6 +530,7 @@ begin
 end;
 
 proc doTH;
+{========}
 var i: integer;
 begin
   closeip;
@@ -568,12 +551,14 @@ begin
   if DEBUG1 then
     writeln('< doTH: pageno=', pageno,
             ' pagepos=', pagepos,
-            ' textseen=', textseen,
             ' headeron=', headeron,
             ' thlen=', thlen, ' >');
+
+  newpage;
 end;
 
 proc doTA;
+{========}
 var p, v: integer;
 begin
   if DEBUG2 then writeln('< doing ta >');
