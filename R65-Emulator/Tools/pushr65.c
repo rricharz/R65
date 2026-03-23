@@ -146,82 +146,105 @@ void pushByte(FILE *f, uint8_t value)
 /***********************************/
 // push a byte to file
 // handles r65 blank packing, tab and disk overflow
+// also maps ` to ' and wraps long text lines
 {
     char chr;
     char cr = 0x0D;
-    
+
     byteInCounter++;                            // count input byte
 
     if (type == 'B') {                          // binary
         byteOutCounter++;
-        if ((fwrite(&value, sizeof(chr), 1, f) != sizeof(chr))) { 
+        if ((fwrite(&value, sizeof(chr), 1, f) != sizeof(chr))) {
             printf("\n***** Write error, disk directory unchanged\n");
-            printf("Maxbytes = %06X, byteOutCounter=%06X\n", maxBytes, byteOutCounter);
+            printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+                   maxBytes, byteOutCounter);
             closeAndExit();
         }
-        return;        
-    }
-    else {   
-      chr = value & 0x7F;               // mask bit 8 off  
-    }
-    
-    if (chr == 0x09) {                          // tab
-        do
-            pushByte(f, ' ');                   // this is a recursive call!
-        while ((((column -1) & 0x07) != 0) && (column < maxCharPerLine));
         return;
     }
-        
-    if (chr == 0x0A) {                          // discard line feed
+    else {
+        chr = value & 0x7F;                     // mask bit 8 off
+    }
+
+    if (chr == '`')                             // replace backtick
+        chr = '\'';
+
+    if (chr == 0x09) {                          // tab
+        do
+            pushByte(f, ' ');                   // recursive call
+        while ((((column - 1) & 0x07) != 0) &&
+               (column < maxCharPerLine));
+        return;
+    }
+
+    if (chr == 0x0A) {                          // line feed -> CR
         blankCounter = 0;                       // ignore trailing blanks
         line++;
         column = 0;
         chr = 0x0D;
-        // return;                              // send cr
     }
-   
+
+    if ((chr != 0x0D) && (column >= maxCharPerLine)) {
+        blankCounter = 0;                       // drop trailing blanks
+
+        if (byteOutCounter++ >= maxBytes) {
+            printf("\n***** Disk full, disk directory unchanged\n");
+            printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+                   maxBytes, byteOutCounter);
+            closeAndExit();
+        }
+        if ((fwrite(&cr, sizeof(chr), 1, f) != sizeof(chr))) {
+            printf("\n***** Write error, disk directory unchanged\n");
+            printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+                   maxBytes, byteOutCounter);
+            closeAndExit();
+        }
+
+        line++;
+        column = 0;
+    }
+
     if ((chr != ' ') && blankCounter > 0) {     // push blank counter
         if (byteOutCounter++ >= maxBytes) {
             printf("\n***** Disk full, disk directory unchanged\n");
-            printf("Maxbytes = %06X, byteOutCounter=%06X\n", maxBytes, byteOutCounter);
+            printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+                   maxBytes, byteOutCounter);
             closeAndExit();
         }
-        if (blankCounter == 1)      // only one blank
-            blankCounter = 0x20;    // keep blank
+        if (blankCounter == 1)
+            blankCounter = 0x20;                // keep one blank
         else
-            blankCounter += 128;                    // set bit 8
-        if ((fwrite(&blankCounter, sizeof(chr), 1, f) != sizeof(chr))) { 
+            blankCounter += 128;                // set bit 8
+        if ((fwrite(&blankCounter, sizeof(chr), 1, f) != sizeof(chr))) {
             printf("\n***** Write error, disk directory unchanged\n");
-            printf("Maxbytes = %06X, byteOutCounter=%06X\n", maxBytes, byteOutCounter);
+            printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+                   maxBytes, byteOutCounter);
             closeAndExit();
         }
         blankCounter = 0;
     }
-    
-    if (column > maxCharPerLine)  {            // ignore rest of line
-        printf("\n***** Line %d too long\n", line);
-        return;
-    }
-    
-    if (chr == ' ') {                            // pack blanks
+
+    if (chr == ' ') {                           // pack blanks
         blankCounter++;
         column++;
         return;
     }
 
-    if (byteOutCounter++ >= maxBytes) {          // push the character
-            printf("\n***** Disk full, disk directory unchanged\n");
-            printf("Maxbytes = %06X, byteOutCounter=%06X\n", maxBytes, byteOutCounter);
-            closeAndExit();
-        }
-        if ((fwrite(&chr, sizeof(chr), 1, f) != sizeof(chr))) { 
-            printf("\n***** Write error, disk directory unchanged\n");
-            printf("Maxbytes = %06X, byteOutCounter=%06X\n", maxBytes, byteOutCounter);
-            closeAndExit();
-        }
-        column++;
+    if (byteOutCounter++ >= maxBytes) {         // push character
+        printf("\n***** Disk full, disk directory unchanged\n");
+        printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+               maxBytes, byteOutCounter);
+        closeAndExit();
+    }
+    if ((fwrite(&chr, sizeof(chr), 1, f) != sizeof(chr))) {
+        printf("\n***** Write error, disk directory unchanged\n");
+        printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+               maxBytes, byteOutCounter);
+        closeAndExit();
+    }
+    column++;
 }
-
 
 /******************************/
 int main(int argc, char *argv[])

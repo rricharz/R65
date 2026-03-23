@@ -73,8 +73,6 @@ var
   thname   : array[LINEMAX] of char; { title from .TH }
   thlen    : integer; { length of title text }
 
-{ --- helpers --- }
-
 proc errec(pos,code:integer);
 {===========================}
 var i: integer;
@@ -90,20 +88,46 @@ begin
   else
     writeln('bad request to errec')
   end;
-
   for i:=0 to llen-1 do
     write(line[i]);
   writeln;
-
   for i:=1 to pos do
     write(' ');
   writeln('^');
-
   if errcount>=ERRMAX then begin
     write('Too many errors');
     _abort;
   end;
+end;
 
+func checkeol(pos:integer):boolean;
+{=================================}
+var pos0:integer;
+begin
+  pos0 := pos;
+  while (pos0<llen) and (line[pos0]=' ') do
+    pos0 := succ(pos0);
+  if pos0<llen then begin
+    errec(pos0,ERR_EXTRA);
+    checkeol := false;
+  end
+  else
+    checkeol := true;
+end;
+
+func findarg(pos:integer):integer;
+{================================}
+var pos0: integer;
+begin
+  pos0 := pos;
+  while (pos0<llen) and (line[pos0]=' ') do
+    pos0 := pos0+1;
+  if pos0>=llen then begin
+    errec(pos0,ERR_MISS);
+    findarg := -1;
+  end
+  else
+    findarg := pos0;
 end;
 
 proc printernewline;
@@ -460,29 +484,32 @@ begin
 end;
 
 proc doB;
+{=======}
 var i: integer;
 begin
+  i := findarg(3);
+  if i<0 then
+    exit;
   flushline;
   textseen := true;
   putspaces(indent);
-
-  i := 3;
   while i < llen do begin
     write(@PRINTER,line[i]);
     i := succ(i);
   end;
-
   newline;
 end;
 
 proc doI;
+{=======}
 var i: integer;
 begin
+  i := findarg(3);
+  if i<0 then
+    exit;
   flushline;
   textseen := true;
   putspaces(indent);
-
-  i := 3;
   while i < llen do begin
     write(@PRINTER,line[i]);
     i := succ(i);
@@ -492,24 +519,21 @@ begin
 end;
 
 proc doIP;
-var pos, col: integer;
+{========}
+var i, col: integer;
 begin
   closeip;
-
-  pos := 3;
-  while (pos < llen) and (line[pos] = ' ') do
-    pos := succ(pos);
-
+  i := findarg(3);
+  if i<0 then
+    exit;
   textseen := true;
   putspaces(indent);
   col := indent;
-
-  while pos < llen do begin
-    write(@PRINTER,line[pos]);
-    pos := succ(pos);
+  while i < llen do begin
+    write(@PRINTER,line[i]);
+    i := succ(i);
     col := succ(col);
   end;
-
   if col < (indent + iphang) then begin
     while col < (indent + iphang) do begin
       write(@PRINTER,' ');
@@ -524,7 +548,6 @@ begin
     ipcur := iphang;
     preind := true;
   end;
-
   indent := indent + ipcur;
   ipmode := true;
 end;
@@ -586,62 +609,68 @@ begin
   end;
 end;
 
-proc doSH;
-var i, pos: integer;
-begin
-  closeip;
-  needspace(4);
-
-  newline;
-
-  pos := 4;
-  putspaces(indent);
-  i := pos;
-  while i < llen do begin
-    write(@PRINTER,_uppercase(line[i]));
-    i := succ(i);
-  end;
-  newline;
-
-  putspaces(indent);
-  underline(llen - 4, '=');
-end;
-
 proc doSS;
-var i, pos: integer;
+{========}
+var i, n: integer;
 begin
+  i := findarg(3);
+  if i<0 then
+    exit;
+  n := llen - i;
   closeip;
   needspace(4);
-
   newline;
-
-  pos := 4;
   putspaces(indent);
-  i := pos;
   while i < llen do begin
     write(@PRINTER, _uppercase(line[i]));
     i := succ(i);
   end;
   newline;
-
   putspaces(indent);
-  underline(llen - 4, '-');
+  underline(n, '-');
+end;
+
+proc doSH;
+{========}
+var i, n: integer;
+begin
+  i := findarg(3);
+  if i<0 then
+    exit;
+  n := llen - i;
+  closeip;
+  needspace(6);
+  newline;
+  putspaces(indent);
+  while i < llen do begin
+    write(@PRINTER, _uppercase(line[i]));
+    i := succ(i);
+  end;
+  newline;
+  putspaces(indent);
+  underline(n, '=');
 end;
 
 proc doPP;
+{========}
 begin
+  if not checkeol(3) then
+    exit;
   closeip;
   emitblank;
 end;
 
 proc doBR;
+{========}
 begin
+  if not checkeol(3) then
+    exit;
   flushline;
 end;
 
 proc doNF;
+{========}
 begin
-  if DEBUG2 then writeln('< doing nf >');
   closeip;
   flushline;
   needspace(5);
@@ -649,21 +678,27 @@ begin
 end;
 
 proc doFI;
+{========}
 begin
-  if DEBUG2 then writeln('< doing fi >');
+  if not checkeol(3) then
+    exit;
   closeip;
   flushline;
   fillmode := true;
 end;
 
 proc doRS;
+{========}
 begin
+  if not checkeol(3) then
+    exit;
   closeip;
   flushline;
   indent := indent + INDSTEP;
 end;
 
 proc doRE;
+{========}
 begin
   closeip;
   flushline;
@@ -672,20 +707,33 @@ begin
 end;
 
 proc doSP;
-var n, j, s: integer;
+{========}
+var i, j, n: integer;
 begin
-  flushline;
-  s := 3;
-  while (s < llen) and (line[s] = ' ') do
-    s := succ(s);
-
-  if llen > 3 then
-    n := parseintfrom(s)
-  else
-    n := 1;
-
-  if n <= 0 then n := 1;
-
+  closeip;
+  i := 3;
+  while (i<llen) and (line[i]=' ') do
+    i := succ(i);
+  if i>=llen then
+    n := 1
+  else begin
+    if (line[i]<'0') or (line[i]>'9') then begin
+      errec(i,ERR_NUM);
+      exit;
+    end;
+    n := 0;
+    while (i<llen) and (line[i]>='0')
+                    and (line[i]<='9') do begin
+      n := n*10 + ord(line[i]) - ord('0');
+      i := succ(i);
+    end;
+    while (i<llen) and (line[i]=' ') do
+      i := succ(i);
+    if i<llen then begin
+      errec(i,ERR_EXTRA);
+      exit;
+    end;
+  end;
   for j := 1 to n do
     newline;
 end;
