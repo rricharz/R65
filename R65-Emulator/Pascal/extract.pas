@@ -1,6 +1,25 @@
 program extract;
 uses syslib, arglib, strlib;
 
+const TOK_OTHER = 0;
+      TOK_CONST = 1;
+      TOK_MEM   = 2;
+      TOK_VAR   = 3;
+      TOK_PROC  = 4;
+      TOK_FUNC  = 5;
+      TOK_BEGIN = 6;
+      TOK_CASE  = 7;
+      TOK_END   = 8;
+
+      SSTART = 0;
+      SCONST = 1;
+      SMEM   = 2;
+      SVAR   = 3;
+      SROUT  = 4;
+      SSKIP  = 5;
+      SBODY  = 6;
+      SDONE  = 7;
+
 var
   f_in, f_out: file;
   line: cpnt;
@@ -8,6 +27,294 @@ var
   lineno: integer;
   ateof: boolean;
   llen: integer;
+
+  state: integer;
+  tok  : integer;
+  seenbegin: boolean;
+  blocklevel: integer;
+  routlevel: integer;
+  ininner  : boolean;
+
+proc isalnum(ch:char; var yes:boolean);
+{*************************************}
+begin
+  yes := (((ch>='A') and (ch<='Z')) or
+          ((ch>='a') and (ch<='z')) or
+          ((ch>='0') and (ch<='9')));
+end;
+
+proc matchtok(t:cpnt; s:cpnt; var yes:boolean);
+{*********************************************}
+var i,j,lt,ls: integer;
+    ok: boolean;
+begin
+  yes := false;
+  lt := _strlen(t);
+  ls := _strlen(s);
+
+  i := 0;
+  while (i<ls) and (s[i]=' ') do
+    i := i + 1;
+
+  if i+lt > ls then
+    exit;
+
+  j := 0;
+  while j<lt do
+  begin
+    if t[j] <> s[i+j] then
+      exit;
+    j := j + 1;
+  end;
+
+  if i+lt < ls then
+  begin
+    isalnum(s[i+lt], ok);
+    if ok then
+      exit;
+  end;
+
+  yes := true;
+end;
+
+proc gettok(var tok:integer);
+{***************************}
+var yes: boolean;
+begin
+  tok := TOK_OTHER;
+
+  matchtok('const', line, yes);
+  if yes then
+  begin
+    tok := TOK_CONST;
+    exit;
+  end;
+
+  matchtok('mem', line, yes);
+  if yes then
+  begin
+    tok := TOK_MEM;
+    exit;
+  end;
+
+  matchtok('var', line, yes);
+  if yes then
+  begin
+    tok := TOK_VAR;
+    exit;
+  end;
+
+  matchtok('proc', line, yes);
+  if yes then
+  begin
+    tok := TOK_PROC;
+    exit;
+  end;
+
+  matchtok('func', line, yes);
+  if yes then
+  begin
+    tok := TOK_FUNC;
+    exit;
+  end;
+
+  matchtok('begin', line, yes);
+  if yes then
+  begin
+    tok := TOK_BEGIN;
+    exit;
+  end;
+
+  matchtok('case', line, yes);
+  if yes then
+  begin
+    tok := TOK_CASE;
+    exit;
+  end;
+
+  matchtok('end', line, yes);
+  if yes then
+  begin
+    tok := TOK_END;
+    exit;
+  end;
+end;
+
+proc printtok(tok:integer);
+{*************************}
+begin
+  case tok of
+    TOK_CONST: write('CONST');
+    TOK_MEM  : write('MEM');
+    TOK_VAR  : write('VAR');
+    TOK_PROC : write('PROC');
+    TOK_FUNC : write('FUNC');
+    TOK_BEGIN: write('BEGIN');
+    TOK_CASE : write('CASE');
+    TOK_END  : write('END')
+  else
+    write('OTHER')
+  end;
+end;
+
+proc printstate(st:integer);
+{**************************}
+begin
+  case st of
+    SSTART: write('SSTART');
+    SCONST: write('SCONST');
+    SMEM  : write('SMEM');
+    SVAR  : write('SVAR');
+    SROUT : write('SROUT');
+    SSKIP : write('SSKIP');
+    SBODY : write('SBODY');
+    SDONE : write('SDONE')
+  else
+    write('???')
+  end;
+end;
+
+proc processline;
+{***************}
+begin
+  write('line ');
+  write(lineno);
+  write(': state=');
+  printstate(state);
+  write(' tok=');
+  printtok(tok);
+  writeln;
+
+  case state of
+
+    SSTART:
+      if tok = TOK_CONST then
+        state := SCONST;
+
+    SCONST:
+      if tok = TOK_MEM then
+        state := SMEM;
+
+    SMEM:
+      if tok = TOK_VAR then
+        state := SVAR;
+
+    SVAR:
+      begin
+        if (tok = TOK_PROC) or (tok = TOK_FUNC) then
+        begin
+          state := SSKIP;
+          seenbegin := false;
+          blocklevel := 0;
+          routlevel := 0;
+          ininner := false;
+        end
+        else if tok = TOK_BEGIN then
+        begin
+          state := SBODY;
+          blocklevel := 1;
+        end;
+      end;
+
+    SROUT:
+      begin
+        if (tok = TOK_PROC) or (tok = TOK_FUNC) then
+        begin
+          state := SSKIP;
+          seenbegin := false;
+          blocklevel := 0;
+          routlevel := 0;
+          ininner := false;        end
+        else if tok = TOK_BEGIN then
+        begin
+          state := SBODY;
+          blocklevel := 1;
+        end;
+      end;
+
+    SSKIP:
+      begin
+        if not seenbegin then
+        begin
+          { detect nested routines }
+          if (tok = TOK_PROC) or (tok = TOK_FUNC) then
+          begin
+            routlevel := routlevel + 1;
+            write('  nested routine, level=');
+            writeln(routlevel);
+          end
+
+          { begin found }
+          else if tok = TOK_BEGIN then
+          begin
+            if routlevel > 0 then
+            begin
+              { begin of inner routine }
+              ininner := true;
+              blocklevel := 1;
+              write('  inner begin, level=');
+              writeln(routlevel);
+            end
+            else
+            begin
+              { begin of outer routine }
+              seenbegin := true;
+              blocklevel := 1;
+              write('  outer begin');
+              writeln;
+            end;
+          end
+
+          { end of inner routine }
+          else if (tok = TOK_END) and ininner then
+          begin
+            blocklevel := blocklevel - 1;
+
+            if blocklevel = 0 then
+            begin
+              ininner := false;
+              routlevel := routlevel - 1;
+              write('  inner end, level=');
+              writeln(routlevel);
+            end;
+          end;
+        end
+
+        else
+        begin
+          { normal outer routine body }
+
+          if (tok = TOK_BEGIN) or (tok = TOK_CASE) then
+            blocklevel := blocklevel + 1;
+
+          if tok = TOK_END then
+            blocklevel := blocklevel - 1;
+
+          write('  blocklevel=');
+          writeln(blocklevel);
+
+          if blocklevel = 0 then
+            state := SROUT;
+        end;
+      end;
+
+    SBODY:
+      begin
+        if (tok = TOK_BEGIN) or (tok = TOK_CASE) then
+          blocklevel := blocklevel + 1;
+
+        if tok = TOK_END then
+          blocklevel := blocklevel - 1;
+
+        write('  main blocklevel=');
+        writeln(blocklevel);
+
+        if blocklevel = 0 then
+          state := SDONE;
+      end
+
+  end {case};
+end;
 
 proc strread(f:file;
                s:cpnt;
@@ -112,22 +419,28 @@ end;
 begin
   write(PRTON);
 
-  open_files('H'); { for first pass }
+  open_files('H');
 
   line := _new;
   lineno := 0;
+  state := SSTART;
+  seenbegin := false;
+  blocklevel := 0;
+
   repeat
     strread(f_in, line, ateof, llen);
-    writeln('DEBUG: llen=', llen,
-            ', ateof=', ateof);
+    lineno := lineno + 1;
 
-    writeln('DEBUG: const strcmp=',
-      _strcmp('const', line));
-    writeln('DEBUG: var strcmp=',
-      _strcmp('var', line));
+    if llen > 0 then
+    begin
+      writeln;
+      write('TEXT: ');
+      writeln(line);
 
-    writeln(line);
-    strwrite(f_out, line); writeln(@f_out);
+      gettok(tok);
+      processline;
+    end;
+
   until ateof;
 
   close_files;
