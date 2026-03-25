@@ -388,7 +388,7 @@ CPOINT  LDX CURSEQ
 **********************************
 * ENTRY: x,FILDRV
 * EXIT: FILERR IN Y AND STATUS, CHAR IN A
-* CHAR =$1F MEANS EOF, CHAR=$1D MEANS ERROR
+* CHAR =$7F MEANS EOF, CHAR=$1D MEANS ERROR
 *
 READCH  LDA =0          MUST BE READ FILE
         JSR TESTFN
@@ -429,7 +429,7 @@ READC4  CMP =$FE        EOR?
 *
 READC5  CMP =$FF        END OF FILE?
         BNE READC6
-        LDA =$1F        END OF FILE
+        LDA =$7F        END OF FILE
         BNE READC7      ALLWAYS TAKEN, OK
 *
 READC6  SEC             COUNT ONE BLANK
@@ -536,7 +536,7 @@ WRITCH  AND =$7F        MASK OFF BIT 7
         BEQ WRITC4
 *
 WRITC0  STA (POINT),Y
-        CMP =$1F        EOF?
+        CMP =$7F        EOF?
         BEQ WRITC1      YES, STORE BUFFER
 *
         INY             ELSE COUNT
@@ -621,7 +621,7 @@ CLOSE   LDA FIDRTB,X
         AND =$80
         BEQ CLOSE1      SKIP, IF READ
 *
-        LDA =$1F        EOF
+        LDA =$7F        EOF
         JSR WRITCH+2
         BNE CLOSE2+2    SKIP, IF ERROR
 *

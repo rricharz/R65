@@ -424,7 +424,7 @@ int i, end, filtyp, filstp;
     crtUpdate();
     
     // execute mousepad command
-    sprintf(estring, "mousepad Files/%s%s", s, extension);
+    sprintf(estring, "mousepad --disable-server Files/%s%s", s, extension);
     printf("Running %s, waiting for completion\n", estring);   
     int res = system(estring);
     // printf("result =%d\n", res);

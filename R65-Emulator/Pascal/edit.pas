@@ -1,22 +1,15 @@
- {
-         *****************
-         *               *
-         *      edit     *
-         *               *
-         *****************
+{
+{         *****************             }
+{         *               *             }
+{         *      edit     *             }
+{         *               *             }
+{         *****************             }
 
-    2018 rricharz (r77@bluewin.ch)
+{    2018 rricharz (r77@bluewin.ch)     }
 
-Edit a text file.
+{ Edit a text file.                     }
 
-Written 2018 to _test the R65 emulator and
-to demonstrate the power of Tiny Pascal.
-
-Usage:  edit FILNAM[:x][.cy[,drive]]
-
-  [:X]:    type of file,     default :P
-  [drive]: disk drive (0,1), default 1
-}
+{  Usage:  edit FILNAM[:x][.cy[,drive]] }
 
 program edit;
 uses syslib,arglib,disklib;
@@ -50,6 +43,7 @@ end;
 
 proc setsubtype(subtype:char);
 { only set subtype if not already there }
+mem filstp=$312:char&;
 var i:integer;
 begin
   i:=0;
@@ -60,7 +54,10 @@ begin
   if name[i]<>':' then begin
     name[i]:=':';
     name[i+1]:=subtype;
-  end;
+    filstp:=subtype;
+  end
+  else
+    filstp:=name[i+1];
 end;
 
 begin { main }

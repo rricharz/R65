@@ -516,35 +516,6 @@ int export_file()
     else
         system("mkdir Files");
     
-    filtyp = memory[M8_FILTYP];
-    // printf("Filtyp = %c\n", filtyp);
-        
-    filstp = memory[M8_FILSTP];
-    // printf("Filstp = %c\n", filstp);
-    
-    if (filtyp=='S') {      // sequential file
-        if (filstp == 'A')
-            extension = ".asm";
-        else if (filstp == 'P')
-            extension = ".pas";
-        else if (filstp == 'H')
-            extension = ".help";
-       else if (filstp == 'B')
-            extension = ".txt";
-        else
-            extension = ".txt";
-    }
-    else {                  // block file
-        if (filstp == 'R') {
-           extension = ".pdump";
-           pnt = 0x2000;
-        }
-        else {
-           extension = ".bin";
-           pnt =0;
-        }
-    }
-    
     drive = memory[M8_FILDRV];
     // printf("Drive = %d\n", drive);
     
@@ -564,15 +535,49 @@ int export_file()
         if (memory[M8_FILNAM+i] == ':') {               // remove :
             s[i]=' ';
             end = i;
+            filstp = memory[M8_FILNAM+i+1];
         }
-        else
+        else {
             s[i] = memory[M8_FILNAM+i];
+            filstp = 'B';                               // generic text file
+        }
             
         if ((s[i] >= 'A') && (s[i] <= 'Z'))             // convert to small letters
             s[i] = s[i] + 0x20;
     }
     
     s[end] = 0;                                         // add end of string mark
+    
+    filtyp = memory[M8_FILTYP];
+    printf("Filtyp = %c   ", filtyp);
+    memory[M8_FILSTP] = filstp;
+    printf("Filstp = %c\n", filstp);
+    
+    if (filtyp=='S') {      // sequential file
+        if (filstp == 'A')
+            extension = ".asm";
+        else if (filstp == 'P')
+            extension = ".pas";
+        else if (filstp == 'H')
+            extension = ".help";
+       else if (filstp == 'B')
+            extension = ".txt";
+       else if (filstp == 'N')
+            extension = ".nroff";
+        else
+            extension = ".txt";
+    }
+    else {                  // block file
+        if (filstp == 'R') {
+           extension = ".pdump";
+           pnt = 0x2000;
+        }
+        else {
+           extension = ".bin";
+           pnt =0;
+        }
+    }
+    
     sprintf(name, "Files/%s%s", s, extension);
     printf("Exporting to %s\n", name);
     
@@ -609,16 +614,16 @@ int export_file()
                     if ((buffer[i] >= 0x80) && (buffer[i] <= 0xFe)) {
                         for (int ii = 0; ii < (buffer[i] & 0x7F); ii++) {
                             fprintf(foutput, "%c", ' ');
-                            printf("<BL>");
+                            // printf("<BL>");
 						}
                     }
                     else if (buffer[i] == 0x0D) {
                         fprintf(foutput, "\n");
-                        printf("<RT>\n");
+                        // printf("<RT>\n");
                     }
                     else {
                         fprintf(foutput, "%c",buffer[i]);
-                        printf("%c", buffer[i]);
+                        // printf("%c", buffer[i]);
                         count++;
                     }
                     i++;
