@@ -65,7 +65,8 @@ mem  { The & below are required for 8-bit!}
   MAXSEQ =$0336: integer&;
   FIDRTP =$0339: array[MMAXSEQ] of integer&;
 
-var _day,_month,_year: integer;
+var
+  _day, _month, _year: integer;
 
 proc _setemucom(i:integer);
 mem emucom=$1430:integer&;

@@ -1,483 +1,610 @@
 
-R65 COMPILE 4.6: program EXTRACT          25/3/26 page 1
+R65 COMPILE 4.6: program EXTRACT          26/3/26 page 1
 
 
    1 (    4) program extract;
    2 (    4) uses syslib, arglib, strlib;
    3 ( 2170) 
    4 ( 2170) const TOK_OTHER = 0;
-   5 ( 2173)       TOK_CONST = 1;
-   6 ( 2173)       TOK_MEM   = 2;
-   7 ( 2173)       TOK_VAR   = 3;
-   8 ( 2173)       TOK_PROC  = 4;
-   9 ( 2173)       TOK_FUNC  = 5;
-  10 ( 2173)       TOK_BEGIN = 6;
-  11 ( 2173)       TOK_CASE  = 7;
-  12 ( 2173)       TOK_END   = 8;
-  13 ( 2173) 
-  14 ( 2173)       SSTART = 0;
-  15 ( 2173)       SCONST = 1;
-  16 ( 2173)       SMEM   = 2;
-  17 ( 2173)       SVAR   = 3;
-  18 ( 2173)       SROUT  = 4;
-  19 ( 2173)       SSKIP  = 5;
-  20 ( 2173)       SBODY  = 6;
-  21 ( 2173)       SDONE  = 7;
-  22 ( 2173) 
-  23 ( 2173) var
-  24 ( 2173)   f_in, f_out: file;
-  25 ( 2173)   line: cpnt;
-  26 ( 2173)   name: array[15] of char;
-  27 ( 2173)   lineno: integer;
-  28 ( 2173)   ateof: boolean;
-  29 ( 2173)   llen: integer;
-  30 ( 2173) 
-  31 ( 2173)   state: integer;
-  32 ( 2173)   tok  : integer;
-  33 ( 2173)   seenbegin: boolean;
-  34 ( 2173)   blocklevel: integer;
-  35 ( 2173)   routlevel: integer;
-  36 ( 2173)   ininner  : boolean;
-  37 ( 2173) 
-  38 ( 2173) proc isalnum(ch:char; var yes:boolean);
-  39 ( 2173) {*************************************}
-  40 ( 2173) begin
-  41 ( 2173)   yes := (((ch>='A') and (ch<='Z')) or
-  42 ( 2193)           ((ch>='a') and (ch<='z')) or
-  43 ( 2208)           ((ch>='0') and (ch<='9')));
-  44 ( 2225) end;
-  45 ( 2229) 
-  46 ( 2230) proc matchtok(t:cpnt; s:cpnt; var yes:boolean);
-  47 ( 2230) {*********************************************}
-  48 ( 2230) var i,j,lt,ls: integer;
-  49 ( 2233)     ok: boolean;
-  50 ( 2233) begin
-  51 ( 2233)   yes := false;
-  52 ( 2237)   lt := _strlen(t);
-  53 ( 2253)   ls := _strlen(s);
-  54 ( 2269) 
-  55 ( 2273)   i := 0;
-  56 ( 2275)   while (i<ls) and (s[i]=' ') do
-  57 ( 2301)     i := i + 1;
-  58 ( 2311) 
-  59 ( 2319)   if i+lt > ls then
+   5 ( 2176)       TOK_CONST = 1;
+   6 ( 2179)       TOK_MEM   = 2;
+   7 ( 2182)       TOK_VAR   = 3;
+   8 ( 2185)       TOK_PROC  = 4;
+   9 ( 2188)       TOK_FUNC  = 5;
+  10 ( 2191)       TOK_BEGIN = 6;
+  11 ( 2194)       TOK_CASE  = 7;
+  12 ( 2197)       TOK_END   = 8;
+  13 ( 2200) 
+  14 ( 2200)       SSTART = 0;
+  15 ( 2203)       SCONST = 1;
+  16 ( 2206)       SMEM   = 2;
+  17 ( 2209)       SVAR   = 3;
+  18 ( 2212)       SROUT  = 4;
+  19 ( 2215)       SSKIP  = 5;
+  20 ( 2218)       SBODY  = 6;
+  21 ( 2221)       SDONE  = 7;
+  22 ( 2224) 
+  23 ( 2224)       DEBUG1 = false;
+  24 ( 2227) 
+  25 ( 2227) var
+  26 ( 2230)   f_in, f_out: file;
+  27 ( 2233)   line:       cpnt;
+  28 ( 2236)   name:       array[15] of char;
+  29 ( 2239)   lineno:     integer;
+  30 ( 2242)   ateof:      boolean;
+  31 ( 2245)   llen:       integer;
+  32 ( 2248) 
+  33 ( 2248)   state:      integer;
+  34 ( 2251)   tok  :      integer;
+  35 ( 2254)   seenbegin:  boolean;
+  36 ( 2257)   blocklevel: integer;
+  37 ( 2260)   routlevel:  integer;
+  38 ( 2263)   ininner  :  boolean;
+  39 ( 2266)   pass:       integer; { 1 > :H file, 2 > :N file }
+  40 ( 2269)   routheader: boolean;
+  41 ( 2272) 
+  42 ( 2272) proc rtrim(s:cpnt);
+  43 ( 2275) {*****************}
+  44 ( 2278) var i: integer;
+  45 ( 2284) begin
+  46 ( 2287)   i := _strlen(s);
+  47 ( 2304)   while i > 0 do
+  48 ( 2317)   begin
+  49 ( 2324)     if s[i-1] <> ' ' then
+  50 ( 2347)     begin
+  51 ( 2351)       s[i] := ENDMARK;
+  52 ( 2368)       exit;
+  53 ( 2376)     end;
+  54 ( 2379)     i := i - 1;
+  55 ( 2388)   end;
+  56 ( 2396)   s[0] := ENDMARK;
+  57 ( 2411) end;
+  58 ( 2418) 
+  59 ( 2419) proc outln(s:cpnt);
 
-R65 COMPILE 4.6: program EXTRACT          25/3/26 page 2
+R65 COMPILE 4.6: program EXTRACT          26/3/26 page 2
 
-  60 ( 2328)     exit;
-  61 ( 2337) 
-  62 ( 2337)   j := 0;
-  63 ( 2339)   while j<lt do
-  64 ( 2347)   begin
-  65 ( 2355)     if t[j] <> s[i+j] then
-  66 ( 2378)       exit;
-  67 ( 2385)     j := j + 1;
-  68 ( 2391)   end;
-  69 ( 2396) 
-  70 ( 2399)   if i+lt < ls then
-  71 ( 2408)   begin
-  72 ( 2413)     isalnum(s[i+lt], ok);
-  73 ( 2445)     if ok then
-  74 ( 2445)       exit;
-  75 ( 2453)   end;
-  76 ( 2453) 
-  77 ( 2453)   yes := true;
-  78 ( 2455) end;
-  79 ( 2459) 
-  80 ( 2460) proc gettok(var tok:integer);
-  81 ( 2460) {***************************}
-  82 ( 2460) var yes: boolean;
-  83 ( 2463) begin
-  84 ( 2463)   tok := TOK_OTHER;
-  85 ( 2467) 
-  86 ( 2471)   matchtok('const', line, yes);
-  87 ( 2497)   if yes then
-  88 ( 2497)   begin
-  89 ( 2501)     tok := TOK_CONST;
-  90 ( 2506)     exit;
-  91 ( 2511)   end;
-  92 ( 2511) 
-  93 ( 2511)   matchtok('mem', line, yes);
-  94 ( 2535)   if yes then
-  95 ( 2535)   begin
-  96 ( 2539)     tok := TOK_MEM;
-  97 ( 2544)     exit;
-  98 ( 2549)   end;
-  99 ( 2549) 
- 100 ( 2549)   matchtok('var', line, yes);
- 101 ( 2573)   if yes then
- 102 ( 2573)   begin
- 103 ( 2577)     tok := TOK_VAR;
- 104 ( 2582)     exit;
- 105 ( 2587)   end;
- 106 ( 2587) 
- 107 ( 2587)   matchtok('proc', line, yes);
- 108 ( 2612)   if yes then
- 109 ( 2612)   begin
- 110 ( 2616)     tok := TOK_PROC;
- 111 ( 2621)     exit;
- 112 ( 2626)   end;
- 113 ( 2626) 
- 114 ( 2626)   matchtok('func', line, yes);
- 115 ( 2651)   if yes then
- 116 ( 2651)   begin
- 117 ( 2655)     tok := TOK_FUNC;
- 118 ( 2660)     exit;
- 119 ( 2665)   end;
+  60 ( 2422) {****************}
+  61 ( 2425) var i: integer;
+  62 ( 2431)     ch: char;
+  63 ( 2434) begin
+  64 ( 2437)   if pass <> 1 then
+  65 ( 2448)     exit;
+  66 ( 2456)   { skip leading blanks }
+  67 ( 2459)   i := 0;
+  68 ( 2464)   while s[i] = ' ' do
+  69 ( 2488)     i := i + 1;
+  70 ( 2501)   ch := s[i];
+  71 ( 2525)   { skip empty lines }
+  72 ( 2534)   if ch = ENDMARK then
+  73 ( 2543)     exit;
+  74 ( 2551)   { skip comment-only lines }
+  75 ( 2554)   if ch = '{' then
+  76 ( 2563)     exit;
+  77 ( 2571)   { output original line (not shifted!) }
+  78 ( 2574)   writeln(@f_out, s);
+  79 ( 2594) end;
+  80 ( 2597) 
+  81 ( 2598) proc outtxt(t:cpnt);
+  82 ( 2601) {******************}
+  83 ( 2604) begin
+  84 ( 2607)   if pass=1 then
+  85 ( 2621)     writeln(@f_out,t);
+  86 ( 2645) end;
+  87 ( 2648) 
+  88 ( 2649) proc isalnum(ch:char; var yes:boolean);
+  89 ( 2652) {*************************************}
+  90 ( 2655) begin
+  91 ( 2658)   yes := (((ch>='A') and (ch<='Z')) or
+  92 ( 2681)           ((ch>='a') and (ch<='z')) or
+  93 ( 2699)           ((ch>='0') and (ch<='9')));
+  94 ( 2719) end;
+  95 ( 2726) 
+  96 ( 2727) proc matchtok(t:cpnt; s:cpnt; var yes:boolean);
+  97 ( 2730) {*********************************************}
+  98 ( 2733) var i,j,lt,ls: integer;
+  99 ( 2739)     ok: boolean;
+ 100 ( 2742) begin
+ 101 ( 2745)   yes := false;
+ 102 ( 2752)   lt := _strlen(t);
+ 103 ( 2771)   ls := _strlen(s);
+ 104 ( 2790) 
+ 105 ( 2794)   i := 0;
+ 106 ( 2799)   while (i<ls) and (s[i]=' ') do
+ 107 ( 2833)     i := i + 1;
+ 108 ( 2846) 
+ 109 ( 2854)   if i+lt > ls then
+ 110 ( 2866)     exit;
+ 111 ( 2878) 
+ 112 ( 2878)   j := 0;
+ 113 ( 2883)   while j<lt do
+ 114 ( 2894)   begin
+ 115 ( 2905)     if t[j] <> s[i+j] then
+ 116 ( 2941)       exit;
+ 117 ( 2951)     j := j + 1;
+ 118 ( 2960)   end;
+ 119 ( 2968) 
 
-R65 COMPILE 4.6: program EXTRACT          25/3/26 page 3
+R65 COMPILE 4.6: program EXTRACT          26/3/26 page 3
 
- 120 ( 2665) 
- 121 ( 2665)   matchtok('begin', line, yes);
- 122 ( 2691)   if yes then
- 123 ( 2691)   begin
- 124 ( 2695)     tok := TOK_BEGIN;
- 125 ( 2700)     exit;
- 126 ( 2705)   end;
- 127 ( 2705) 
- 128 ( 2705)   matchtok('case', line, yes);
- 129 ( 2730)   if yes then
- 130 ( 2730)   begin
- 131 ( 2734)     tok := TOK_CASE;
- 132 ( 2739)     exit;
- 133 ( 2744)   end;
- 134 ( 2744) 
- 135 ( 2744)   matchtok('end', line, yes);
- 136 ( 2768)   if yes then
- 137 ( 2768)   begin
- 138 ( 2772)     tok := TOK_END;
- 139 ( 2777)     exit;
- 140 ( 2782)   end;
- 141 ( 2782) end;
- 142 ( 2782) 
- 143 ( 2783) proc printtok(tok:integer);
- 144 ( 2783) {*************************}
- 145 ( 2783) begin
- 146 ( 2783)   case tok of
- 147 ( 2788)     TOK_CONST: write('CONST');
- 148 ( 2805)     TOK_MEM  : write('MEM');
- 149 ( 2819)     TOK_VAR  : write('VAR');
- 150 ( 2833)     TOK_PROC : write('PROC');
- 151 ( 2848)     TOK_FUNC : write('FUNC');
- 152 ( 2863)     TOK_BEGIN: write('BEGIN');
- 153 ( 2879)     TOK_CASE : write('CASE');
- 154 ( 2894)     TOK_END  : write('END')
- 155 ( 2908)   else
- 156 ( 2908)     write('OTHER')
- 157 ( 2917)   end;
- 158 ( 2919) end;
- 159 ( 2919) 
- 160 ( 2920) proc printstate(st:integer);
- 161 ( 2920) {**************************}
- 162 ( 2920) begin
- 163 ( 2920)   case st of
- 164 ( 2925)     SSTART: write('SSTART');
- 165 ( 2943)     SCONST: write('SCONST');
- 166 ( 2960)     SMEM  : write('SMEM');
- 167 ( 2975)     SVAR  : write('SVAR');
- 168 ( 2990)     SROUT : write('SROUT');
- 169 ( 3006)     SSKIP : write('SSKIP');
- 170 ( 3022)     SBODY : write('SBODY');
- 171 ( 3038)     SDONE : write('SDONE')
- 172 ( 3054)   else
- 173 ( 3054)     write('???')
- 174 ( 3061)   end;
- 175 ( 3063) end;
- 176 ( 3063) 
- 177 ( 3064) proc processline;
- 178 ( 3064) {***************}
- 179 ( 3064) begin
+ 120 ( 2971)   if i+lt < ls then
+ 121 ( 2983)   begin
+ 122 ( 2991)     isalnum(s[i+lt], ok);
+ 123 ( 3031)     if ok then
+ 124 ( 3034)       exit;
+ 125 ( 3045)   end;
+ 126 ( 3048) 
+ 127 ( 3048)   yes := true;
+ 128 ( 3053) end;
+ 129 ( 3060) 
+ 130 ( 3061) proc gettok(var tok:integer);
+ 131 ( 3064) {***************************}
+ 132 ( 3067) var yes: boolean;
+ 133 ( 3073) begin
+ 134 ( 3076)   tok := TOK_OTHER;
+ 135 ( 3083) 
+ 136 ( 3087)   matchtok('const', line, yes);
+ 137 ( 3116)   if yes then
+ 138 ( 3119)   begin
+ 139 ( 3126)     tok := TOK_CONST;
+ 140 ( 3134)     exit;
+ 141 ( 3142)   end;
+ 142 ( 3145) 
+ 143 ( 3145)   matchtok('mem', line, yes);
+ 144 ( 3172)   if yes then
+ 145 ( 3175)   begin
+ 146 ( 3182)     tok := TOK_MEM;
+ 147 ( 3190)     exit;
+ 148 ( 3198)   end;
+ 149 ( 3201) 
+ 150 ( 3201)   matchtok('var', line, yes);
+ 151 ( 3228)   if yes then
+ 152 ( 3231)   begin
+ 153 ( 3238)     tok := TOK_VAR;
+ 154 ( 3246)     exit;
+ 155 ( 3254)   end;
+ 156 ( 3257) 
+ 157 ( 3257)   matchtok('proc', line, yes);
+ 158 ( 3285)   if yes then
+ 159 ( 3288)   begin
+ 160 ( 3295)     tok := TOK_PROC;
+ 161 ( 3303)     exit;
+ 162 ( 3311)   end;
+ 163 ( 3314) 
+ 164 ( 3314)   matchtok('func', line, yes);
+ 165 ( 3342)   if yes then
+ 166 ( 3345)   begin
+ 167 ( 3352)     tok := TOK_FUNC;
+ 168 ( 3360)     exit;
+ 169 ( 3368)   end;
+ 170 ( 3371) 
+ 171 ( 3371)   matchtok('begin', line, yes);
+ 172 ( 3400)   if yes then
+ 173 ( 3403)   begin
+ 174 ( 3410)     tok := TOK_BEGIN;
+ 175 ( 3418)     exit;
+ 176 ( 3426)   end;
+ 177 ( 3429) 
+ 178 ( 3429)   matchtok('case', line, yes);
+ 179 ( 3457)   if yes then
 
-R65 COMPILE 4.6: program EXTRACT          25/3/26 page 4
+R65 COMPILE 4.6: program EXTRACT          26/3/26 page 4
 
- 180 ( 3064)   write('line ');
- 181 ( 3075)   write(lineno);
- 182 ( 3080)   write(': state=');
- 183 ( 3089)   printstate(state);
- 184 ( 3099)   write(' tok=');
- 185 ( 3105)   printtok(tok);
- 186 ( 3115)   writeln;
- 187 ( 3115) 
- 188 ( 3121)   case state of
- 189 ( 3121) 
- 190 ( 3125)     SSTART:
- 191 ( 3129)       if tok = TOK_CONST then
- 192 ( 3138)         state := SCONST;
- 193 ( 3144) 
- 194 ( 3151)     SCONST:
- 195 ( 3155)       if tok = TOK_MEM then
- 196 ( 3164)         state := SMEM;
- 197 ( 3170) 
- 198 ( 3177)     SMEM:
- 199 ( 3181)       if tok = TOK_VAR then
- 200 ( 3190)         state := SVAR;
- 201 ( 3196) 
- 202 ( 3203)     SVAR:
- 203 ( 3207)       begin
- 204 ( 3210)         if (tok = TOK_PROC) or (tok = TOK_FUNC) then
- 205 ( 3224)         begin
- 206 ( 3225)           state := SSKIP;
- 207 ( 3230)           seenbegin := false;
- 208 ( 3236)           blocklevel := 0;
- 209 ( 3242)           routlevel := 0;
- 210 ( 3248)           ininner := false;
- 211 ( 3254)         end
- 212 ( 3258)         else if tok = TOK_BEGIN then
- 213 ( 3267)         begin
- 214 ( 3268)           state := SBODY;
- 215 ( 3273)           blocklevel := 1;
- 216 ( 3279)         end;
- 217 ( 3283)       end;
- 218 ( 3283) 
- 219 ( 3286)     SROUT:
- 220 ( 3290)       begin
- 221 ( 3293)         if (tok = TOK_PROC) or (tok = TOK_FUNC) then
- 222 ( 3307)         begin
- 223 ( 3308)           state := SSKIP;
- 224 ( 3313)           seenbegin := false;
- 225 ( 3319)           blocklevel := 0;
- 226 ( 3325)           routlevel := 0;
- 227 ( 3331)           ininner := false;        end
- 228 ( 3341)         else if tok = TOK_BEGIN then
- 229 ( 3350)         begin
- 230 ( 3351)           state := SBODY;
- 231 ( 3356)           blocklevel := 1;
- 232 ( 3362)         end;
- 233 ( 3366)       end;
- 234 ( 3366) 
- 235 ( 3369)     SSKIP:
- 236 ( 3373)       begin
- 237 ( 3376)         if not seenbegin then
- 238 ( 3376)         begin
- 239 ( 3381)           { detect nested routines }
+ 180 ( 3460)   begin
+ 181 ( 3467)     tok := TOK_CASE;
+ 182 ( 3475)     exit;
+ 183 ( 3483)   end;
+ 184 ( 3486) 
+ 185 ( 3486)   matchtok('end', line, yes);
+ 186 ( 3513)   if yes then
+ 187 ( 3516)   begin
+ 188 ( 3523)     tok := TOK_END;
+ 189 ( 3531)     exit;
+ 190 ( 3539)   end;
+ 191 ( 3542) end;
+ 192 ( 3545) 
+ 193 ( 3546) proc printtok(tok:integer);
+ 194 ( 3549) {*************************}
+ 195 ( 3552) begin
+ 196 ( 3555)   case tok of
+ 197 ( 3563)     TOK_CONST: write('CONST');
+ 198 ( 3583)     TOK_MEM  : write('MEM');
+ 199 ( 3600)     TOK_VAR  : write('VAR');
+ 200 ( 3617)     TOK_PROC : write('PROC');
+ 201 ( 3635)     TOK_FUNC : write('FUNC');
+ 202 ( 3653)     TOK_BEGIN: write('BEGIN');
+ 203 ( 3672)     TOK_CASE : write('CASE');
+ 204 ( 3690)     TOK_END  : write('END')
+ 205 ( 3707)   else
+ 206 ( 3710)     write('OTHER')
+ 207 ( 3722)   end;
+ 208 ( 3727) end;
+ 209 ( 3730) 
+ 210 ( 3731) proc printstate(st:integer);
+ 211 ( 3734) {**************************}
+ 212 ( 3737) begin
+ 213 ( 3740)   case st of
+ 214 ( 3748)     SSTART: write('SSTART');
+ 215 ( 3769)     SCONST: write('SCONST');
+ 216 ( 3789)     SMEM  : write('SMEM');
+ 217 ( 3807)     SVAR  : write('SVAR');
+ 218 ( 3825)     SROUT : write('SROUT');
+ 219 ( 3844)     SSKIP : write('SSKIP');
+ 220 ( 3863)     SBODY : write('SBODY');
+ 221 ( 3882)     SDONE : write('SDONE')
+ 222 ( 3901)   else
+ 223 ( 3904)     write('???')
+ 224 ( 3914)   end;
+ 225 ( 3919) end;
+ 226 ( 3922) 
+ 227 ( 3923) proc doSSTART;
+ 228 ( 3926) {************}
+ 229 ( 3929) var i:      integer;
+ 230 ( 3935)     next:   char;
+ 231 ( 3938)     strout: cpnt;
+ 232 ( 3941) begin
+ 233 ( 3944)   i := 0;
+ 234 ( 3951)   strout := _new;
+ 235 ( 3964) 
+ 236 ( 3968)   repeat
+ 237 ( 3971)     strout[i] := _uppercase(line[i]);
+ 238 ( 4006)     i := i + 1;
+ 239 ( 4019) 
 
-R65 COMPILE 4.6: program EXTRACT          25/3/26 page 5
+R65 COMPILE 4.6: program EXTRACT          26/3/26 page 5
 
- 240 ( 3384)           if (tok = TOK_PROC) or (tok = TOK_FUNC) then
- 241 ( 3398)           begin
- 242 ( 3399)             routlevel := routlevel + 1;
- 243 ( 3408)             write('  nested routine, level=');
- 244 ( 3438)             writeln(routlevel);
- 245 ( 3449)           end
- 246 ( 3449) 
- 247 ( 3449)           { begin found }
- 248 ( 3449)           else if tok = TOK_BEGIN then
- 249 ( 3458)           begin
- 250 ( 3459)             if routlevel > 0 then
- 251 ( 3468)             begin
- 252 ( 3469)               { begin of inner routine }
- 253 ( 3472)               ininner := true;
- 254 ( 3474)               blocklevel := 1;
- 255 ( 3480)               write('  inner begin, level=');
- 256 ( 3506)               writeln(routlevel);
- 257 ( 3517)             end
- 258 ( 3517)             else
- 259 ( 3517)             begin
- 260 ( 3520)               { begin of outer routine }
- 261 ( 3520)               seenbegin := true;
- 262 ( 3522)               blocklevel := 1;
- 263 ( 3528)               write('  outer begin');
- 264 ( 3546)               writeln;
- 265 ( 3546)             end;
- 266 ( 3552)           end
- 267 ( 3552) 
- 268 ( 3552)           { end of inner routine }
- 269 ( 3552)           else if (tok = TOK_END) and ininner then
- 270 ( 3562)           begin
- 271 ( 3567)             blocklevel := blocklevel - 1;
- 272 ( 3576) 
- 273 ( 3581)             if blocklevel = 0 then
- 274 ( 3587)             begin
- 275 ( 3588)               ininner := false;
- 276 ( 3593)               routlevel := routlevel - 1;
- 277 ( 3603)               write('  inner end, level=');
- 278 ( 3628)               writeln(routlevel);
- 279 ( 3639)             end;
- 280 ( 3639)           end;
- 281 ( 3639)         end
- 282 ( 3639) 
- 283 ( 3639)         else
- 284 ( 3639)         begin
- 285 ( 3642)           { normal outer routine body }
- 286 ( 3642) 
- 287 ( 3642)           if (tok = TOK_BEGIN) or (tok = TOK_CASE) then
- 288 ( 3656)             blocklevel := blocklevel + 1;
- 289 ( 3666) 
- 290 ( 3671)           if tok = TOK_END then
- 291 ( 3677)             blocklevel := blocklevel - 1;
- 292 ( 3687) 
- 293 ( 3692)           write('  blocklevel=');
- 294 ( 3706)           writeln(blocklevel);
- 295 ( 3717) 
- 296 ( 3717)           if blocklevel = 0 then
- 297 ( 3723)             state := SROUT;
- 298 ( 3729)         end;
- 299 ( 3733)       end;
+ 240 ( 4024)     if i >= STRSIZE-1 then
+ 241 ( 4035)     begin
+ 242 ( 4040)       strout[i] := ENDMARK;
+ 243 ( 4057)       outln(strout);
+ 244 ( 4074)       _release(strout);
+ 245 ( 4087)       exit;
+ 246 ( 4091)     end;
+ 247 ( 4094) 
+ 248 ( 4094)     next := line[i];
+ 249 ( 4110)   until (next=';') or (next=ENDMARK);
+ 250 ( 4133) 
+ 251 ( 4137)   strout[i] := ENDMARK;
+ 252 ( 4151)   outln(strout);
+ 253 ( 4168)   _release(strout);
+ 254 ( 4181) end;
+ 255 ( 4184) 
+ 256 ( 4185) proc doCONST;
+ 257 ( 4188) {************}
+ 258 ( 4191) begin
+ 259 ( 4194)   writeln(@f_out);
+ 260 ( 4214)   outtxt('CONST');
+ 261 ( 4231) end;
+ 262 ( 4234) 
+ 263 ( 4235) proc doMEM;
+ 264 ( 4238) {**********}
+ 265 ( 4241) begin
+ 266 ( 4244)   writeln(@f_out);
+ 267 ( 4264)   outtxt('MEM');
+ 268 ( 4279) end;
+ 269 ( 4282) 
+ 270 ( 4283) proc doVAR;
+ 271 ( 4286) {**********}
+ 272 ( 4289) begin
+ 273 ( 4292)   writeln(@f_out);
+ 274 ( 4312)   outtxt('VAR');
+ 275 ( 4327) end;
+ 276 ( 4330) 
+ 277 ( 4331) proc processline;
+ 278 ( 4334) {***************}
+ 279 ( 4337) begin
+ 280 ( 4340)   if DEBUG1 then begin
+ 281 ( 4350)     write('line ');
+ 282 ( 4362)     write(lineno);
+ 283 ( 4370)     write(': state=');
+ 284 ( 4382)     printstate(state);
+ 285 ( 4395)     write(' tok=');
+ 286 ( 4404)     printtok(tok);
+ 287 ( 4417)     writeln;
+ 288 ( 4420)   end;
+ 289 ( 4429) 
+ 290 ( 4429)   case state of
+ 291 ( 4432) 
+ 292 ( 4436)     SSTART:
+ 293 ( 4443)       begin
+ 294 ( 4449)         if tok = TOK_CONST then begin
+ 295 ( 4459)           doCONST;
+ 296 ( 4469)           state := SCONST;
+ 297 ( 4474)         end else
+ 298 ( 4481)           doSSTART;
+ 299 ( 4491)       end;
 
-R65 COMPILE 4.6: program EXTRACT          25/3/26 page 6
+R65 COMPILE 4.6: program EXTRACT          26/3/26 page 6
 
- 300 ( 3733) 
- 301 ( 3736)     SBODY:
- 302 ( 3740)       begin
- 303 ( 3743)         if (tok = TOK_BEGIN) or (tok = TOK_CASE) then
- 304 ( 3757)           blocklevel := blocklevel + 1;
- 305 ( 3767) 
- 306 ( 3772)         if tok = TOK_END then
- 307 ( 3778)           blocklevel := blocklevel - 1;
- 308 ( 3788) 
- 309 ( 3793)         write('  main blocklevel=');
- 310 ( 3812)         writeln(blocklevel);
- 311 ( 3823) 
- 312 ( 3823)         if blocklevel = 0 then
- 313 ( 3829)           state := SDONE;
- 314 ( 3835)       end
- 315 ( 3839) 
- 316 ( 3839)   end {case};
- 317 ( 3841) end;
- 318 ( 3841) 
- 319 ( 3842) proc strread(f:file;
- 320 ( 3842)                s:cpnt;
- 321 ( 3842)                  var ateof0:boolean;
- 322 ( 3842)                    var len:integer);
- 323 ( 3842) {**********************************}
- 324 ( 3842) var ch  : char;
- 325 ( 3845)     i   : integer;
- 326 ( 3845)     done: boolean;
- 327 ( 3845) begin
- 328 ( 3845)   ateof0 := false;
- 329 ( 3849)   i := 0;
- 330 ( 3855)   done := false;
- 331 ( 3861) 
- 332 ( 3865)   while not done do
- 333 ( 3865)   begin
- 334 ( 3873)     read(@f, ch);
- 335 ( 3883) 
- 336 ( 3884)     if ch = EOF then
- 337 ( 3890)     begin
- 338 ( 3891)       ateof0 := true;
- 339 ( 3896)       done := true;
- 340 ( 3902)     end;
- 341 ( 3906) 
- 342 ( 3906)     if (not done) and (ch = chr($0d)) then
- 343 ( 3919)       done := true;
- 344 ( 3925) 
- 345 ( 3929)     if (not done) and (ch = chr($0a)) then
- 346 ( 3942)       done := true;
- 347 ( 3948) 
- 348 ( 3952)     if not done then
- 349 ( 3952)       if i < STRSIZE-1 then
- 350 ( 3968)       begin
- 351 ( 3970)         s[i] := ch;
- 352 ( 3977)         i := i + 1;
- 353 ( 3991)       end;
- 354 ( 3996)   end;
- 355 ( 3996) 
- 356 ( 3999)   s[i] := ENDMARK;
- 357 ( 4005)   len := i;
- 358 ( 4009) end;
- 359 ( 4017) 
+ 300 ( 4494) 
+ 301 ( 4497)     SCONST:
+ 302 ( 4504)       begin
+ 303 ( 4510)         if tok = TOK_OTHER then
+ 304 ( 4519)           outln(line);
+ 305 ( 4536)         if tok = TOK_MEM then begin
+ 306 ( 4546)           doMEM;
+ 307 ( 4556)           state := SMEM;
+ 308 ( 4561)         end;
+ 309 ( 4568)       end;
+ 310 ( 4571) 
+ 311 ( 4574)     SMEM:
+ 312 ( 4581)       begin
+ 313 ( 4587)         if tok = TOK_OTHER then
+ 314 ( 4596)           outln(line);
+ 315 ( 4613)         if tok = TOK_VAR then begin
+ 316 ( 4623)           doVAR;
+ 317 ( 4633)           state := SVAR;
+ 318 ( 4638)         end;
+ 319 ( 4645)       end;
+ 320 ( 4648) 
+ 321 ( 4651)     SVAR:
+ 322 ( 4658)       begin
+ 323 ( 4664)         if tok = TOK_OTHER then
+ 324 ( 4673)           outln(line);
+ 325 ( 4690)         if (tok = TOK_PROC) or (tok = TOK_FUNC) then
+ 326 ( 4707)         begin
+ 327 ( 4711)           if not routheader then
+ 328 ( 4717)             begin
+ 329 ( 4725)               writeln(@f_out);
+ 330 ( 4743)               outtxt('ROUTINES');
+ 331 ( 4763)               routheader := true;
+ 332 ( 4768)             end;
+ 333 ( 4775) 
+ 334 ( 4775)           outln(line);
+ 335 ( 4788) 
+ 336 ( 4788)           state := SSKIP;
+ 337 ( 4793)           seenbegin := false;
+ 338 ( 4802)           blocklevel := 0;
+ 339 ( 4811)           routlevel := 0;
+ 340 ( 4820)           ininner := false;
+ 341 ( 4829)         end
+ 342 ( 4836)         else if tok = TOK_BEGIN then
+ 343 ( 4848)         begin
+ 344 ( 4852)           state := SBODY;
+ 345 ( 4860)           blocklevel := 1;
+ 346 ( 4869)         end;
+ 347 ( 4876)       end;
+ 348 ( 4879) 
+ 349 ( 4882)     SROUT:
+ 350 ( 4889)       begin
+ 351 ( 4895)         if (tok = TOK_PROC) or (tok = TOK_FUNC) then
+ 352 ( 4912)         begin
+ 353 ( 4916)           if not routheader then
+ 354 ( 4922)             begin
+ 355 ( 4930)               outtxt('ROUTINES');
+ 356 ( 4953)               routheader := true;
+ 357 ( 4958)             end;
+ 358 ( 4965) 
+ 359 ( 4965)           outln(line);
 
-R65 COMPILE 4.6: program EXTRACT          25/3/26 page 7
+R65 COMPILE 4.6: program EXTRACT          26/3/26 page 7
 
- 360 ( 4018) proc strwrite(f:file; s:cpnt);
- 361 ( 4018) {****************************}
- 362 ( 4018) { bypass a bug in compile1, cannot write s to f }
- 363 ( 4018) var i: integer;
- 364 ( 4021) begin
- 365 ( 4021)   i := 0;
- 366 ( 4025)   while s[i] <> ENDMARK do
- 367 ( 4041)   begin
- 368 ( 4045)     write(@f, s[i]);
- 369 ( 4062)     i := i + 1;
- 370 ( 4068)   end;
- 371 ( 4073) end;
- 372 ( 4076) 
- 373 ( 4077) proc setsubtype(subtype:char);
- 374 ( 4077) {****************************}
- 375 ( 4077) { set subtype in name }
- 376 ( 4077) var i:integer;
- 377 ( 4080) begin
- 378 ( 4080)   i := 0;
- 379 ( 4084)   repeat
- 380 ( 4088)     i:=i + 1;
- 381 ( 4094)   until (name[i]=':') or
- 382 ( 4110)     (name[i] = ' ') or (i >= 14);
- 383 ( 4129)   name[i] := ':';
- 384 ( 4139)   name[i+1]:=subtype;
- 385 ( 4150) end;
- 386 ( 4158) 
- 387 ( 4159) proc open_files(outsubtype: char);
- 388 ( 4159) {********************************}
- 389 ( 4159) var default: boolean;
- 390 ( 4162)     i, cyclus, drive: integer;
- 391 ( 4162) begin
- 392 ( 4162)   drive   := 1;
- 393 ( 4166)   cyclus  := 0;
- 394 ( 4172)   default := true;
- 395 ( 4178) 
- 396 ( 4182)   { open input file, must be :P }
- 397 ( 4182)   _agetstring(name, default, cyclus, drive);
- 398 ( 4222)   setsubtype('P');
- 399 ( 4230)   _asetfile(name, cyclus, drive, ' ');
- 400 ( 4252)   openr(f_in);
- 401 ( 4258)   writeln; { required if openr is not silent }
- 402 ( 4264) 
- 403 ( 4264)   { open output file }
- 404 ( 4264)   cyclus := 0;
- 405 ( 4266)   setsubtype(outsubtype);
- 406 ( 4280)   _asetfile(name, cyclus, drive, ' ');
- 407 ( 4302)   openw(f_out);
- 408 ( 4308) end;
- 409 ( 4308) 
- 410 ( 4309) proc close_files;
- 411 ( 4309) {***************}
- 412 ( 4309) begin
- 413 ( 4309)   close(f_in);
- 414 ( 4320)   close(f_out);
- 415 ( 4326) end;
- 416 ( 4326) 
- 417 ( 4327) { main program }
- 418 ( 4327) {**************}
- 419 ( 4327) begin
+ 360 ( 4978) 
+ 361 ( 4978)           state := SSKIP;
+ 362 ( 4983)           seenbegin := false;
+ 363 ( 4992)           blocklevel := 0;
+ 364 ( 5001)           routlevel := 0;
+ 365 ( 5010)           ininner := false;
+ 366 ( 5019)         end
+ 367 ( 5026)         else if tok = TOK_BEGIN then
+ 368 ( 5038)         begin
+ 369 ( 5042)           state := SBODY;
+ 370 ( 5050)           blocklevel := 1;
+ 371 ( 5059)         end;
+ 372 ( 5066)       end;
+ 373 ( 5069) 
+ 374 ( 5072)     SSKIP:
+ 375 ( 5079)       begin
+ 376 ( 5085)         if not seenbegin then
+ 377 ( 5088)         begin
+ 378 ( 5096)           { detect nested routines }
+ 379 ( 5102)           if (tok = TOK_PROC) or (tok = TOK_FUNC) then
+ 380 ( 5119)           begin
+ 381 ( 5123)             routlevel := routlevel + 1;
+ 382 ( 5135)             write('  nested routine, level=');
+ 383 ( 5168)             writeln(routlevel);
+ 384 ( 5182)           end
+ 385 ( 5185) 
+ 386 ( 5185)           { begin found }
+ 387 ( 5188)           else if tok = TOK_BEGIN then
+ 388 ( 5200)           begin
+ 389 ( 5204)             if routlevel > 0 then
+ 390 ( 5216)             begin
+ 391 ( 5220)               { begin of inner routine }
+ 392 ( 5226)               ininner := true;
+ 393 ( 5231)               blocklevel := 1;
+ 394 ( 5240)               write('  inner begin, level=');
+ 395 ( 5269)               writeln(routlevel);
+ 396 ( 5283)             end
+ 397 ( 5286)             else
+ 398 ( 5289)             begin
+ 399 ( 5295)               { begin of outer routine }
+ 400 ( 5298)               seenbegin := true;
+ 401 ( 5303)               blocklevel := 1;
+ 402 ( 5312)               write('  outer begin');
+ 403 ( 5333)               writeln;
+ 404 ( 5336)             end;
+ 405 ( 5345)           end
+ 406 ( 5348) 
+ 407 ( 5348)           { end of inner routine }
+ 408 ( 5351)           else if (tok = TOK_END) and ininner then
+ 409 ( 5364)           begin
+ 410 ( 5372)             blocklevel := blocklevel - 1;
+ 411 ( 5384) 
+ 412 ( 5389)             if blocklevel = 0 then
+ 413 ( 5398)             begin
+ 414 ( 5402)               ininner := false;
+ 415 ( 5410)               routlevel := routlevel - 1;
+ 416 ( 5423)               write('  inner end, level=');
+ 417 ( 5451)               writeln(routlevel);
+ 418 ( 5465)             end;
+ 419 ( 5468)           end;
 
-R65 COMPILE 4.6: program EXTRACT          25/3/26 page 8
+R65 COMPILE 4.6: program EXTRACT          26/3/26 page 8
 
- 420 ( 4327)   write(PRTON);
- 421 ( 4332) 
- 422 ( 4332)   open_files('H');
- 423 ( 4340) 
- 424 ( 4340)   line := _new;
- 425 ( 4346)   lineno := 0;
- 426 ( 4352)   state := SSTART;
- 427 ( 4358)   seenbegin := false;
- 428 ( 4364)   blocklevel := 0;
- 429 ( 4370) 
- 430 ( 4374)   repeat
- 431 ( 4374)     strread(f_in, line, ateof, llen);
- 432 ( 4404)     lineno := lineno + 1;
- 433 ( 4410) 
- 434 ( 4415)     if llen > 0 then
- 435 ( 4421)     begin
- 436 ( 4422)       writeln;
- 437 ( 4425)       write('TEXT: ');
- 438 ( 4438)       writeln(line);
- 439 ( 4449) 
- 440 ( 4449)       gettok(tok);
- 441 ( 4461)       processline;
- 442 ( 4465)     end;
- 443 ( 4465) 
- 444 ( 4465)   until ateof;
- 445 ( 4465) 
- 446 ( 4472)   close_files;
- 447 ( 4476)   _release(line);
- 448 ( 4486)   writeln;
- 449 ( 4486)   write(PRTOFF);
- 450 ( 4495) end.
- 451 ( 4495) 
+ 420 ( 5471)         end
+ 421 ( 5474) 
+ 422 ( 5474)         else
+ 423 ( 5477)         begin
+ 424 ( 5483)           { normal outer routine body }
+ 425 ( 5486) 
+ 426 ( 5486)           if (tok = TOK_BEGIN) or (tok = TOK_CASE) then
+ 427 ( 5503)             blocklevel := blocklevel + 1;
+ 428 ( 5516) 
+ 429 ( 5521)           if tok = TOK_END then
+ 430 ( 5530)             blocklevel := blocklevel - 1;
+ 431 ( 5543) 
+ 432 ( 5548)           write('  blocklevel=');
+ 433 ( 5565)           writeln(blocklevel);
+ 434 ( 5579) 
+ 435 ( 5579)           if blocklevel = 0 then
+ 436 ( 5588)             state := SROUT;
+ 437 ( 5597)         end;
+ 438 ( 5604)       end;
+ 439 ( 5607) 
+ 440 ( 5610)     SBODY:
+ 441 ( 5617)       begin
+ 442 ( 5623)         if (tok = TOK_BEGIN) or (tok = TOK_CASE) then
+ 443 ( 5640)           blocklevel := blocklevel + 1;
+ 444 ( 5653) 
+ 445 ( 5658)         if tok = TOK_END then
+ 446 ( 5667)           blocklevel := blocklevel - 1;
+ 447 ( 5680) 
+ 448 ( 5685)         write('  main blocklevel=');
+ 449 ( 5707)         writeln(blocklevel);
+ 450 ( 5721) 
+ 451 ( 5721)         if blocklevel = 0 then
+ 452 ( 5730)           state := SDONE;
+ 453 ( 5739)       end
+ 454 ( 5746) 
+ 455 ( 5746)   end {case};
+ 456 ( 5751) end;
+ 457 ( 5754) 
+ 458 ( 5755) proc strread(f:file; s:cpnt;
+ 459 ( 5758)                  var ateof0:boolean; var len:integer);
+ 460 ( 5761) {****************************************************}
+ 461 ( 5764) var ch  : char;
+ 462 ( 5770)     i   : integer;
+ 463 ( 5773)     done: boolean;
+ 464 ( 5776) begin
+ 465 ( 5779)   ateof0 := false;
+ 466 ( 5786)   i := 0;
+ 467 ( 5795)   done := false;
+ 468 ( 5804)   while not done do
+ 469 ( 5811)   begin
+ 470 ( 5822)     read(@f, ch);
+ 471 ( 5835)     if ch = EOF then
+ 472 ( 5845)     begin
+ 473 ( 5849)       ateof0 := true;
+ 474 ( 5857)       done := true;
+ 475 ( 5866)     end;
+ 476 ( 5873)     if (not done) and (ch = chr($0d)) then
+ 477 ( 5889)       done := true;
+ 478 ( 5898)     if (not done) and (ch = chr($0a)) then
+ 479 ( 5918)       done := true;
+
+R65 COMPILE 4.6: program EXTRACT          26/3/26 page 9
+
+ 480 ( 5927)     if not done then
+ 481 ( 5934)       if i < STRSIZE-1 then
+ 482 ( 5953)       begin
+ 483 ( 5958)         s[i] := ch;
+ 484 ( 5973)         i := i + 1;
+ 485 ( 5990)       end;
+ 486 ( 5998)   end;
+ 487 ( 6001)   s[i] := ENDMARK;
+ 488 ( 6018)   len := i;
+ 489 ( 6025) end;
+ 490 ( 6036) 
+ 491 ( 6037) proc setsubtype(subtype:char);
+ 492 ( 6040) {****************************}
+ 493 ( 6043) { set subtype in name }
+ 494 ( 6046) var i:integer;
+ 495 ( 6052) begin
+ 496 ( 6055)   i := 0;
+ 497 ( 6062)   repeat
+ 498 ( 6069)     i:=i + 1;
+ 499 ( 6078)   until (name[i]=':') or
+ 500 ( 6102)     (name[i] = ' ') or (i >= 14);
+ 501 ( 6129)   name[i] := ':';
+ 502 ( 6147)   name[i+1]:=subtype;
+ 503 ( 6166) end;
+ 504 ( 6177) 
+ 505 ( 6178) proc open_files(outsubtype: char);
+ 506 ( 6181) {********************************}
+ 507 ( 6184) var default: boolean;
+ 508 ( 6190)     i, cyclus, drive: integer;
+ 509 ( 6193) begin
+ 510 ( 6196)   drive   := 1;
+ 511 ( 6203)   cyclus  := 0;
+ 512 ( 6212)   default := true;
+ 513 ( 6221) 
+ 514 ( 6225)   { open input file, must be :P }
+ 515 ( 6228)   _agetstring(name, default, cyclus, drive);
+ 516 ( 6271)   setsubtype('P');
+ 517 ( 6282)   _asetfile(name, cyclus, drive, ' ');
+ 518 ( 6307)   openr(f_in);
+ 519 ( 6316)   writeln; { required if openr is not silent }
+ 520 ( 6325) 
+ 521 ( 6325)   { open output file }
+ 522 ( 6328)   cyclus := 0;
+ 523 ( 6333)   setsubtype(outsubtype);
+ 524 ( 6350)   _asetfile(name, cyclus, drive, ' ');
+ 525 ( 6375)   openw(f_out);
+ 526 ( 6384) end;
+ 527 ( 6387) 
+ 528 ( 6388) proc close_files;
+ 529 ( 6391) {***************}
+ 530 ( 6394) begin
+ 531 ( 6397)   close(f_in);
+ 532 ( 6411)   close(f_out);
+ 533 ( 6420) end;
+ 534 ( 6423) 
+ 535 ( 6424) { main program }
+ 536 ( 6427) {**************}
+ 537 ( 6430) begin
+ 538 ( 6433)   write(PRTON);
+ 539 ( 6441) 
+
+R65 COMPILE 4.6: program EXTRACT          26/3/26 page 10
+
+ 540 ( 6441)   open_files('H');
+ 541 ( 6452) 
+ 542 ( 6452)   line := _new;
+ 543 ( 6461)   lineno := 0;
+ 544 ( 6470)   state := SSTART;
+ 545 ( 6479)   seenbegin := false;
+ 546 ( 6488)   blocklevel := 0;
+ 547 ( 6497)   pass := 1;
+ 548 ( 6506)   routheader := false;
+ 549 ( 6515) 
+ 550 ( 6519)   repeat
+ 551 ( 6522)     strread(f_in, line, ateof, llen);
+ 552 ( 6555)     rtrim(line);
+ 553 ( 6568)     lineno := lineno + 1;
+ 554 ( 6577) 
+ 555 ( 6582)     if llen > 0 then
+ 556 ( 6591)     begin
+ 557 ( 6595)       writeln;
+ 558 ( 6601)       write('TEXT: ');
+ 559 ( 6617)       writeln(line);
+ 560 ( 6631) 
+ 561 ( 6631)       gettok(tok);
+ 562 ( 6646)       processline;
+ 563 ( 6653)     end;
+ 564 ( 6656) 
+ 565 ( 6656)   until ateof;
+ 566 ( 6659) 
+ 567 ( 6666)   close_files;
+ 568 ( 6673)   _release(line);
+ 569 ( 6686)   writeln;
+ 570 ( 6689)   write(PRTOFF);
+ 571 ( 6701) end.
+ 572 ( 6704) 
 
 End compile
 
-Code lenght:          4494
-Compiler stack size:  105
-Ident stack size:     135
+Code lenght:          6703
+Compiler stack size:  108
+Ident stack size:     144
 Pascal errors:        0

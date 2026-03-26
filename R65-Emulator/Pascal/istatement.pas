@@ -61,20 +61,12 @@ begin {gpval}
           code3($22,svda[idpnt]);
           code1(3); code1($3d+d) end
   else begin
-    if typ='q' then begin
-      { relad=1 bedeutet: s[i] Zugriff auf }
-      { cpnt-string-byte }
-      if relad=1 then begin
-        if sspsz[idpnt]=0 then
-          checkindex(0,63)
-        else
-          checkindex(0,sspsz[idpnt]);
-      end;
-      code4($55,level-slevel[idpnt],2*svda[idpnt]);
-    end else
+    if typ='q' then
+      code4($55,level-slevel[idpnt],2*svda[idpnt])
+    else
       code4($27+2*d+relad,level-slevel[idpnt],
         2*svda[idpnt]);
-    end
+    end {else}
   end {case}
 end;
 

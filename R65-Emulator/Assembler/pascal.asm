@@ -1718,13 +1718,18 @@ CPNT    JSR COPY
 *****************
 *
 WRCP    LDY =0
+WRCP1   LDA (ACCU),Y
+        BEQ WRCP2       END MARK
+        TYA             PRESERVE Y
+        PHA
         LDA (ACCU),Y
-        BEQ WRCP2
-        JSR PRTCHR0     END MARK
+        JSR PRTCHR0
+        PLA             RESTORE Y
+        TAY
         INY
         CPY =63
-        BNE WRCP+2
-WRCP2   JMP GETS2
+        BNE WRCP1
+WRCP2   RTS
 *
 * P-CODE 58: ADPS       ADD PROGRAM START
 *****************
