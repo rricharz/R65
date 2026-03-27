@@ -36,6 +36,8 @@ proc block(bottom: integer);
 var l,f9,i,n,stackpn1,forwpn,find,cproc,
     spnt1,dpnt1,parlevel: integer;
     fortab: array[8] of integer;
+    ptok: packed char;
+    isfunc: boolean;
 
 {#################################}
 { findid: {search in table for id }
@@ -117,18 +119,35 @@ end;
 
 proc putsym(ltyp1,ltyp2: char);
 
-var i,addr: integer;
+var i,addr,oldid: integer;
+
 begin
-  if spnt>symbsize then error(7)
+  if ucheck then begin
+    oldid:=findid;
+    if oldid<>0 then
+      if not ((ltyp1='f') and
+            (oldid=spnt) and
+            (high(stype[oldid])='f') and
+            (level=slevel[oldid]+1))
+      then error(24);
+  end;
+
+  if spnt>=symbsize then error(7)
   else spnt:=succ(spnt);
+
   if spnt>spntmax then spntmax:=spnt;
+
   stype[spnt]:=packed(ltyp1,ltyp2);
   sspsz[spnt]:=0;
+
   addr:=8*spnt;
   for i:=1 to 8 do idtab[addr+i]:=ident[i];
+
   if ltyp1='v' then begin
-    svda[spnt]:=dpnt; dpnt:=succ(dpnt);
+    svda[spnt]:=dpnt;
+    dpnt:=succ(dpnt);
   end;
+
   slevel[spnt]:=level
 end {putsym};
 
@@ -138,7 +157,7 @@ end {putsym};
 
 proc checkindex(lowlim,highlim: integer);
 begin
-  if icheck then begin
+  if rcheck then begin
     code3($40,lowlim-1);
     code2(highlim and 255, highlim shr 8)
   end
@@ -422,7 +441,7 @@ begin
     stack[bs]:=counter1;
     n:=sspsz[fortab[find]]; {existing stack data}
     for i:=0 to stackpnt-bs do
-      if stack[bs+1]<>stack[n+1]
+      if stack[bs+i]<>stack[n+i]
         then merror(13,'pa'); {parameter wrong}
     stackpnt:=prec(bs) {clear the new info}
   end  {else}
@@ -501,8 +520,8 @@ begin {findforw}
     if i=forwpn then forwpn:=forwpn-1
     else begin
       sav1:=fortab[i];
-      for j:=1 to forwpn-1 do
-      fortab[j]:=fortab[succ(j)];
+      for j:=i to forwpn-1 do
+        fortab[j]:=fortab[succ(j)];
       fortab[forwpn]:=sav1;
       findforw:=forwpn;
       forwpn:=forwpn-1
@@ -529,34 +548,45 @@ begin
 
   if token='va' then variable;{ * var * }
 
-  while (token='pr')or (token='fu') do begin
+    while (token='pr')or (token='fu') do begin
     parlevel:=0;
+    isfunc:=token='fu';
     case token of
     'pr': begin               { * proc * }
             parse('id'); npara:=0;
-            putsym('p','r'); cproc:=spnt;
+            if forwpn=0 then find:=0
+            else find:=findforw;
+            if find=0 then begin
+              putsym('p','r');
+              cproc:=spnt;
+            end else begin
+              cproc:=fortab[find];
+              fixup(svda[cproc]);
+            end;
             level:=succ(level);
           end;
     'fu': begin               { * func * }
             parse('id'); npara:=1;
-            putsym('f','i');
-            cproc:=spnt; level:=succ(level);
-            putsym('f','i');
-            svda[spnt]:=parlevel;
-            parlevel:=succ(parlevel);
+            if forwpn=0 then find:=0
+            else find:=findforw;
+            if find=0 then begin
+              putsym('f','i');
+              cproc:=spnt; level:=succ(level);
+              putsym('f','i');
+              svda[spnt]:=parlevel;
+              parlevel:=succ(parlevel);
+            end else begin
+              cproc:=fortab[find];
+              level:=succ(level);
+              parlevel:=1;
+              fixup(svda[cproc]);
+            end;
           end
     end; {case of token}
-    if forwpn=0 then find:=0
-    else find:=findforw;
-    if find<>0 then begin
-      spnt:=spnt-npara-1;
-      cproc:=fortab[find];
-      fixup(svda[cproc]);
-    end;
     scan; spnt1:=spnt;
     dpnt1:=dpnt;
     if token=' (' then parameter;
-    if stype[cproc]='fi' then function;
+    if isfunc then function;
     testto(' ;');
     for i:=1 to npara do
     svda[succ(spnt-i)]:=svda[succ(spnt-i)]

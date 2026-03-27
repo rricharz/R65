@@ -1,8 +1,6 @@
 { include file IGLOBAL:P for compile1 }
 
 const version='4.6';
-    table     =$97ff; {user ident table -1}
-    idtab     =$95ff; {resword table -1}
     idlength  =64;    {max. length of ident}
     stacksize =256;   {stack size}
     pagelenght=60;    {no of lines per page}
@@ -23,7 +21,8 @@ var reswtab: array[ 512] of char; {8*(nresw+1)}
     value: array[1] of integer;
     ch,restype,vartype:char;
     token: packed char;
-    prt,libflg,icheck,ateof,lineflg,nlflg: boolean;
+    prt,libflg,rcheck,ateof: boolean;
+    ucheck,lineflg,nlflg: boolean;
     fno,ofno,savefno: file;
     incname: array[15] of char;
     filstk: array[maxfi] of file;
@@ -87,7 +86,6 @@ end {savebyte};
 {###############}
 
 proc crlf;
-  var i: integer;
 begin
   writeln;
   line:=succ(line); lineinc:=succ(lineinc);
@@ -101,11 +99,11 @@ end {crlf};
 {#################################}
 
 proc merror(x: integer; code: packed char);
-var i: integer;
+var k: integer;
     answer: char;
 begin
   crlf; numerr:=succ(numerr);
-  for i:=2 to tpos do write(' ');
+  for k:=2 to tpos do write(' ');
   write('^'); crlf;
   write(INVVID,'ERROR: ');
   case x of
@@ -131,7 +129,8 @@ begin
     20: write('Compiler directive syntax');
     21: write('Nested include files');
     22: write('Unexpected EOF');
-    23: write('End mark for comment or string')
+    23: write('End mark for comment or string');
+    24: write('Identifier already defined')
   end {case};
   writeln(NORVID);
   if (ofno<>nooutput) and (ofno<>yesOUTPUT)
@@ -331,15 +330,19 @@ begin {init}
   _agetstring(pname,default,scyclus,sdrive);
 
   _agetstring(request,default,dummy,dummy);
-  icheck:=false;
-  prt:=true; ofno:=yesOUTPUT; lineflg:=false;
+
+  rcheck:=false;
+  ucheck:=false;
+  prt:=true;
+  ofno:=yesOUTPUT;
+  lineflg:=false;
   if not default then begin
     if request[0]<>'/' then _argerror(103);
     for i:=1 to 8 do
       case request[i] of
         'P': prt:=false;
         'L': lineflg:=true;
-        'I','R': icheck:=true;
+        'R': rcheck:=true;
         'N': ofno:=nooutput;
         ' ': begin end
         else _argerror(104)

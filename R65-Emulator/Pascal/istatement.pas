@@ -762,51 +762,55 @@ end {mainexp};
 {#########################}
 
 proc assign;
-var savetype: char;
+var sid: integer;
+    styp, sknd: char;
 
   proc assign1;
-  {###########}
   begin
     testto(':='); scan; express;
-    if (vartype='q') and (restype='s') then begin
+    if (styp='q') and (restype='s') then begin
       code1($58); restype:='q';
     end;
-    gpval(idpnt,true,vartyp2);
+    gpval(sid,true,sknd);
   end {assign1};
 
 begin {assign}
   idpnt:=findid;
   if idpnt=0 then error(5);
   if stype[idpnt]='pr' then begin
-    prcall(idpnt);scan end
-  else begin
-    getvar; savetype:=vartype;
+    prcall(idpnt); scan
+  end else begin
+    getvar;
+    sid:=idpnt;
+    styp:=vartype;
+    sknd:=vartyp2;
     if relad<2 then begin
-      assign1; testtype(vartype)
+      assign1;
+      testtype(styp)
     end else begin
-      if vartyp2='i' then error(16); {8-bit mem}
+      if sknd='i' then error(16); {8-bit mem}
       testto(':='); scan;
       if relad=3 then begin
-        arrayexp(1,vartype); relad:=1;
+        arrayexp(1,styp); relad:=1;
         code1($53);
-        if vartyp2='n' then begin
+        if sknd='n' then begin
           code1($3f);
-          code3($22,1);code1($12);
-          code3($22,svda[idpnt]+2);
-          code1($3);code1($3e)
+          code3($22,1); code1($12);
+          code3($22,svda[sid]+2);
+          code1($3); code1($3e)
         end else
-          code4($2a,level-slevel[idpnt],
-            2*svda[idpnt]+2);
+          code4($2a,level-slevel[sid],
+            2*svda[sid]+2);
         code2($3c,1)
       end else begin
-        arrayexp(sspsz[idpnt],vartype);
-        if vartyp2='n' then begin
-          code3($22,svda[idpnt]+2*sspsz[idpnt]);
+        arrayexp(sspsz[sid],styp);
+        if sknd='n' then begin
+          code3($22,svda[sid]+2*sspsz[sid]);
           code1($3e);
         end else
-          code4($29,level-slevel[idpnt],
-            2*(svda[idpnt]+sspsz[idpnt]));
-        code2($3c,sspsz[idpnt]);
+          code4($29,level-slevel[sid],
+            2*(svda[sid]+sspsz[sid]));
+        code2($3c,sspsz[sid]);
       end
     end
   end

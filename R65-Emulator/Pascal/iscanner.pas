@@ -113,6 +113,20 @@ end {setval};
 
 proc directive;
 var i,icyclus:integer;
+
+  proc onoff(var flag:boolean);
+  begin
+    getchr0; if ch=CR then error(23);
+    case ch of
+      '+': flag:=true;
+      '-': flag:=false
+    else error(20)
+    end;
+    getchr0; if ch=CR then error(23);
+    if ch<>'}' then error(23);
+    getchr; scan;
+  end {onoff};
+
 begin
   getchr;
   case ch of
@@ -138,8 +152,10 @@ begin
            crlf;
            nextline;
            getchr; scan;
-         end
-    else error(20)
+         end;
+    'R': onoff(rcheck);
+    'U': onoff(ucheck)
+  else error(20)
   end {case}
 end;
 
