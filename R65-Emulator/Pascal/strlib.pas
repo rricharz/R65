@@ -1,9 +1,9 @@
-{ ************************************
-  *  strlib: handling cpnt pointers  *
-  ************************************
+{  ************************************      }
+{  *  strlib: handling cpnt pointers  *      }
+{  ************************************      }
 
-type cpnt are pointers to strings of
-0 delimited strings of up to 64 characters }
+{ type cpnt are pointers to strings of       }
+{ 0 delimited strings of up to 64 characters }
 
 library strlib;
 
@@ -84,9 +84,9 @@ begin
 end;
 
 { **** _strcmp: compare two strings **** }
-{ returns -1  if s1<s2
-           0  if s1=s2
-           1  if s1>s2                  }
+{ returns -1  if s1<s2                   }
+{          0  if s1=s2                   }
+{          1  if s1>s2                   }
 
 func _strcmp(s1,s2:cpnt):integer;
 var i:integer;
@@ -115,22 +115,35 @@ begin
   end;
 end;
 
-{ **** _strread: read string from input }
-{ returns the number of chars read }
-
-func _strread(f: file; s: cpnt): integer;
-var i: integer;
-    ch: char;
+{***** strread: read line from file *****}
+func _strread(f:file; s:cpnt;
+                 var ateof0:boolean):integer;
+var ch  : char;
+    i   : integer;
+    done: boolean;
 begin
-  i:=-1;
-  repeat
-    i:=succ(i);
-    read(@f,ch);
-    s[i]:=ch;
-    until (ch=chr($d)) or (ch=chr($1f)) or
-      (ch=chr($7f)) or (ch=chr(0)) or (i>=STRSIZE-1);
-  s[i]:=chr(0);
-  _strread:=i;
+  ateof0 := false;
+  i := 0;
+  done := false;
+  while not done do begin
+    read(@f, ch);
+    if ch = chr($7f) then begin { EOF }
+      ateof0 := true;
+      done := true;
+    end;
+    if (not done) and (ch = chr($0d)) then
+      done := true;
+    if (not done) and (ch = chr($0a)) then
+      done := true;
+    if not done then
+      if i < STRSIZE-1 then
+      begin
+        s[i] := ch;
+        i := i + 1;
+      end;
+  end;
+  s[i] := ENDMARK;
+  _strread := i;
 end;
 
 { _hexstr: convert hex byte to hex string }
