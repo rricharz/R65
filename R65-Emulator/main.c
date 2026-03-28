@@ -546,7 +546,11 @@ int main (int argc, char *argv[])
     if (aspect > target) screenWidth =  (int)((screenHeight  * target) + 0.5 );
     if (aspect < target) screenHeight = (int)((screenWidth / target) + 0.5);
     printf("Aspect ratio adjusted: %d x %d\n", screenWidth, screenHeight);
-        
+    
+    g_set_prgname("R65");
+    g_set_application_name("R65");
+    gtk_window_set_default_icon_name("computer");
+
     if (fullscreen) {	    
 	    // DISPLAY UNDECORATED MAXIMIZED WINDOW
 	    gtk_window_set_decorated(GTK_WINDOW(global_window), FALSE);
@@ -584,7 +588,7 @@ int main (int argc, char *argv[])
     g_signal_connect(G_OBJECT(global_window), "key_press_event", G_CALLBACK(on_key_press), NULL);
     g_signal_connect(G_OBJECT(global_window), "key_release_event", G_CALLBACK(on_key_release), NULL);	
     if (strlen(ICON_NAME) > 0) {
-	gtk_window_set_icon_name(GTK_WINDOW(global_window), ICON_NAME);	
+	  gtk_window_set_icon_name(GTK_WINDOW(global_window), ICON_NAME);	
     }
 
     gtk_widget_show_all(global_window);
