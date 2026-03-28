@@ -610,12 +610,6 @@ int export_file()
             
             if (filtyp=='S') {  // sequential file
 				
-printf("Raw buffer dump (first 32 bytes):\n");
-for (int j = 0; j < 32; j++) {
-   printf("%02X ", buffer[j] & 0xFF);
-}
-printf("\n");
-    			
                 while ((i < 256) && ((buffer[i] & 0x7F) != 0x7F)
                     && ((buffer[i] & 0x7F) != 0x1F)) {
                     if ((buffer[i] >= 0x80) && (buffer[i] <= 0xFe)) {

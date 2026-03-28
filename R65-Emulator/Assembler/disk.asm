@@ -388,7 +388,7 @@ CPOINT  LDX CURSEQ
 **********************************
 * ENTRY: x,FILDRV
 * EXIT: FILERR IN Y AND STATUS, CHAR IN A
-* CHAR =$7F MEANS EOF, CHAR=$1D MEANS ERROR
+* CHAR =$1F MEANS EOF, CHAR=$1D MEANS ERROR
 *
 READCH  LDA =0          MUST BE READ FILE
         JSR TESTFN
@@ -619,9 +619,9 @@ CLOSE   LDA FIDRTB,X
         STX CURSEQ
         LDA FIDRTB,X
         AND =$80
-        BEQ CLOSE1      SKIP, IF READ
+        BEQ CLOSE1      SKI, IF READ
 *
-        LDA =$7F        EOF
+        LDA =$7F        WRITE LAST CHAR
         JSR WRITCH+2
         BNE CLOSE2+2    SKIP, IF ERROR
 *

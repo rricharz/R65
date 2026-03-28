@@ -499,6 +499,7 @@ proc close_files;
 {***************}
 begin
   close(f_in);
+  writeln(@f_out); { this seems to be needed by R65 }
   close(f_out);
 end;
 

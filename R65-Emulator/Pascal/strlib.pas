@@ -1,9 +1,18 @@
-{  ************************************      }
-{  *  strlib: handling cpnt pointers  *      }
-{  ************************************      }
+{    ************************************    }
+{    *  strlib: handling cpnt pointers  *    }
+{    ************************************    }
 
-{ type cpnt are pointers to strings of       }
-{ 0 delimited strings of up to 64 characters }
+{ Type cpnt are pointers to 0 delimided      }
+{ strings of up to STRSIZE (64) characters.  }
+{ Following the definition of arrays in R65  }
+{ Pascal the first character is s[0.         }
+{ s[STRSIZE] can be used to set ENDMARK for  }
+{ a string of STRSIZE characters. Range      }
+{ checking is turned on for safety.          }
+{ Strings need to be released in reverse     }
+{ order. There is no garbage collection.     }
+
+{$R+}
 
 library strlib;
 
@@ -22,7 +31,7 @@ end;
 
 { ***** _new: allocate heap memory ***** }
 
-func _new:cpnt;
+func _new: cpnt;
 mem  sp     = $0008: integer;
      endstk = $000e: integer;
 var  freewords,i:integer;
@@ -33,15 +42,15 @@ begin
   { We work therefore with free words here }
   freewords:=(endstk-sp) shr 1;
   if freewords < (STRSIZE + 256) then begin
-    { 256 words are left for the growing stack }
+    { 255 words are left for the growing stack }
     _runerr($88);
   end;
   { allocate heap memory }
-  endstk:=endstk-STRSIZE;
-  str:=cpnt(endstk);
+  endstk := endstk - STRSIZE - 1;
+  str := cpnt(endstk);
   { initialize the string }
-  str[0]:=ENDMARK;
-  _new:=str;
+  str[0] := ENDMARK;
+  _new := str;
 end;
 
 { ***** _release: _release heap memory ***** }
@@ -51,19 +60,24 @@ proc _release(s: cpnt);
 { This is suitable for recursive functions }
 mem endstk=$000e: integer;
 begin
-  if cpnt(endstk)=s then endstk:=endstk+STRSIZE
+  if cpnt(endstk)=s then endstk:=endstk+STRSIZE+1
   else _runerr($92);
 end;
 
 { ***** _strlen: length of string ***** }
 
 func _strlen(strin:cpnt):integer;
-var i:integer;
+var i: integer;
 begin
   i:=0;
-  while (strin[i]<>ENDMARK) and (i<STRSIZE) do
-    i:=succ(i);
-    _strlen:=i;
+  while i<STRSIZE do begin
+    if strin[i]=ENDMARK then begin
+      _strlen:=i;
+      exit;
+    end;
+    i:=i+1;
+  end;
+  _strlen:=STRSIZE;
 end;
 
 { ***** strcopy: copy cpnt string ***** }
@@ -71,16 +85,16 @@ end;
 proc _strcpy(strin, strout:cpnt);
 var i: integer;
 begin
-  strout[0]:=ENDMARK;
-  write(@strout,strin);
+  strout[0] := ENDMARK;
+  write(@strout, strin);
 end;
 
 { **** _stradd: add string to string ***** }
 
 proc _stradd(strin,strinout:cpnt);
-var i,j:integer;
+var i,j: integer;
 begin
-  write(@strinout,strin);
+  write(@strinout, strin);
 end;
 
 { **** _strcmp: compare two strings **** }
@@ -91,13 +105,20 @@ end;
 func _strcmp(s1,s2:cpnt):integer;
 var i:integer;
 begin
-  { find first difference or end of string }
   i:=0;
-  while (s1[i]<>ENDMARK) and (s1[i]=s2[i])
-    and (i<STRSIZE) do i:=succ(i);
-  if s1[i]=s2[i] then _strcmp:=0
-  else if s1[i]>s2[i] then _strcmp:=1
-  else _strcmp:=-1;
+  while i<STRSIZE do begin
+    if s1[i]<>s2[i] then begin
+      if s1[i]>s2[i] then _strcmp:=1
+      else _strcmp:=-1;
+      exit;
+    end;
+    if s1[i]=ENDMARK then begin
+      _strcmp:=0;
+      exit;
+    end;
+    i:=i+1;
+  end;
+  _strcmp:=0;
 end;
 
 { **** _strpos: find occurance of char **** }
@@ -109,9 +130,9 @@ begin
   if start>=len then _strpos:=-1
   else  begin
     i:=start;
-    while (i<len) and (s1[i]<>ch) do i:=succ(i);
-    if s1[i]=ch then _strpos:=i
-    else _strpos:=-1;
+    while (i<len) and (s1[i]<>ch) do i :=i + 1;
+    if s1[i]=ch then _strpos := i
+    else _strpos := -1;
   end;
 end;
 
@@ -151,13 +172,22 @@ end;
 proc _hexstr(d:integer; s:cpnt);
   func hchar(h:integer):char;
   begin
-    if h<10 then hchar:=chr(h+ord('0'))
-    else hchar:=chr(h-10+ord('A'));
+    if h<10 then hchar := chr(h+ord('0'))
+    else hchar := chr(h-10+ord('A'));
   end;
 begin
-  s[0]:=hchar((d shr 4) and 15);
-  s[1]:=hchar(d and 15);
-  s[2]:=chr(0);
+  s[0] := hchar((d shr 4) and 15);
+  s[1] := hchar(d and 15);
+  s[2] := chr(0);
+end;proc _strdelc(pos:integer;s:cpnt);
+var i,l:integer;
+begin
+  l:=_strlen(s);
+  if pos<0 then _runerr($91);
+  if pos>l then _runerr($91);
+  for i:=pos to l-1 do
+      { move includes end mark }
+      s[i]:=s[i+1];
 end;
 
 { *** _strinsc: insert char into string *** }
@@ -187,15 +217,18 @@ proc _strdelc(pos:integer;s:cpnt);
 var i,l:integer;
 begin
   l:=_strlen(s);
+  if pos<0 then _runerr($91);
+  if pos>l then _runerr($91);
   for i:=pos to l-1 do
       { move includes end mark }
       s[i]:=s[i+1];
 end;
 
 { **** _intstr: convert integer to string **** }
-{ right justified in a field of 6 chars }
+{ right justified in a field of fsize chars }
 
 proc _intstr(n:integer;s:cpnt;fsize:integer);
+{ Very useful for tables }
 begin
   s[0]:=ENDMARK;
   write(@s,n);
