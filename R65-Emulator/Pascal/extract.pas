@@ -22,8 +22,11 @@ const TOK_OTHER = 0;
       SSKIP  = 5;
       SBODY  = 6;
       SDONE  = 7;
+      SHEAD  = 8;
 
       DEBUG1 = false;
+
+      INDENT = '      ';
 
 var
   f_in, f_out: file;
@@ -41,6 +44,45 @@ var
   ininner  :  boolean;
   pass:       integer; { 1 > :H file, 2 > :N file }
   routheader: boolean;
+  parlevel:   integer;
+
+proc updpar(s:cpnt);
+{******************}
+var i: integer;
+begin
+  i:=0;
+  while s[i]<>ENDMARK do
+  begin
+    if s[i]='(' then begin
+      parlevel:=parlevel+1;
+    end;
+    if s[i]=')' then begin
+      parlevel:=parlevel-1;
+    end;
+    i:=i+1;
+  end;
+end;
+
+func hassemi(s:cpnt): boolean;
+{************************}
+var i: integer;
+begin
+  i:=0;
+  while s[i]<>ENDMARK do
+  begin
+    if s[i]=';' then
+    begin
+      hassemi:=true;
+      if DEBUG1 then
+        writeln('hassemi = true');
+      exit;
+    end;
+    i:=i+1;
+  end;
+  hassemi:=false;
+  if DEBUG1 then
+    writeln('hassemi = false');
+end;
 
 proc rtrim(s:cpnt);
 {*****************}
@@ -221,9 +263,40 @@ begin
     SROUT : write('SROUT');
     SSKIP : write('SSKIP');
     SBODY : write('SBODY');
-    SDONE : write('SDONE')
+    SDONE : write('SDONE');
+    SHEAD : write('SHEAD')
   else
     write('???')
+  end;
+end;
+
+proc print_remainder(line0:cpnt; kwlen:integer);
+{**********************************************}
+var i:integer;
+begin
+  i := 0;
+
+  { skip leading spaces }
+  while line0[i] = ' ' do
+    i := i + 1;
+
+  { skip keyword }
+  i := i + kwlen;
+
+  { skip spaces after keyword }
+  while line0[i] = ' ' do
+    i := i + 1;
+
+  { anything left? write it }
+  if line[i] <> ENDMARK then
+  begin
+    write(@f_out, INDENT);   { indentation }
+    while line[i] <> ENDMARK do
+    begin
+      write(@f_out, line[i]);
+      i := i + 1;
+    end;
+    writeln(@f_out);
   end;
 end;
 
@@ -261,6 +334,7 @@ proc doCONST;
 begin
   writeln(@f_out);
   outtxt('CONST');
+  print_remainder(line, 5);
 end;
 
 proc doMEM;
@@ -268,6 +342,7 @@ proc doMEM;
 begin
   writeln(@f_out);
   outtxt('MEM');
+  print_remainder(line, 3);
 end;
 
 proc doVAR;
@@ -275,6 +350,7 @@ proc doVAR;
 begin
   writeln(@f_out);
   outtxt('VAR');
+  print_remainder(line, 3);
 end;
 
 proc processline;
@@ -286,7 +362,10 @@ begin
     write(': state=');
     printstate(state);
     write(' tok=');
-    { printtok(tok); }
+    printtok(tok);
+    write(' text="');
+    write(line);
+    writeln('"');
     writeln;
   end;
 
@@ -303,22 +382,22 @@ begin
 
     SCONST:
       begin
-        if tok = TOK_OTHER then
-          outln(line);
         if tok = TOK_MEM then begin
-          doMEM;
-          state := SMEM;
-        end;
+         doMEM;
+         state := SMEM;
+        end
+        else
+          outln(line);
       end;
 
     SMEM:
       begin
-        if tok = TOK_OTHER then
-          outln(line);
         if tok = TOK_VAR then begin
-          doVAR;
-          state := SVAR;
-        end;
+        doVAR;
+        state := SVAR;
+        end
+        else
+        outln(line);
       end;
 
     SVAR:
@@ -336,11 +415,19 @@ begin
 
           outln(line);
 
-          state := SSKIP;
-          seenbegin := false;
-          blocklevel := 0;
-          routlevel := 0;
-          ininner := false;
+          parlevel := 0;
+          updpar(line);
+
+          if (parlevel = 0) and hassemi(line) then
+          begin
+            state := SSKIP;
+            seenbegin := false;
+            blocklevel := 0;
+            routlevel := 0;
+            ininner := false;
+          end
+         else
+            state := SHEAD;
         end
         else if tok = TOK_BEGIN then
         begin
@@ -348,6 +435,21 @@ begin
           blocklevel := 1;
         end;
       end;
+
+     SHEAD:
+       begin
+         outln(line);
+         updpar(line);
+
+         if (parlevel = 0) and hassemi(line) then
+         begin
+           state := SSKIP;
+           seenbegin := false;
+           blocklevel := 0;
+           routlevel := 0;
+           ininner := false;
+         end;
+       end;
 
     SROUT:
       begin
@@ -360,21 +462,28 @@ begin
             end;
 
           outln(line);
+          parlevel := 0;
+          updpar(line);
 
-          state := SSKIP;
-          seenbegin := false;
-          blocklevel := 0;
-          routlevel := 0;
-          ininner := false;
+
+          if (parlevel = 0) and hassemi(line) then
+          begin
+            state := SSKIP;
+            seenbegin := false;
+            blocklevel := 0;
+            routlevel := 0;
+            ininner := false;
+          end
+          else
+            state := SHEAD;
         end
-        else if tok = TOK_BEGIN then
-        begin
+        else if tok = TOK_BEGIN then begin
           state := SBODY;
           blocklevel := 1;
         end;
       end;
 
-SSKIP:
+    SSKIP:
       begin
 
         if not seenbegin then
@@ -456,6 +565,11 @@ SSKIP:
       end
 
   end {case};
+  if DEBUG1 then begin
+    write('     newstate=');
+    printstate(state);
+    writeln;
+  end
 end;
 
 proc setsubtype(subtype:char);
@@ -472,14 +586,35 @@ begin
   name[i+1]:=subtype;
 end;
 
+proc writehex(f:file; a:integer);
+{*******************************}
+var h:integer;
+  func hexdigit(c:char):char;
+  var d:integer;
+  begin
+    d:=ord(c) and 15;
+    if d>9 then hexdigit:=chr(d-10+ord('A'))
+    else hexdigit:=chr(d+ord('0'));
+  end;
+begin
+  h:=a and 255;
+  write(@f,hexdigit(chr(h shr 4)));
+  write(@f,hexdigit(chr(h and 15)));
+end;
+
 proc open_files(outsubtype: char);
 {********************************}
 var default: boolean;
-    i, cyclus, drive: integer;
+    i, cyclus, drive, vcyclus: integer;
+
 begin
   drive   := 1;
   cyclus  := 0;
   default := true;
+
+  { print version number of current EXTRACT }
+
+  vcyclus := FILCYC;
 
   { open input file, must be :P }
   _agetstring(name, default, cyclus, drive);
@@ -493,13 +628,19 @@ begin
   setsubtype(outsubtype);
   _asetfile(name, cyclus, drive, ' ');
   openw(f_out);
+
+  if DEBUG1 then begin
+    write(@f_out, 'program EXTRACT version ');
+    writehex(f_out,vcyclus);
+    writeln(@f_out);
+  end;
+
 end;
 
 proc close_files;
 {***************}
 begin
   close(f_in);
-  writeln(@f_out); { this seems to be needed by R65 }
   close(f_out);
 end;
 
@@ -538,3 +679,5 @@ begin
   writeln;
   write(PRTOFF);
 end.
+
+
