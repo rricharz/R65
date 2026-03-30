@@ -1729,7 +1729,7 @@ WRCP1   LDA (ACCU),Y
         INY
         CPY =63
         BNE WRCP1
-WRCP2   RTS
+WRCP2   JMP GETS2
 *
 * P-CODE 58: ADPS       ADD PROGRAM START
 *****************
