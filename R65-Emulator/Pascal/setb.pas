@@ -1,8 +1,8 @@
-{ ######################################
-  # setb n: set a breakpoint at line n #
-  ######################################
+{ #######################################   }
+{  # setb n: set a breakpoint at line n #   }
+{  ######################################   }
 
-  18.11.2023 rricharz                  }
+{  18.11.2023 rricharz                      }
 
 program setb;
 uses syslib,arglib;
@@ -21,4 +21,4 @@ begin
     brkpnt:=n;
     writeln('Breakpoint set at line ',n);
   end;
-end. 
+end.

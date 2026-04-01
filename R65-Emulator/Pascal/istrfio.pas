@@ -4,12 +4,6 @@
 {   openr;                                      }
 
 proc strfio(name:cpnt; device: integer);
-mem FILFLG   =$00da: integer&;
-    FILDRV   =$00dc: integer&;
-    FILCYC   =$0311: integer&;
-    FILCY1   =$0330: integer&;
-    FILNAM   =$0301: array[15] of char&;
-    FILNM1   =$0320: array[15] of char&;
 var i,j: integer;
 begin
   i := 0;

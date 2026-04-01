@@ -6,6 +6,8 @@
 {  *                            *  }
 {  ******************************  }
 
+{ 03/31/206 cleaned up printing to disk }
+
 program compile2;
 uses syslib,arglib,disklib;
 
@@ -89,12 +91,12 @@ begin
   cdrive:=FILDRV; { drive of compile program }
   ENDSTK:=sblock-144;   {reserve memory }
   writeln;
-  writeln(title);
+  write(title);
   scyclus:=0; sdrive:=1;
   _agetstring(name,default,scyclus,sdrive);
   _asetfile(name,scyclus,sdrive,'Q');
   openr(source);
-  writeln;
+  { writeln; }
   scyclus:=FILCYC;
 end {init};
 
@@ -113,7 +115,7 @@ begin
   byte:=byte + ((ord(ch) and 15));
   getbyte1:=byte;
   { heartbeat: }
-  if (pointer and 63)=0 then write('.');
+  { if (pointer and 255)=0 then write('.'); }
 end {getbyte1};
 
 
@@ -144,10 +146,11 @@ proc getbl(base:integer);  {get block }
       lname[i]:=ch1
     end;
     lcyclus:=0; ldrive:=cdrive;
-    write('Loading library ');
-    _prtext8(OUTPUT,lname);
+    { write('Loading library ');      }
+    { _prtext8(OUTPUT,lname);         }
+
     { loading library from same drive }
-    { as program compile2 }
+    { as program compile2             }
     _asetfile(lname&'        ',
       lcyclus,ldrive,'T');
     openr(source);
@@ -163,8 +166,8 @@ proc getbl(base:integer);  {get block }
     mem[pointer+3]:=0;
     pointer:=pointer+4;
     offset:=pointer-sblock;
-    writeln;
-    writeln('Library loaded')
+    { writeln; }
+    { writeln('Library loaded') }
   end {getlib};
 
 
@@ -217,6 +220,7 @@ proc showused;
 var usedbytes, maxbytes,
     usedpages, maxpages: integer;
 begin
+  writeln;
   usedbytes := pointer - sblock;
   maxbytes  := maxsize + 2;
 
@@ -239,10 +243,10 @@ begin {main}
   mem[pointer+1]:=255;
   pointer:=pointer+1;
   close(source);
-  writeln;
+  { writeln; }
   showused;
   blocksave(sblock,pointer);
-  writeln('Program has been stored');
+  { writeln('Program has been stored'); }
   ENDSTK:=TOPMEM-144;
   dummy:=_freedrv(sdrive,true);
 end.
