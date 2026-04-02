@@ -887,7 +887,7 @@ begin
     _abort;
   end;
 
-  _asetfile(name, cyclus, drive, 'B');
+  _asetfile(name, cyclus, drive, 'N');
   openr(src);
   writeln;
 

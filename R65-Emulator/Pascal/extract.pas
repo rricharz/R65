@@ -25,26 +25,50 @@ const TOK_OTHER = 0;
       SHEAD  = 8;
 
       DEBUG1 = false;
-
+      DEBUG2 = true;
       INDENT = '      ';
 
 var
   f_in, f_out: file;
-  line:       cpnt;
-  name:       array[15] of char;
-  lineno:     integer;
-  ateof:      boolean;
-  llen:       integer;
-
-  state:      integer;
-  tok  :      integer;
-  seenbegin:  boolean;
-  blocklevel: integer;
-  routlevel:  integer;
-  ininner  :  boolean;
-  pass:       integer; { 1 > :H file, 2 > :N file }
+  line, libname, cname, cval: cpnt;
+  name: array[15] of char;
+  lineno, llen: integer;
+  ateof: boolean;
+  state, tok, pass: integer;
+  seenbegin, ininner: boolean;
   routheader: boolean;
-  parlevel:   integer;
+  blocklevel, routlevel: integer;
+  parlevel: integer;
+
+proc splitconst;
+{**************}
+var i,j: integer;
+begin
+  cname[0] := ENDMARK;
+  cval[0]  := ENDMARK;
+
+  i := _strpos('=',line,0);
+  if i < 0 then begin
+    cname := line;
+    exit;
+  end;
+
+  j := 0;
+  while j < i do begin
+    cname[j] := line[j];
+    j := j + 1;
+  end;
+  cname[j] := ENDMARK;
+
+  j := 0;
+  i := i + 1;
+  while line[i] <> ENDMARK do begin
+    cval[j] := line[i];
+    j := j + 1;
+    i := i + 1;
+  end;
+  cval[j] := ENDMARK;
+end;
 
 proc updpar(s:cpnt);
 {******************}
@@ -53,12 +77,10 @@ begin
   i:=0;
   while s[i]<>ENDMARK do
   begin
-    if s[i]='(' then begin
+    if s[i]='(' then
       parlevel:=parlevel+1;
-    end;
-    if s[i]=')' then begin
+    if s[i]=')' then
       parlevel:=parlevel-1;
-    end;
     i:=i+1;
   end;
 end;
@@ -73,69 +95,36 @@ begin
     if s[i]=';' then
     begin
       hassemi:=true;
-      if DEBUG1 then
-        writeln('hassemi = true');
       exit;
     end;
     i:=i+1;
   end;
   hassemi:=false;
-  if DEBUG1 then
-    writeln('hassemi = false');
 end;
 
 proc rtrim(s:cpnt);
 {*****************}
 var i: integer;
 begin
-  i := _strlen(s);
-  while i > 0 do
+  i:=_strlen(s);
+  while i>0 do
   begin
-    if s[i-1] <> ' ' then
+    if s[i-1]<>' ' then
     begin
-      s[i] := ENDMARK;
+      s[i]:=ENDMARK;
       exit;
     end;
-    i := i - 1;
+    i:=i-1;
   end;
-  s[0] := ENDMARK;
-end;
-
-proc outln(s:cpnt);
-{****************}
-var i: integer;
-    ch: char;
-begin
-  if pass <> 1 then
-    exit;
-  { skip leading blanks }
-  i := 0;
-  while s[i] = ' ' do
-    i := i + 1;
-  ch := s[i];
-  { skip empty lines }
-  if ch = ENDMARK then
-    exit;
-  { skip comment-only lines }
-  if ch = '{' then
-    exit;
-  { output original line (not shifted!) }
-  writeln(@f_out, s);
-end;
-
-proc outtxt(t:cpnt);
-{******************}
-begin
-  if pass=1 then
-    writeln(@f_out,t);
+  s[0]:=ENDMARK;
 end;
 
 proc isalnum(ch:char; var yes:boolean);
 {*************************************}
 begin
-  yes := (((ch>='A') and (ch<='Z')) or
-          ((ch>='a') and (ch<='z')) or
-          ((ch>='0') and (ch<='9')));
+  yes:=(((ch>='A') and (ch<='Z')) or
+        ((ch>='a') and (ch<='z')) or
+        ((ch>='0') and (ch<='9')));
 end;
 
 proc matchtok(t:cpnt; s:cpnt; var yes:boolean);
@@ -143,94 +132,94 @@ proc matchtok(t:cpnt; s:cpnt; var yes:boolean);
 var i,j,lt,ls: integer;
     ok: boolean;
 begin
-  yes := false;
-  lt := _strlen(t);
-  ls := _strlen(s);
+  yes:=false;
+  lt:=_strlen(t);
+  ls:=_strlen(s);
 
-  i := 0;
+  i:=0;
   while (i<ls) and (s[i]=' ') do
-    i := i + 1;
+    i:=i+1;
 
-  if i+lt > ls then
+  if i+lt>ls then
     exit;
 
-  j := 0;
+  j:=0;
   while j<lt do
   begin
-    if t[j] <> s[i+j] then
+    if t[j]<>s[i+j] then
       exit;
-    j := j + 1;
+    j:=j+1;
   end;
 
-  if i+lt < ls then
+  if i+lt<ls then
   begin
     isalnum(s[i+lt], ok);
     if ok then
       exit;
   end;
 
-  yes := true;
+  yes:=true;
 end;
 
 proc gettok(var tok0:integer);
 {****************************}
 var yes: boolean;
 begin
-  tok0 := TOK_OTHER;
+  tok0:=TOK_OTHER;
 
   matchtok('const', line, yes);
   if yes then
   begin
-    tok0 := TOK_CONST;
+    tok0:=TOK_CONST;
     exit;
   end;
 
   matchtok('mem', line, yes);
   if yes then
   begin
-    tok0 := TOK_MEM;
+    tok0:=TOK_MEM;
     exit;
   end;
 
   matchtok('var', line, yes);
   if yes then
   begin
-    tok0 := TOK_VAR;
+    tok0:=TOK_VAR;
     exit;
   end;
 
   matchtok('proc', line, yes);
   if yes then
   begin
-    tok0 := TOK_PROC;
+    tok0:=TOK_PROC;
     exit;
   end;
 
   matchtok('func', line, yes);
   if yes then
   begin
-    tok0 := TOK_FUNC;
+    tok0:=TOK_FUNC;
     exit;
   end;
 
   matchtok('begin', line, yes);
   if yes then
   begin
-    tok0 := TOK_BEGIN;
+    tok0:=TOK_BEGIN;
     exit;
   end;
 
   matchtok('case', line, yes);
   if yes then
   begin
-    tok0 := TOK_CASE;
+    tok0:=TOK_CASE;
     exit;
   end;
 
   matchtok('end', line, yes);
   if yes then
   begin
-    tok0 := TOK_END;
+    tok0:=TOK_END;
     exit;
   end;
 end;
@@ -270,93 +259,311 @@ begin
   end;
 end;
 
-proc print_remainder(line0:cpnt; kwlen:integer);
-{**********************************************}
+proc writehex(f:file; a:integer);
+{*******************************}
+var h:integer;
+  func hexdigit(c:char):char;
+  var d:integer;
+  begin
+    d:=ord(c) and 15;
+    if d>9 then
+      hexdigit:=chr(d-10+ord('A'))
+    else
+      hexdigit:=chr(d+ord('0'));
+  end;
+begin
+  h:=a and 255;
+  write(@f,hexdigit(chr(h shr 4)));
+  write(@f,hexdigit(chr(h and 15)));
+end;
+
+proc setsubtype(subtype:char);
+{****************************}
 var i:integer;
 begin
-  i := 0;
+  i:=0;
+  repeat
+    i:=i+1;
+  until (name[i]=':') or
+        (name[i]=' ') or
+        (i>=14);
+  name[i]:=':';
+  name[i+1]:=subtype;
+end;
 
-  { skip leading spaces }
-  while line0[i] = ' ' do
-    i := i + 1;
+proc initname;
+{*************}
+var default: boolean;
+    cyclus, drive: integer;
+begin
+  cyclus:=0;
+  drive:=1;
+  default:=true;
+  _agetstring(name, default, cyclus, drive);
+end;
 
-  { skip keyword }
-  i := i + kwlen;
+proc open_files(outsubtype:char);
+{******************************}
+var cyclus, drive, vcyclus: integer;
+begin
+  drive:=1;
+  cyclus:=0;
+  vcyclus:=FILCYC;
 
-  { skip spaces after keyword }
-  while line0[i] = ' ' do
-    i := i + 1;
+  setsubtype('P');
+  _asetfile(name, cyclus, drive, ' ');
+  openr(f_in);
+  writeln;
 
-  { anything left? write it }
-  if line[i] <> ENDMARK then
+  cyclus:=0;
+  setsubtype(outsubtype);
+  _asetfile(name, cyclus, drive, ' ');
+  openw(f_out);
+
+  if DEBUG1 then
   begin
-    write(@f_out, INDENT);   { indentation }
-    while line[i] <> ENDMARK do
+    write(@f_out,'program EXTRACT version ');
+    writehex(f_out,vcyclus);
+    writeln(@f_out);
+  end;
+end;
+
+proc close_files;
+{***************}
+begin
+  close(f_in);
+  close(f_out);
+end;
+
+proc print_rem(kwlen:integer);
+{************************}
+var i:integer;
+begin
+  i:=0;
+  while line[i]=' ' do
+    i:=i+1;
+
+  i:=i+kwlen;
+  while line[i]=' ' do
+    i:=i+1;
+
+  if line[i]<>ENDMARK then
+  begin
+    write(@f_out,INDENT);
+    while line[i]<>ENDMARK do
     begin
-      write(@f_out, line[i]);
-      i := i + 1;
+      write(@f_out,line[i]);
+      i:=i+1;
     end;
     writeln(@f_out);
   end;
 end;
 
-proc doSSTART;
-{************}
-var i:      integer;
-    next:   char;
-    strout: cpnt;
+proc getlibname;
+{***************}
+var i,j: integer;
+begin
+  i:=0;
+  while line[i]=' ' do
+    i:=i+1;
+
+  i:=i+7;
+  while line[i]=' ' do
+    i:=i+1;
+
+  j:=0;
+  while (line[i]<>ENDMARK) and
+        (line[i]<>';') and
+        (line[i]<>' ') do
+  begin
+    libname[j]:=_uppercase(line[i]);
+    i:=i+1;
+    j:=j+1;
+  end;
+  libname[j]:=ENDMARK;
+end;
+
+proc stripcomment;
+{****************}
+var  i: integer;
+begin
+  i := _strpos('{',line,0);
+  if i >= 0 then
+    line[i] := ENDMARK;
+end;
+
+func isemptyline: boolean;
+{************************}
+var i: integer;
 begin
   i := 0;
-  strout := _new;
-
-  repeat
-    strout[i] := _uppercase(line[i]);
-    i := i + 1;
-
-    if i >= STRSIZE-1 then
+  while line[i] <> ENDMARK do begin
+    if (line[i] <> ' ') and (line[i] <> TAB8) then
     begin
-      strout[i] := ENDMARK;
-      outln(strout);
-      _release(strout);
+      isemptyline := false;
       exit;
     end;
-
-    next := line[i];
-  until (next=';') or (next=ENDMARK);
-
-  strout[i] := ENDMARK;
-  outln(strout);
-  _release(strout);
+    i := i + 1;
+  end;
+  isemptyline := true;
 end;
 
-proc doCONST;
-{************}
+proc dostart;
+{*************}
+var i: integer;
 begin
-  writeln(@f_out);
-  outtxt('CONST');
-  print_remainder(line, 5);
+  getlibname;
+  if isemptyline then exit;
+
+  if pass=1 then
+  begin
+    i:=0;
+    while line[i]<>ENDMARK do
+    begin
+      if line[i]=';' then
+      begin
+        write(@f_out,';');
+        writeln(@f_out);
+        exit;
+      end;
+      write(@f_out,_uppercase(line[i]));
+      i:=i+1;
+    end;
+    writeln(@f_out);
+  end
+  else
+  begin
+    writeln(@f_out,'.TH ',libname,' 1');
+    writeln(@f_out);
+    writeln(@f_out,'.SH NAME');
+    writeln(@f_out,libname,' - library');
+  end;
 end;
 
-proc doMEM;
-{**********}
+proc doconst(entering:boolean);
+{****************************}
 begin
-  writeln(@f_out);
-  outtxt('MEM');
-  print_remainder(line, 3);
+  stripcomment;
+  if isemptyline then exit;
+  if pass=1 then
+  begin
+    if entering then
+    begin
+      writeln(@f_out);
+      writeln(@f_out, 'CONSTANTS');
+      print_rem(5);
+    end
+    else
+      writeln(@f_out, line);
+  end
+  else
+  begin
+    if entering then
+    begin
+      writeln(@f_out);
+      writeln(@f_out,'.SH CONSTANTS');
+      writeln(@f_out);
+    end
+    else
+    begin
+      splitconst;
+      writeln(@f_out,'.IP ',cname,' 12');
+        if cval[0] <> ENDMARK then
+      writeln(@f_out,cval);
+      writeln(@f_out);
+    end
+  end;
 end;
 
-proc doVAR;
-{**********}
+proc domem(entering:boolean);
+{**************************}
 begin
-  writeln(@f_out);
-  outtxt('VAR');
-  print_remainder(line, 3);
+  stripcomment;
+    if isemptyline then exit;
+  if pass=1 then
+  begin
+    if entering then
+    begin
+      writeln(@f_out);
+      writeln(@f_out, 'MEMORY');
+      print_rem(3);
+    end
+    else
+      writeln(@f_out, line);
+  end
+  else
+  begin
+    if entering then
+    begin
+      writeln(@f_out);
+      writeln(@f_out,'.SH MEMORY');
+      writeln(@f_out);
+    end
+    else
+      writeln(@f_out, line);
+  end;
 end;
 
-proc processline;
-{***************}
+proc dovar(entering:boolean);
+{**************************}
 begin
-  if DEBUG1 then begin
+  stripcomment;
+  if isemptyline then exit;
+  if pass=1 then
+  begin
+    if entering then
+    begin
+      writeln(@f_out);
+      writeln(@f_out, 'VARIABLES');
+      print_rem(3);
+    end
+    else
+      writeln(@f_out, line);
+  end
+  else
+  begin
+    if entering then
+    begin
+      writeln(@f_out);
+      writeln(@f_out,'.SH VARIABLES');
+      writeln(@f_out);
+    end
+    else
+      writeln(@f_out, line);
+  end;
+end;
+
+proc dorout(entering:boolean);
+{***************************}
+begin
+  if pass=1 then
+  begin
+    if entering and not routheader then
+    begin
+      writeln(@f_out);
+      writeln(@f_out, 'ROUTINES');
+      routheader:=true;
+    end;
+    writeln(@f_out, line);
+  end
+  else
+  begin
+    if entering and not routheader then
+    begin
+      writeln(@f_out);
+      writeln(@f_out,'.SH ROUTINES');
+      writeln(@f_out);
+      routheader:=true;
+    end;
+    writeln(@f_out, line);
+  end;
+end;
+
+proc debugline;
+{**************}
+begin
+  if DEBUG1 then
+  begin
     write('line ');
     write(lineno);
     write(': state=');
@@ -368,280 +575,305 @@ begin
     writeln('"');
     writeln;
   end;
+end;
 
-  case state of
-
-    SSTART:
-      begin
-        if tok = TOK_CONST then begin
-          doCONST;
-          state := SCONST;
-        end else
-          doSSTART;
-      end;
-
-    SCONST:
-      begin
-        if tok = TOK_MEM then begin
-         doMEM;
-         state := SMEM;
-        end
-        else
-          outln(line);
-      end;
-
-    SMEM:
-      begin
-        if tok = TOK_VAR then begin
-        doVAR;
-        state := SVAR;
-        end
-        else
-        outln(line);
-      end;
-
-    SVAR:
-      begin
-        if tok = TOK_OTHER then
-          outln(line);
-        if (tok = TOK_PROC) or (tok = TOK_FUNC) then
-        begin
-          if not routheader then
-            begin
-              writeln(@f_out);
-              outtxt('ROUTINES');
-              routheader := true;
-            end;
-
-          outln(line);
-
-          parlevel := 0;
-          updpar(line);
-
-          if (parlevel = 0) and hassemi(line) then
-          begin
-            state := SSKIP;
-            seenbegin := false;
-            blocklevel := 0;
-            routlevel := 0;
-            ininner := false;
-          end
-         else
-            state := SHEAD;
-        end
-        else if tok = TOK_BEGIN then
-        begin
-          state := SBODY;
-          blocklevel := 1;
-        end;
-      end;
-
-     SHEAD:
-       begin
-         outln(line);
-         updpar(line);
-
-         if (parlevel = 0) and hassemi(line) then
-         begin
-           state := SSKIP;
-           seenbegin := false;
-           blocklevel := 0;
-           routlevel := 0;
-           ininner := false;
-         end;
-       end;
-
-    SROUT:
-      begin
-        if (tok = TOK_PROC) or (tok = TOK_FUNC) then
-        begin
-          if not routheader then
-            begin
-              outtxt('ROUTINES');
-              routheader := true;
-            end;
-
-          outln(line);
-          parlevel := 0;
-          updpar(line);
-
-
-          if (parlevel = 0) and hassemi(line) then
-          begin
-            state := SSKIP;
-            seenbegin := false;
-            blocklevel := 0;
-            routlevel := 0;
-            ininner := false;
-          end
-          else
-            state := SHEAD;
-        end
-        else if tok = TOK_BEGIN then begin
-          state := SBODY;
-          blocklevel := 1;
-        end;
-      end;
-
-    SSKIP:
-      begin
-
-        if not seenbegin then
-        begin
-          if ininner then
-          begin
-            if (tok=TOK_BEGIN) or (tok=TOK_CASE) then
-            begin
-              blocklevel := blocklevel + 1;
-            end;
-
-            if tok = TOK_END then
-            begin
-              blocklevel := blocklevel - 1;
-
-              if blocklevel = 0 then
-              begin
-                ininner := false;
-                routlevel := routlevel - 1;
-              end;
-            end;
-          end
-
-          else
-          begin
-            if (tok=TOK_PROC) or (tok=TOK_FUNC) then
-            begin
-              routlevel := routlevel + 1;
-            end
-
-            else if tok = TOK_BEGIN then
-            begin
-              if routlevel > 0 then
-              begin
-                ininner := true;
-                blocklevel := 1;
-              end
-              else
-              begin
-               seenbegin := true;
-                blocklevel := 1;
-              end;
-            end;
-          end;
-        end
-
-        else
-        begin
-          if (tok=TOK_BEGIN) or (tok=TOK_CASE) then
-          begin
-            blocklevel := blocklevel + 1;
-          end;
-
-          if tok = TOK_END then
-          begin
-            blocklevel := blocklevel - 1;
-          end;
-
-          if blocklevel = 0 then
-          begin
-             state := SROUT;
-          end;
-        end;
-      end;
-
-    SBODY:
-      begin
-        if (tok = TOK_BEGIN) or (tok = TOK_CASE) then
-          blocklevel := blocklevel + 1;
-
-        if tok = TOK_END then
-          blocklevel := blocklevel - 1;
-
-        { write('  main blocklevel='); }
-        { writeln(blocklevel);         }
-
-        if blocklevel = 0 then
-          state := SDONE;
-      end
-
-  end {case};
-  if DEBUG1 then begin
+proc debugstate;
+{***************}
+begin
+  if DEBUG1 then
+  begin
     write('     newstate=');
     printstate(state);
     writeln;
-  end
+  end;
 end;
 
-proc setsubtype(subtype:char);
+proc runpass(outsubtype:char);
 {****************************}
-{ set subtype in name }
-var i:integer;
+var islib: boolean;
 begin
-  i := 0;
+  open_files(outsubtype);
+
+  lineno:=0;
+  state:=SSTART;
+  seenbegin:=false;
+  ininner:=false;
+  blocklevel:=0;
+  routlevel:=0;
+  parlevel:=0;
+  routheader:=false;
+
   repeat
-    i:=i + 1;
-  until (name[i]=':') or
-    (name[i] = ' ') or (i >= 14);
-  name[i] := ':';
-  name[i+1]:=subtype;
-end;
+    llen:=_strread(f_in, line, ateof);
+    rtrim(line);
+    lineno:=lineno+1;
 
-proc writehex(f:file; a:integer);
-{*******************************}
-var h:integer;
-  func hexdigit(c:char):char;
-  var d:integer;
-  begin
-    d:=ord(c) and 15;
-    if d>9 then hexdigit:=chr(d-10+ord('A'))
-    else hexdigit:=chr(d+ord('0'));
-  end;
-begin
-  h:=a and 255;
-  write(@f,hexdigit(chr(h shr 4)));
-  write(@f,hexdigit(chr(h and 15)));
-end;
+    if llen>0 then
+    begin
+      write('.');
+      gettok(tok);
+      debugline;
+      matchtok('library', line, islib);
 
-proc open_files(outsubtype: char);
-{********************************}
-var default: boolean;
-    i, cyclus, drive, vcyclus: integer;
+      case state of
 
-begin
-  drive   := 1;
-  cyclus  := 0;
-  default := true;
+        SSTART:
+          begin
+            if islib then
+              dostart
+            else if tok=TOK_CONST then
+            begin
+              doconst(true);
+              state:=SCONST;
+            end
+            else if tok=TOK_MEM then
+            begin
+              domem(true);
+              state:=SMEM;
+            end
+            else if tok=TOK_VAR then
+            begin
+              dovar(true);
+              state:=SVAR;
+            end
+            else if (tok=TOK_PROC) or
+                    (tok=TOK_FUNC) then
+            begin
+              dorout(true);
+              parlevel:=0;
+              updpar(line);
+              if (parlevel=0) and hassemi(line) then
+              begin
+                state:=SSKIP;
+                seenbegin:=false;
+                blocklevel:=0;
+                routlevel:=0;
+                ininner:=false;
+              end
+              else
+                state:=SHEAD;
+            end
+            else if tok=TOK_BEGIN then
+            begin
+              state:=SBODY;
+              blocklevel:=1;
+            end;
+          end;
 
-  { print version number of current EXTRACT }
+        SCONST:
+          begin
+            if tok=TOK_MEM then
+            begin
+              domem(true);
+              state:=SMEM;
+            end
+            else if tok=TOK_VAR then
+            begin
+              dovar(true);
+              state:=SVAR;
+            end
+            else if (tok=TOK_PROC) or
+                    (tok=TOK_FUNC) then
+            begin
+              dorout(true);
+              parlevel:=0;
+              updpar(line);
+              if (parlevel=0) and hassemi(line) then
+              begin
+                state:=SSKIP;
+                seenbegin:=false;
+                blocklevel:=0;
+                routlevel:=0;
+                ininner:=false;
+              end
+              else
+                state:=SHEAD;
+            end
+            else if tok=TOK_BEGIN then
+            begin
+              state:=SBODY;
+              blocklevel:=1;
+            end
+            else
+              doconst(false);
+          end;
 
-  vcyclus := FILCYC;
+        SMEM:
+          begin
+            if tok=TOK_VAR then
+            begin
+              dovar(true);
+              state:=SVAR;
+            end
+            else if (tok=TOK_PROC) or
+                    (tok=TOK_FUNC) then
+            begin
+              dorout(true);
+              parlevel:=0;
+              updpar(line);
+              if (parlevel=0) and hassemi(line) then
+              begin
+                state:=SSKIP;
+                seenbegin:=false;
+                blocklevel:=0;
+                routlevel:=0;
+                ininner:=false;
+              end
+              else
+                state:=SHEAD;
+            end
+            else if tok=TOK_BEGIN then
+            begin
+              state:=SBODY;
+              blocklevel:=1;
+            end
+            else
+              domem(false);
+          end;
 
-  { open input file, must be :P }
-  _agetstring(name, default, cyclus, drive);
-  setsubtype('P');
-  _asetfile(name, cyclus, drive, ' ');
-  openr(f_in);
-  writeln; { required if openr is not silent }
+        SVAR:
+          begin
+            if tok=TOK_OTHER then
+              dovar(false)
+            else if (tok=TOK_PROC) or
+                    (tok=TOK_FUNC) then
+            begin
+              dorout(true);
+              parlevel:=0;
+              updpar(line);
+              if (parlevel=0) and hassemi(line) then
+              begin
+                state:=SSKIP;
+                seenbegin:=false;
+                blocklevel:=0;
+                routlevel:=0;
+                ininner:=false;
+              end
+              else
+                state:=SHEAD;
+            end
+            else if tok=TOK_BEGIN then
+            begin
+              state:=SBODY;
+              blocklevel:=1;
+            end;
+          end;
 
-  { open output file }
-  cyclus := 0;
-  setsubtype(outsubtype);
-  _asetfile(name, cyclus, drive, ' ');
-  openw(f_out);
+        SROUT:
+          begin
+            if (tok=TOK_PROC) or
+               (tok=TOK_FUNC) then
+            begin
+              dorout(true);
+              parlevel:=0;
+              updpar(line);
+              if (parlevel=0) and hassemi(line) then
+              begin
+                state:=SSKIP;
+                seenbegin:=false;
+                blocklevel:=0;
+                routlevel:=0;
+                ininner:=false;
+              end
+              else
+                state:=SHEAD;
+            end
+            else if tok=TOK_BEGIN then
+            begin
+              state:=SBODY;
+              blocklevel:=1;
+            end;
+          end;
 
-  if DEBUG1 then begin
-    write(@f_out, 'program EXTRACT version ');
-    writehex(f_out,vcyclus);
-    writeln(@f_out);
-  end;
+        SHEAD:
+          begin
+            dorout(false);
+            updpar(line);
+            if (parlevel=0) and hassemi(line) then
+            begin
+              state:=SSKIP;
+              seenbegin:=false;
+              blocklevel:=0;
+              routlevel:=0;
+              ininner:=false;
+            end;
+          end;
 
-end;
+        SSKIP:
+          begin
+            if not seenbegin then
+            begin
+              if ininner then
+              begin
+                if (tok=TOK_BEGIN) or
+                   (tok=TOK_CASE) then
+                  blocklevel:=blocklevel+1;
 
-proc close_files;
-{***************}
-begin
-  close(f_in);
-  close(f_out);
+                if tok=TOK_END then
+                begin
+                  blocklevel:=blocklevel-1;
+                  if blocklevel=0 then
+                  begin
+                    ininner:=false;
+                    routlevel:=routlevel-1;
+                  end;
+                end;
+              end
+              else
+              begin
+                if (tok=TOK_PROC) or
+                   (tok=TOK_FUNC) then
+                  routlevel:=routlevel+1
+                else if tok=TOK_BEGIN then
+                begin
+                  if routlevel>0 then
+                  begin
+                    ininner:=true;
+                    blocklevel:=1;
+                  end
+                  else
+                  begin
+                    seenbegin:=true;
+                    blocklevel:=1;
+                  end;
+                end;
+              end;
+            end
+            else
+            begin
+              if (tok=TOK_BEGIN) or
+                 (tok=TOK_CASE) then
+                blocklevel:=blocklevel+1;
+
+              if tok=TOK_END then
+                blocklevel:=blocklevel-1;
+
+              if blocklevel=0 then
+                state:=SROUT;
+            end;
+          end;
+
+        SBODY:
+          begin
+            if (tok=TOK_BEGIN) or
+               (tok=TOK_CASE) then
+              blocklevel:=blocklevel+1;
+
+            if tok=TOK_END then
+              blocklevel:=blocklevel-1;
+
+            if blocklevel=0 then
+              state:=SDONE;
+          end
+
+      end;
+
+      debugstate;
+    end;
+
+  until ateof or (state=SDONE);
+
+  close_files;
 end;
 
 { main program }
@@ -649,35 +881,24 @@ end;
 begin
   write(PRTON);
 
-  open_files('H');
+  line    := _new;
+  libname := _new;
+  cname   := _new;
+  cval    := _new;
 
-  line := _new;
-  lineno := 0;
-  state := SSTART;
-  seenbegin := false;
-  blocklevel := 0;
-  pass := 1;
-  routheader := false;
+  initname;
 
-  repeat
-    llen := _strread(f_in, line, ateof);
-    rtrim(line);
-    lineno := lineno + 1;
+  pass:=1;
+  runpass('H');
 
-    if llen > 0 then
-    begin
-      write('.');
+  pass:=2;
+  runpass('N');
 
-      gettok(tok);
-      processline;
-    end;
-
-  until ateof;
-
-  close_files;
+  _release(cval);
+  _release(cname);
+  _release(libname);
   _release(line);
+
   writeln;
   write(PRTOFF);
 end.
-
-

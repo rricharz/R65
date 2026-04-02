@@ -1,14 +1,13 @@
-{
-*************************************
-*                                   *
-* Copy(filename,source,destination) *
-*                                   *
-*************************************
+{ ************************************* }
+{ *                                   * }
+{ * Copy(filename,source,destination) * }
+{ *                                   * }
+{ ************************************* }
 
-  2019 rricharz
-  2023 Added wildcard handling
+{  2019 rricharz                        }
+{  2023 RR: Added wildcard handling     }
+{  2024-2026 RR: small improvements     }
 
-}
 
 program copy;
 uses syslib,arglib,wildlib;
@@ -37,7 +36,7 @@ var name,savename: array[15] of char;
     entry: integer;
     last, found: boolean;
 
-{ * isblockf * }
+{ **** isblockf **** }
 
 func isblockf(nm: array[15] of char): boolean;
 var j: integer;
@@ -56,7 +55,7 @@ begin
     end;
 end;
 
-{ * blockload * }
+{ **** blockload ***** }
 
 proc blockload(lowlim: integer);
 var i: integer;
@@ -70,7 +69,7 @@ begin
   call(rdfile);
 end {blockload};
 
-{ * blocksave * }
+{ **** blocksave ***** }
 
 proc blocksave(lowlim,highlim: integer);
 var i: integer;
@@ -85,17 +84,17 @@ begin
   call(wrfile);
 end {blocksave};
 
-{ * error * }
+{ ***** error ***** }
 
 proc error(x:integer);
 mem RUNERR=$0c: integer&;
 begin
   writeln;
-  writeln(INVVID,'File error ',
+  writeln(INVVID,'COPY: file error ',
     (x shr 4),(x and 15),NORVID);
 end {error};
 
-{ * copyfile * }
+{ **** copyfile ***** }
 
 proc copyfile;
 begin
@@ -133,11 +132,11 @@ begin
       FILCY1:=FILCYC;
       FILDRV:=ddrive;
       openw(ofno);
-      {write('.');}
+      { write('.'); }
       repeat
         read(@fno,ch);
         write(@ofno,ch);
-        if ch=CR then write('.')
+        { if ch=CR then write('.') }
         until (ch=EOF) or (ch=chr(31));
         { chr(31) for compatibility with old files }
       write(@ofno,EOF);
@@ -155,8 +154,9 @@ begin
     if (nm1[k]='*') or (nm1[k]='?') then
       haswildcard:=true;
 end;
-{
- * main * }
+
+
+{ **** main **** }
 
 begin
   cyclus:=0;
@@ -214,4 +214,4 @@ begin
   end else
     copyfile;
 end.
- 
+

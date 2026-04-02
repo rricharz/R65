@@ -1,0 +1,540 @@
+EXTRACT STATE MACHINE
+=====================
+
+Purpose
+-------
+EXTRACT reads an R65 Pascal library source file in two passes.
+
+Pass 1 creates:
+  library:H   help file for the 48x16 screen
+
+Pass 2 creates:
+  library:U   mini-nroff input file for later editing
+
+The parser should stay simple. It is not a full Pascal parser.
+It only recognizes the normal top-level library structure and
+collects declarations which are useful for documentation.
+
+Overall structure assumed
+-------------------------
+A normal library is expected to have roughly this form:
+
+  library name;
+
+  const
+    ...
+
+  mem
+    ...
+
+  var
+    ...
+
+  proc ...
+  func ...
+  ...
+
+  begin
+    initialization
+  end.
+
+The actual order is usually:
+
+  library -> const -> mem -> var -> proc/func -> body
+
+Missing sections are allowed.
+
+Basic idea
+----------
+The EXTRACT logic can be viewed as a small state machine.
+The states describe where we are in the source file.
+
+A practical design is to use the same state machine in both passes,
+but produce different output.
+
+Pass 1 mainly uses:
+  library, const, mem, var, proc, func
+
+Pass 2 uses the same recognition, but writes a fuller skeleton in
+mini-nroff format.
+
+Top-level states
+----------------
+
+  S_START
+  S_LIBRARY
+  S_CONST
+  S_MEM
+  S_VAR
+  S_ROUTINE_HEAD
+  S_ROUTINE_BODY
+  S_BODY
+  S_DONE
+  S_ERROR
+
+These are logical states. The real program can encode them as small
+integers or packed-char constants.
+
+State descriptions
+------------------
+
+1. S_START
+-----------
+Meaning:
+  No useful input has yet been recognized.
+
+Entry:
+  Initial state before the first real source line is processed.
+
+Actions in this state:
+  - Skip empty lines
+  - Skip comment-only lines if desired
+  - Look for the library header
+
+Transition from S_START:
+  - on "library ..."     -> S_LIBRARY
+  - on anything else     -> S_ERROR
+    because a library source should start with a library header
+
+2. S_LIBRARY
+-------------
+Meaning:
+  The library header has been recognized. The library name is known.
+
+Typical line:
+  library strlib;
+
+Actions in this state:
+  - Save the library name
+  - Open output file for current pass
+  - Emit file header
+    Pass 1: help heading if needed
+    Pass 2: .TH and fixed skeleton heading
+
+Transition from S_LIBRARY:
+  - on "const"           -> S_CONST
+  - on "mem"             -> S_MEM
+  - on "var"             -> S_VAR
+  - on "proc" or "func"  -> S_ROUTINE_HEAD
+  - on "begin"           -> S_BODY
+  - on empty/comment     -> stay in S_LIBRARY
+  - on anything else     -> stay in S_LIBRARY or S_ERROR
+
+Practical note:
+  It is usually best to tolerate blank lines here and simply wait
+  for the next top-level keyword.
+
+3. S_CONST
+-----------
+Meaning:
+  We are inside the top-level const section.
+
+Typical input:
+  const
+    STRSIZE=64;
+    ENDMARK=chr(0);
+
+Actions in this state:
+  - Read constant declarations
+  - Extract constant names
+  - Write them to current output format
+  - Ignore details not needed for documentation
+
+Transition from S_CONST:
+  - on constant entry     -> stay in S_CONST
+  - on "mem"              -> S_MEM
+  - on "var"              -> S_VAR
+  - on "proc" or "func"   -> S_ROUTINE_HEAD
+  - on "begin"            -> S_BODY
+  - on empty/comment      -> stay in S_CONST
+  - on anything else      -> usually stay in S_CONST until a new
+                             top-level keyword is seen
+
+Practical note:
+  Since Pascal declarations may span lines, the actual extractor may
+  need a small sub-parser. But logically it is still S_CONST.
+
+4. S_MEM
+---------
+Meaning:
+  We are inside the top-level mem section.
+
+Typical input:
+  mem sp = $0008: integer;
+
+Actions in this state:
+  - Read mem declarations
+  - Extract names
+  - Write them to current output format
+
+Transition from S_MEM:
+  - on mem entry          -> stay in S_MEM
+  - on "var"              -> S_VAR
+  - on "proc" or "func"   -> S_ROUTINE_HEAD
+  - on "begin"            -> S_BODY
+  - on empty/comment      -> stay in S_MEM
+  - on anything else      -> wait for next top-level keyword
+
+5. S_VAR
+---------
+Meaning:
+  We are inside the top-level var section.
+
+Typical input:
+  var freewords,i:integer;
+      str:cpnt;
+
+Actions in this state:
+  - Read variable declarations
+  - Extract names
+  - Write them to current output format
+
+Transition from S_VAR:
+  - on var entry          -> stay in S_VAR
+  - on "proc" or "func"   -> S_ROUTINE_HEAD
+  - on "begin"            -> S_BODY
+  - on empty/comment      -> stay in S_VAR
+  - on anything else      -> wait for next top-level keyword
+
+6. S_ROUTINE_HEAD
+-----------------
+Meaning:
+  A top-level procedure or function header has just been recognized.
+
+Typical input:
+  proc _runerr(e:integer);
+  func _new:cpnt;
+
+Actions in this state:
+  - Determine whether it is proc or func
+  - Extract routine name
+  - Extract parameter text if present
+  - For func also note return placeholder if desired
+  - Emit routine entry in output
+    Pass 1: compact help line
+    Pass 2: .SS section with Usage/Description skeleton
+
+Transition from S_ROUTINE_HEAD:
+  - after header line     -> S_ROUTINE_BODY
+
+Reason:
+  After a routine header, we must skip its local declarations and body
+  until we return to top-level scanning again.
+
+7. S_ROUTINE_BODY
+-----------------
+Meaning:
+  We are inside one top-level routine and must ignore its internals
+  for top-level extraction.
+
+Typical contents skipped:
+  const ...
+  mem ...
+  var ...
+  begin
+    ...
+  end;
+
+Important:
+  Inner proc/func declarations may appear here. These must NOT be
+  documented as top-level library entries.
+
+Actions in this state:
+  - Skip all lines belonging to the current routine
+  - Count nesting so that inner begin/end pairs do not confuse us
+  - Return to top-level only after the routine really ends
+
+Suggested implementation:
+  Use a small nesting counter.
+
+  Example:
+    level = 0 when the routine header is seen
+    on "begin" increase level
+    on "end"   decrease level if level > 0
+    when routine closing "end;" finishes the routine and level is back
+    to the outer routine level, return to top-level scanning
+
+Practical caution:
+  "case ... end" also uses "end". Therefore the routine-body skipper
+  must treat every nested begin/case/repeat style structure carefully
+  enough that the final routine "end;" is recognized correctly.
+
+Transition from S_ROUTINE_BODY:
+  - while inside routine   -> stay in S_ROUTINE_BODY
+  - on routine finished    -> one of:
+                                S_CONST
+                                S_MEM
+                                S_VAR
+                                S_ROUTINE_HEAD
+                                S_BODY
+                              depending on next top-level token
+  - on EOF unexpectedly    -> S_ERROR
+
+Practical simplification:
+  In many libraries, after a routine ends, the next useful item is
+  another top-level proc/func or the final begin of the library body.
+
+8. S_BODY
+----------
+Meaning:
+  We have reached the library body:
+
+  begin
+    initialization
+  end.
+
+This is the final top-level body of the library, not a routine body.
+
+Actions in this state:
+  - No more declarations are extracted
+  - Skip until final end.
+  - Close output file at the end
+
+Transition from S_BODY:
+  - while scanning body    -> stay in S_BODY
+  - on final "end."        -> S_DONE
+  - on EOF unexpectedly    -> S_ERROR
+
+9. S_DONE
+----------
+Meaning:
+  Extraction for this pass is complete.
+
+Actions:
+  - close files
+  - report success
+  - if pass 1 finished, restart source scan for pass 2
+  - if pass 2 finished, terminate program
+
+10. S_ERROR
+-----------
+Meaning:
+  An unexpected source structure was found.
+
+Actions:
+  - report error
+  - close files safely
+  - stop extraction, or continue in a controlled way
+
+Typical reasons:
+  - missing library header
+  - unexpected EOF in routine or body
+  - impossible top-level order
+  - damaged source
+
+Pass structure
+--------------
+The two-pass design is:
+
+  pass 1:
+    source -> state machine -> :H output
+
+  pass 2:
+    source -> same state machine -> :U output
+
+So the parsing logic should be shared as much as possible.
+Only the output actions differ.
+
+This means:
+
+  same states
+  same state changes
+  different "emit" routines
+
+For example:
+  emit_const_help(...)
+  emit_const_nroff(...)
+
+State changes by keyword
+------------------------
+The top-level keyword transitions can be summarized as follows.
+
+From S_LIBRARY:
+  const  -> S_CONST
+  mem    -> S_MEM
+  var    -> S_VAR
+  proc   -> S_ROUTINE_HEAD
+  func   -> S_ROUTINE_HEAD
+  begin  -> S_BODY
+
+From S_CONST:
+  mem    -> S_MEM
+  var    -> S_VAR
+  proc   -> S_ROUTINE_HEAD
+  func   -> S_ROUTINE_HEAD
+  begin  -> S_BODY
+
+From S_MEM:
+  var    -> S_VAR
+  proc   -> S_ROUTINE_HEAD
+  func   -> S_ROUTINE_HEAD
+  begin  -> S_BODY
+
+From S_VAR:
+  proc   -> S_ROUTINE_HEAD
+  func   -> S_ROUTINE_HEAD
+  begin  -> S_BODY
+
+From S_ROUTINE_HEAD:
+  next line / routine text -> S_ROUTINE_BODY
+
+From S_ROUTINE_BODY:
+  routine finished         -> back to top-level scan
+                              then to S_ROUTINE_HEAD or S_BODY
+
+From S_BODY:
+  final end.               -> S_DONE
+
+ASCII diagram
+-------------
+Yes. A 1970's-style diagram can be done perfectly well with plain
+ASCII characters.
+
+A simple version is:
+
+  +---------+
+  | S_START |
+  +---------+
+       |
+       | library
+       v
+  +-----------+
+  | S_LIBRARY |
+  +-----------+
+    |   |   |   \
+    |   |   |    \
+    |   |   |     \ proc/func
+    |   |   |      v
+    |   |   |  +----------------+
+    |   |   |  | S_ROUTINE_HEAD |
+    |   |   |  +----------------+
+    |   |   |           |
+    |   |   |           v
+    |   |   |  +----------------+
+    |   |   |  | S_ROUTINE_BODY |
+    |   |   |  +----------------+
+    |   |   |           |
+    |   |   |           | routine finished
+    |   |   +-----------+
+    |   |
+    |   | var
+    |   v
+    | +-------+
+    | | S_VAR |
+    | +-------+
+    |
+    | mem
+    v
+  +-------+
+  | S_MEM |
+  +-------+
+
+  and also:
+
+  S_LIBRARY --const--> S_CONST
+  S_CONST   --mem----> S_MEM
+  S_CONST   --var----> S_VAR
+  S_MEM     --var----> S_VAR
+
+  S_LIBRARY/S_CONST/S_MEM/S_VAR --begin--> S_BODY
+
+  +--------+
+  | S_BODY |
+  +--------+
+      |
+      | final end.
+      v
+  +--------+
+  | S_DONE |
+  +--------+
+
+A more complete transition map
+------------------------------
+
+                      +---------+
+                      | S_START |
+                      +---------+
+                           |
+                           | library
+                           v
+                     +-----------+
+                     | S_LIBRARY |
+                     +-----------+
+                      /   |   |   \
+                 const   mem var  proc/func
+                    /      |   |       \
+                   v       v   v        v
+              +---------+ +-----+ +-----+ +----------------+
+              | S_CONST | |S_MEM| |S_VAR| | S_ROUTINE_HEAD |
+              +---------+ +-----+ +-----+ +----------------+
+                   |         |       |             |
+                   |         |       |             v
+                   |         |       |      +----------------+
+                   |         |       |      | S_ROUTINE_BODY |
+                   |         |       |      +----------------+
+                   |         |       |             |
+                   +---------+-------+-------------+
+                             next top-level item
+
+  Any top-level declaration state can also go to:
+
+                     +--------+
+                     | S_BODY |
+                     +--------+
+                          |
+                          | final end.
+                          v
+                     +--------+
+                     | S_DONE |
+                     +--------+
+
+Why this state machine is useful
+--------------------------------
+1. It keeps EXTRACT simple.
+2. It matches the normal structure of R65 libraries.
+3. It supports both outputs with the same parser.
+4. It clearly separates:
+     top-level declarations
+     routine skipping
+     final library body
+5. It prevents inner procedures/functions from being documented by
+   mistake.
+
+Recommended coding style
+------------------------
+Internally, I would separate:
+
+  state recognition
+  state transition
+  output generation
+
+For example:
+
+  state tells where we are
+  token tells what this line begins with
+  pass tells whether we write :H or :U
+
+Then the main loop becomes conceptually:
+
+  read line
+  classify line
+  case state of
+    ...
+  end
+
+This will make EXTRACT easier to extend later.
+
+Final practical note
+--------------------
+The exact routine-body skipping is the most delicate part.
+The declaration states are easy.
+So if you want to test the design early, first verify these cases:
+
+  1. library with only const/var and no routines
+  2. library with several top-level procs/funcs
+  3. routine containing local vars
+  4. routine containing inner proc/func
+  5. routine containing case ... end
+  6. final library begin ... end.
+
+If these work, the state machine is probably sound.
