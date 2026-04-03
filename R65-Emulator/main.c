@@ -25,10 +25,14 @@
 #define GDK_DISABLE_DEPRECATION_WARNINGS
 
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <errno.h>
 #include <string.h>
+#include <stdint.h>
+
 #include <cairo.h>
 #include <gtk/gtk.h>
 #include <math.h>
@@ -497,6 +501,55 @@ static void on_key_release(GtkWidget *widget, GdkEventKey *event, gpointer user_
     global_key_is_down = 0;
 }
 
+static int lock_fd = -1;
+
+//////////////////////////////////////
+int acquire_single_instance_lock(void)
+//?///////////////////////////////////
+{
+    const char *lockfile = "/tmp/r65-emulator.lock";
+
+    lock_fd = open(lockfile, O_RDWR | O_CREAT, 0666);
+    if (lock_fd < 0) {
+        perror("open lockfile");
+        return -1;
+    }
+
+    if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
+        if (errno == EWOULDBLOCK) {
+            fprintf(stderr, "Another instance is already running.\n");
+        } else {
+            perror("flock");
+        }
+        close(lock_fd);
+        lock_fd = -1;
+        return -1;
+    }
+
+    /* Optional: write PID into lock file */
+    if (ftruncate(lock_fd, 0) == 0) {
+        char buf[64];
+        int len = snprintf(buf, sizeof(buf), "%ld\n",
+                           (long)getpid());
+        if (len > 0) {
+            write(lock_fd, buf, (size_t)len);
+        }
+    }
+
+    return 0;
+}
+
+///////////////////////////////////////
+void release_single_instance_lock(void)
+///////////////////////////////////////
+{
+    if (lock_fd >= 0) {
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        lock_fd = -1;
+    }
+}
+
 /////////////////////////////////
 int main (int argc, char *argv[])
 /////////////////////////////////
@@ -504,6 +557,10 @@ int main (int argc, char *argv[])
     GtkWidget *darea;
 	
     int firstArg = 1;
+    
+    if (acquire_single_instance_lock() != 0) {
+        return 1;
+    }
         
     exDisplay  = FALSE;
     fullscreen = FALSE;
@@ -595,6 +652,8 @@ int main (int argc, char *argv[])
     r65Setup();
 
     gtk_main();
+    
+    release_single_instance_lock();
 
 	return 0;
 }
