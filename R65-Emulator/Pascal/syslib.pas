@@ -2,18 +2,17 @@
 {  ***************************************  }
 {  *                                     *  }
 {  *  R65 Computer System                *  }
-{  *  Pascal LIBRARY SYSL                *  }
+{  *  Pascal LIBRARY SYSLIB              *  }
 {  *                                     *  }
 {  ***************************************  }
 
 {  The system library contains a set of     }
 {  standard constants, variables and        }
 {  procedures for the implementation of     }
-{  Pascal on the R6 microcomputer system    }
+{  Pascal on the R65 microcomputer system   }
 
-{ Based on version 11 01/08/82 rricharz     }
-{ Current version 12.0 03/09/2018 rricharz  }
-{ Added function: random                    }
+{ Based on version 11  01/08/1982 rricharz  }
+{ Current version 12.1 04/03/2026 rricharz  }
 
 library syslib;
 
@@ -31,6 +30,7 @@ const
   INVVID=chr($0e);  {inverse video}
   PRTON=chr($12);   {autoprint on}
   PRTOFF=chr($14);  {autoprint off}
+  RESETPR=chr($1c); {reset printer file printout.txt}
 
   MMAXSEQ = 8;      {max no of seq. files}
 

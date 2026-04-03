@@ -17,6 +17,7 @@ const
   TMARGIN = 3;   { top margin }
   INDSTEP = 4;   { indent step for .RS / .RE }
   MAXTABS = 16;  { max number of explicit tab stops }
+  IPINDENT= 5;  { default IP indent }
 
   ERR_MISS  = 1;  { missing argument }
   ERR_NUM   = 2;  { invalid number }
@@ -24,6 +25,8 @@ const
   ERR_RANGE = 4;  { value out of range }
   ERR_REQ   = 5;  { invalid request }
   ERRMAX    = 4;  { max number of errors on screen }
+
+  QUOTE     = chr($27);
 
   DEBUG1  = false;
   DEBUG2  = false;
@@ -74,7 +77,7 @@ var
   thlen    : integer; { length of title text }
 
 proc errec(pos,code:integer);
-{===========================}
+{***************************}
 var i: integer;
 begin
   errcount := succ(errcount);
@@ -101,7 +104,7 @@ begin
 end;
 
 func checkeol(pos:integer):boolean;
-{=================================}
+{*********************************}
 var pos0:integer;
 begin
   pos0 := pos;
@@ -116,7 +119,7 @@ begin
 end;
 
 func findarg(pos:integer):integer;
-{================================}
+{********************************}
 var pos0: integer;
 begin
   pos0 := pos;
@@ -131,14 +134,14 @@ begin
 end;
 
 proc printernewline;
-{==================}
+{******************}
 begin
   write(@PRINTER, CR);
   write(@PRINTER, LF);
 end;
 
 proc startline;
-{=============}
+{*************}
 var i: integer;
 begin
 
@@ -158,7 +161,7 @@ begin
 end;
 
 proc printheader;
-{===============}
+{***************}
 var i, spaces, n: integer;
 begin
   if DEBUG1 then begin
@@ -202,7 +205,7 @@ begin
 end;
 
 proc newpage;
-{===========}
+{***********}
 begin
   if pageno>0 then
     write(@PRINTER, FF);
@@ -221,7 +224,7 @@ begin
 end;
 
 proc clearprintout;
-{=================}
+{*****************}
 begin
   { erase the current printout.txt file }
   { this is a command to the emulator }
@@ -229,7 +232,7 @@ begin
 end;
 
 func nexttab(col: integer): integer;
-{==================================}
+{**********************************}
 var i: integer;
 begin
   if ntab > 0 then begin
@@ -249,6 +252,7 @@ begin
 end;
 
 proc putspaces(n: integer);
+{*************************}
 var i: integer;
 begin
   for i := 1 to n do
@@ -256,6 +260,7 @@ begin
 end;
 
 proc writewithtabs;
+{*****************}
 var i, col, target: integer;
 begin
   col := indent;
@@ -276,6 +281,7 @@ begin
 end;
 
 proc newline;
+{***********}
 begin
   writeln(@PRINTER);
   pagepos := succ(pagepos);
@@ -286,7 +292,21 @@ begin
     startline;
 end;
 
+proc doquotedline;
+{****************}
+var i: integer;
+begin
+  startline;
+  i := 1;
+  while (i<llen) and (line[i]<>QUOTE) do begin
+    write(@PRINTER,line[i]);
+    i := i+1;
+  end;
+  newline;
+end;
+
 proc underline(n: integer; c: char);
+{**********************************}
 var m, i: integer;
 begin
   m := n;
@@ -297,6 +317,7 @@ begin
 end;
 
 proc flushline;
+{*************}
 begin
   if outlen > 0 then begin
     textseen := true;
@@ -310,12 +331,14 @@ begin
 end;
 
 proc emitblank;
+{*************}
 begin
   flushline;
   newline;
 end;
 
 proc needspace(n: integer);
+{*************************}
 begin
   if pagepos > pagelen - n then begin
     pagepos := pagelen;
@@ -324,6 +347,7 @@ begin
 end;
 
 proc emittextnofill;
+{******************}
 var i: integer;
 begin
   flushline;
@@ -335,11 +359,13 @@ begin
 end;
 
 func isspace(c: char): boolean;
+{*****************************}
 begin
   isspace := (c = ' ') or (c = TAB8);
 end;
 
 proc addchartoline(c: char);
+{**************************}
 begin
   if llen >= MAXSRC then exit;
   line[llen] := c;
@@ -347,6 +373,7 @@ begin
 end;
 
 func parseintfrom(p: integer): integer;
+{*************************************}
 var v, pos: integer;
 begin
   v := 0;
@@ -359,7 +386,42 @@ begin
   parseintfrom := v;
 end;
 
+proc getnumarg(pos: integer; var n,npos: integer);
+{************************************************}
+var i: integer;
+begin
+  i := pos;
+  while (i<llen) and (line[i]=' ') do
+    i := i+1;
+  if i>=llen then begin
+    n := -1;
+    npos := i;
+    exit;
+  end;
+  if (line[i]<'0') or (line[i]>'9') then begin
+    errec(i,ERR_NUM);
+    n := -2;
+    npos := i;
+    exit;
+  end;
+  npos := i;
+  n := 0;
+  while (i<llen) and (line[i]>='0')
+                  and (line[i]<='9') do begin
+    n := n*10 + ord(line[i]) - ord('0');
+    i := i+1;
+  end;
+  while (i<llen) and (line[i]=' ') do
+    i := i+1;
+  if i<llen then begin
+    errec(i,ERR_EXTRA);
+    n := -2;
+    exit;
+  end;
+end;
+
 proc addword(start, wlen: integer);
+{*********************************}
 var need, i: integer;
 begin
   { space before word if not first }
@@ -383,6 +445,7 @@ begin
 end;
 
 proc formatfillfromline;
+{**********************}
 var i, wstart, wlen: integer;
 begin
   i := 0;
@@ -408,6 +471,7 @@ begin
 end;
 
 proc saveth(startpos: integer);
+{*****************************}
 var pos: integer;
 begin
   pos := startpos;
@@ -438,6 +502,7 @@ begin
 end;
 
 proc endip;
+{*********}
 begin
   if ipmode then begin
     indent := indent - ipcur;
@@ -448,14 +513,22 @@ begin
 end;
 
 proc closeip;
+{***********}
 begin
   flushline;
   endip;
 end;
 
-{ --- command handlers --- }
+proc getwordend(i: integer; var j: integer);
+{******************************************}
+begin
+  j := i;
+  while (j<llen) and (line[j]<>' ') do
+    j := j+1;
+end;
 
 proc printth;
+{***********}
 var i, spaces: integer;
 begin
   flushline;
@@ -484,7 +557,7 @@ begin
 end;
 
 proc doB;
-{=======}
+{*******}
 var i: integer;
 begin
   i := findarg(3);
@@ -501,7 +574,7 @@ begin
 end;
 
 proc doI;
-{=======}
+{*******}
 var i: integer;
 begin
   i := findarg(3);
@@ -519,48 +592,59 @@ begin
 end;
 
 proc doIP;
-{========}
-var i, col: integer;
+{********}
+var i,j,n,npos,col: integer;
 begin
   closeip;
   i := findarg(3);
   if i<0 then
     exit;
+
+  getwordend(i,j);
+  getnumarg(j,n,npos);
+  if n=-2 then
+    exit;
+  if n=-1 then
+    n := IPINDENT;
+
   textseen := true;
   putspaces(indent);
   col := indent;
-  while i < llen do begin
+
+  while i<j do begin
     write(@PRINTER,line[i]);
-    i := succ(i);
-    col := succ(col);
+    i := i+1;
+    col := col+1;
   end;
-  if col < (indent + iphang) then begin
-    while col < (indent + iphang) do begin
+
+  if col < (indent + n) then begin
+    while col < (indent + n) do begin
       write(@PRINTER,' ');
-      col := succ(col);
+      col := col+1;
     end;
-    ipcur := iphang;
+    ipcur := n;
     preind := true;
   end
   else begin
     newline;
-    putspaces(indent + iphang);
-    ipcur := iphang;
+    putspaces(indent + n);
+    ipcur := n;
     preind := true;
   end;
+
   indent := indent + ipcur;
   ipmode := true;
 end;
 
 proc doTH;
-{========}
+{********}
 var i: integer;
 begin
   closeip;
 
   i := 3;
   while (i<llen) and (line[i]=' ') do
-    i := i+1;
+    i := i+1
 
   if i>=llen then begin
     headeron := false;
@@ -581,7 +665,7 @@ begin
 end;
 
 proc doTA;
-{========}
+{********}
 var p, v: integer;
 begin
   if DEBUG2 then writeln('< doing ta >');
@@ -610,7 +694,7 @@ begin
 end;
 
 proc doSS;
-{========}
+{********}
 var i, n: integer;
 begin
   i := findarg(3);
@@ -631,7 +715,7 @@ begin
 end;
 
 proc doSH;
-{========}
+{********}
 var i, n: integer;
 begin
   i := findarg(3);
@@ -652,7 +736,7 @@ begin
 end;
 
 proc doPP;
-{========}
+{********}
 begin
   if not checkeol(3) then
     exit;
@@ -661,7 +745,7 @@ begin
 end;
 
 proc doBR;
-{========}
+{********}
 begin
   if not checkeol(3) then
     exit;
@@ -669,7 +753,7 @@ begin
 end;
 
 proc doNF;
-{========}
+{********}
 begin
   closeip;
   flushline;
@@ -678,7 +762,7 @@ begin
 end;
 
 proc doFI;
-{========}
+{********}
 begin
   if not checkeol(3) then
     exit;
@@ -688,7 +772,7 @@ begin
 end;
 
 proc doRS;
-{========}
+{********}
 begin
   if not checkeol(3) then
     exit;
@@ -698,7 +782,7 @@ begin
 end;
 
 proc doRE;
-{========}
+{********}
 begin
   closeip;
   flushline;
@@ -707,7 +791,7 @@ begin
 end;
 
 proc doSP;
-{========}
+{********}
 var i, j, n: integer;
 begin
   closeip;
@@ -739,45 +823,22 @@ begin
 end;
 
 proc doLL;
-{========}
-var i,j,n: integer;
+{********}
+var n,npos: integer;
 begin
   flushline;                  { end current line }
+  getnumarg(3,n,npos);
 
-  i := 3;                   { after .ll }
+  if n=-2 then
+    exit;
 
-  while (i<llen) and (line[i]=' ') do
-    i := i+1;
-
-  if i>=llen then begin
+  if n=-1 then begin
     linelen := LINEDEF;
     exit;
   end;
 
-  if (line[i]<'0') or (line[i]>'9') then begin
-    errec(i,ERR_NUM);
-    exit;
-  end;
-
-  j := i;                   { start of number }
-
-  n := 0;
-  while (i<llen) and (line[i]>='0')
-                  and (line[i]<='9') do begin
-    n := n*10 + ord(line[i]) - ord('0');
-    i := i+1;
-  end;
-
-  while (i<llen) and (line[i]=' ') do
-    i := i+1;
-
-  if i<llen then begin
-    errec(i,ERR_EXTRA);
-    exit;
-  end;
-
   if (n<1) or (n>LINEMAX) then begin
-    errec(j,ERR_RANGE);
+    errec(npos,ERR_RANGE);
     exit;
   end;
 
@@ -785,7 +846,7 @@ begin
 end;
 
 func readline: boolean;
-{=====================}
+{*********************}
 begin
   srcline := succ(srcline);
   llen := 0;
@@ -813,8 +874,20 @@ begin
   until false;
 end;
 
+proc emitquotedline;
+{********************}
+var i: integer;
+begin
+  i := 1; { skip opening quote }
+  while (i<llen) and (line[i]<>QUOTE) do begin
+    write(@PRINTER,line[i]);
+    i := i+1;
+  end;
+  newline;
+end;
+
 proc handleline;
-{==============}
+{**************}
 var cmd: packed char;
 begin
   if (llen >= 2) and (line[0] = '.') then begin
@@ -845,13 +918,18 @@ begin
     end { case }
   end
   else begin
+    if line[0]=QUOTE then begin
+      flushline;
+      emitquotedline;
+      exit;
+    end;
     if fillmode then formatfillfromline
     else emittextnofill;
   end;
 end;
 
 { main }
-{======}
+{******}
 begin
   clearprintout;
 

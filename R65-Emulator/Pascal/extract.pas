@@ -14,23 +14,27 @@ const TOK_OTHER = 0;
       TOK_CASE  = 7;
       TOK_END   = 8;
 
-      SSTART = 0;
-      SCONST = 1;
-      SMEM   = 2;
-      SVAR   = 3;
-      SROUT  = 4;
-      SSKIP  = 5;
-      SBODY  = 6;
-      SDONE  = 7;
-      SHEAD  = 8;
+      SSTART   = 0;
+      SCONST   = 1;
+      SMEM     = 2;
+      SVAR     = 3;
+      SROUT    = 4;
+      SSKIP    = 5;
+      SBODY    = 6;
+      SDONE    = 7;
+      SHEAD    = 8;
 
-      DEBUG1 = false;
-      DEBUG2 = true;
-      INDENT = '      ';
+      DEBUG1   = false;
+      DEBUG2   = true;
+      INDENT   = '      ';
+      IPINDENT = ' 10';
+
+      QUOTE    = chr($27);
 
 var
   f_in, f_out: file;
-  line, libname, cname, cval: cpnt;
+  line, libname, cname,
+    cval, cval2, cval3, addrpad, body: cpnt;
   name: array[15] of char;
   lineno, llen: integer;
   ateof: boolean;
@@ -40,35 +44,60 @@ var
   blocklevel, routlevel: integer;
   parlevel: integer;
 
-proc splitconst;
-{**************}
+proc splitstr(src: cpnt; sep: char; dstl,dstr: cpnt);
+{***************************************************}
 var i,j: integer;
 begin
-  cname[0] := ENDMARK;
-  cval[0]  := ENDMARK;
+  dstl[0] := ENDMARK;
+  dstr[0] := ENDMARK;
 
-  i := _strpos('=',line,0);
+  i := _strpos(sep,src,0);
   if i < 0 then begin
-    cname := line;
+    _strcpy(src, dstl);
     exit;
   end;
 
   j := 0;
   while j < i do begin
-    cname[j] := line[j];
-    j := j + 1;
+    dstl[j] := src[j];
+    j := j+1;
   end;
-  cname[j] := ENDMARK;
+  dstl[j] := ENDMARK;
+
+  i := i+1;
+  while src[i] = ' ' do
+    i := i+1;
 
   j := 0;
-  i := i + 1;
-  while line[i] <> ENDMARK do begin
-    cval[j] := line[i];
-    j := j + 1;
-    i := i + 1;
+  while src[i] <> ENDMARK do begin
+    dstr[j] := src[i];
+    j := j+1;
+    i := i+1;
   end;
-  cval[j] := ENDMARK;
+  dstr[j] := ENDMARK;
 end;
+
+proc padright(src,dst: cpnt; w: integer);
+{***************************************}
+var i: integer;
+begin
+  dst[0] := ENDMARK;
+  write(@dst, src);
+  i := _strlen(src);
+  while i < w do begin
+    write(@dst, ' ');
+    i := i+1;
+  end;
+end;
+
+proc buildbody(addr,typ,dst: cpnt);
+{********************************}
+begin
+  dst[0] := ENDMARK;
+  write(@dst, addr, '  ',typ);
+end;
+
+
 
 proc updpar(s:cpnt);
 {******************}
@@ -466,10 +495,10 @@ begin
     end
     else
     begin
-      splitconst;
-      writeln(@f_out,'.IP ',cname,' 12');
-        if cval[0] <> ENDMARK then
-      writeln(@f_out,cval);
+      splitstr(line,'=',cname,cval);
+      writeln(@f_out,'.IP ',cname,IPINDENT);
+      if cval[0] <> ENDMARK then
+        writeln(@f_out,cval);
       writeln(@f_out);
     end
   end;
@@ -479,17 +508,17 @@ proc domem(entering:boolean);
 {**************************}
 begin
   stripcomment;
-    if isemptyline then exit;
+  if isemptyline then exit;
   if pass=1 then
   begin
     if entering then
     begin
       writeln(@f_out);
-      writeln(@f_out, 'MEMORY');
-      print_rem(3);
+      writeln(@f_out,'MEMORY');
+      print_rem(5);
     end
     else
-      writeln(@f_out, line);
+      writeln(@f_out,line);
   end
   else
   begin
@@ -500,7 +529,14 @@ begin
       writeln(@f_out);
     end
     else
-      writeln(@f_out, line);
+    begin
+      splitstr(line,'=',cname,cval);
+      splitstr(cval,':',cval2,cval3);
+      padright(cval2,addrpad,8);
+      buildbody(addrpad,cval3,body);
+      writeln(@f_out,'.IP ',cname,' ',IPINDENT);
+      writeln(@f_out,QUOTE,body,QUOTE);
+    end;
   end;
 end;
 
@@ -885,6 +921,10 @@ begin
   libname := _new;
   cname   := _new;
   cval    := _new;
+  cval2   := _new;
+  cval3   := _new;
+  addrpad := _new;
+  body    := _new;
 
   initname;
 
@@ -894,6 +934,10 @@ begin
   pass:=2;
   runpass('N');
 
+  _release(body);
+  _release(addrpad);
+  _release(cval3);
+  _release(cval2);
   _release(cval);
   _release(cname);
   _release(libname);
