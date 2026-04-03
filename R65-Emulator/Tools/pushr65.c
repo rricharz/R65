@@ -16,7 +16,8 @@
 // .pa2   pascal binary files     B     R      :R
 // .pb1   pascal lib loader file  S     T      :T
 // .lib   pascal library table    S     L      :L
-// .help  pascal help files       S     H      :H
+// .help  help files              S     H      :H
+// .nroff nroff source file       S     N      :N
 //
 // (subnames are used to differentiate files for
 // commands such as DELETE, RENAME etc. They are
@@ -326,9 +327,14 @@ int main(int argc, char *argv[])
     }
     else if ((end = strstr(argv[1],".help")) != NULL) {
         type = 'S';
-        subtype = 'H';      // Pascal library file
+        subtype = 'H';      // Help file
         maxCharPerLine = 48;
         subname = 'H';
+    }
+       else if ((end = strstr(argv[1],".nroff")) != NULL) {
+        type = 'S';
+        subtype = 'N';      // nroff source file
+        subname = 'N';
     }
     else {
         printf("Filename must end with .asm,.txt,.pas,.pa2,.lib,.li1\n");

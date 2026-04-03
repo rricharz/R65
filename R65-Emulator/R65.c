@@ -396,6 +396,8 @@ int i, end, filtyp, filstp;
         extension = ".pas";
     else if (filstp == 'H')
         extension = ".help";
+    else if (filstp == 'N')
+        extension = ".nroff";
     else
         extension = ".txt";
     

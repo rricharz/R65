@@ -701,6 +701,8 @@ int import_file()
               extension = ".pas";
             else if (filstp == 'H')
               extension = ".help";
+            else if (filstp == 'N')
+              extension = ".nroff";
             end = i;
         }
         
