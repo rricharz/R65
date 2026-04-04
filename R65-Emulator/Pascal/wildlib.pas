@@ -1,19 +1,19 @@
 library wildlib;
-{ find filesentries. Wildcards * and ? are allowed.
-  The cyclus is ignored.
-  File type is required either as
-  name:x, name* or name:?
 
-  2023 rricharz                       }
+{ find filesentries. Wildcards * and ? }
+{  The cyclus is ignored.              }
+{  File type is required either as     }
+{  name:x, name* or name:?             }
 
-const NAMESIZE=15;
-      NUMENTRIES=255;
+{  2023 rricharz                       }
 
-mem FILNAM=$0301: array[NAMESIZE] of char&;
+const NAMESIZE   = 15;
+      NUMENTRIES = 255;
+
+mem   FILNAM=$0301: array[NAMESIZE] of char&;
 
 proc _test(s1:array[NAMESIZE] of char;
       var found:boolean);
-{***********************************}
 var i1,i2,l1,l2:integer;
 
 func match(i0,i2:integer): boolean;
@@ -26,16 +26,12 @@ begin
   else begin
     if s1[i1]='*' then
       while (i1<l1) and (s1[i1+1]='*') do i1:=i1+1;
-{    writeln('skipped: i1=',i1,', i2=',i2); }
     if (s1[i1]='*') and (i1<l1-1) and (i2>=l2) then
       match:=false
     else begin
-{      writeln('ckeck ? or equal: i1=',i1,', i2=',i2,
-        ' ',s1[i1],W_FILNAM[i2]); }
       if (s1[i1]='?') or (s1[i1]=FILNAM[i2]) then
         match:=match(i1+1,i2+1)
       else begin
-{        writeln('char not equal'); }
         if (s1[i1]='*') and (i1<l1) then begin
           b:=match(i1+1,i2);
           if not b then
@@ -68,7 +64,6 @@ end;
 proc _findentry(var nm:array[NAMESIZE] of char;
        drv:integer;var ent: integer;
        var fnd,lst:boolean);
-{********************************************}
 const aprepdo    = $f4a7;
       agetentx   = $f63a;
       aenddo     = $f625;
@@ -123,4 +118,4 @@ end;
 
 begin
 end.
- 
+

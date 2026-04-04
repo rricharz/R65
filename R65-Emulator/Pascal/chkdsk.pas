@@ -1,18 +1,8 @@
-{ ***************************************
-  * chkdsk: check and fix a floppy disk *
-  ***************************************
+{  ***************************************  }
+{  * chkdsk: check and fix a floppy disk *  }
+{  ***************************************  }
 
-  usage: chkdsk [d]      check drive d
-         chkdsk [d] /f   check and fix drive d
-
-         Default for d is disk 1
-
-  2024   rricharz
-
-  The directory table has 256 entries of 32 bytes
-  The disk name is stored in the last entry (255)
-  The last currently used entry has filtyp=TEND
-}
+{         Default for d is disk 1           }
 
 program chkdsk;
 uses syslib,arglib;
@@ -23,14 +13,6 @@ const aprepdo  = $f4a7;
       MAXENT   = 255;   { number of entries in table }
       TSECTORS = 2560;  { number of sectors on disk }
       TEND     = chr(0);{ end mark for last used entry}
-
-mem   filerr   = $00db:integer&;
-      filtyp   = $0300:char&;
-      FILCYC   = $0311:integer&;
-      filloc   = $0313:integer;
-      filsiz   = $0315:integer;
-      fillnk   = $031e:integer;
-      scyfc    = $037c:integer&;
 
 var entry, sector,drive: integer;
     done,fixit,default,notok: boolean;
@@ -61,7 +43,7 @@ var i:integer;
 { get drive number, default drive 1 }
 begin
   drive:=1; {default drive}
-  filerr:=0;
+  FILERR:=0;
   if ARGTYPE[_carg]='i' then _agetval(drive,default);
   if (drive<0) or (drive>1) then begin
     writeln('Drive must be 0 or 1');

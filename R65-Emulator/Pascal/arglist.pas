@@ -1,29 +1,30 @@
 { display argument list }
 
-program arglist;
-uses syslib,arglib;
+program ARGLIST;
+uses syslib, arglib;
 
 var string: array[15] of char;
     i, val: integer;
 
 begin
-  if argtype[carg]=chr(0) then
-    writeln('Usage: arglist arguments');
-  while argtype[carg]<>chr(0) do begin
-    write(carg,': ',argtype[carg],' ');
-    case argtype[carg] of
+  if ARGTYPE[_carg]=chr(0) then
+    writeln('Usage: ARGLIST arguments');
+  while ARGTYPE[_carg]<>chr(0) do begin
+    if _carg < 10 then write(' ');
+    write(_carg, ': ', ARGTYPE[_carg],' ');
+    case ARGTYPE[_carg] of
     's': begin
            for i:=0 to 15 do
-             string[i]:=arglists[2*carg+i];
-           carg:=carg+8;
-           prtext16(output,string);
+             string[i]:=ARGLISTS[2*_carg+i];
+           _carg:=_carg+8;
+           _prtext16(OUTPUT,string);
          end;
-    'i': begin val:=arglist[carg];
-           carg:=succ(carg);
+    'i': begin val:=ARGLIST[_carg];
+           _carg:=succ(_carg);
            write(val);
          end;
     'd': begin
-           carg:= succ(carg);
+           _carg:= succ(_carg);
            write(val);
          end
     end;

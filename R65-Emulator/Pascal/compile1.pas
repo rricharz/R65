@@ -22,7 +22,7 @@
 
 program compile1;
 
-uses syslib, arglib;
+uses syslib, arglib, filelib;
 
 {$I IGLOBAL:P}
 {$I ISCANNER:P}

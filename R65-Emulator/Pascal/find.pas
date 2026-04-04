@@ -1,16 +1,19 @@
+
 program find;
-{ find files on drive 0 and drive 1.
-  Wildcards * and ? are allowed.
-  The cyclus is ignored.
-  File type is required either as
-  name:x, name* or name:?
 
-  2023 rricharz                       }
+{  find files on all disks             }
+{  Wildcards * and ? are allowed.      }
+{  The cyclus is ignored.              }
+{  File type is required either as     }
+{  name:x, name* or name:?             }
 
-uses syslib,arglib,wildlib,disklib;
+{  2023 rricharz                       }
 
-const afloppy=$c827;
-      agetentx=$f63a;
+uses syslib, arglib, wildlib, filelib;
+
+const afloppy  = $c827;
+      agetentx = $f63a;
+      MAXENT   = 255;
 
 mem   filerr=$db: integer&;
       scyfc   =$037c: integer&;

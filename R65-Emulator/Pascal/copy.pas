@@ -10,7 +10,7 @@
 
 
 program copy;
-uses syslib,arglib,wildlib;
+uses syslib,arglib,filelib, wildlib;
 
 const MAXLINES = 13;
       rdfile=$e815;

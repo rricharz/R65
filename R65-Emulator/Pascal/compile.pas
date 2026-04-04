@@ -3,7 +3,7 @@
 {        *****************        }
 
 program compile;
-uses syslib,arglib;
+uses syslib,arglib, filelib;
 
 const adelete=$c80c; { exdos vector }
 

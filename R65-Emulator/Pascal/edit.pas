@@ -1,4 +1,4 @@
-{
+
 {         *****************             }
 {         *               *             }
 {         *      edit     *             }
@@ -9,10 +9,10 @@
 
 { Edit a text file.                     }
 
-{  Usage:  edit FILNAM[:x][.cy[,drive]] }
+{ Usage:  edit FILNAM[:x][.cy[,drive]]  }
 
 program edit;
-uses syslib,arglib,disklib;
+uses syslib, arglib, filelib;
 
 const aedit=$c80f; { exdos vector }
       cup = chr($1a);

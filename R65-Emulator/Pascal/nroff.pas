@@ -4,7 +4,7 @@ program nroff;
 { Written March 2026 for the R65 system }
 { R. Richarz / ChatGPT }
 
-uses syslib, arglib;
+uses syslib, arglib, filelib;
 
 const
   LINEMAX = 132; { max chars per printer output line }

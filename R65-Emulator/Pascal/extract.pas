@@ -1,5 +1,5 @@
 program extract;
-uses syslib, arglib, strlib;
+uses syslib, arglib, filelib, strlib;
 
 {$R+}
 {$U+}

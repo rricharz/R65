@@ -1,25 +1,20 @@
-{
-         *****************
-         *               *
-         *  clean drive  *
-         *               *
-         *****************
 
-    2018 rricharz (r77@bluewin.ch)
+{         *****************                 }
+{         *  clean drive  *                 }
+{         *****************                 }
 
-Clean disk. Only the latest cyclus of
-each file is kept. Uses EPROM (disk.asm)
-calls to get info from disk directory
-and EXDOS delete.
+{    2018 rricharz (r77@bluewin.ch)         }
 
-Written 2018 to test the R65 emulator and
-to demonstrate the power of Tiny Pascal.
+{ Clean disk. Only the latest cyclus of     }
+{ each file is kept. Uses EPROM (disk.asm)  }
+{ calls to get info from disk directory     }
+{ and EXDOS delete.                         }
 
-Usage:  clean [drive]
-        default: drive 1                 }
+{ Usage:  clean [drive]                     }
+{         default: drive 1                  }
 
 program clean;
-uses syslib,arglib;
+uses syslib,arglib, filelib;
 
 {R65 disk eprom calls and params: }
 const aprepdo =$f4a7;
@@ -162,4 +157,4 @@ begin { mani }
     ', now deleted: ',sdel+sfound);
 
 end.
- 
+

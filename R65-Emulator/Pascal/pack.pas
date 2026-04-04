@@ -1,24 +1,17 @@
- {
-         *****************
-         *               *
-         *     pack      *
-         *               *
-         *****************
 
-    2018 rricharz (r77@bluewin.ch)
+{       *****************            }
+{       *     pack      *            }
+{       *               *            }
+{       *****************            }
 
-Pack a floppy disk
+{    2018 rricharz (r77@bluewin.ch)  }
 
-Written 2018 to _test the R65 emulator and
-to demonstrate the power of Tiny Pascal.
+{ Pack a floppy disk                 }
 
-Usage:  pack [drive]
-
-  [drive]: disk drive (0,1), default 1
-}
+{ Usage:  pack [drive]               }
 
 program pack;
-uses syslib,arglib,disklib;
+uses syslib, arglib, filelib;
 
 const apack=$c809; { exdos vector }
 mem filerr=$db: integer&;

@@ -1,11 +1,9 @@
-{
-  CD filename
-  Unix style cd command
-  Floppy disk 1 is set to filename
-}
+{ CD filename                       }
+{ Unix style cd command             }
+{ Floppy disk 1 is set to filename  }
 
 program cd;
-uses syslib,arglib,strlib;
+uses syslib, arglib, filelib, strlib;
 
 var arg0: cpnt;
     debug: boolean;

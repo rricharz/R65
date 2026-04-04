@@ -1,8 +1,6 @@
-{
-  IARGCPNT.PAS
-  Include file providing acces to arguments with
-  cpnt srrings
-}
+{ IARGCPNT.PAS                     }
+{ Include file providing acces to  }
+{ arguments with   cpnt srrings    }
 
  proc conv_to_cpnt(n:array[15] of char; s: cpnt);
 {**********************************************}

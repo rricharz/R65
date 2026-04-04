@@ -1,28 +1,17 @@
-{
-         *****************
-         *               *
-         *    delete     *
-         *               *
-         *****************
 
-    2018 rricharz (r77@bluewin.ch)
-    2023 added wildcards
+{         *****************                }
+{         *    delete     *                }
+{         *****************                }
 
-Delete a file.
+{    2018 rricharz (r77@bluewin.ch)        }
+{    2023 added wildcards                  }
 
-Written 2018 to _test the R65 emulator and
-to demonstrate the power of Micro Pascal.
+{ Usage:  delete FILNAM[:x][.cy][,drive]   }
 
-Usage:  delete FILNAM[:x][.cy][,drive]
-
-  [:X]:    type of file,     default :P
-  [drive]: disk drive (0,1), default 1
-
-Wild cards * and ? are allowed
-}
+{W ild cards * and ? are allowed           }
 
 program delete;
-uses syslib,arglib,wildlib;
+uses syslib, arglib, filelib, wildlib;
 
 const adelete=$c80c; { exdos vector }
       prflab     = $ece3;

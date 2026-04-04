@@ -9,7 +9,7 @@
 { 03/31/206 cleaned up printing to disk }
 
 program compile2;
-uses syslib,arglib,disklib;
+uses syslib,arglib,filelib;
 
 const
     title='R65 PASCAL COMPILER Version 4.2, Pass 2';

@@ -22,6 +22,7 @@ const STRSIZE=64;
 { ***** _runerr: stop with runtime error ***** }
 
 proc _runerr(e:integer);
+{ set runerr to e and stop execution of app }
 const stopcode = $2010;
 mem   _runerr = $000c: integer&;
 begin
@@ -32,6 +33,7 @@ end;
 { ***** _new: allocate heap memory ***** }
 
 func _new: cpnt;
+{ alocate memory on heap for string }
 mem  sp     = $0008: integer;
      endstk = $000e: integer;
 var  freewords,i:integer;
@@ -56,6 +58,7 @@ end;
 { ***** _release: _release heap memory ***** }
 
 proc _release(s: cpnt);
+{ release memory on heap }
 { Only the last allocated string can be _released }
 { This is suitable for recursive functions }
 mem endstk=$000e: integer;
@@ -67,6 +70,7 @@ end;
 { ***** _strlen: length of string ***** }
 
 func _strlen(strin:cpnt):integer;
+{ lwngth of sring }
 var i: integer;
 begin
   i:=0;
@@ -83,6 +87,7 @@ end;
 { ***** strcopy: copy cpnt string ***** }
 
 proc _strcpy(strin, strout:cpnt);
+{ make copy of string }
 var i: integer;
 begin
   strout[0] := ENDMARK;
@@ -92,6 +97,7 @@ end;
 { **** _stradd: add string to string ***** }
 
 proc _stradd(strin,strinout:cpnt);
+{ add string to string }
 var i,j: integer;
 begin
   write(@strinout, strin);
@@ -103,6 +109,7 @@ end;
 {          1  if s1>s2                   }
 
 func _strcmp(s1,s2:cpnt):integer;
+{ compare 2 strings }
 var i:integer;
 begin
   i:=0;
@@ -123,7 +130,9 @@ end;
 
 { **** _strpos: find occurance of char **** }
 { returns -1 if char not found }
-func _strpos(ch:char; s1:cpnt; start:integer): integer;
+func _strpos(ch:char; s1:cpnt;
+          start:integer): integer;
+{ get position of character in string }
 var i,len: integer;
 begin
   len:=_strlen(s1);
@@ -139,6 +148,7 @@ end;
 {***** strread: read line from file *****}
 func _strread(f:file; s:cpnt;
                  var ateof0:boolean):integer;
+{ read string from file }
 var ch  : char;
     i   : integer;
     done: boolean;
@@ -167,14 +177,15 @@ begin
   _strread := i;
 end;
 
-{ _hexstr: convert hex byte to hex string }
-
 proc _hexstr(d:integer; s:cpnt);
+{ convert hex byte to hex string }
+
   func hchar(h:integer):char;
   begin
     if h<10 then hchar := chr(h+ord('0'))
     else hchar := chr(h-10+ord('A'));
   end;
+
 begin
   s[0] := hchar((d shr 4) and 15);
   s[1] := hchar(d and 15);
@@ -191,9 +202,10 @@ begin
 end;
 
 { *** _strinsc: insert char into string *** }
-{ inserts char if string is short enough }
 
 proc _strinsc(ch:char;pos:integer;s:cpnt);
+{ inserts char if string is short enough }
+
 var i,l:integer;
 begin
   l:=_strlen(s);
@@ -211,9 +223,9 @@ begin
   else _runerr($91);
 end;
 
-{ *** _strdelc: delete char in string *** }
-
 proc _strdelc(pos:integer;s:cpnt);
+{ delete one char in string }
+
 var i,l:integer;
 begin
   l:=_strlen(s);
@@ -228,7 +240,7 @@ end;
 { right justified in a field of fsize chars }
 
 proc _intstr(n:integer;s:cpnt;fsize:integer);
-{ Very useful for tables }
+{ convert integer to right justified  string }
 begin
   s[0]:=ENDMARK;
   write(@s,n);
