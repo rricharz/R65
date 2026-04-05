@@ -24,8 +24,8 @@ const TOK_OTHER = 0;
       SDONE    = 7;
       SHEAD    = 8;
 
-      DEBUG1   = false;
-      DEBUG2   = true;
+      DEBUG1   = true;
+      DEBUG2   = false;
       INDENT   = '      ';
       IPINDENT = ' 10';
 
@@ -41,8 +41,95 @@ var
   state, tok, pass: integer;
   seenbegin, ininner: boolean;
   routheader: boolean;
-  blocklevel, routlevel: integer;
+  blocklevel, routlevel, dlevel: integer;
   parlevel: integer;
+
+proc isidchar(ch:char; var yes:boolean);
+{************************************}
+begin
+  yes:=(((ch>='A') and (ch<='Z')) or
+        ((ch>='a') and (ch<='z')) or
+        ((ch>='0') and (ch<='9')) or
+        (ch='_'));
+end;
+
+proc wordat(pos:integer; w:cpnt;
+            var yes:boolean);
+{******************************}
+var i,n: integer;
+    b1,b2: boolean;
+begin
+  yes:=false;
+  n:=_strlen(w);
+
+  i:=0;
+  while i<n do
+  begin
+    if line[pos+i]=ENDMARK then exit;
+    if line[pos+i]<>w[i] then exit;
+    i:=i+1;
+  end;
+
+  if pos=0 then
+    b1:=false
+  else
+    isidchar(line[pos-1],b1);
+
+  isidchar(line[pos+n],b2);
+  yes:=not b1 and not b2;
+end;
+
+proc updblockline(var delta:integer);
+{***********************************}
+var i: integer;
+    inquote,yes: boolean;
+begin
+  delta:=0;
+  i:=0;
+  inquote:=false;
+
+  while line[i]<>ENDMARK do
+  begin
+    if line[i]=QUOTE then
+    begin
+      inquote:=not inquote;
+      i:=i+1;
+    end
+    else if (not inquote) and (line[i]='{') then
+      exit
+    else if not inquote then
+    begin
+      wordat(i,'begin',yes);
+      if yes then
+      begin
+        delta:=delta+1;
+        i:=i+5;
+      end
+      else
+      begin
+        wordat(i,'case',yes);
+        if yes then
+        begin
+          delta:=delta+1;
+          i:=i+4;
+        end
+        else
+        begin
+          wordat(i,'end',yes);
+          if yes then
+          begin
+            delta:=delta-1;
+            i:=i+3;
+          end
+          else
+            i:=i+1;
+        end;
+      end;
+    end
+    else
+      i:=i+1;
+  end;
+end;
 
 proc splitstr(src: cpnt; sep: char; dstl,dstr: cpnt);
 {***************************************************}
@@ -515,7 +602,7 @@ begin
     begin
       writeln(@f_out);
       writeln(@f_out,'MEMORY');
-      print_rem(5);
+      print_rem(4);
     end
     else
       writeln(@f_out,line);
@@ -609,6 +696,7 @@ begin
     write(' text="');
     write(line);
     writeln('"');
+    write(' blocklevel=',blocklevel);
     writeln;
   end;
 end;
@@ -841,18 +929,15 @@ begin
             begin
               if ininner then
               begin
-                if (tok=TOK_BEGIN) or
-                   (tok=TOK_CASE) then
-                  blocklevel:=blocklevel+1;
+                updblockline(dlevel);
+                if (dlevel<>0) and DEBUG1 then
+                  writeln(' dlevel=',dlevel);
 
-                if tok=TOK_END then
+                blocklevel:=blocklevel+dlevel;
+                if blocklevel=0 then
                 begin
-                  blocklevel:=blocklevel-1;
-                  if blocklevel=0 then
-                  begin
-                    ininner:=false;
-                    routlevel:=routlevel-1;
-                  end;
+                  ininner:=false;
+                  routlevel:=routlevel-1;
                 end;
               end
               else
@@ -877,13 +962,11 @@ begin
             end
             else
             begin
-              if (tok=TOK_BEGIN) or
-                 (tok=TOK_CASE) then
-                blocklevel:=blocklevel+1;
+              updblockline(dlevel);
+                if (dlevel<>0) and DEBUG1 then
+                  writeln(' dlevel=',dlevel);
 
-              if tok=TOK_END then
-                blocklevel:=blocklevel-1;
-
+              blocklevel:=blocklevel+dlevel;
               if blocklevel=0 then
                 state:=SROUT;
             end;
@@ -891,17 +974,14 @@ begin
 
         SBODY:
           begin
-            if (tok=TOK_BEGIN) or
-               (tok=TOK_CASE) then
-              blocklevel:=blocklevel+1;
+            updblockline(dlevel);
+                if (dlevel<>0) and DEBUG1 then
+                  writeln(' dlevel=',dlevel);
 
-            if tok=TOK_END then
-              blocklevel:=blocklevel-1;
-
+            blocklevel:=blocklevel+dlevel;
             if blocklevel=0 then
               state:=SDONE;
           end
-
       end;
 
       debugstate;
@@ -932,7 +1012,7 @@ begin
   runpass('H');
 
   pass:=2;
-  runpass('N');
+{  runpass('B'); }
 
   _release(body);
   _release(addrpad);
@@ -946,3 +1026,5 @@ begin
   writeln;
   write(PRTOFF);
 end.
+https://chatgpt.com/c/69b3a02f-4c00-838c-a990-6c2fa3855
+4ca
