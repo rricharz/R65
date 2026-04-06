@@ -1,11 +1,18 @@
-library filelib;
-{ provides functions for the handling of  }
-{ files and disk directories              }
 
-{  The directory table has 256 entries of }
+{ *************************************** }
+{ *         FILELIB - LIBRARY           * }
+{ *************************************** }
+
+
+{ Provides functions for the handling of  }
+{ files and disk directories.             }
+
+{ The directory table has 256 entries of  }
 { 32 bytes. The disk name is stored in    }
-{ last entry (255). The last currently    }
+{ the last entry (255). The last          }
 { used entry has filtyp=DEND              }
+
+library filelib;
 
 mem
     FILFLG = $00da: integer&;
@@ -18,6 +25,7 @@ mem
     FILCY1 = $0330: integer&;
 
 func _uppercase(ch1: char): char;
+{*******************************}
 { returns uppercase of char }
 begin
   if (ch1 >= 'a') and (ch1 <= 'z') then
@@ -28,6 +36,7 @@ end;
 
 proc _asetfile(name: array[15] of char;
       cyclus,device: integer; subtype: char);
+{*******************************************}
 { prepare for disk io }
 var i,e: integer;
 begin
@@ -50,9 +59,8 @@ begin
   FILFLG:=$40; { Do not show file entry }
 end;
 
-
-
 func _freedrv(drive:integer; printit:boolean);
+{********************************************}
 { gets and prints % of free sectors }
 const
   aprepdo  = $f4a7;

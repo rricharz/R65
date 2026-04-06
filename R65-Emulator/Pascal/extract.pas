@@ -24,7 +24,7 @@ const TOK_OTHER = 0;
       SDONE    = 7;
       SHEAD    = 8;
 
-      DEBUG1   = true;
+      DEBUG1   = false;
       DEBUG2   = false;
       INDENT   = '      ';
       IPINDENT = ' 10';
@@ -460,6 +460,7 @@ begin
     i:=i+1;
 
   i:=i+kwlen;
+  if line[i]=ENDMARK then exit;
   while line[i]=' ' do
     i:=i+1;
 
@@ -602,7 +603,8 @@ begin
     begin
       writeln(@f_out);
       writeln(@f_out,'MEMORY');
-      print_rem(4);
+      if tok=TOK_MEM then
+        print_rem(3);
     end
     else
       writeln(@f_out,line);

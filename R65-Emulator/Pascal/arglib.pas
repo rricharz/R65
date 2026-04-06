@@ -15,7 +15,8 @@
 
 library arglib;
 
-mem NUMARG   = $005f: integer&;
+mem
+    NUMARG   = $005f: integer&;
     ARGLIST  = $0060: array[10] of integer;
     ARGLISTS = $0060: array[63] of char&;
     ARGTYPE  = $00a0: array[31] of char&;
@@ -88,15 +89,6 @@ begin
   end {case}
   _agetval(cyclus,dummy);
   _agetval(drive,dummy);
-end;
-
-func _uppercase(ch1: char): char;
-{ returns uppercase of char }
-begin
-  if (ch1 >= 'a') and (ch1 <= 'z') then
-    _uppercase := chr(ord(ch1) - 32)
-  else
-    _uppercase := ch1;
 end;
 
 begin
