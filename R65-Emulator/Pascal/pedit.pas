@@ -6,7 +6,7 @@ program pedit;
 {$U+}
 {$R-}
 
-uses syslib, arglib, strlib, disklib;
+uses syslib, arglib, strlib, filelib;
 
 const title='R65 PEDIT 2.2'; {max 20 chars}
 

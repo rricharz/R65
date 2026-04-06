@@ -532,8 +532,18 @@ begin
   getlibname;
   if isemptyline then exit;
 
-  if pass=1 then
+  if pass=2 then
   begin
+    writeln(@f_out,'.TH ',libname,' 1');
+    writeln(@f_out);
+    writeln(@f_out,'.SH NAME');
+    writeln(@f_out,libname,' - library');
+    writeln(@f_out);
+    writeln(@f_out,'.NF');
+    writeln(@f_out);
+    exit;
+  end;
+
     i:=0;
     while line[i]<>ENDMARK do
     begin
@@ -546,15 +556,6 @@ begin
       write(@f_out,_uppercase(line[i]));
       i:=i+1;
     end;
-    writeln(@f_out);
-  end
-  else
-  begin
-    writeln(@f_out,'.TH ',libname,' 1');
-    writeln(@f_out);
-    writeln(@f_out,'.SH NAME');
-    writeln(@f_out,libname,' - library');
-  end;
 end;
 
 proc doconst(entering:boolean);
@@ -562,34 +563,16 @@ proc doconst(entering:boolean);
 begin
   stripcomment;
   if isemptyline then exit;
-  if pass=1 then
-  begin
-    if entering then
+  if entering then
     begin
       writeln(@f_out);
+      if pass=2 then
+        write(@f_out, '.SH ');
       writeln(@f_out, 'CONSTANTS');
       print_rem(5);
     end
-    else
-      writeln(@f_out, line);
-  end
   else
-  begin
-    if entering then
-    begin
-      writeln(@f_out);
-      writeln(@f_out,'.SH CONSTANTS');
-      writeln(@f_out);
-    end
-    else
-    begin
-      splitstr(line,'=',cname,cval);
-      writeln(@f_out,'.IP ',cname,IPINDENT);
-      if cval[0] <> ENDMARK then
-        writeln(@f_out,cval);
-      writeln(@f_out);
-    end
-  end;
+    writeln(@f_out, line);
 end;
 
 proc domem(entering:boolean);
@@ -597,36 +580,18 @@ proc domem(entering:boolean);
 begin
   stripcomment;
   if isemptyline then exit;
-  if pass=1 then
-  begin
-    if entering then
+  if entering then
     begin
       writeln(@f_out);
+
+if pass=2 then
+        write(@f_out, '.SH ');
       writeln(@f_out,'MEMORY');
       if tok=TOK_MEM then
         print_rem(3);
     end
-    else
-      writeln(@f_out,line);
-  end
   else
-  begin
-    if entering then
-    begin
-      writeln(@f_out);
-      writeln(@f_out,'.SH MEMORY');
-      writeln(@f_out);
-    end
-    else
-    begin
-      splitstr(line,'=',cname,cval);
-      splitstr(cval,':',cval2,cval3);
-      padright(cval2,addrpad,8);
-      buildbody(addrpad,cval3,body);
-      writeln(@f_out,'.IP ',cname,' ',IPINDENT);
-      writeln(@f_out,QUOTE,body,QUOTE);
-    end;
-  end;
+    writeln(@f_out,line);
 end;
 
 proc dovar(entering:boolean);
@@ -634,54 +599,30 @@ proc dovar(entering:boolean);
 begin
   stripcomment;
   if isemptyline then exit;
-  if pass=1 then
-  begin
-    if entering then
+  if entering then
     begin
       writeln(@f_out);
+      if pass=2 then
+        write(@f_out, '.SH ');
       writeln(@f_out, 'VARIABLES');
       print_rem(3);
     end
-    else
-      writeln(@f_out, line);
-  end
   else
-  begin
-    if entering then
-    begin
-      writeln(@f_out);
-      writeln(@f_out,'.SH VARIABLES');
-      writeln(@f_out);
-    end
-    else
-      writeln(@f_out, line);
-  end;
+    writeln(@f_out, line);
 end;
 
 proc dorout(entering:boolean);
 {***************************}
 begin
-  if pass=1 then
-  begin
-    if entering and not routheader then
+     if entering and not routheader then
     begin
       writeln(@f_out);
+      if pass=2 then
+        write(@f_out, '.SH ');
       writeln(@f_out, 'ROUTINES');
       routheader:=true;
     end;
     writeln(@f_out, line);
-  end
-  else
-  begin
-    if entering and not routheader then
-    begin
-      writeln(@f_out);
-      writeln(@f_out,'.SH ROUTINES');
-      writeln(@f_out);
-      routheader:=true;
-    end;
-    writeln(@f_out, line);
-  end;
 end;
 
 proc debugline;
@@ -714,12 +655,15 @@ begin
   end;
 end;
 
-proc runpass(outsubtype:char);
-{****************************}
+proc runpass(passno: integer);
+{***************************}
 var islib: boolean;
 begin
-  open_files(outsubtype);
-
+  pass := passno;
+  if pass = 1 then
+    open_files('H')
+  else
+    open_files('N');
   lineno:=0;
   state:=SSTART;
   seenbegin:=false;
@@ -1010,11 +954,9 @@ begin
 
   initname;
 
-  pass:=1;
-  runpass('H');
+  runpass(1);
 
-  pass:=2;
-{  runpass('B'); }
+  runpass(2);
 
   _release(body);
   _release(addrpad);
@@ -1028,5 +970,3 @@ begin
   writeln;
   write(PRTOFF);
 end.
-https://chatgpt.com/c/69b3a02f-4c00-838c-a990-6c2fa3855
-4ca

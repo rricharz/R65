@@ -16,7 +16,7 @@
 
 
 program getsource;
-uses syslib,arglib,disklib;
+uses syslib,arglib,filelib;
 
 const afloppy=$c827; { exdos vector }
 

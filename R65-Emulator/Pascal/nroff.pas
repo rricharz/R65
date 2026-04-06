@@ -10,11 +10,11 @@ const
   LINEMAX = 132; { max chars per printer output line }
   LINEDEF = 55;  { default line width for A5 output }
   PAGEMAX = 200; { max lines per page in program }
-  PAGEDEF = 58;  { default lines per page for A5}
+  PAGEDEF = 65;  { default lines per page for A5}
   MAXSRC  = 56;  { max source chars per input line }
   MAXOUT  = 200; { max chars in formatted output }
-  LMARGIN = 3;   { left margint }
-  TMARGIN = 3;   { top margin }
+  LMARGIN = 12;  { left margint }
+  TMARGIN = 0;   { top margin }
   INDSTEP = 4;   { indent step for .RS / .RE }
   MAXTABS = 16;  { max number of explicit tab stops }
   IPINDENT= 5;  { default IP indent }

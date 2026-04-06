@@ -1,5 +1,6 @@
 program fixup;
 { Fixup a pascal source file }
+
 uses syslib,arglib,strlib;
 
 var debug:           boolean;
@@ -306,7 +307,7 @@ begin
   underscore('test');
   underscore('findentry');
   underscore('writename');
-{ disklib }
+{ filelib }
   underscore('freedrv');
 { ledlib }
   underscore('ledstring');
