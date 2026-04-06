@@ -21,7 +21,7 @@ end;
 func _attach(fname:array[15] of char;
   cyclus,drive,operation,size,start:integer;
   subtype:char):file;
-{ open file for _random access            }
+{ open file for _random access           }
 {   operation FNEW,FREAD,FWRITE          }
 {   var size in bytes (used for FNEW,    }
 {        returned for FREAD and FWRITE)  }

@@ -1,22 +1,23 @@
 library teklib;
 
-{ plot routines for Tektronix 4010 graphics
-  on the R65 PRINTER port. On the original
-  R65 computer, a PRINTER or PLOTTER could
-  be hooked up using RS-232. On the R65
-  emulator, the OUTPUT is stored in the Linux
-  file printout.txt. The tek4010 tektronix
-  emulator (github.com/rricharz/tek4010) can
-  be hooked up to the R65 emulator by
-  calling tek4010 as follows, if a copy of
-  tek4010 is put in the R65-emulator folder.
+{ plot routines for Tektronix 4010 graphics      }
+{  on the R65 PRINTER port. On the original      }
+{  R65 computer, a PRINTER or PLOTTER could      }
+{  be hooked up using RS-232. On the R65         }
+{  emulator, the OUTPUT is stored in the Linux   }
+{  file printout.txt. The tek4010 tektronix      }
+{  emulator (github.com/rricharz/tek4010) can    }
+{  be hooked up to the R65 emulator by           }
+{  calling tek4010 as follows, if a copy of      }
 
-    ./tek4010 tail -f printout.txt           }
+{  tek4010 is put in the R65-emulator folder.    }
 
-const MAXX = 1023; { Tektronix 4010 graphics }
+{    ./tek4010 tail -f printout.txt              }
+
+const MAXX = 1023; { Tektronix 4010 graphics     }
       MAXY = 780;
 
-      MAXCOLUMNS = 74; { Tektronix 4010 alpha }
+      MAXCOLUMNS = 74; { Tektronix 4010 }
       MAXLINES   = 35;
 
       SOLID      = 1;
