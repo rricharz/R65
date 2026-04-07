@@ -108,6 +108,24 @@ begin
 
 end;
 
+proc _sfindentry(name: cpnt; drv:integer;
+       var ent: integer;
+       var fnd,lst: boolean);
+{ wrapper for cpnt string }
+const ENDMARK = chr(0);
+var nm: array[NAMESIZE] of char;
+    i:  integer;
+begin
+  for i := 0 to 15 do nm[i] := ' ';
+  i := 0;
+  while (i <= NAMESIZE) and (name[i] <> ENDMARK) do
+  begin
+    nm[i] := name[i];
+    i := i + 1;
+  end;
+  _findentry(nm, drv, ent, fnd, lst);
+end;
+
 proc _writename(nm1:array[15] of char);
 var j,k:integer;
 begin
