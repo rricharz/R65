@@ -10,7 +10,9 @@ library striolib;
 {   openr;                   }
 
 const
-      NAMESIZE = 15;
+    NAMESIZE = 15;
+mem
+    filerr  =$00db: integer&;
 
 var scarg: integer;
 
@@ -28,15 +30,28 @@ begin
     call(STOP)
 end;
 
+proc _checkfilerr;
+{****************}
+{ display file error code and stop }
+const
+    STOP=$2010;
+mem
+    RUNERR=$000c: integer&;
+begin
+  if filerr<>0 then begin
+    writeln('File Error ', filerr);
+    RUNERR := 255;
+    call(STOP);
+  end;
+end;
+
 proc _sgetval(var value:integer;
                      var default:boolean);
 {****************************************}
 { get integer argument }
 { does not change value, if no argument }
 mem
-    NUMARG   = $005f: integer&;
-    ARGLIST  = $0060: array[10] of integer;
-    ARGLISTS = $0060: array[63] of char&;
+    ARGLIST  = $0060: array[31] of integer;
     ARGTYPE  = $00a0: array[31] of char&;
 begin
   case ARGTYPE[scarg] of
@@ -62,8 +77,6 @@ proc _sgetstring(string: cpnt; var default: boolean;
 const
     ENDMARK = chr(0);
 mem
-    NUMARG   = $005f: integer&;
-    ARGLIST  = $0060: array[10] of integer;
     ARGLISTS = $0060: array[63] of char&;
     ARGTYPE  = $00a0: array[31] of char&;
 var
@@ -74,7 +87,7 @@ begin
   case ARGTYPE[scarg] of
     's': begin
            for i:=0 to NAMESIZE do
-             string[i]:=ARGLISTS[2 *scarg + i];
+             string[i]:=ARGLISTS[2 * scarg + i];
            scarg:=scarg + 8;
            default:=false;
            string[16] := ENDMARK;
@@ -165,24 +178,17 @@ const
 mem
     FILDRV  = $00dc: integer&;
     FILNAM  = $0301: array[NAMESIZE] of char&;
-    filerr  =$00db: integer&;
     scyfc   =$037c: integer&;
 var
     i: integer;
 
-  proc checkfilerr;
-  begin
-    if filerr<>0 then
-      writeln('Cannot read directory');
-  end;
-
 begin
   FILDRV:=drive;
   call(aprepdo);
-  checkfilerr;
+  _checkfilerr;
   scyfc:=MAXENT;
   call(agetentx);
-  checkfilerr;
+  _checkfilerr;
   for i:=0 to NAMESIZE do begin
     if (FILNAM[i] = ' ') then
       s[i] := ENDMARK
@@ -199,6 +205,29 @@ const afloppy = $c827; { exdos vector }
 begin
   _strfio(s, drv);
   call(afloppy);
+end;
+
+proc srunprog(name: cpnt; cyc: integer; drv: integer);
+{****************************************************}
+const
+    ENDMARK = chr(0);
+mem
+    FILFLG = $00da: integer&;
+    FILNM1 = $0320: array[15] of char&;
+    FILCY1 = $0330: integer&;
+    FILDRV = $00dc: integer&;
+var
+    i: integer;
+begin
+  for i := 0 to NAMESIZE do FILNM1[i] := ' ';
+  i := 0;
+  while (name[i] <> ENDMARK) and (i <= NAMESIZE)
+  do begin
+    FILNM1[i]:=name[i];
+    i := i + 1;
+  end;
+  FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
+  run;
 end;
 
 begin

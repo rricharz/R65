@@ -21,12 +21,32 @@ var
     hfile: file;
 
 proc init;
+{********}
 begin
   fname    := _new;
   diskname := _new;
   cyclus := 0;
   _sgetstring(fname, default, cyclus, drive);
   _ssetsubtype(fname, 'H', true); { force set }
+end;
+
+proc copyback;
+{************}
+{ copy exact file name found back into argument }
+mem
+    ARGLIST  = $0060: array[31] of integer;
+    ARGLISTS = $0060: array[63] of char&;
+    ARGTYPE  = $00a0: array[31] of char&;
+    FILNAM   = $0301: array[NAMESIZE] of char&;
+var i: integer;
+begin
+  ARGTYPE[0] := 's';
+  for i:= 0 to 15 do
+    ARGLISTS[i] := FILNAM[i];
+  ARGTYPE[8] := 'i';
+  ARGLIST[8] := 0;
+  ARGTYPE[9] := 'd';
+  ARGLIST[9] := 1;
 end;
 
 begin
@@ -46,9 +66,15 @@ begin
     drive:=1; entry:=0;
     _sfindentry(fname, drive, entry, found, last);
   end;
-  writeln('found =', found, ', changed=', changed);
 
-  if changed then _change_disk(diskname, 1);
-  _release(diskname);
-  _release(fname);
+  if found then begin
+    copyback;
+    srunprog('VIEW:R', 0, 0);
+  end else
+    writeln('No help file for this topic available');
+
+  if changed then begin
+    _change_disk(diskname, 1);
+   end;
+
 end.
