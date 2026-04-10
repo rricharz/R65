@@ -606,10 +606,15 @@ int main (int argc, char *argv[])
     
     g_set_prgname("r65-emulator");
     g_set_application_name("R65 Emulator");
-    gtk_window_set_default_icon_name("computer");
-    gtk_window_set_icon_name(GTK_WINDOW(global_window), "computer");    
-    gtk_window_set_title(GTK_WINDOW(global_window), WINDOW_NAME);
 
+    GError *icon_error = NULL;
+    if (!gtk_window_set_icon_from_file(GTK_WINDOW(global_window),
+                        "r65_icon.png", &icon_error)) {
+        g_printerr("Could not load icon: %s\n", icon_error->message);
+        g_clear_error(&icon_error);
+    }
+
+    gtk_window_set_title(GTK_WINDOW(global_window), WINDOW_NAME);
     if (fullscreen) {	    
 	    // DISPLAY UNDECORATED MAXIMIZED WINDOW
 	    gtk_window_set_decorated(GTK_WINDOW(global_window), FALSE);
