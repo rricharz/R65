@@ -626,9 +626,9 @@ int main (int argc, char *argv[])
     else {
 	    // DISPLAY DECORATED WINDOW
 	    gtk_window_set_decorated(GTK_WINDOW(global_window), TRUE);
-	    windowWidth  = (int)(0.6 * (double)screenWidth);
-	    windowHeight = (int)(0.6 * (double)screenHeight);
-	    panelScale = (double)screenHeight * 0.00165;
+	    windowWidth  = (int)(0.5 * (double)screenWidth);
+	    windowHeight = (int)(0.5 * (double)screenHeight);
+	    panelScale = (double)screenHeight * 0.00142;
 	    gtk_window_set_default_size(GTK_WINDOW(global_window),
 		windowWidth, windowHeight);
     }

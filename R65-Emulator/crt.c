@@ -164,17 +164,17 @@ void infoPanel()
     // show Quit button
     SETBUTTONCOLOR;
     Rect(quit_hpos, quit_vpos, quit_hsize, quit_vsize);
-    Text(quit_hpos + (PANEL_FONTSIZE / 2), quit_vpos - (PANEL_FONTSIZE / 3),
+    Text(quit_hpos + (PANEL_FONTSIZE / 2), quit_vpos - (PANEL_FONTSIZE / 5),
       "QUIT", "Monospace", PANEL_FONTSIZE, 0, 0);
     
     // show STOP button
     Rect(stop_hpos, quit_vpos, quit_hsize, quit_vsize);
-    Text(stop_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 3),
+    Text(stop_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 5),
       "BREAK", "Monospace", PANEL_FONTSIZE, 0, 0);
       
     // show SHUTDOWN button
     Rect(sdown_hpos, quit_vpos, sdown_hsize, quit_vsize);
-    Text(sdown_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 3),
+    Text(sdown_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 5),
       "SHUTDOWN", "Monospace", PANEL_FONTSIZE, 0, 0);
       
     // show leds

@@ -42,6 +42,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <glib.h>
+#include <glib/gstdio.h>
+#include <sys/wait.h>
 #include "time.h"
 #include "main.h"
 #include "R65.h"
@@ -375,21 +378,21 @@ void write6502_8(uint16_t address, uint8_t value)
 int mousepad()
 /************/
 {
-int i, end, filtyp, filstp;
+    int i, end, filtyp, filstp;
+    int status;
     char *extension;
     char s[24];
     char name[80];
-    char estring[80];
-    
-    // printf("Edit called\n");
-    
+    GPid pid;
+    GError *error = NULL;
+    GStatBuf st_before, st_after;
+    gboolean existed_before, exists_after;
+
     filtyp = memory[M8_FILTYP];
-    // printf("Filtyp = %c\n", filtyp);
     if (filtyp != 'S')
-        return (5);         // must be sequential file
-        
+        return 5;                   // must be sequential file
+
     filstp = memory[M8_FILSTP];
-    // printf("Filstp = %c\n", filstp);
     if (filstp == 'A')
         extension = ".asm";
     else if (filstp == 'P')
@@ -400,40 +403,80 @@ int i, end, filtyp, filstp;
         extension = ".nroff";
     else
         extension = ".txt";
-    
+
     i = 15;
-    while ((memory[M8_FILNAM+i] == ' ') && (i > 0) )    // find end of file name
+    while ((memory[M8_FILNAM + i] == ' ') && (i > 0))   // find end of file name
         i--;
     end = i + 1;
-    
+
     for (i = 0; i < end; i++) {
-        
-        if (memory[M8_FILNAM+i] == ':') {               // remove :
-            s[i]=' ';
+
+        if (memory[M8_FILNAM + i] == ':') {             // remove :
+            s[i] = ' ';
             end = i;
         }
         else
-            s[i] = memory[M8_FILNAM+i];
-            
+            s[i] = memory[M8_FILNAM + i];
+
         if ((s[i] >= 'A') && (s[i] <= 'Z'))             // convert to small letters
             s[i] = s[i] + 0x20;
     }
-    
+
     s[end] = 0;                                         // add end of string mark
     sprintf(name, "Files/%s%s", s, extension);
-    // printf("Editing %s\n", name);
-    
+
+    existed_before = (g_stat(name, &st_before) == 0);
+
     crtUpdate();
-    
-    // execute mousepad command
-    sprintf(estring, "mousepad --disable-server Files/%s%s", s, extension);
-    printf("Running %s, waiting for completion\n", estring);   
-    int res = system(estring);
-    // printf("result =%d\n", res);
-    if (res)
-        return (0X68);
-    else
-        return 0;
+
+    {
+        char *argv[] = {
+            "/usr/bin/mousepad",
+            "--disable-server",
+            name,
+            NULL
+        };
+
+        printf("Running mousepad on %s, waiting for completion\n", name);
+
+        if (!g_spawn_async(NULL, argv, NULL,
+                           G_SPAWN_DO_NOT_REAP_CHILD,
+                           NULL, NULL, &pid, &error)) {
+            if (error) {
+                g_printerr("Cannot start mousepad: %s\n",
+                           error->message);
+                g_error_free(error);
+            }
+            return 0x68;
+        }
+    }
+
+    for (;;) {
+        while (g_main_context_iteration(NULL, FALSE))
+            ;
+
+        if (waitpid(pid, &status, WNOHANG) == pid)
+            break;
+
+        g_usleep(20000);
+    }
+
+    g_spawn_close_pid(pid);
+
+    if (!(WIFEXITED(status) && (WEXITSTATUS(status) == 0)))
+        return 0x68;
+
+    exists_after = (g_stat(name, &st_after) == 0);
+
+    if (!existed_before && !exists_after)
+        return 0x69;               // file still does not exist
+
+    if (existed_before && exists_after &&
+        (st_before.st_size == st_after.st_size) &&
+        (st_before.st_mtime == st_after.st_mtime))
+        return 0x69;               // file unchanged
+
+    return 0;                      // changed, write new version
 }
 
 /*********************************************/
