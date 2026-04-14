@@ -54,9 +54,9 @@
 #define M8_DATE     0x17B9
 #define M8_TIME     0x17B5
 
-int r65Setup();
+void r65Setup();
 int r65Loop();
-int r65Quit();
+void r65Quit();
 
 // functions to handle memory mapped io
 uint8_t read6502(uint16_t address);

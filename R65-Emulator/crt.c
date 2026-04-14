@@ -51,6 +51,12 @@ int      stop_hpos;      // STOP button
 
 int led[NUM_LEDS];
 
+#ifdef __APPLE__
+#define SCREEN_FONT "Menlo"
+#else
+#define SCREEN_FONT "DejaVu Sans Mono"
+#endif
+
 /*************/
 void crt_init()
 /*************/
@@ -211,7 +217,8 @@ void infoPanel()
     int usedByUser = 0;
     int j=0;
     for (int i=0; i<8; i++) {
-        if (s1[j]=read6502_8(RS8_LED+i)) usedByUser = 1;
+		s1[j]=read6502_8(RS8_LED+i);
+        if (s1[j]) usedByUser = 1;
         if (s1[j]&128) {
             s1[j]=s1[j]&127;
             s1[(j++)+1]='.';      
@@ -324,7 +331,7 @@ void crtUpdate()
                             s, "basis33", csize, 0, 0);
                     else
                         Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset + coffset,
-                            s, "Monospace", csize, 0, 0);
+                            s, SCREEN_FONT, csize, 0, 0);
                 }
             }
                         // Display cursor

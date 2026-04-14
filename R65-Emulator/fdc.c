@@ -175,7 +175,7 @@ void openDiskFile()
     long size = ftell(floppy[FDC.drive].file);  // file size in bytes
     // printf("Disk opened, size = %ld\n", size);
     if (size < 205000) {
-       printf("Old has old format\n", size);
+       printf("Old has old format\n");
        convertFloppy();
     }
 }
@@ -240,7 +240,7 @@ int fdc_read(uint16_t address)
         if (FDC.bytecounter == 255) {
 
             // seek
-            long asector = RPERTR * floppy[FDC.drive].track + floppy[FDC.drive].sector;
+            unsigned int asector = RPERTR * floppy[FDC.drive].track + floppy[FDC.drive].sector;
             if (debug) printf("FDC%d Seek to block %04X\n", FDC.drive, asector);
             if (fseek(floppy[FDC.drive].file, 256 * (asector - 1), SEEK_SET)) {
                 printf("****** seek error\n");
@@ -293,7 +293,7 @@ void checkMotorTurnoff(int tics)
                 setLed(drv, 0);
                 if (debug) printf("FDC%d Turning motor off\n", drv);
                 closeDiskFile(drv);
-                floppy[drv].motor;
+                floppy[drv].motor = 0;
             }
         }
     }
@@ -452,7 +452,7 @@ void fdc_write(uint16_t address, uint8_t value)
         }
         
         if (FDC.bytecounter == 255) {
-            long asector = RPERTR * floppy[FDC.drive].track + floppy[FDC.drive].sector;
+            unsigned int asector = RPERTR * floppy[FDC.drive].track + floppy[FDC.drive].sector;
             
             // seek
             if (debug) printf("seek to start of sector %02X\n", asector);
@@ -612,7 +612,7 @@ int export_file()
 				
                 while ((i < 256) && ((buffer[i] & 0x7F) != 0x7F)
                     && ((buffer[i] & 0x7F) != 0x1F)) {
-                    if ((buffer[i] >= 0x80) && (buffer[i] <= 0xFe)) {
+                    if (((unsigned char)buffer[i] >= 0x80) && ((unsigned char)buffer[i] <= 0xFe)) {
                         for (int ii = 0; ii < (buffer[i] & 0x7F); ii++) {
                             fprintf(foutput, "%c", ' ');
                             // printf("<BL>");

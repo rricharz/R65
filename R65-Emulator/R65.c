@@ -73,7 +73,7 @@ const char *mnemonic[] = {           // p-codes
     "fcom","tfer","opra","getr","putr","swa2",
 };
 
-uint8_t memory[65536];
+uint8_t memory[65536] = {0};
 int timeOfSpMin;
 int timeOfPascalMin;
 int timeOfTemp;          // time of last temperature read
@@ -897,10 +897,11 @@ int loadCodeFromListing(char* s, int storeFlag)
     free(lineBuffer);
     fclose(codeFile);
     codeFile = NULL;
+	return 0;
 }
 
 /************/
-int r65Setup()
+void r65Setup()
 /************/
 {
     FILE *confFile;
@@ -936,7 +937,7 @@ int r65Setup()
     }
     else {
         for (int drive = 0; drive < 2; drive++) {
-            if (fscanf(confFile, "disk=%16s\n", &name) != 1) {
+            if (fscanf(confFile, "disk=%16s\n", name) != 1) {
                 if (drive == 0)
                     strcpy(name,"PASCAL");
                 else
@@ -1001,7 +1002,7 @@ int r65Loop()
 }
     
 /***********/
-int r65Quit()
+void r65Quit()
 /***********/
 {
     FILE *confFile;
