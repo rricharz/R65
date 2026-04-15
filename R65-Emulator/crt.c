@@ -136,27 +136,72 @@ void checkInfoBarButtons()
 /*******************************************************/
 void crt_show7segmentDisplay(char* s, int y, char* label)
 /*******************************************************/
-
 {
-    int x;
-    int i = 0;
-    do {
-        if (s[i] == ' ') s[i] = '!';
-        i++;
-    }
-    while ((i<16) && (s[i] != 0));
+    int x, xfield;
+    double pitch;
+    int i, pos;
+    char out[3];
+
     x = panelOffset + 5 * panelScale;
-    Stroke(210,210,210); Fill(0, 0, 0, 0);
-    Rect(x - 2 * panelScale, y + 4 * panelScale, 160 * panelScale, 32 * panelScale);
+    xfield = 160 * panelScale;
+    pitch = (double)xfield / 8.2;
+
+    Stroke(210,210,210);
+    Fill(0, 0, 0, 0);
+    Rect(x - 2 * panelScale, y + 4 * panelScale, xfield, 32 * panelScale);
+
+    /* gray background */
     Stroke(65, 65, 65);
-    Text(x, y, "8.8.8.8.8.8.8.8.",
-                "DSEG7 Classic", 24 * panelScale, 0, 1);
+    for (pos = 0; pos < 8; pos++) {
+        Text(x + (int)(pos * pitch), y, "8",
+             "DSEG7 Classic", 24 * panelScale, 0, 1);
+    }
+
+    /* red foreground */
     Stroke(255, 20, 20);
-    Text(x, y, s,
-                "DSEG7 Classic", 24 * panelScale, 0, 1);
+
+    pos = 0;
+    i = 0;
+
+    while ((s[i] != 0) && (pos < 8)) {
+
+        if (s[i] == ' ') {
+            pos++;
+            i++;
+        }
+        else {
+            unsigned char c = (unsigned char)s[i];
+
+            /* ignore non-ASCII completely */
+            if (c >= 0x80) {
+                i++;
+                continue;
+            }
+
+            out[0] = c;
+            out[1] = 0;
+            out[2] = 0;
+
+            /* attach dot to same digit */
+            if (s[i + 1] == '.') {
+                out[1] = '.';
+                out[2] = 0;
+                i += 2;
+            }
+            else {
+                i += 1;
+            }
+
+            Text(x + (int)(pos * pitch), y, out,
+                 "DSEG7 Classic", 24 * panelScale, 0, 1);
+
+            pos++;
+        }
+    }
+
     SETBUTTONCOLOR;
     Text(x, y + 15 * panelScale, label,
-                "Monospace", 10 * panelScale, 0, 0);
+         SCREEN_FONT, 10 * panelScale, 0, 0);
 }
 
 /**************/
@@ -171,17 +216,17 @@ void infoPanel()
     SETBUTTONCOLOR;
     Rect(quit_hpos, quit_vpos, quit_hsize, quit_vsize);
     Text(quit_hpos + (PANEL_FONTSIZE / 2), quit_vpos - (PANEL_FONTSIZE / 5),
-      "QUIT", "Monospace", PANEL_FONTSIZE, 0, 0);
+     "QUIT", SCREEN_FONT, PANEL_FONTSIZE, 0, 0);
     
     // show STOP button
     Rect(stop_hpos, quit_vpos, quit_hsize, quit_vsize);
     Text(stop_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 5),
-      "BREAK", "Monospace", PANEL_FONTSIZE, 0, 0);
+      "BREAK", SCREEN_FONT, PANEL_FONTSIZE, 0, 0);
       
     // show SHUTDOWN button
     Rect(sdown_hpos, quit_vpos, sdown_hsize, quit_vsize);
     Text(sdown_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 5),
-      "SHUTDOWN", "Monospace", PANEL_FONTSIZE, 0, 0);
+      "SHUTDOWN", SCREEN_FONT, PANEL_FONTSIZE, 0, 0);
       
     // show leds
     SETLEDBORDERCOLOR;
@@ -210,7 +255,7 @@ void infoPanel()
         char s[16];
         sprintf(s,"Floppy disk %d",drive);
         Text(LED_HPOS, LED_VPOS + drive * LED_VDIST + 16 * panelScale,
-          s, "Monospace", 10 * panelScale, 0, 0);
+          s, SCREEN_FONT, 10 * panelScale, 0, 0);
     }
     
     // show 7 segment displays
@@ -226,28 +271,9 @@ void infoPanel()
         j++;
     }
     s1[j]=0;
-    if (!usedByUser) {
-        time_t now;
-        struct tm * now_tm;
-        now = time(NULL);
-        now_tm = localtime(&now);
- 
-        if (T < 0) {
-            FILE *temperatureFile =
-                fopen("/sys/class/thermal/thermal_zone0/temp", "r");
- 	        if (temperatureFile != NULL) {
-		        fscanf(temperatureFile, "%d", &T);
-                T  = T / 1000;
-		        if (T < 0) T = 0;
-		        if (T > 99) T = 99;
-		        fclose (temperatureFile);
-		    }
-	        else T = 0;
-        }
-        
-        sprintf(s1,"%02d.%02d %02d°", now_tm->tm_hour,   
-          now_tm->tm_min, (int)T);
-    }
+
+    if (!usedByUser)
+		s1[0] = 0;
     sprintf(s2,"%04X  %02X",pc, spMin);
     sprintf(s3,"%05d %02X", (read6502_16(R16_PPC) - read6502_16(R16_STPROG)),
         pascalMinFree >> 8);
@@ -264,7 +290,7 @@ void infoPanel()
 
     SETBUTTONCOLOR;
     Text(panelOffset + 14 * panelScale, 345 * panelScale,
-            "R65 System 1978-1982 RR", "Monospace", 10 * panelScale, 0, 0);    
+            "R65 System 1978-1982 RR", SCREEN_FONT, 10 * panelScale, 0, 0);    
 }
 
 /**************/
