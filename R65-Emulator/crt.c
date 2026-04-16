@@ -52,7 +52,7 @@ int      stop_hpos;      // STOP button
 int led[NUM_LEDS];
 
 #ifdef __APPLE__
-#define SCREEN_FONT "Menlo"
+#define SCREEN_FONT "Monaco"
 #else
 #define SCREEN_FONT "DejaVu Sans Mono"
 #endif

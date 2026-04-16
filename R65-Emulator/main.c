@@ -32,6 +32,11 @@
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
+
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 #include <cairo.h>
 #include <gtk/gtk.h>
@@ -164,7 +169,7 @@ void Text(int x, int y, char *s, char *fn, int fontSize, int erase, int bold)
 	else
 	    weight = CAIRO_FONT_WEIGHT_NORMAL;
 	cairo_select_font_face(global_surface_cr, fn, CAIRO_FONT_SLANT_NORMAL, weight);
-	cairo_set_font_size(global_surface_cr, fontSize);
+	cairo_set_font_size(global_surface_cr, fontSize - 1);
 	if (erase) {
 		cairo_text_extents(global_surface_cr, s, &extents);
 		cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
@@ -187,7 +192,7 @@ void TextMid(int x, int y, char *s, int fontSize, int erase)
 	cairo_text_extents_t extents;
 	cairo_select_font_face(global_surface_cr, "Monospace", CAIRO_FONT_SLANT_NORMAL,
 	    CAIRO_FONT_WEIGHT_NORMAL);
-	cairo_set_font_size(global_surface_cr, fontSize);
+	cairo_set_font_size(global_surface_cr, fontSize - 1);
 	cairo_text_extents(global_surface_cr, s, &extents);
 	if (erase) {
 		cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
@@ -550,6 +555,45 @@ void release_single_instance_lock(void)
     }
 }
 
+/////////////////////////////////////////////
+int set_working_directory_to_executable(void)
+/////////////////////////////////////////////
+{
+    char path[PATH_MAX];
+    char *last_slash;
+
+#ifdef __APPLE__
+    uint32_t size = sizeof(path);
+    if (_NSGetExecutablePath(path, &size) != 0) {
+        fprintf(stderr, "Path buffer too small\n");
+        return -1;
+    }
+#elif __linux__
+    ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
+    if (len == -1) {
+        perror("readlink");
+        return -1;
+    }
+    path[len] = '\0';
+#else
+    #error "Unsupported platform"
+#endif
+
+    // Remove executable name → keep directory
+    last_slash = strrchr(path, '/');
+    if (last_slash != NULL) {
+        *last_slash = '\0';
+    }
+
+    // Change working directory
+    if (chdir(path) != 0) {
+        perror("chdir");
+        return -1;
+    }
+
+    return 0;
+}
+
 /////////////////////////////////
 int main (int argc, char *argv[])
 /////////////////////////////////
@@ -561,6 +605,8 @@ int main (int argc, char *argv[])
     if (acquire_single_instance_lock() != 0) {
         return 1;
     }
+	
+	set_working_directory_to_executable();
         
     exDisplay  = FALSE;
     fullscreen = FALSE;
