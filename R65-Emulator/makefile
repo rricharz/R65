@@ -1,12 +1,14 @@
 CC = gcc
 
 LIBS = `pkg-config --libs gtk+-3.0`
-CFLAGS = `pkg-config --cflags gtk+-3.0`
+CFLAGS = `pkg-config --cflags gtk+-3.0` -Isrc
+
+SRC = src/main.c src/fake6502.c src/R65.c src/crt.c src/fdc.c
 
 all: emulator
 
-emulator: main.c main.h fake6502.c fake6502.h R65.c R65.h crt.c crt.h fdc.c fdc.h
-	$(CC) -pthread -o emulator main.c fake6502.c R65.c crt.c fdc.c $(CFLAGS) $(LIBS)
+emulator: $(SRC)
+	$(CC) -pthread -o emulator $(SRC) $(CFLAGS) $(LIBS)
 
 .PHONY: clean
 

@@ -430,20 +430,29 @@ int mousepad()
     crtUpdate();
 
     {
+#ifdef __APPLE__
+        char *argv[] = {
+               "/usr/local/bin/mate",
+               "--wait",
+               name,
+               NULL
+        };
+        printf("Running bbedit on %s, waiting for completion\n", name);
+#else
         char *argv[] = {
             "/usr/bin/mousepad",
             "--disable-server",
             name,
             NULL
         };
-
         printf("Running mousepad on %s, waiting for completion\n", name);
+#endif
 
         if (!g_spawn_async(NULL, argv, NULL,
                            G_SPAWN_DO_NOT_REAP_CHILD,
                            NULL, NULL, &pid, &error)) {
             if (error) {
-                g_printerr("Cannot start mousepad: %s\n",
+                g_printerr("Cannot start external editor: %s\n",
                            error->message);
                 g_error_free(error);
             }

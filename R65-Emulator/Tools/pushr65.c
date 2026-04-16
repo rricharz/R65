@@ -83,13 +83,13 @@ int getDirEntry(FILE *f, int index)
 /********************************/
 {
     long int offset = index * sizeof(dirEntry);
-    if (debug) printf("Seek to %d\n", offset);
+    if (debug) printf("Seek to %ld\n", offset);
     int res = fseek(f, offset, SEEK_SET);
     if (res != 0) {
         printf("***** Seek failed\n");
         closeAndExit();
     }    
-    if (debug) printf("Reading %d bytes\n", sizeof(dirEntry));
+    if (debug) printf("Reading %ld bytes\n", sizeof(dirEntry));
     return ((fread(&dirEntry, sizeof(dirEntry), 1, f) == sizeof(dirEntry)));
 }
 
@@ -98,13 +98,13 @@ int putDirEntry(FILE *f, int index)
 /********************************/
 {
     long int offset = index * sizeof(dirEntry);
-    if (debug) printf("Seek to %d\n", offset);
+    if (debug) printf("Seek to %ld\n", offset);
     int res = fseek(f, offset, SEEK_SET);
     if (res != 0) {
         printf("***** Seek failed\n");
         closeAndExit();
     }    
-    if (debug) printf("Writing %d bytes\n", sizeof(dirEntry));
+    if (debug) printf("Writing %ld bytes\n", sizeof(dirEntry));
     return ((fwrite(&dirEntry, sizeof(dirEntry), 1, f) == sizeof(dirEntry)));
 }
 
@@ -113,19 +113,19 @@ int readSector(FILE *f, int index)
 /********************************/
 {
     long int offset = index * sizeof(sector);
-    if (debug) printf("Seek to %d\n", offset);
+    if (debug) printf("Seek to %ld\n", offset);
     int res = fseek(f, offset, SEEK_SET);
     if (res != 0) {
         printf("*** Seek failed\n");
         closeAndExit();
     }    
-    if (debug) printf("Reading %d bytes\n", sizeof(sector));
+    if (debug) printf("Reading %ld bytes\n", sizeof(sector));
     return ((fread(&sector, sizeof(sector), 1, f) == sizeof(sector)));
 }
 
-/*******************/
-int displayDirEntry()
-/*******************/
+/********************/
+void displayDirEntry()
+/********************/
 {
     if (debug) printf("Directory entry: ");
     if (debug) printf("type=%02X ", dirEntry.filtyp);
@@ -158,7 +158,7 @@ void pushByte(FILE *f, uint8_t value)
         byteOutCounter++;
         if ((fwrite(&value, sizeof(chr), 1, f) != sizeof(chr))) {
             printf("\n***** Write error, disk directory unchanged\n");
-            printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+            printf("Maxbytes = %06X, byteOutCounter=%06lX\n",
                    maxBytes, byteOutCounter);
             closeAndExit();
         }
@@ -191,13 +191,13 @@ void pushByte(FILE *f, uint8_t value)
 
         if (byteOutCounter++ >= maxBytes) {
             printf("\n***** Disk full, disk directory unchanged\n");
-            printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+            printf("Maxbytes = %06X, byteOutCounter=%06lX\n",
                    maxBytes, byteOutCounter);
             closeAndExit();
         }
         if ((fwrite(&cr, sizeof(chr), 1, f) != sizeof(chr))) {
             printf("\n***** Write error, disk directory unchanged\n");
-            printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+            printf("Maxbytes = %06X, byteOutCounter=%06lX\n",
                    maxBytes, byteOutCounter);
             closeAndExit();
         }
@@ -209,7 +209,7 @@ void pushByte(FILE *f, uint8_t value)
     if ((chr != ' ') && blankCounter > 0) {     // push blank counter
         if (byteOutCounter++ >= maxBytes) {
             printf("\n***** Disk full, disk directory unchanged\n");
-            printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+            printf("Maxbytes = %06X, byteOutCounter=%06lX\n",
                    maxBytes, byteOutCounter);
             closeAndExit();
         }
@@ -219,7 +219,7 @@ void pushByte(FILE *f, uint8_t value)
             blankCounter += 128;                // set bit 8
         if ((fwrite(&blankCounter, sizeof(chr), 1, f) != sizeof(chr))) {
             printf("\n***** Write error, disk directory unchanged\n");
-            printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+            printf("Maxbytes = %06X, byteOutCounter=%06lX\n",
                    maxBytes, byteOutCounter);
             closeAndExit();
         }
@@ -234,13 +234,13 @@ void pushByte(FILE *f, uint8_t value)
 
     if (byteOutCounter++ >= maxBytes) {         // push character
         printf("\n***** Disk full, disk directory unchanged\n");
-        printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+        printf("Maxbytes = %06X, byteOutCounter=%06lX\n",
                maxBytes, byteOutCounter);
         closeAndExit();
     }
     if ((fwrite(&chr, sizeof(chr), 1, f) != sizeof(chr))) {
         printf("\n***** Write error, disk directory unchanged\n");
-        printf("Maxbytes = %06X, byteOutCounter=%06X\n",
+        printf("Maxbytes = %06X, byteOutCounter=%06lX\n",
                maxBytes, byteOutCounter);
         closeAndExit();
     }
@@ -280,7 +280,7 @@ int main(int argc, char *argv[])
     if (debug) printf("Disk file: %s\n", diskName);
     
     if (sizeof(dirEntry) != 32) {
-        printf("Size of dirent is wrong (%d)!\n",sizeof(dirEntry));
+        printf("Size of dirent is wrong (%ld)!\n",sizeof(dirEntry));
         closeAndExit();
     }
     
@@ -403,7 +403,7 @@ int main(int argc, char *argv[])
         if (getDirEntry(foutput,dirIndex) == 0) {
         }
         else {
-            printf("Cannot read directory entry %d\n");
+            printf("Cannot read directory entry\n");
             closeAndExit();
         }
         if (dirEntry.filtyp != 0) {
@@ -453,9 +453,9 @@ int main(int argc, char *argv[])
     while ((!feof(finput))&&((chr != 0xff)));
     pushByte(foutput, 0x7f);        // R65 system EOF character
     numSectors = (byteOutCounter / 256) + 1;
-    printf("Bytes read %d\n", byteInCounter);
-    printf("Bytes written %d\n", byteOutCounter);
-    printf("Compression %d\%\n", (100 * byteOutCounter) / byteInCounter);
+    printf("Bytes read %d\n", (int)byteInCounter);
+    printf("Bytes written %d\n", (int)byteOutCounter);
+    printf("Compression %d%%\n", (int)((100 * byteOutCounter) / byteInCounter));
     if (debug) printf("Lines written %d\n", line);
     if (debug) printf("Sectors written %d\n", numSectors);
 
