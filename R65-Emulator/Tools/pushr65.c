@@ -290,7 +290,7 @@ int main(int argc, char *argv[])
     for (i = 0;  i < 16; i++)
         r65name[i] = ' ';
         
-    maxCharPerLine = 56;
+    maxCharPerLine = 55;
         
     if ((end = strstr(argv[1],".asm")) != NULL) {
         type = 'S';
@@ -300,7 +300,6 @@ int main(int argc, char *argv[])
     else if ((end = strstr(argv[1],".txt")) != NULL) {
         type = 'S';
         subtype = 'B';      // Textfile
-        maxCharPerLine = 56;
         subname = 'B';
     }
     else if ((end = strstr(argv[1],".pas")) != NULL) {
@@ -328,7 +327,6 @@ int main(int argc, char *argv[])
     else if ((end = strstr(argv[1],".help")) != NULL) {
         type = 'S';
         subtype = 'H';      // Help file
-        maxCharPerLine = 48;
         subname = 'H';
     }
        else if ((end = strstr(argv[1],".nroff")) != NULL) {

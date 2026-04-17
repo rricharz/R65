@@ -1,33 +1,31 @@
 
-{         *****************             }
-{         *               *             }
-{         *      edit     *             }
-{         *               *             }
-{         *****************             }
+{         *****************               }
+{         *               *               }
+{         *     IMPORT    *               }
+{         *               *               }
+{         *****************               }
 
-{    2018 rricharz (r77@bluewin.ch)     }
+{    2026 rricharz (r77@bluewin.ch)       }
 
-{ Edit a text file.                     }
+{ Import a text file.                     }
+{ 3/2026 rricharz direct call to emulator }
 
-{ Usage:  edit FILNAM[:x][.cy[,drive]]  }
+{ Usage: import FILNAM[:x][.cy[,drive]]   }
 
-program edit;
+program import;
 uses syslib, arglib, filelib;
 
-const cup      = chr($1a);
-      ECEXPORT = 1;
-      ECIMPORT = 2;
-      ECEDIT   = 3;
-      PRFLAB   = $ece3;
+const
+    ECIMPORT = 2;
+    PRFLAB = $ece3;
 
 mem filerr = $db: integer&;
     emucom = $1430: integer&;
     emures = $1431: integer&;
 
 var cyclus,drive,free: integer;
-    name:    array[15] of char;
+    name: array[15] of char;
     default: boolean;
-    fno:     file;
 
 proc bcderror(e:integer);
 begin
@@ -41,6 +39,7 @@ proc _delay10msec(time:integer);
 {*****************************}
 { _delay10msec: _delay 10 msec }
 { process is suspended during _delay }
+mem emucom=$1430: integer&;
 var i:integer;
 begin
   for i:=1 to time do
@@ -72,36 +71,11 @@ begin { main }
   setsubtype('P');
   _asetfile(name,cyclus,drive,' ');
   _delay10msec(3); { allow R65 display to updatee }
-  write(cup);
-
-  openr(fno); { used to find file }
-  emucom := ECEXPORT;
-  filerr := emures;
-  if filerr<>0 then begin
-    bcderror(filerr);
-    writeln;
-    exit;
-  end;
-  close(fno);
-  writeln;
-
-  emucom := ECEDIT;
-  filerr := emures;
-  if filerr<>0 then begin
-    bcderror(filerr);
-    writeln;
-    exit;
-  end;
-
   emucom := ECIMPORT;
   filerr := emures;
-  if filerr<>0 then begin
-    bcderror(filerr);
-    writeln;
-    exit;
-  end;
   call(PRFLAB);
   writeln;
-
+  if filerr<>0 then bcderror(filerr);
   free:=_freedrv(FILDRV,true);
 end.
+ 
