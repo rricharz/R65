@@ -2,6 +2,8 @@
 {        * C O M P I L E *        }
 {        *****************        }
 
+{ this version tests whether object file exists }
+
 program compile;
 uses syslib,arglib, filelib;
 
@@ -25,24 +27,27 @@ end;
 
 begin {main}
   {get file name to be able to delete :Q}
-  cyclus:=0; drive:=1;
+  cyclus := 0;
+        drive := 1;
   _agetstring(name,default,cyclus,drive);
 
-  RUNERR:=0;
+  { check versions }
+        RUNERR := 0;
+  runprog('LASTVERS:R      ');
+        if RUNERR <> 0 then exit;
+
   runprog('COMPILE1:R      ');
-
-  cyclus:=FILCYC;
+  cyclus := FILCYC;
   {make sure that load runs same cyclus}
-  ARGTYPE[8]:='i';
-  ARGLIST[8]:=cyclus;
+  ARGTYPE[8] := 'i';
+  ARGLIST[8] := cyclus;
 
-  if RUNERR=0 then begin
+  if RUNERR = 0 then begin
     runprog('COMPILE2:R      ');
   end;
 
   _asetfile(name,cyclus,drive,'Q');
   call(adelete);
-
   RUNERR:=0;
 end.
 
