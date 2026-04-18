@@ -341,7 +341,7 @@ void crtUpdate()
                             SETINVERSEPTEXTCOLOR; }
                     	else {
                             SETINVERSETEXTCOLOR; }
-                        Rect(hcell*xx + crtOffset, vcell*(yy+1) + 8 * panelScale + crtOffset,
+                        Rect(hcell*xx + crtOffset, vcell*(yy+1) + 8 * panelScale + crtOffset - 8,
                             hcell, vcell);
                         Stroke(0,0,0);
                         }
