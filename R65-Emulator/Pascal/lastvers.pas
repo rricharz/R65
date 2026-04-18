@@ -102,6 +102,11 @@ begin
   if cyclus = 0 then begin
     pversion := getlastvers;
   end;
+  if (pversion = 0) then begin
+    writeln(INVVID, 'Source file ',
+                    tname,' not found', NORVID);
+    _abort;
+  end;
   _hexstr(pversion, h);
   writeln('Source file ', tname, '.',h );
 

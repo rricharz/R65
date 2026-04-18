@@ -344,6 +344,7 @@ begin {init}
         'L': lineflg:=true;
         'R': rcheck:=true;
         'N': ofno:=nooutput;
+        'F': begin end;
         ' ': begin end
         else _argerror(104)
       end; {case}

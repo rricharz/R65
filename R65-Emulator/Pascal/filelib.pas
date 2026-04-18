@@ -59,6 +59,19 @@ begin
   FILFLG:=$40; { Do not show file entry }
 end;
 
+proc bestmatch;
+{*************}
+{find the best (highers cyclus) entry in directory}
+const
+  preprd = $f62c;
+  prflab = $e82d;
+  cup = chr($1a);
+begin
+  call(preprd); { find entry with system subroutine }
+  write(cup);   { get rid of empty line }
+  call(prflab); { print info with system subroutine }
+end;
+
 func _freedrv(drive:integer; printit:boolean);
 {********************************************}
 { gets and prints % of free sectors }

@@ -10,7 +10,7 @@
 { Export a text file.                     }
 { 3/2026 rricharz direct call to emulator }
 
-{ Usage: import FILNAM[:x][.cy[,drive]]   }
+{ Usage: export FILNAM[:x][.cy[,drive]]   }
 
 program export;
 uses syslib, arglib, filelib;
@@ -26,7 +26,6 @@ mem filerr=$db: integer&;
 var cyclus,drive,free: integer;
     name: array[15] of char;
     default: boolean;
-    fno: file;
 
 proc bcderror(e:integer);
 begin
@@ -34,17 +33,6 @@ begin
   write(INVVID,'ERROR ');
   write((e shr 4) and 15);
   write(e and 15,NORVID);
-end;
-
-proc _delay10msec(time:integer);
-{*****************************}
-{ _delay10msec: _delay 10 msec }
-{ process is suspended during _delay }
-mem emucom=$1430: integer&;
-var i:integer;
-begin
-  for i:=1 to time do
-    emucom:=6;
 end;
 
 proc setsubtype(subtype:char);
@@ -71,13 +59,11 @@ begin { main }
   _agetstring(name,default,cyclus,drive);
   setsubtype('P');
   _asetfile(name,cyclus,drive,' ');
-  _delay10msec(3); { allow R65 display to update }
-  write(cup);
-  openr(fno); { used to find file }
+  { _delay10msec(3); } { allow R65 display to update }
+  bestmatch;
   writeln;
   emucom := ECEXPORT;
   filerr := emures;
   if filerr<>0 then bcderror(filerr);
-  close(fno);
 end.
   

@@ -90,16 +90,17 @@ begin
       call(aexport);
       writeln;
 
-      { delete the source file                    }
-      { writeln('Deleting the source file');      }
-      { drive:=0; filerr:=0;                      }
-      { setargi(0,8);                             }
-      { runprog('DELETE:R        ',cyclus,drive); }
-      { if (filerr<>0) or (RUNERR<>0) then  begin }
-      {   ok:=false;                              }
-      {   writeln(INVVID,                         }
-      {      'Deleting original failed',NORVID);  }
-      { end;                                      }
+      { delete the source file               }
+      if VERBOSE then
+        writeln('Deleting the source file');
+      drive:=0; filerr:=0;
+      setargi(0,8);
+      runprog('DELETE:R        ',cyclus,drive);
+      if (filerr<>0) or (RUNERR<>0) then  begin
+        ok:=false;
+        writeln(INVVID,
+           'Deleting original failed',NORVID);
+      end;
 
       { check free space on destination drive }
       free:=_freedrv(0,false);

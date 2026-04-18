@@ -9,6 +9,7 @@
 { Version 3.7 (20K)  01/08/82 rricharz          }
 { Recovered 2018 by rricharz (r77@bluewin.ch)   }
 { Improved 2018-2026 by rricharz                }
+{ 2026/4 ignore /F option                       }
 
 { Original derived from the publication by      }
 { Kin-Man Chung and Herbert Yen in              }
