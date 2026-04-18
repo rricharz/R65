@@ -21,7 +21,7 @@
 #define SETINVERSEPTEXTCOLOR Stroke(0,160,160); Fill(0,160,160,0)
 #define SETDISKNAMECOLOR     Stroke(255, 20, 20)
 #define SETBACKGROUNDCOLOR   Fill(0,0,0,0)
-#define SETBUTTONCOLOR       Stroke(210,210,210); Fill(63,63,63,0)
+#define SETBUTTONCOLOR       Stroke(210,210,210); Fill(100,0,0,1)
 #define SETLEDBORDERCOLOR    Stroke(210,210,210);
 #define SETLEDONCOLOR        Fill(255, 0, 0, 0)
 #define SETLEDOFFCOLOR       Fill(127, 0, 0, 0)
@@ -34,8 +34,8 @@ int      global_curpos;
 int      global_curloc;
 int      global_graphicsFlag;
 int      global_videoMemorySplitted;
-int      hcell;
-int      vcell;
+double   hcell;
+double   vcell;
 int      csize;
 double   xdot2;
 double   ydot2;
@@ -214,18 +214,19 @@ void infoPanel()
     
     // show Quit button
     SETBUTTONCOLOR;
+
     Rect(quit_hpos, quit_vpos, quit_hsize, quit_vsize);
-    Text(quit_hpos + (PANEL_FONTSIZE / 2), quit_vpos - (PANEL_FONTSIZE / 5),
+    Text(quit_hpos + (PANEL_FONTSIZE / 2), quit_vpos - (PANEL_FONTSIZE / 4),
      "QUIT", SCREEN_FONT, PANEL_FONTSIZE, 0, 0);
     
     // show STOP button
     Rect(stop_hpos, quit_vpos, quit_hsize, quit_vsize);
-    Text(stop_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 5),
+    Text(stop_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 4),
       "BREAK", SCREEN_FONT, PANEL_FONTSIZE, 0, 0);
       
     // show SHUTDOWN button
     Rect(sdown_hpos, quit_vpos, sdown_hsize, quit_vsize);
-    Text(sdown_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 5),
+    Text(sdown_hpos + (PANEL_FONTSIZE / 3), quit_vpos - (PANEL_FONTSIZE / 4),
       "SHUTDOWN", SCREEN_FONT, PANEL_FONTSIZE, 0, 0);
       
     // show leds
@@ -289,7 +290,7 @@ void infoPanel()
         "Pascal pc and free pages");
 
     SETBUTTONCOLOR;
-    Text(panelOffset + 14 * panelScale, 345 * panelScale,
+    Text(panelOffset + 14 * panelScale, 340 * panelScale,
             "R65 System 1978-1982 RR", SCREEN_FONT, 10 * panelScale, 0, 0);    
 }
 
@@ -304,14 +305,14 @@ void crtUpdate()
     int gcrtxoff;
     int gcrtyoff;
 
-    hcell = crtWidth / NUMCHAR;
-    vcell = crtHeight / NUMLINES;
+    hcell = (double)crtWidth / (double)NUMCHAR;
+    vcell = (double)crtHeight / (double)NUMLINES;
     if (pixelated) 
         csize = hcell * 2.1;       
     else
         csize = hcell * 1.7;
         
-//  printf("Cell size = %d x %d, numchr = %d\n", hcell, vcell, NUMCHAR);
+ // printf("Cell size = %f x %d, numchr = %d\n", hcell, vcell, NUMCHAR);
     
     checkInfoBarButtons();
     
@@ -353,10 +354,10 @@ void crtUpdate()
                     if ((!pixelated) && (s[0] == '*')) coffset = csize/5;
                     else coffset = 0;
                     if (pixelated)
-                        Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset + coffset,
+                        Text(hcell * xx + crtOffset, vcell * (yy + 1) -5 + crtOffset + coffset,
                             s, "basis33", csize, 0, 0);
                     else
-                        Text(hcell * xx + crtOffset, vcell * (yy + 1) + 3 + crtOffset + coffset,
+                        Text(hcell * xx + crtOffset, vcell * (yy + 1) - 5 + crtOffset + coffset,
                             s, SCREEN_FONT, csize, 0, 0);
                 }
             }
@@ -375,8 +376,8 @@ void crtUpdate()
                 yy = vcell * (onscreenCurlin + 1) + 3;
                 if (hcell < 10) StrokeWidth(2);
                 else StrokeWidth(hcell / 5); 
-                Line(xx + crtOffset, yy  + crtOffset + hcell/3,
-                    xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell/3);
+                Line(xx + crtOffset, yy  + crtOffset + hcell/3 - 7,
+                    xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell/3 - 7);
                 StrokeWidth(2);
             }
         }   
