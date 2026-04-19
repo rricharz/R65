@@ -34,7 +34,7 @@ The last currently used entry has filtyp=TEND
 }
 
 program dir;
-uses syslib,arglib,strlib;
+uses syslib, arglib, strlib, striolib;
 
 const aprepdo =$f4a7;
       agetentx=$f63a;
@@ -44,30 +44,27 @@ const aprepdo =$f4a7;
       MAXENT   = 255;    { max number of entries }
       TEND     = chr(0); { end mark of table }
 
-mem   filtyp  =$0300: char&;
-      FILCYC  =$0311: integer&;
-      filloc  =$0313: integer;
-      filsiz  =$0315: integer;
-      fillnk  =$031e: integer;
-      scyfc   =$037c: integer&;
-      filerr  =$00db: integer&;
+mem   filtyp  = $0300: char&;
+      FILCYC  = $0311: integer&;
+      filloc  = $0313: integer;
+      filsiz  = $0315: integer;
+      fillnk  = $031e: integer;
+      scyfc   = $037c: integer&;
+      filerr  = $00db: integer&;
 
 var default, name_given,
-    sortit:              boolean;
+    sortit:               boolean;
     drive, index, i, ti,
     maxlen, nument, col,
     ncol, row, nspaces,
-    sfree,sdel, lines:   integer;
-    ffree, fdel:         real;
-    s:                   cpnt;
-    entry:               array[MAXENT] of cpnt;
-    afloppy:             array[15] of char;
-    cfloppy, newname:    cpnt;
-
-{$I IOPTION:P}
-{$I IARGCPNT:p}
+    sfree,sdel, lines:    integer;
+    ffree, fdel:          real;
+    s:                    cpnt;
+    entry:                array[MAXENT] of cpnt;
+    cfloppy, newname:     cpnt;
 
 func hex(d:integer):char;
+{***********************}
 { convert hex digit to hex char }
 begin
   if (d>=0) and (d<10) then
@@ -78,6 +75,7 @@ begin
 end;
 
 proc checkfilerr;
+{***************}
 begin
   if filerr<>0 then begin
     writeln('Cannot read directory');
@@ -86,6 +84,7 @@ begin
 end;
 
 func smaller(pnt1,pnt2:cpnt):boolean;
+{***********************************}
 var k:integer;
 begin
   k:=0;
@@ -95,6 +94,7 @@ begin
 end;
 
 proc sort;
+{********}
 var i,j:integer;
     savepnt:cpnt;
 begin
@@ -108,6 +108,7 @@ begin
 end;
 
 begin {main}
+{**********}
   cfloppy:=_new;
   newname:=_new;
   name_given:=false;
@@ -130,7 +131,12 @@ begin {main}
     end
   end else if ARGTYPE[_carg]='s' then begin
     { name of disk or option }
-    aget_cpnt(newname);
+    _sgetstring(newname, _carg, default);
+    i := 15;
+    while (newname[i] = ' ') and (i > 0) do begin
+      newname[i] := ENDMARK;
+      i := i - 1;
+    end;
     if newname[0]<>'/' then begin
       name_given:=true;
       _carg:=10;
@@ -141,19 +147,24 @@ begin {main}
       sortit:=option('S');
   end;
 
-{ read disk name (FILNAM in last directory entry) }
-  FILDRV:=drive;
+{ read disk name (FILNAM of last directory entry) }
+  FILDRV := drive;
   call(aprepdo);
   checkfilerr;
-  scyfc:=MAXENT;
+  scyfc := MAXENT;
   call(agetentx);
   checkfilerr;
-  for i:=0 to 15 do afloppy[i]:=FILNAM[i];
-  conv_to_cpnt(afloppy,cfloppy);
+  for i:=0 to 15 do begin
+    if FILNAM[i] = ' ' then
+      cfloppy[i] := ENDMARK
+    else
+      cfloppy[i] := FILNAM[i];
+  end;
+  cfloppy[16] := ENDMARK;
+
   if name_given then begin
-    change_disk(newname, 1);
+    _change_disk(newname, 1);
     drive:= 1;
-    { read FILNAM again after disk has been changed }
     FILDRV:=drive;
     call(aprepdo);
     checkfilerr;
@@ -198,7 +209,8 @@ begin {main}
     end else { end mark }
       sfree:=TSECTORS-filloc;
     index:=index+1
-  until (index>MAXENT) or (filtyp=TEND); {end of table}
+  until (index>MAXENT) or (filtyp=TEND); {end of table
+}
   call(aenddo);
   nument:=ti-1;
 
@@ -237,5 +249,5 @@ begin {main}
 
 { Change back to original disk }
   if name_given then
-    change_disk(cfloppy,1);
+    _change_disk(cfloppy,1);
 end.
