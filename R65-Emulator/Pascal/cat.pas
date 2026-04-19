@@ -1,7 +1,9 @@
 program cat;
-uses syslib, strlib, striolib;
+uses syslib, arglib, strlib, striolib;
 
-const CUP = chr($1a);
+const
+    CUP = chr($1a);
+    DEBUG = false;
 
 var name :         cpnt;
     f:             file;
@@ -11,12 +13,17 @@ var name :         cpnt;
 
 begin
   name := _new;
+  cyclus := 0;
   drive := 1;
   default := true;
   { get parameter 1 (name of file) }
-  _sgetstring(name, default, cyclus, drive);
+  _sgetstring(name, _carg, default);
+  _agetval(cyclus, default);
+  _agetval(drive, default);
+  if DEBUG then
+    writeln('cyclus=',cyclus,' drive=', drive)
   _ssetsubtype(name,'P', false);
-  _strfio(name,1);
+  _strfio(name, cyclus, drive);
   write(CUP); { avoid an empty line }
   openr(f);
   read(@f, ch);

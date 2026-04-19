@@ -306,7 +306,7 @@ void crtUpdate()
     int gcrtyoff;
 
     hcell = (double)crtWidth / (double)NUMCHAR;
-    vcell = (double)crtHeight / (double)NUMLINES;
+    vcell = 0.99 * (double)crtHeight / (double)NUMLINES;
     if (pixelated) 
         csize = hcell * 2.1;       
     else

@@ -17,7 +17,9 @@ program clean;
 uses syslib,arglib, filelib;
 
 {R65 disk eprom calls and params: }
-const aprepdo =$f4a7;
+const
+      DEBUG = false;
+      aprepdo =$f4a7;
       agetentx=$f63a;
       aenddo  =$f625;
       adelete =$c80c;
@@ -33,7 +35,8 @@ mem   filtyp  =$0300: char&;
 var default: boolean;
     drive,index,i,ti,maxlen,nument,sfree,
     sdel,sfound : integer;
-    nametab     : array[1280] of char;
+    { array size = 16 * 256 }
+    nametab     : array[4096] of char;
     filstptab   : array[255] of char;
     cyctab      : array[255] of integer;
     foundtab    : array[255] of boolean;
@@ -114,6 +117,7 @@ begin { mani }
     if filtyp<>chr(0) then begin
       { check for deleted flag }
       if (fillnk and 255)<128 then begin
+        if DEBUG then writeln('ii=', ti);
         for i:=0 to 15 do
           nametab[16*ti+i]:=FILNAM[i];
         i:=16;

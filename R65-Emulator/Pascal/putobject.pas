@@ -14,7 +14,7 @@
 
 
 program putobject;
-uses syslib,arglib;
+uses syslib, arglib, filelib;
 
 const afloppy=$c827; { exdos vector }
 
@@ -59,7 +59,8 @@ begin
       setsubtype('L');
       setargs(fname,0,0,1);
       runprog('COPY:R          ',cyclus,drive);
-      if (filerr<>0) or (RUNERR<>0) then begin
+      if (filerr <> 0) or (RUNERR <> 0) then begin
+        write('COPY completed with error');
         ok:=false;
       end else begin
         setsubtype('T');
@@ -84,23 +85,22 @@ begin
       writeln('Deleting the original file(s)');
       drive:=0; filerr:=0;
       runprog('DELETE:R        ',cyclus,drive);
-      if (filerr<>0) or (RUNERR<>0) then begin
-        writeln(INVVID,
-          'Deleting original failed',NORVID);
+      if (filerr <> 0) or (RUNERR <> 0) then begin
+        write('DELETE completed with error');
         ok:=false;
       end;
       if libflag then begin
         setsubtype('L');
         setargs(fname,0,0,1);
         runprog('DELETE:R        ',cyclus,drive);
-        if (filerr<>0) or (RUNERR<>0) then begin
-          writeln(INVVID,
-            'Deleting original failed',NORVID);
+        if (filerr <> 0) or (RUNERR <> 0) then begin
+          write('DELETE completed with error');
           ok:=false;
         end;
       end;
       { delete any remaining :Q files }
-      writeln('Deleting any remaining temporary files');
+      writeln('Deleting any remaining temporary files'
+);
        setsubtype('Q');
       fname[0]:='*';
       setargs(fname,0,0,1);
@@ -110,15 +110,21 @@ begin
       ARGTYPE[1]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
       runprog('CLEAN:R         ',cyclus,drive);
-      if (filerr<>0) or (RUNERR<>0) then
+      if (filerr<>0) or (RUNERR<>0) then begin
          ok:=false;
+         writeln('CLEAN completed with error');
+      end;
       { pack the destination drive }
-      setargi(0,0);
-      ARGTYPE[1]:=chr(0);
-      cyclus:=0; drive:=0; filerr:=0;
+      setargi(0, 0);
+      ARGTYPE[1] := chr(0);
+      cyclus := 0;
+      drive := 0;
+      filerr := 0;
       runprog('PACK:R          ',cyclus,drive);
-      if (filerr<>0) or (RUNERR<>0) then
-         ok:=false;
+      if (filerr <> 0) or (RUNERR <> 0) then begin
+        write('PACK completed with error');
+        ok:=false;
+      end;
     end;
   end;
   if (not ok) or (RUNERR<>0) then begin

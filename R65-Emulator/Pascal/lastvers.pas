@@ -6,34 +6,13 @@
 {$R+}
 
 program lastvers;
-uses syslib, striolib, filelib, strlib, wildlib;
+uses syslib,arglib,striolib,filelib,strlib,wildlib;
 
 const DEBUG = false;
 
 var force, default, found: boolean;
     name, sname, tname, h: cpnt;
     cyclus, drive, pos, pversion, rversion: integer;
-
-func option(opt:char):boolean;
-var i,dummy,savecarg: integer;
-    options:  cpnt;
-    default0: boolean;
-begin
-  options := _new;
-  _sgetstring(options,default0,dummy,dummy);
-  option:=false;
-  scarg := 10;
-  if not default0 then begin
-    if options[0]<>'/' then _argerror(103);
-    i := 1;
-    while (options[i] <> ENDMARK) and
-          (i < 16) do begin
-      if options[i]=opt then option:=true;
-      i := i + 1;
-    end;
-  end;
-  _release(options);
-end;
 
 func getlastvers: integer;
 var entry, version: integer;
@@ -71,16 +50,18 @@ begin
   cyclus := 0;
   drive  := 1;
 
-  _sgetstring(name, default, cyclus, drive);
+  _sgetstring(name, _carg, default);
+  _agetval(cyclus, default);
+  _agetval(drive, default);
   force := option('F');
-        if force then
-        begin
-          _release(h);
-          _release(tname);
-          _release(sname);
-          _release(name);
-                exit;
-        end;
+  if force then
+  begin
+    _release(h);
+    _release(tname);
+    _release(sname);
+    _release(name);
+    exit;
+  end;
 
   { sname has the suntype stripped away }
   _strcpy(name, sname);
@@ -110,15 +91,15 @@ begin
   _hexstr(pversion, h);
   writeln('Source file ', tname, '.',h );
 
-        { check object file versions }
+  { check object file versions }
   _strcpy(sname, tname);
   _stradd(':R',tname);
-        drive := 1;
+    drive := 1;
   rversion := getlastvers;
-        if rversion < pversion then begin
-                drive := 0;
-                rversion := getlastvers;
-        end;
+  if rversion < pversion then begin
+    drive := 0;
+    rversion := getlastvers;
+  end;
   if (rversion >= pversion) then begin
     _hexstr(pversion, h);
     write(INVVID, 'Error: Object file exists: ');
@@ -130,6 +111,6 @@ begin
   _release(tname);
   _release(sname);
   _release(name);
-        RUNERR := 0;
+  RUNERR := 0;
 
 end.

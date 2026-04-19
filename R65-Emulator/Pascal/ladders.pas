@@ -24,14 +24,14 @@ var bx,by,bxs,bys,bxspeed,byspeed,fx,fxs: real;
     demomode:boolean;
 
 {$I IRANDOM:P}
-{$I IOPTION:P}
 
 func getoption(opt:char):boolean;
 var i,dummy,save_carg:integer;
     options:array[15] of char;
     default:boolean;
 begin
-  save_carg:=_carg; { save for next call to getoption }
+  save_carg:=_carg; { save for next call to getoption
+}
   _agetstring(options,default,dummy,dummy);
   getoption:=false;
   if not default then begin
@@ -316,7 +316,7 @@ begin
   if demomode then writeln('Demo mode');
   _grinit; _fullview;
   init;
-  _animate(autorepeat);
+  animate(autorepeat);
   _splitview;
   showresult;
   writeln('Score ',score,' of ',count);

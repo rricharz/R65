@@ -1,6 +1,12 @@
-program fixup;
-{ Fixup a pascal source file }
 
+{ ********************************** }
+{ * fixup - Fix Pascal Source File * }
+{ ********************************** }
+
+{ fix a pascal source file  for new syntax }
+{ of libraries and compiler                }
+
+program fixup;
 uses syslib,arglib,strlib;
 
 var debug:           boolean;
@@ -14,6 +20,7 @@ var debug:           boolean;
     modified:        boolean;
 
 proc setsubtype(subtype:char);
+{****************************}
 { set subtype in name if not already there }
 var i:integer;
 begin
@@ -29,6 +36,7 @@ begin
 end;
 
 proc openfiles;
+{*************}
 var default: boolean;
     i, cyclus, drive: integer;
 begin
@@ -53,6 +61,7 @@ begin
 end;
 
 proc closefiles;
+{**************}
 begin
   close(fno);
   write(@ofno,EOF);
@@ -61,6 +70,7 @@ begin
 end;
 
 func readline(input: file): boolean;
+{**********************************}
 var ch1: char;
     pos: integer;
 begin
@@ -88,6 +98,7 @@ begin
 end;
 
 func find(s: cpnt; start: integer): boolean;
+{******************************************}
 var i, st: integer;
 begin
   st := start;
@@ -103,12 +114,14 @@ begin
 end;
 
 func isletter(ch:char): boolean;
+{******************************}
 begin
   isletter := ((ch>='A') and (ch<='Z')) or
               ((ch>='a') and (ch<='z'));
 end;
 
 proc upper(s: cpnt);
+{******************}
 var found: boolean;
     i, start: integer;
 begin
@@ -135,12 +148,13 @@ begin
 end;
 
 proc underscore(s: cpnt);
+{***********************}
 var found: boolean;
     i, start: integer;
     ch : char;
 begin
   lstring := _strlen(s);
-  i := 0;
+  i :=  0;
   repeat
     if i>0 then
       found := (find(s, i) and (sline[i-1] <> '_'))
@@ -152,17 +166,43 @@ begin
   until found or (i > lline - lstring);
   if found then begin
     start := i - 1;
-    modified := true;
-    _strinsc('_', start, sline);
+    if start = 0 then
+      modified := true
+    else if sline[start - 1] <> '_' then
+      modified := true;  
+    if modified then
+      _strinsc('_', start, sline);
     { recursive: fix more on same line }
     underscore(s);
   end;
 end;
 
+proc curly;
+{*********}
+var pos1, pos2: integer;
+begin
+  if continue then begin
+    _strinsc('{', 0, sline);
+    pos2 := _strpos('}',sline, pos);
+    if pos2 >= 0 then
+      continue := false;    
+  end;
+  pos1 := _strpos('{',sline,0);
+  if pos1 >= 0 then then begin
+    pos2 := _strpos('}',sline, pos);
+    if pos2 < 0 then begin
+      write(@sline, '}');
+      modified := true;
+      continue : = true;
+  end;
+end;
+
 proc fixup_line;
+{**************}
 begin
   lline := _strlen(sline);
   modified := false;
+  continue := false;
 
 { syslib }
   upper('numarg');
@@ -210,7 +250,7 @@ begin
   upper('strsize');
   upper('endmark');
 { plotlib }
-  { upper('xsize'); }
+  upper('xsize');
   upper('ysize');
   upper('xwords');
   upper('white');
@@ -236,7 +276,6 @@ begin
 { wildlib }
   upper('numentries');
   upper('namesize');
-
 { syslib }
   underscore('setemucom');
   underscore('getbcd');
@@ -314,10 +353,12 @@ begin
   underscore('ledstop');
   underscore('ledhex');
   underscore('ledbyte');
-
+  
+  curly;
 end;
 
 proc putline;
+{***********}
 var pos: integer;
 begin
   pos := 0;
@@ -330,12 +371,13 @@ begin
 end;
 
 proc showline(show_number: boolean);
+{**********************************}
 begin
   if show_number then write(numlines,' ');
   writeln(sline);
 end;
 
-begin
+begin {main}
   debug := false;
   openfiles;
   sline := _new;

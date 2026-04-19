@@ -1,28 +1,26 @@
-{ CD filename                       }
+{ CD diskname                       }
 { Unix style cd command             }
-{ Floppy disk 1 is set to filename  }
+{ Floppy disk 1 is set to diskname  }
 
 program cd;
-uses syslib, arglib, filelib, strlib;
+uses syslib, arglib, striolib, strlib;
+
+const
+    DEBUG = false;
 
 var arg0: cpnt;
-    debug: boolean;
-
-{$I IARGCPNT}
+    cyclus, drive : integer;
+    default: boolean;
 
 begin {main}
   arg0 := _new;
-  aget_cpnt(arg0);
-  debug := true;
+  _sgetstring(arg0, default, cyclus, drive);
 
-  { diskname must be given }
-  if arg0[0] = ENDMARK then begin
-    writeln(INVVID, 'Usage: CD diskname', NORVID);
-    _release(arg0);
-    exit;
-  end;
-  if debug then writeln('Setting disk 1 to ', arg0);
-  change_disk(arg0, 1);
+  if default then
+    _strcpy('WORK', arg0);
+
+  if DEBUG then writeln('Setting disk 1 to ', arg0);
+  _change_disk(arg0, 1);
 
   _release(arg0);
 end.

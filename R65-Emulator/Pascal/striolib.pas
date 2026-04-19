@@ -14,8 +14,6 @@ const
 mem
     filerr  =$00db: integer&;
 
-var scarg: integer;
-
 proc _argerror(e: integer);
 {*************************}
 { display argument error e and stops app }
@@ -45,33 +43,9 @@ begin
   end;
 end;
 
-proc _sgetval(var value:integer;
-                     var default:boolean);
-{****************************************}
-{ get integer argument }
-{ does not change value, if no argument }
-mem
-    ARGLIST  = $0060: array[31] of integer;
-    ARGTYPE  = $00a0: array[31] of char&;
-begin
-  case ARGTYPE[scarg] of
-    'i': begin value:=ARGLIST[scarg];
-           scarg:=succ(scarg); default:=false;
-         end;
-    'd': begin
-           scarg:=succ(scarg); default:=true;
-         end;
-    chr(0):
-         begin
-           default:=true;
-         end
-    else _argerror(102)
-  end {case}
-end;
-
-proc _sgetstring(string: cpnt; var default: boolean;
-                 var cyclus, drive: integer);
-{**************************************************}
+proc _sgetstring(string: cpnt; var scarg: integer;
+                  var default: boolean);
+{***************** ********************}
 { get string argument }
 { set string to if no argument }
 const
@@ -103,8 +77,6 @@ begin
          end
     else _argerror(101)
   end {case}
-  _sgetval(cyclus,dummy);
-  _sgetval(drive,dummy);
 end;
 
 
@@ -135,8 +107,8 @@ begin
   sname[i+2] := ENDMARK;
 end;
 
-proc _strfio(name:cpnt; drive: integer);
-{**************************************}
+proc _strfio(name:cpnt; cyclus, drive: integer);
+{**********************************************}
 const
     ENDMARK = chr(0);
 mem
@@ -161,8 +133,8 @@ begin
     FILNAM[j] := ' ';
     FILNM1[j] := ' ';
   end;
-  FILCYC := 0;
-  FILCY1 := 0;
+  FILCYC := cyclus;
+  FILCY1 := cyclus;
   FILDRV := drive;
   FILFLG := 0;
 end;
@@ -203,7 +175,7 @@ proc _change_disk(s: cpnt; drv: integer);
 { set drv (drive) to s (name) }
 const afloppy = $c827; { exdos vector }
 begin
-  _strfio(s, drv);
+  _strfio(s, 0, drv);
   call(afloppy);
 end;
 
@@ -231,5 +203,4 @@ begin
 end;
 
 begin
-  scarg := 0;
 end.

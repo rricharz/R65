@@ -9,14 +9,14 @@
 {    Usage:  help subject               }
 
 program help;
-uses syslib, strlib, wildlib, striolib;
+uses syslib, arglib, strlib, wildlib, striolib;
 
 const
     debug = true;
 
 var
     fname, diskname: cpnt;
-    cyclus, drive,  entry: integer;
+    drive,  entry: integer;
     default, found, last, changed:  boolean;
     hfile: file;
 
@@ -25,8 +25,7 @@ proc init;
 begin
   fname    := _new;
   diskname := _new;
-  cyclus := 0;
-  _sgetstring(fname, default, cyclus, drive);
+  _sgetstring(fname, _carg, default);
   _ssetsubtype(fname, 'H', true); { force set }
 end;
 

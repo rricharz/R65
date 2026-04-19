@@ -31,6 +31,7 @@ mem
 var _carg: integer;
 
 proc _argerror(e: integer);
+{*************************}
 { display argument error e and stops app }
 const STOP=$2010;
 mem RUNERR=$000c: integer&;
@@ -41,8 +42,8 @@ begin
     call(STOP)
 end;
 
-proc _agetval(var value:integer;
-        var default:boolean);
+proc _agetval(var value:integer; var default:boolean);
+{****************************************************}
 { get integer argument }
 { does not change value, if no argument }
 begin
@@ -62,8 +63,8 @@ begin
 end;
 
 proc _agetstring(var string: array[15] of char;
-        var default: boolean;
-        var cyclus, drive: integer);
+  var default: boolean; var cyclus, drive: integer);
+{**************************************************}
 { get string argument }
 { set string to blank if no argument }
 var i: integer;
@@ -91,7 +92,26 @@ begin
   _agetval(drive,dummy);
 end;
 
+func option(opt:char):boolean;
+{****************************}
+{ check and set option }
+var i,dummy,savecarg:integer;
+    options:array[15] of char;
+    default:boolean;
 begin
+  savecarg:=_carg; { save for next call to option }
+  _agetstring(options,default,dummy,dummy);
+  option:=false;
+  if not default then begin
+    if options[0]<>'/' then _argerror(103);
+    for i:=1 to 15 do
+      if options[i]=opt then option:=true;
+  end;
+  _carg:=savecarg;
+end;
+
+begin {main}
+{**********}
   _carg:=0;
 end.
 

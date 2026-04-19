@@ -19,9 +19,8 @@ library strlib;
 const STRSIZE=64;
       ENDMARK=chr(0);
 
-{ ***** _runerr: stop with runtime error ***** }
-
 proc _runerr(e:integer);
+{**********************}
 { set runerr to e and stop execution of app }
 const stopcode = $2010;
 mem   _runerr = $000c: integer&;
@@ -30,9 +29,8 @@ begin
   call(stopcode);
 end;
 
-{ ***** _new: allocate heap memory ***** }
-
 func _new: cpnt;
+{**************}
 { alocate memory on heap for string }
 mem  sp     = $0008: integer;
      endstk = $000e: integer;
@@ -55,9 +53,8 @@ begin
   _new := str;
 end;
 
-{ ***** _release: _release heap memory ***** }
-
 proc _release(s: cpnt);
+{*********************}
 { release memory on heap }
 { Only the last allocated string can be _released }
 { This is suitable for recursive functions }
@@ -67,10 +64,9 @@ begin
   else _runerr($92);
 end;
 
-{ ***** _strlen: length of string ***** }
-
 func _strlen(strin:cpnt):integer;
-{ lwngth of sring }
+{*******************************}
+{ length of sring }
 var i: integer;
 begin
   i:=0;
@@ -84,9 +80,8 @@ begin
   _strlen:=STRSIZE;
 end;
 
-{ ***** strcopy: copy cpnt string ***** }
-
 proc _strcpy(strin, strout:cpnt);
+{*******************************}
 { make copy of string }
 var i: integer;
 begin
@@ -94,22 +89,20 @@ begin
   write(@strout, strin);
 end;
 
-{ **** _stradd: add string to string ***** }
-
 proc _stradd(strin,strinout:cpnt);
+{********************************}
 { add string to string }
 var i,j: integer;
 begin
   write(@strinout, strin);
 end;
 
-{ **** _strcmp: compare two strings **** }
+func _strcmp(s1,s2:cpnt):integer;
+{*******************************}
+{ compare 2 strings }
 { returns -1  if s1<s2                   }
 {          0  if s1=s2                   }
 {          1  if s1>s2                   }
-
-func _strcmp(s1,s2:cpnt):integer;
-{ compare 2 strings }
 var i:integer;
 begin
   i:=0;
@@ -128,11 +121,11 @@ begin
   _strcmp:=0;
 end;
 
-{ **** _strpos: find occurance of char **** }
-{ returns -1 if char not found }
 func _strpos(ch:char; s1:cpnt;
           start:integer): integer;
-{ get position of character in string }
+{********************************}
+{ get first position of character in string }
+
 var i,len: integer;
 begin
   len:=_strlen(s1);
@@ -145,9 +138,9 @@ begin
   end;
 end;
 
-{***** strread: read line from file *****}
 func _strread(f:file; s:cpnt;
-                 var ateof0:boolean):integer;
+          var ateof0:boolean):integer;
+{************************************}
 { read string from file }
 var ch  : char;
     i   : integer;
@@ -178,7 +171,9 @@ begin
 end;
 
 proc _hexstr(d:integer; s:cpnt);
+{******************************}
 { convert hex byte to hex string }
+{ returns -1 if char not found }
 
   func hchar(h:integer):char;
   begin
@@ -190,22 +185,24 @@ begin
   s[0] := hchar((d shr 4) and 15);
   s[1] := hchar(d and 15);
   s[2] := chr(0);
-end;proc _strdelc(pos:integer;s:cpnt);
+end;
+
+proc _strdelc(pos:integer; s:cpnt);
+{*********************************}
+{ delete char in string at position }
 var i,l:integer;
 begin
   l:=_strlen(s);
   if pos<0 then _runerr($91);
   if pos>l then _runerr($91);
   for i:=pos to l-1 do
-      { move includes end mark }
+      { move includes ENDMARK }
       s[i]:=s[i+1];
 end;
 
-{ *** _strinsc: insert char into string *** }
-
 proc _strinsc(ch:char;pos:integer;s:cpnt);
+{****************************************}
 { inserts char if string is short enough }
-
 var i,l:integer;
 begin
   l:=_strlen(s);
@@ -223,23 +220,8 @@ begin
   else _runerr($91);
 end;
 
-proc _strdelc(pos:integer;s:cpnt);
-{ delete one char in string }
-
-var i,l:integer;
-begin
-  l:=_strlen(s);
-  if pos<0 then _runerr($91);
-  if pos>l then _runerr($91);
-  for i:=pos to l-1 do
-      { move includes end mark }
-      s[i]:=s[i+1];
-end;
-
-{ **** _intstr: convert integer to string **** }
-{ right justified in a field of fsize chars }
-
 proc _intstr(n:integer;s:cpnt;fsize:integer);
+{*******************************************}
 { convert integer to right justified  string }
 begin
   s[0]:=ENDMARK;
