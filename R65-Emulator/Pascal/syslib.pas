@@ -132,5 +132,62 @@ begin
   _random:=mem[$1706] and 255;
 end;
 
+proc __wrintf(value, width: integer);
+var
+  buf: array [5] of char;
+  { 0..5, enough for -32768..32767 }
+  i, len, n, w, q, r: integer;
+  neg: boolean;
+
+begin
+  w := width;
+  { Special case, because -(-32768) would overflow
+  on a 16-bit machine, -32768 cannot be entered }
+  if value = $8000 then begin
+    len := 6;
+    while w > len do begin
+      write(' ');
+      w := w - 1
+    end;
+    write('-32768');
+    exit
+  end;
+
+  neg := value < 0;
+  if neg then
+    n := -value
+  else
+    n := value;
+
+  i := 5;
+
+  { Generate digits backwards into buf }
+  repeat
+    q := n div 10;
+    r := n - q*10;
+    buf[i] := chr(ord('0') + r);
+    n := q;
+    i := i - 1
+  until n = 0;
+
+  if neg then begin
+    buf[i] := '-';
+    i := i - 1
+  end;
+
+  { Characters are now in buf[i+1..5] }
+  len := 5 - i;
+
+  while w > len do begin
+    write(' ');
+    w := w - 1
+  end;
+
+  while i < 5 do begin
+    i := i + 1;
+    write(buf[i])
+  end
+end;
+
 begin {main}
 end.

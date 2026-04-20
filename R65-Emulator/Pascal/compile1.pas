@@ -155,7 +155,8 @@ begin
     21: write('Nested include files');
     22: write('Unexpected EOF');
     23: write('End mark for comment or string');
-    24: write('Identifier already defined')
+    24: write('Identifier already defined');
+    25: write('Formatted write')
   end {case};
   writeln(NORVID);
   if (ofno<>nooutput) and (ofno<>yesOUTPUT)
@@ -1193,7 +1194,7 @@ end {memory};
 proc statmnt;
 var idpnt,relad,k2,savpc,bottom1: integer;
     device,wln: boolean;
-    savtp1,vartyp2: char;
+    savtp1,vartyp2,vtype1: char;
     wl: boolean;
 
 {########################}
@@ -1211,7 +1212,7 @@ begin
 end {code4};
 
 {##############################}
-{ testferror ( of statement) ) }
+{ testferror ( of ,vtype1) ) }
 {##############################}
 
 proc testferror;
@@ -2226,24 +2227,46 @@ begin {body of statement }
                 end else begin
                   {expression}
                   express;
-                  case restype of
-                    'i':  code1(30);
-                    'c':  code1(29);
-                    'q':  code1($57);
-                    's':  begin
-                            code1($58);
-                            code1($57);
-                          end;
-                    'b':  writebool;
-                    'p':  begin
-                            code1(22);
-                            code1(51);
-                            code1(29);
-                            code1(52);
-                            code1(29);
-                          end
-                    else merror(14,'09')
-                  end {case}
+                  vtype1 := restype;
+                  if token=' :' then begin
+                    if vtype1<>'i' then
+                      merror(14,'09');
+                    scan;
+                    express;
+                    testtype('i');
+
+                    ident[1]:='_'; ident[2]:='_';
+                    ident[3]:='w'; ident[4]:='r';
+                    ident[5]:='i'; ident[6]:='n';
+                    ident[7]:='t'; ident[8]:='f';
+                    idpnt:=findid;
+                    if (idpnt=0) or
+                      (stype[idpnt]<>'pr')
+                      then error(25);
+                  code4(43, level-slevel[idpnt],
+                    svda[idpnt]);
+                    code2(33,252)
+                  end
+                  else begin
+                    case vtype1 of
+                      'i':  code1(30);
+                      'c':  code1(29);
+                      'q':  code1($57);
+                      's':  begin
+                              code1($58);
+                              code1($57);
+                            end;
+                      'b':  writebool;
+                      'p':  begin
+                              code1(22);
+                              code1(51);
+                              code1(29);
+                              code1(52);
+                              code1(29);
+                            end
+                      else merror(14,'09')
+                    end
+                  end
                 end {expression}
               until token<>' ,';
               if wln then begin {writeln(..)}
