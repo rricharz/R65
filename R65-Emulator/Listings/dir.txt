@@ -1,5 +1,5 @@
 
-R65 COMPILE 4.6: program DIR              19/4/26 page 1
+R65 COMPILE 4.6: program DIR              21/4/26 page 1
 
 
    1 (    4) {
@@ -12,266 +12,286 @@ R65 COMPILE 4.6: program DIR              19/4/26 page 1
    8 (    4)     2018,2019 rricharz (r77@bluewin.ch)
    9 (    4)     2023 removed INVERSE video display
   10 (    4)     2023 default drive 1
-  11 (    4) 
-  12 (    4) Display the directory of a disk drive.
-  13 (    4) Uses EPROM (disk.asm) calls to get info
-  14 (    4) from disk directory.
-  15 (    4) 
-  16 (    4) Written 2018 for Micro Pascal.
-  17 (    4) 
-  18 (    4) Makes a table to find out how long the
-  19 (    4) longest name is. Then computes the number
-  20 (    4) of columns which can be displayed and
-  21 (    4) displays the directory.
-  22 (    4) 
-  23 (    4) option /S sorts the directory
-  24 (    4) 
-  25 (    4) Usage:
-  26 (    4)   DIR drive [/s]
-  27 (    4)      where drive is the drive number 1 (default) or 0
-  28 (    4)   DIR name
-  29 (    4)      where name is the name of a floppy disk
-  30 (    4) 
-  31 (    4) The directory table has 256 entries of 32 bytes
-  32 (    4) The disk name is stored in the last entry (255)
-  33 (    4) The last currently used entry has filtyp=TEND
-  34 (    4) }
-  35 (    4) 
-  36 (    4) program dir;
-  37 (    4) uses syslib, arglib, strlib, striolib;
-  38 ( 3152) 
-  39 ( 3152) const aprepdo =$f4a7;
-  40 ( 3155)       agetentx=$f63a;
-  41 ( 3155)       aenddo  =$f625;
-  42 ( 3155) 
-  43 ( 3155)       TSECTORS = 2560;   { size of disk in pages }
-  44 ( 3155)       MAXENT   = 255;    { max number of entries }
-  45 ( 3155)       TEND     = chr(0); { end mark of table }
-  46 ( 3155) 
-  47 ( 3155) mem   filtyp  = $0300: char&;
-  48 ( 3155)       FILCYC  = $0311: integer&;
-  49 ( 3155)       filloc  = $0313: integer;
-  50 ( 3155)       filsiz  = $0315: integer;
-  51 ( 3155)       fillnk  = $031e: integer;
-  52 ( 3155)       scyfc   = $037c: integer&;
-  53 ( 3155)       filerr  = $00db: integer&;
-  54 ( 3155) 
-  55 ( 3155) var default, name_given,
-  56 ( 3155)     sortit:               boolean;
-  57 ( 3155)     drive, index, i, ti,
-  58 ( 3155)     maxlen, nument, col,
-  59 ( 3155)     ncol, row, nspaces,
+  11 (    4)     2026 added DIR diskname
+  12 (    4) 
+  13 (    4) Display the directory of a disk drive.
+  14 (    4) Uses EPROM (disk.asm) calls to get info
+  15 (    4) from disk directory.
+  16 (    4) 
+  17 (    4) Written 2018 for Micro Pascal.
+  18 (    4) 
+  19 (    4) Makes a table to find out how long the
+  20 (    4) longest name is. Then computes the number
+  21 (    4) of columns which can be displayed and
+  22 (    4) displays the directory.
+  23 (    4) 
+  24 (    4) option /S sorts the directory
+  25 (    4) 
+  26 (    4) Usage:
+  27 (    4)   DIR drive [/s]
+  28 (    4)      where drive is the drive number 1 (default) or 0
+  29 (    4)   DIR name
+  30 (    4)      where name is the name of a floppy disk
+  31 (    4) 
+  32 (    4) The directory table has 256 entries of 32 bytes
+  33 (    4) The disk name is stored in the last entry (255)
+  34 (    4) The last currently used entry has filtyp=TEND
+  35 (    4) }
+  36 (    4) 
+  37 (    4) program dir;
+  38 (    4) uses syslib, arglib, strlib, striolib;
+  39 ( 3435) 
+  40 ( 3435) const aprepdo =$f4a7;
+  41 ( 3438)       agetentx=$f63a;
+  42 ( 3438)       aenddo  =$f625;
+  43 ( 3438) 
+  44 ( 3438)       TSECTORS = 2560;   { size of disk in pages }
+  45 ( 3438)       MAXENT   = 255;    { max number of entries }
+  46 ( 3438)       TEND     = chr(0); { end mark of table }
+  47 ( 3438) 
+  48 ( 3438) mem   filtyp  = $0300: char&;
+  49 ( 3438)       filcyc  = $0311: integer&;
+  50 ( 3438)       filloc  = $0313: integer;
+  51 ( 3438)       filsiz  = $0315: integer;
+  52 ( 3438)       fildat  = $0317: array[2] of integer&;
+  53 ( 3438)       fillnk  = $031e: integer;
+  54 ( 3438)       scyfc   = $037c: integer&;
+  55 ( 3438)       filerr  = $00db: integer&;
+  56 ( 3438) 
+  57 ( 3438) var default, name_given,
+  58 ( 3438)     sortit, full:             boolean;
+  59 ( 3438)     drive, index, i, l, ti:   integer;
 
-R65 COMPILE 4.6: program DIR              19/4/26 page 2
+R65 COMPILE 4.6: program DIR              21/4/26 page 2
 
-  60 ( 3155)     sfree,sdel, lines:    integer;
-  61 ( 3155)     ffree, fdel:          real;
-  62 ( 3155)     s:                    cpnt;
-  63 ( 3155)     entry:                array[MAXENT] of cpnt;
-  64 ( 3155)     cfloppy, newname:     cpnt;
-  65 ( 3155) 
-  66 ( 3155) func hex(d:integer):char;
-  67 ( 3155) {***********************}
-  68 ( 3155) { convert hex digit to hex char }
-  69 ( 3155) begin
-  70 ( 3155)   if (d>=0) and (d<10) then
-  71 ( 3174)     hex:=chr(d+ord('0'))
-  72 ( 3184)   else if (d>=10) and (d<16) then
-  73 ( 3207)     hex:=chr(d+ord('A')-10)
-  74 ( 3220)   else hex:='?';
-  75 ( 3231) end;
-  76 ( 3235) 
-  77 ( 3236) proc checkfilerr;
-  78 ( 3236) {***************}
-  79 ( 3236) begin
-  80 ( 3236)   if filerr<>0 then begin
-  81 ( 3247)     writeln('Cannot read directory');
-  82 ( 3278)     _abort;
-  83 ( 3282)   end;
-  84 ( 3282) end;
-  85 ( 3282) 
-  86 ( 3283) func smaller(pnt1,pnt2:cpnt):boolean;
-  87 ( 3283) {***********************************}
-  88 ( 3283) var k:integer;
-  89 ( 3286) begin
-  90 ( 3286)   k:=0;
-  91 ( 3290)   while (pnt2[k]=pnt1[k]) and (k<15) do
-  92 ( 3322)     k:=k+1;
-  93 ( 3332)   smaller:=(pnt2[k]<pnt1[k]);
-  94 ( 3361) end;
-  95 ( 3365) 
-  96 ( 3366) proc sort;
-  97 ( 3366) {********}
-  98 ( 3366) var i,j:integer;
-  99 ( 3369)     savepnt:cpnt;
- 100 ( 3369) begin
- 101 ( 3369)   for i:=0 to nument-1 do
- 102 ( 3383)      for j:=nument-1 downto i do
- 103 ( 3404)        if smaller(entry[j],entry[j+1]) then begin
- 104 ( 3444)           savepnt:=entry[j];
- 105 ( 3451)           entry[j]:=entry[j+1];
- 106 ( 3470)           entry[j+1]:=savepnt;
- 107 ( 3485)        end;
- 108 ( 3493) end;
- 109 ( 3521) 
- 110 ( 3522) begin {main}
- 111 ( 3522) {**********}
- 112 ( 3522)   cfloppy:=_new;
- 113 ( 3531)   newname:=_new;
- 114 ( 3541)   name_given:=false;
- 115 ( 3547)   drive:=1;
- 116 ( 3553)   filerr:=0;
- 117 ( 3559)   sortit:=false;
- 118 ( 3565)   _carg:=0;
- 119 ( 3571) { Process arguments }
+  60 ( 3438)     maxlen, nument, col:      integer;
+  61 ( 3438)     ncol, row, nspaces:       integer;
+  62 ( 3438)     sfree,sdel, lines:        integer;
+  63 ( 3438)     day, month, year:         integer;
+  64 ( 3438)     ffree, fdel:              real;
+  65 ( 3438)     s:                        cpnt;
+  66 ( 3438)     entry:                    array[MAXENT] of cpnt;
+  67 ( 3438)     cfloppy, newname:         cpnt;
+  68 ( 3438) 
+  69 ( 3438) func hex(d:integer):char;
+  70 ( 3438) {***********************}
+  71 ( 3438) { convert hex digit to hex char }
+  72 ( 3438) begin
+  73 ( 3438)   if (d>=0) and (d<10) then
+  74 ( 3457)     hex:=chr(d+ord('0'))
+  75 ( 3467)   else if (d>=10) and (d<16) then
+  76 ( 3490)     hex:=chr(d+ord('A')-10)
+  77 ( 3503)   else hex:='?';
+  78 ( 3514) end;
+  79 ( 3518) 
+  80 ( 3519) proc checkfilerr;
+  81 ( 3519) {***************}
+  82 ( 3519) begin
+  83 ( 3519)   if filerr<>0 then begin
+  84 ( 3530)     writeln('Cannot read directory');
+  85 ( 3561)     _abort;
+  86 ( 3565)   end;
+  87 ( 3565) end;
+  88 ( 3565) 
+  89 ( 3566) func smaller(pnt1,pnt2:cpnt):boolean;
+  90 ( 3566) {***********************************}
+  91 ( 3566) var k:integer;
+  92 ( 3569) begin
+  93 ( 3569)   k:=0;
+  94 ( 3573)   while (pnt1[k]=pnt2[k]) and (pnt1[k]<>ENDMARK) do
+  95 ( 3611)     k:=k+1;
+  96 ( 3621)   smaller:=(pnt2[k]<pnt1[k]);
+  97 ( 3650) end;
+  98 ( 3654) 
+  99 ( 3655) proc sort;
+ 100 ( 3655) {********}
+ 101 ( 3655) var i,j:integer;
+ 102 ( 3658)     savepnt:cpnt;
+ 103 ( 3658) begin
+ 104 ( 3658)   for i:=0 to nument-1 do
+ 105 ( 3672)      for j:=nument-1 downto i do
+ 106 ( 3693)        if smaller(entry[j],entry[j+1]) then begin
+ 107 ( 3733)           savepnt:=entry[j];
+ 108 ( 3740)           entry[j]:=entry[j+1];
+ 109 ( 3759)           entry[j+1]:=savepnt;
+ 110 ( 3774)        end;
+ 111 ( 3782) end;
+ 112 ( 3810) 
+ 113 ( 3811) proc filnam_to_str(str: cpnt);
+ 114 ( 3811) {****************************}
+ 115 ( 3811) var j: integer;
+ 116 ( 3814) begin
+ 117 ( 3814)   j := 0;
+ 118 ( 3818)   while (j <= NAMESIZE) and (FILNAM[j] <> ' ') do
+ 119 ( 3841)   begin
 
-R65 COMPILE 4.6: program DIR              19/4/26 page 3
+R65 COMPILE 4.6: program DIR              21/4/26 page 3
 
- 120 ( 3575)   if ARGTYPE[_carg]=chr(0) then begin
- 121 ( 3587)     { no argument }
- 122 ( 3590)     drive:=1;
- 123 ( 3592)   end else if ARGTYPE[_carg]='i' then begin
- 124 ( 3610)     { drive number given }
- 125 ( 3613)     name_given:=false;
- 126 ( 3615)     _agetval(drive,default);
- 127 ( 3639)     _carg:=1;
- 128 ( 3641)     if (drive<0) or (drive>1) then begin
- 129 ( 3660)       writeln('Drive must be 0 or 1');
- 130 ( 3690)       _abort
- 131 ( 3690)     end
- 132 ( 3694)   end else if ARGTYPE[_carg]='s' then begin
- 133 ( 3708)     { name of disk or option }
- 134 ( 3711)     _sgetstring(newname, _carg, default);
- 135 ( 3737)     i := 15;
- 136 ( 3739)     while (newname[i] = ' ') and (i > 0) do begin
- 137 ( 3767)       newname[i] := ENDMARK;
- 138 ( 3773)       i := i - 1;
- 139 ( 3783)     end;
- 140 ( 3788)     if newname[0]<>'/' then begin
- 141 ( 3802)       name_given:=true;
- 142 ( 3807)       _carg:=10;
- 143 ( 3813)     end else _carg:=0;
- 144 ( 3822)   end;
- 145 ( 3826)   if ARGTYPE[_carg]='s' then begin
- 146 ( 3837)       { check for option }
- 147 ( 3840)       sortit:=option('S');
- 148 ( 3850)   end;
- 149 ( 3854) 
- 150 ( 3854) { read disk name (FILNAM of last directory entry) }
- 151 ( 3854)   FILDRV := drive;
- 152 ( 3854)   call(aprepdo);
- 153 ( 3866)   checkfilerr;
- 154 ( 3870)   scyfc := MAXENT;
- 155 ( 3872)   call(agetentx);
- 156 ( 3881)   checkfilerr;
- 157 ( 3885)   for i:=0 to 15 do begin
- 158 ( 3902)     if FILNAM[i] = ' ' then
- 159 ( 3913)       cfloppy[i] := ENDMARK
- 160 ( 3921)     else
- 161 ( 3923)       cfloppy[i] := FILNAM[i];
- 162 ( 3941)   end;
- 163 ( 3947)   cfloppy[16] := ENDMARK;
- 164 ( 3965) 
- 165 ( 3969)   if name_given then begin
- 166 ( 3973)     _change_disk(newname, 1);
- 167 ( 3988)     drive:= 1;
- 168 ( 3990)     FILDRV:=drive;
- 169 ( 3994)     call(aprepdo);
- 170 ( 4006)     checkfilerr;
- 171 ( 4010)     scyfc:=MAXENT;
- 172 ( 4012)     call(agetentx);
- 173 ( 4021)     checkfilerr;
- 174 ( 4025)   end;
- 175 ( 4025) 
- 176 ( 4025) { display info at top of table }
- 177 ( 4025)   if name_given then
- 178 ( 4025)     writeln(INVVID,'Directory drive ',drive,': ',
- 179 ( 4060)     newname,NORVID)
+ 120 ( 3845)     str[j] := FILNAM[j];
+ 121 ( 3856)     j := j + 1;
+ 122 ( 3868)   end;
+ 123 ( 3873)   str[j] := ENDMARK;
+ 124 ( 3882) end;
+ 125 ( 3886) 
+ 126 ( 3887) begin {main}
+ 127 ( 3887) {**********}
+ 128 ( 3887)   cfloppy:=_new;
+ 129 ( 3896)   newname:=_new;
+ 130 ( 3906)   name_given:=false;
+ 131 ( 3912)   drive:=1;
+ 132 ( 3918)   filerr:=0;
+ 133 ( 3924)   sortit:=false;
+ 134 ( 3930)   _carg:=0;
+ 135 ( 3936) { Process arguments }
+ 136 ( 3940)   if ARGTYPE[_carg]=chr(0) then begin
+ 137 ( 3952)     { no argument }
+ 138 ( 3955)     drive:=1;
+ 139 ( 3957)   end else if ARGTYPE[_carg]='i' then begin
+ 140 ( 3975)     { drive number given }
+ 141 ( 3978)     name_given:=false;
+ 142 ( 3980)     _agetval(drive,default);
+ 143 ( 4004)     _carg:=1;
+ 144 ( 4006)     if (drive<0) or (drive>1) then begin
+ 145 ( 4025)       writeln('Drive must be 0 or 1');
+ 146 ( 4055)       _abort
+ 147 ( 4055)     end
+ 148 ( 4059)   end else if ARGTYPE[_carg]='s' then begin
+ 149 ( 4073)     { name of disk or option }
+ 150 ( 4076)     _sgetstring(newname, _carg, default);
+ 151 ( 4102)     i := 15;
+ 152 ( 4104)     while (newname[i] = ' ') and (i > 0) do begin
+ 153 ( 4132)       newname[i] := ENDMARK;
+ 154 ( 4138)       i := i - 1;
+ 155 ( 4148)     end;
+ 156 ( 4153)     if newname[0]<>'/' then begin
+ 157 ( 4167)       name_given:=true;
+ 158 ( 4172)       _carg:=10;
+ 159 ( 4178)     end else _carg:=0;
+ 160 ( 4187)   end;
+ 161 ( 4191)   if ARGTYPE[_carg]='s' then begin
+ 162 ( 4202)       { check for option }
+ 163 ( 4205)       sortit  := option('S');
+ 164 ( 4215)       full    := option('F');
+ 165 ( 4229)   end;
+ 166 ( 4233) 
+ 167 ( 4233) { read disk name (FILNAM of last directory entry) }
+ 168 ( 4233)   FILDRV := drive;
+ 169 ( 4233)   call(aprepdo);
+ 170 ( 4245)   checkfilerr;
+ 171 ( 4249)   scyfc := MAXENT;
+ 172 ( 4251)   call(agetentx);
+ 173 ( 4260)   checkfilerr;
+ 174 ( 4264)   filnam_to_str(cfloppy);
+ 175 ( 4274)   if name_given then begin
+ 176 ( 4278)     _change_disk(newname, 1);
+ 177 ( 4293)     drive:= 1;
+ 178 ( 4295)     FILDRV:=drive;
+ 179 ( 4299)     call(aprepdo);
 
-R65 COMPILE 4.6: program DIR              19/4/26 page 4
+R65 COMPILE 4.6: program DIR              21/4/26 page 4
 
- 180 ( 4067)   else
- 181 ( 4074)     writeln(INVVID,'Directory drive ',drive,': ',
- 182 ( 4105)     cfloppy,NORVID);
- 183 ( 4119) 
- 184 ( 4119) { read file table }
- 185 ( 4119)   index:=0; ti:=0; maxlen:=0;
- 186 ( 4133)   sdel:=0;
- 187 ( 4139)   repeat { for each entry in table }
- 188 ( 4143)     scyfc:=index;
- 189 ( 4143)     call(agetentx);
- 190 ( 4156)     checkfilerr;
- 191 ( 4160)     if filtyp<>chr(0) then begin { not end mark }
- 192 ( 4171)       if (fillnk and 255)<128 then begin {not deleted}
- 193 ( 4184)         entry[ti]:=_new;
- 194 ( 4194)         s:=entry[ti];
- 195 ( 4202)         for i:=0 to 15 do s[i]:=FILNAM[i];
- 196 ( 4238)         for i:=16 to 20 do s[i]:=' ';
- 197 ( 4281)         i:=20;
- 198 ( 4301)         repeat
- 199 ( 4305)           i:=i-1;
- 200 ( 4311)         until (i=0) or
- 201 ( 4323)           (s[i]<>' ');
- 202 ( 4336)         s[i+1]:='.';
- 203 ( 4349)         s[i+2]:=hex(FILCYC shr 4);
- 204 ( 4375)         s[i+3]:=hex(FILCYC and 15);
- 205 ( 4401)         if maxlen<i+3 then maxlen:=i+3;
- 206 ( 4426)         ti:=ti+1
- 207 ( 4435)       end else { deleted }
- 208 ( 4445)         sdel:=sdel+(filsiz shr 8);
- 209 ( 4456)     end else { end mark }
- 210 ( 4464)       sfree:=TSECTORS-filloc;
- 211 ( 4471)     index:=index+1
- 212 ( 4480)   until (index>MAXENT) or (filtyp=TEND); {end of table
- 213 ( 4505) }
- 214 ( 4505)   call(aenddo);
- 215 ( 4509)   nument:=ti-1;
- 216 ( 4515) 
- 217 ( 4520) { sort table if requested }
- 218 ( 4520)   if sortit then sort;
- 219 ( 4531) 
- 220 ( 4531) { compute number of columns and spaces between them }
- 221 ( 4531)   ncol:=48 div (maxlen+2);
- 222 ( 4540)   if nument<8 then ncol:=2
- 223 ( 4555)   else if nument<8 then ncol:=1;
- 224 ( 4576)   nspaces:=(48 div ncol)-maxlen-1;
- 225 ( 4594)   lines:=nument div ncol;
- 226 ( 4603) 
- 227 ( 4612) { display table with columns and rows }
- 228 ( 4612)   for col:=0 to lines do
- 229 ( 4618)   begin
- 230 ( 4631)     for row:=0 to ncol-1 do begin
- 231 ( 4653)       ti:=col+(lines+1)*row;
- 232 ( 4664)       s:=entry[ti];
- 233 ( 4678)       if (ti<=nument) then begin
- 234 ( 4695)         for i:=0 to maxlen do
- 235 ( 4704)           write(s[i]);
- 236 ( 4728)         if row<(ncol-1) then
- 237 ( 4753)           for i:=1 to nspaces do write(' ')
- 238 ( 4778)       end
- 239 ( 4778)     end;
+ 180 ( 4311)     checkfilerr;
+ 181 ( 4315)     scyfc:=MAXENT;
+ 182 ( 4317)     call(agetentx);
+ 183 ( 4326)     checkfilerr;
+ 184 ( 4330)   end;
+ 185 ( 4330) 
+ 186 ( 4330) { display info at top of table }
+ 187 ( 4330)   if name_given then
+ 188 ( 4330)     writeln(INVVID,'Directory drive ',drive,': ',
+ 189 ( 4365)     newname,NORVID)
+ 190 ( 4372)   else
+ 191 ( 4379)     writeln(INVVID,'Directory drive ',drive,': ',
+ 192 ( 4410)     cfloppy,NORVID);
+ 193 ( 4424) 
+ 194 ( 4424) { read file table }
+ 195 ( 4424)   index:=0; ti:=0; maxlen:=0;
+ 196 ( 4438)   sdel:=0;
+ 197 ( 4444)   repeat { for each entry in table }
+ 198 ( 4448)     scyfc:=index;
+ 199 ( 4448)     call(agetentx);
+ 200 ( 4461)     checkfilerr;
+ 201 ( 4465)     if filtyp<>chr(0) then begin { not end mark }
+ 202 ( 4476)       if (fillnk and 255)<128 then begin {not deleted}
+ 203 ( 4489)         entry[ti] := _new;
+ 204 ( 4499)         s := entry[ti];
+ 205 ( 4507)         filnam_to_str(s);
+ 206 ( 4525)         write(@s, '.',
+ 207 ( 4532)           hex(filcyc shr 4), hex(filcyc and 15));
+ 208 ( 4565)         if full then begin
+ 209 ( 4569)           day   := fildat[0]; { format: bcd}
+ 210 ( 4583)           month := fildat[1];
+ 211 ( 4588)           year  := fildat[2];
+ 212 ( 4599)           write(@s,' ',day shr 4, day and 15);
+ 213 ( 4629)           write(@s,'/',month shr 4, month and 15);
+ 214 ( 4653)           write(@s,'/',year shr 4,year and 15);
+ 215 ( 4677)         end;
+ 216 ( 4677)         l := _strlen(s);
+ 217 ( 4689)         if maxlen < l then maxlen := l;
+ 218 ( 4705)         ti:=ti+1
+ 219 ( 4717)       end else { deleted }
+ 220 ( 4727)         sdel:=sdel+(filsiz shr 8);
+ 221 ( 4738)     end else { end mark }
+ 222 ( 4746)     sfree:=TSECTORS-filloc;
+ 223 ( 4753)     index:=index+1
+ 224 ( 4762)   until (index>MAXENT) or (filtyp=TEND);
+ 225 ( 4783)   call(aenddo);
+ 226 ( 4791)   nument:=ti-1;
+ 227 ( 4797)   { fix position of filsiz in string }
+ 228 ( 4802)   { now the lenght of the largest string is known}
+ 229 ( 4802)   if full then begin
+ 230 ( 4806)     for ti := 0 to nument do begin
+ 231 ( 4828)       s := entry[ti];
+ 232 ( 4832)       while _strlen(s) < maxlen do
+ 233 ( 4852)         _strinsc(' ', _strlen(s) - 12, s);
+ 234 ( 4887)     end;
+ 235 ( 4890)   end;
+ 236 ( 4904) 
+ 237 ( 4904) { sort table if requested }
+ 238 ( 4904)   if sortit then sort;
+ 239 ( 4915) 
 
-R65 COMPILE 4.6: program DIR              19/4/26 page 5
+R65 COMPILE 4.6: program DIR              21/4/26 page 5
 
- 240 ( 4792)     writeln
- 241 ( 4806)   end;
- 242 ( 4812) 
- 243 ( 4826) { display info at bottom of table }
- 244 ( 4826)   ffree:=conv(sfree)/conv(TSECTORS);
- 245 ( 4834)   fdel:=conv(sdel)/conv(TSECTORS);
- 246 ( 4850)   writeln('Free:', trunc(100.0*ffree+0.5),
- 247 ( 4884)     '%, deleted:',trunc(100.0*fdel+0.5),
- 248 ( 4918)     '%,',' entries:', index-1, '/',MAXENT);
- 249 ( 4952) 
- 250 ( 4952) { Change back to original disk }
- 251 ( 4952)   if name_given then
- 252 ( 4952)     _change_disk(cfloppy,1);
- 253 ( 4971) end.
- 254 ( 4971) 
+ 240 ( 4915) { compute number of columns and spaces between them }
+ 241 ( 4915)   ncol:=48 div (maxlen+2);
+ 242 ( 4924)   if nument<8 then ncol:=2
+ 243 ( 4939)   else if nument<8 then ncol:=1;
+ 244 ( 4960)   nspaces:=(48 div ncol)-maxlen-1;
+ 245 ( 4978)   lines:=nument div ncol;
+ 246 ( 4987) 
+ 247 ( 4996) { display table with columns and rows }
+ 248 ( 4996)   for col:=0 to lines do
+ 249 ( 5002)   begin
+ 250 ( 5015)     for row:=0 to ncol-1 do begin
+ 251 ( 5037)       ti:=col+(lines+1)*row;
+ 252 ( 5048)       s:=entry[ti];
+ 253 ( 5062)       if (ti<=nument) then begin
+ 254 ( 5079)         write(s);
+ 255 ( 5087)         l := _strlen(s);
+ 256 ( 5099)         for i := l + 1 to maxlen + nspaces do
+ 257 ( 5118)           write(' ');
+ 258 ( 5134)       end
+ 259 ( 5148)     end;
+ 260 ( 5148)     writeln
+ 261 ( 5162)   end;
+ 262 ( 5168) 
+ 263 ( 5182) { display info at bottom of table }
+ 264 ( 5182)   ffree:=conv(sfree)/conv(TSECTORS);
+ 265 ( 5190)   fdel:=conv(sdel)/conv(TSECTORS);
+ 266 ( 5206)   writeln('Free:', trunc(100.0*ffree+0.5),
+ 267 ( 5240)     '%, deleted:',trunc(100.0*fdel+0.5),
+ 268 ( 5274)     '%,',' entries:', index-1, '/',MAXENT);
+ 269 ( 5308) 
+ 270 ( 5308) { Change back to original disk }
+ 271 ( 5308)   if name_given then
+ 272 ( 5308)     _change_disk(cfloppy,1);
+ 273 ( 5327) end.
+ 274 ( 5327) 
 
 End compile
 
-Code lenght:          4970
-Compiler stack size:  102
-Ident stack size:     132
+Code lenght:          5326
+Compiler stack size:  107
+Ident stack size:     139
 Pascal errors:        0

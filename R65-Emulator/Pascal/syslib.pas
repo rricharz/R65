@@ -55,6 +55,7 @@ var
   _year:   integer;
 
 proc _setemucom(i:integer);
+{*************************}
 { set emulator command register }
 mem emucom=$1430:integer&;
 begin
@@ -62,6 +63,7 @@ begin
 end;
 
 func _getbcd(address: integer): integer;
+{**************************************}
 { get 16-bit data from memory in bcd format }
 var data: integer;
 begin
@@ -70,6 +72,7 @@ begin
 end;
 
 proc _getdate;
+{************}
 { get date from Linux }
 begin
   _day:=_getbcd($17b9);
@@ -78,6 +81,7 @@ begin
 end;
 
 proc _prtdate(device: file);
+{**************************}
 { print date }
 begin
   _getdate;
@@ -85,24 +89,28 @@ begin
 end;
 
 func _abs(x: integer): integer;
+{*****************************}
 { compute absolute value of integer }
 begin
   if x<0 then _abs:=-x else _abs:=x
 end;
 
 func _mod(x,n: integer): integer;
+{*******************************}
 { compute modulo function of ineger }
 begin
   _mod:=x - (x div n)*n;
 end;
 
 proc _tab(pos: integer);
+{**********************}
 { tabulate to position on screen }
 begin
  while (pos>CURPOS) do write(' ');
 end;
 
 proc _abort;
+{**********}
 { abort program and give error 54 }
 const STOPCODE=$2010;
 begin
@@ -110,16 +118,16 @@ begin
   call(STOPCODE);
 end;
 
-proc _prtext8(device: file;
-            text: array[7] of char);
+proc _prtext8(device: file; text: array[7] of char);
+{**************************************************}
 { print array of 8 characters }
 var i: integer;
 begin
   for i:=0 to 7 do write(@device,text[i]);
 end;
 
-proc _prtext16(device: file;
-            text: array[15] of char);
+proc _prtext16(device: file; text: array[15] of char);
+{****************************************************}
 { print array of 16 characters }
 var i: integer;
 begin
@@ -127,22 +135,27 @@ begin
 end;
 
 func _random: integer;
+{********************}
 { pseudo random generator, result is 0..255 }
 begin
   _random:=mem[$1706] and 255;
 end;
 
 proc __wrintf(value, width: integer);
+{***********************************}
+{ Write value right justified in a field of width.
+  This procedure is a helper for the compiler. I is
+  used in the write and writeln commands for
+  justified numbers. Do not change the format.     }
 var
   buf: array [5] of char;
   { 0..5, enough for -32768..32767 }
   i, len, n, w, q, r: integer;
   neg: boolean;
-
 begin
   w := width;
   { Special case, because -(-32768) would overflow
-  on a 16-bit machine, -32768 cannot be entered }
+    on a 16-bit machine, -32768 cannot be entered }
   if value = $8000 then begin
     len := 6;
     while w > len do begin
@@ -152,15 +165,12 @@ begin
     write('-32768');
     exit
   end;
-
   neg := value < 0;
   if neg then
     n := -value
   else
     n := value;
-
   i := 5;
-
   { Generate digits backwards into buf }
   repeat
     q := n div 10;
@@ -169,20 +179,16 @@ begin
     n := q;
     i := i - 1
   until n = 0;
-
   if neg then begin
     buf[i] := '-';
     i := i - 1
   end;
-
   { Characters are now in buf[i+1..5] }
   len := 5 - i;
-
   while w > len do begin
     write(' ');
     w := w - 1
   end;
-
   while i < 5 do begin
     i := i + 1;
     write(buf[i])
