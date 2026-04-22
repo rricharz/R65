@@ -12,6 +12,8 @@
 
 { Usage: export FILNAM[:x][.cy[,drive]]   }
 
+{$U+}
+
 program export;
 uses syslib, arglib, filelib;
 

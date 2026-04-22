@@ -132,6 +132,7 @@ begin {main}
   drive:=1;
   filerr:=0;
   sortit:=false;
+  full:=false;
   _carg:=0;
 { Process arguments }
   if ARGTYPE[_carg]=chr(0) then begin
@@ -160,9 +161,10 @@ begin {main}
     end else _carg:=0;
   end;
   if ARGTYPE[_carg]='s' then begin
-      { check for option }
-      sortit  := option('S');
-      full    := option('F');
+    writeln('options found');
+    { check for option }
+    sortit  := option('S');
+    full    := option('F');
   end;
 
 { read disk name (FILNAM of last directory entry) }

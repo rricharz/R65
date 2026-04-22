@@ -12,6 +12,8 @@
 
 { Usage:  edit FILNAM[:x][.cy[,drive]]  }
 
+{$U+}
+
 program edit;
 uses syslib, arglib, filelib;
 

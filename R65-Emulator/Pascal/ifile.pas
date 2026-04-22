@@ -61,22 +61,22 @@ begin
 end;
 
 proc setargs(name:array[15] of char;
-  _carg,cyc,drv:integer);
-var k:integer;
+  _carg0,cyc,drv:integer);
+var k9:integer;
 begin
-  ARGTYPE[_carg]:='s';
-    for k:=0 to 7 do
-      ARGLIST[_carg+k]:=
-        ord(packed(fname[2*k+1],
-                    fname[2*k]));
-    ARGTYPE[_carg+8]:='i';
-    ARGLIST[_carg+8]:=cyc;
-    ARGTYPE[_carg+9]:='i';
-    ARGLIST[_carg+9]:=drv;
+  ARGTYPE[_carg0]:='s';
+    for k9:=0 to 7 do
+      ARGLIST[_carg0+k9]:=
+        ord(packed(fname[2*k9+1],
+                    fname[2*k9]));
+    ARGTYPE[_carg0+8]:='i';
+    ARGLIST[_carg0+8]:=cyc;
+    ARGTYPE[_carg0+9]:='i';
+    ARGLIST[_carg0+9]:=drv;
 end;
 
-proc setargi(val,_carg:integer);
+proc setargi(val,_carg0:integer);
 begin
-  ARGTYPE[_carg]:='i';
-  ARGLIST[_carg]:=val;
+  ARGTYPE[_carg0]:='i';
+  ARGLIST[_carg0]:=val;
 end;

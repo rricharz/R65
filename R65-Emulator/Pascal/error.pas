@@ -6,7 +6,9 @@
 
 { Displays R65 error codes as text }
 
-{ Usage: error errnum                 }
+{ Usage: error errnum              }
+
+{$U+}
 
 program error;
 uses syslib,arglib;

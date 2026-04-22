@@ -1,8 +1,10 @@
 { extime - measure execution time of a }
 { pascal program }
 
+{$U+}
+
 program extime;
-uses syslib,arglib,timelib,mathlib;
+uses syslib, arglib, timelib, mathlib, filelib;
 
 var cyclus,drive,i: integer;
     etime: real;

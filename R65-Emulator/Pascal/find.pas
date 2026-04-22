@@ -9,6 +9,8 @@ program find;
 
 {  2023 rricharz                       }
 
+{$U+}
+
 uses syslib, arglib, wildlib, filelib;
 
 const afloppy  = $c827;

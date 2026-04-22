@@ -14,6 +14,7 @@
 
 {   2019 rricharz (r77@bluewin.ch)     }
 
+{$U+}
 
 program getsource;
 uses syslib,arglib,filelib;
@@ -60,7 +61,7 @@ begin
     ARGTYPE[10]:='i';
     ARGLIST[10]:=1; {copy to drive 1}
     cyclus:=0; drive:=0;
-    filerr:=0;
+    filerr:=0; RUNERR:=0;
     runprog('COPY:R          ',cyclus,drive);
     if (filerr<>0) or (RUNERR<>0) then begin
       ok:=false;
