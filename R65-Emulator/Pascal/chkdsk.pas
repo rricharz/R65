@@ -13,6 +13,8 @@
 {  The disk name is stored in the last entry (255) }
 {  The last currently used entry has filtyp=TEND.  }
 
+{$U+}
+
 program chkdsk;
 uses syslib,arglib;
 
@@ -25,7 +27,6 @@ const aprepdo  = $f4a7;
 
 mem   filerr   = $00db:integer&;
       filtyp   = $0300:char&;
-      FILCYC   = $0311:integer&;
       filloc   = $0313:integer;
       filsiz   = $0315:integer;
       fillnk   = $031e:integer;

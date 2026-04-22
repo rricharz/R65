@@ -1,17 +1,17 @@
-{
-*************************************
-*                                   *
-* Copy(filename,source,destination) *
-*                                   *
-*************************************
+{ ************************************* }
+{ *                                   * }
+{ * Copy(filename,source,destination) * }
+{ *                                   * }
+{ ************************************* }
 
-  2019 rricharz
-  2023 Added wildcard handling
+{  2019 rricharz                        }
+{  2023 RR: Added wildcard handling     }
+{  2024-2026 RR: small improvements     }
 
-}
+{$U+}
 
 program copy;
-uses syslib,arglib,wildlib;
+uses syslib, arglib, wildlib, filelib;
 
 const MAXLINES = 13;
       rdfile=$e815;
@@ -20,16 +20,14 @@ const MAXLINES = 13;
       eblock=TOPMEM;
       cup=chr($1a);
 
-mem   ENDSTK=$e: integer;
-      FILFLG=$da: char&;
-      filerr=$db: integer&;
+mem   filerr=$db: integer&;
       filsa=$031a,
       filea=$031c,
       filsa1=$0331: integer;
       filtyp=$0300: char&;
 
 var name,savename: array[15] of char;
-    i,fcount:integer;
+    ii,fcount:integer;
     fno,ofno: file;
     cyclus,scyclus,drive,ddrive: integer;
     default: boolean;
@@ -37,7 +35,7 @@ var name,savename: array[15] of char;
     entry: integer;
     last, found: boolean;
 
-{ * isblockf * }
+{ **** isblockf **** }
 
 func isblockf(nm: array[15] of char): boolean;
 var j: integer;
@@ -56,13 +54,13 @@ begin
     end;
 end;
 
-{ * blockload * }
+{ **** blockload ***** }
 
 proc blockload(lowlim: integer);
 var i: integer;
 begin
   _asetfile(name,cyclus,drive,' ');
-  FILFLG:=chr(0);
+  FILFLG:=0;
   filsa:=lowlim;
   filsa1:=lowlim;
   filtyp:='B';
@@ -70,13 +68,13 @@ begin
   call(rdfile);
 end {blockload};
 
-{ * blocksave * }
+{ **** blocksave ***** }
 
 proc blocksave(lowlim,highlim: integer);
 var i: integer;
 begin
   _asetfile(name,cyclus,ddrive,' ');
-  FILFLG:=chr(0);
+  FILFLG:=0;
   filsa:=lowlim;
   filea:=highlim;
   filsa1:=lowlim;
@@ -85,17 +83,16 @@ begin
   call(wrfile);
 end {blocksave};
 
-{ * error * }
+{ ***** error ***** }
 
 proc error(x:integer);
-mem RUNERR=$0c: integer&;
 begin
   writeln;
-  writeln(INVVID,'File error ',
+  writeln(INVVID,'COPY: file error ',
     (x shr 4),(x and 15),NORVID);
 end {error};
 
-{ * copyfile * }
+{ **** copyfile ***** }
 
 proc copyfile;
 begin
@@ -133,11 +130,11 @@ begin
       FILCY1:=FILCYC;
       FILDRV:=ddrive;
       openw(ofno);
-      {write('.');}
+      { write('.'); }
       repeat
         read(@fno,ch);
         write(@ofno,ch);
-        if ch=CR then write('.')
+        { if ch=CR then write('.') }
         until (ch=EOF) or (ch=chr(31));
         { chr(31) for compatibility with old files }
       write(@ofno,EOF);
@@ -148,15 +145,15 @@ begin
 end;
 
 func haswildcard(nm1:array[15] of char): boolean;
-var k:integer;
+var kk:integer;
 begin
   haswildcard:=false;
-  for k:=0 to 15 do
-    if (nm1[k]='*') or (nm1[k]='?') then
+  for kk:=0 to 15 do
+    if (nm1[kk]='*') or (nm1[kk]='?') then
       haswildcard:=true;
 end;
-{
- * main * }
+
+{ **** main **** }
 
 begin
   cyclus:=0;
@@ -198,15 +195,15 @@ begin
       _findentry(name,drive,entry,found,last);
       if found and (not last) and
         ((scyclus=0) or (scyclus=FILCYC)) then begin
-        for i:=0 to 15 do begin
-          savename[i]:=name[i];
-          name[i]:=FILNAM[i];
+        for ii:=0 to 15 do begin
+          savename[ii]:=name[ii];
+          name[ii]:=FILNAM[ii];
         end;
         cyclus:=FILCYC;
         copyfile;
         fcount:=fcount+1;
-        for i:=0 to 15 do
-          name[i]:=savename[i];
+        for ii:=0 to 15 do
+          name[ii]:=savename[ii];
       end;
     end;
       if fcount=0 then writeln('no files found')
@@ -214,4 +211,4 @@ begin
   end else
     copyfile;
 end.
- 
+

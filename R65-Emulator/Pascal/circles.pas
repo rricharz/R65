@@ -2,12 +2,11 @@
 program circles;
 uses syslib,plotlib,mathlib;
 
-const toggle=chr($0c);
-      autorepeat=false;
+{$U+}
 
-mem   sflag=$1781:integer&;
+const autorepeat=false;
 
-var   x,y,r:integer;
+var   x9,y9,r9:integer;
 
 {$I ICIRCLE:P}
 {$I IRANDOM:P}
@@ -15,10 +14,10 @@ var   x,y,r:integer;
 func expaint:boolean;
 begin
   expaint:=false;
-  r := 3 + _random div 5;
-  x := irandom(r div 2, XSIZE - r div 2);
-  y := irandom(r div 2, YSIZE - r div 2);
-  circle(x,y,r,WHITE);
+  r9 := 3 + _random div 5;
+  x9 := irandom(r9 div 2, XSIZE - r9 div 2);
+  y9 := irandom(r9 div 2, YSIZE - r9 div 2);
+  circle(x9,y9,r9,WHITE);
 end;
 
 func exkey(ch:char):boolean;

@@ -16,6 +16,8 @@ system.
 
           rricharz 2018,2019             }
 
+{$U+}
+
 program alien;
 uses syslib,plotlib;
 

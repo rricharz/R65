@@ -13,6 +13,8 @@
 { Usage:  clean [drive]                     }
 {         default: drive 1                  }
 
+{$U+}
+
 program clean;
 uses syslib,arglib, filelib;
 

@@ -1,6 +1,8 @@
 program cat;
 uses syslib, arglib, strlib, striolib;
 
+{$U+}
+
 const
     CUP = chr($1a);
     DEBUG = false;

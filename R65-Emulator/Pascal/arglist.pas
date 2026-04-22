@@ -1,5 +1,7 @@
 { display argument list }
 
+{$U+}
+
 program ARGLIST;
 uses syslib, arglib;
 

@@ -2,6 +2,8 @@
 { Unix style cd command             }
 { Floppy disk 1 is set to diskname  }
 
+{$U+}
+
 program cd;
 uses syslib, arglib, striolib, strlib;
 
@@ -14,7 +16,7 @@ var arg0: cpnt;
 
 begin {main}
   arg0 := _new;
-  _sgetstring(arg0, default, cyclus, drive);
+  _sgetstring(arg0, _carg, default);
 
   if default then
     _strcpy('WORK', arg0);

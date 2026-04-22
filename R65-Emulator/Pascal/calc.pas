@@ -428,23 +428,35 @@ end;
 {*********main body********}
 begin
   write(INVVID);
-  writeln('Enter an expression, for example:        ');
-  writeln('32767      INPUT decimal number          ');
-  writeln('$FFF       INPUT hex number              ');
-  writeln('%1101      INPUT binary number           ');
-  writeln('-55.35     INPUT negative number         ');
-  writeln('2*(5+28)   math expression               ');
-  writeln('R*3        last result                   ');
-  writeln('<return>,<esc>    exit                   ');
-  writeln('Operators: +,-,*,/,^,(),&,|,<<,>>        ');
-  writeln('Functions: SQRT(),SQR(),SIN(),COS()      ');
-  writeln('           TAN(),EXP(),LN(),LOG()        ');
+  writeln('Enter an expression, for example:        ')
+;
+  writeln('32767      INPUT decimal number          ')
+;
+  writeln('$FFF       INPUT hex number              ')
+;
+  writeln('%1101      INPUT binary number           ')
+;
+  writeln('-55.35     INPUT negative number         ')
+;
+  writeln('2*(5+28)   math expression               ')
+;
+  writeln('R*3        last result                   ')
+;
+  writeln('<return>,<esc>    exit                   ')
+;
+  writeln('Operators: +,-,*,/,^,(),&,|,<<,>>        ')
+;
+  writeln('Functions: SQRT(),SQR(),SIN(),COS()      ')
+;
+  writeln('           TAN(),EXP(),LN(),LOG()        ')
+;
   writeln(NORVID);
   r:=0.0; lastr:=0.0; dotused:=false;
   repeat
     firsterror:=true;
     clearinput;
     stop:=true; showresult;
-    dotused:=false; lastr:=r; r:=express; checkfor(CR);
+    dotused:=false; lastr:=r; r:=express; checkfor(CR)
+;
   until stop;
 end.

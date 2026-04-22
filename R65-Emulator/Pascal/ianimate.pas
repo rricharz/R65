@@ -12,13 +12,13 @@ const toggle=chr($0c);
 mem   sflag=$1781:integer&;
       emuflags=$1707:integer&;
 var   ch:char;
-      dummy:integer;
+      dummy0:integer;
       stop:boolean;
 begin
   repeat
     repeat
       stop:=expaint;
-      dummy:=_syncscreen; { sleep for up to 30 msec }
+      dummy0:=_syncscreen; { sleep for up to 30 msec }
       ch:=KEYPRESSED; { sleep for 10 msec }
       { sflag bit 8 is escape flag. Pass it through }
     until (ord(ch)<>0) or ((sflag and $80)<>0)

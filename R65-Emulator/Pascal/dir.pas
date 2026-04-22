@@ -34,6 +34,8 @@ The disk name is stored in the last entry (255)
 The last currently used entry has filtyp=TEND
 }
 
+{$U+}
+
 program dir;
 uses syslib, arglib, strlib, striolib;
 
@@ -52,7 +54,6 @@ mem   filtyp  = $0300: char&;
       fildat  = $0317: array[2] of integer&;
       fillnk  = $031e: integer;
       scyfc   = $037c: integer&;
-      filerr  = $00db: integer&;
 
 var default, name_given,
     sortit, full:             boolean;
@@ -98,11 +99,11 @@ end;
 
 proc sort;
 {********}
-var i,j:integer;
+var ii,j:integer;
     savepnt:cpnt;
 begin
-  for i:=0 to nument-1 do
-     for j:=nument-1 downto i do
+  for ii:=0 to nument-1 do
+     for j:=nument-1 downto ii do
        if smaller(entry[j],entry[j+1]) then begin
           savepnt:=entry[j];
           entry[j]:=entry[j+1];

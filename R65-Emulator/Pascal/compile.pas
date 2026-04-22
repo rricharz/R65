@@ -4,6 +4,8 @@
 
 { this version tests whether object file exists }
 
+{$U+}
+
 program compile;
 uses syslib,arglib, filelib;
 
@@ -15,10 +17,10 @@ var cyclus,drive: integer;
 
 {       * runprog *           }
 
-proc runprog(name: array[15] of char);
+proc runprog(rname: array[15] of char);
 var i: integer;
 begin
-  for i:=0 to 15 do FILNM1[i]:=name[i];
+  for i:=0 to 15 do FILNM1[i]:=rname[i];
   FILCY1:=0; FILCYC:=0; FILDRV:=0;
   run
 end;

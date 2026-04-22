@@ -10,11 +10,13 @@
 
 {W ild cards * and ? are allowed           }
 
+{$U+}
+
 program delete;
 uses syslib, arglib, filelib, wildlib;
 
-const adelete=$c80c; { exdos vector }
-      prflab     = $ece3;
+const adelete  = $c80c; { exdos vector }
+      prflab   = $ece3;
 
 mem filerr=$db: integer&;
 
