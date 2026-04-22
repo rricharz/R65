@@ -1,11 +1,13 @@
-library wildlib;
-
 { find filesentries. Wildcards * and ? }
 {  The cyclus is ignored.              }
 {  File type is required either as     }
 {  name:x, name* or name:?             }
 
 {  2023 rricharz                       }
+
+{$U+}
+
+library wildlib;
 
 const NAMESIZE   = 15;
       NUMENTRIES = 255;
@@ -14,7 +16,7 @@ mem   FILNAM=$0301: array[NAMESIZE] of char&;
 
 proc _test(s1:array[NAMESIZE] of char;
       var found:boolean);
-var i1,i2,l1,l2:integer;
+var l1,l2:integer;
 
 func match(i0,i2:integer): boolean;
 var i1:integer;
@@ -74,7 +76,6 @@ mem   filtyp     = $0300: char&;
       fildrv     = $00dc: integer&;
 
 var   i: integer;
-
 
 proc checkfilerr;
 const stopcode=$2010;

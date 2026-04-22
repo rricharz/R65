@@ -22,6 +22,8 @@ Real output functions:
   d     digits after decimal point
   r     real number to write             }
 
+{$U+}
+
 library mathlib;
 
 const PI = 3.14159;
@@ -64,14 +66,14 @@ func cos(x:real):real;
 
 var m:real;
 
-  func cos0(x:real):real;
+  func cos0(x0:real):real;
   var t,s:real;
     i, p:integer;
   begin
     p:=0; s:=1.; t:=1.;
     while fabs(t/s) > 0.00001 do begin
       p:=p+1;
-      t:=(-t*x*x)/(conv(2*p-1)*conv(2*p));
+      t:=(-t*x0*x0)/(conv(2*p-1)*conv(2*p));
       s:=s+t;
     end;
     cos0:=s;

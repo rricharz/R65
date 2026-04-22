@@ -10,23 +10,23 @@ var mask:array[XSIZE] of integer;
     x,y,step,max,scale:real;
     sx,sy,dx,dy:real;
 
-func f1(x,y:real):real;
+func f1(x0,y0:real):real;
 begin
-  f1:=sin(2.0*x+y);
+  f1:=sin(2.0*x0+y0);
 end;
 
-func f2(x,y:real):real;
+func f2(x0,y0:real):real;
 var r:real;
 begin
-  r:=sqrt(x * x + y * y);
+  r:=sqrt(x0 * x0 + y0 * y0);
   if r=0.0 then f2:= 1.0
   else f2:=sin(r)/r;
 end;
 
-proc drawvec(x1,y1,x2,y2);
+proc drawvec(x11,y11,x22,y22);
 begin
-  _move(x1,y1);
-  _draw(x2,y2,WHITE);
+  _move(x11,y11);
+  _draw(x22,y22,WHITE);
 end;
 
 proc drawmasked(x1,y1,x2,y2:integer;

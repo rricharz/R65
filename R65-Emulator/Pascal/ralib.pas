@@ -4,6 +4,8 @@
 { Original rricharz 1982                 }
 { Reconstructed rricharz 2019            }
 
+{$U+}
+
 library ralib;
 
 const FREAD=$00;  {existing file, read}

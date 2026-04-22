@@ -19,6 +19,8 @@
 { the panel of the emulator. On the R65 replica,   }
 { front panel.                                     }
 
+{$U+}
+
 library ledlib;
 
 mem LEDREG=$1432: array[7] of char&;

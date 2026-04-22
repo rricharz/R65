@@ -13,6 +13,7 @@
 { order. There is no garbage collection.     }
 
 {$R+}
+{$U+}
 
 library strlib;
 
@@ -23,9 +24,9 @@ proc _runerr(e:integer);
 {**********************}
 { set runerr to e and stop execution of app }
 const stopcode = $2010;
-mem   _runerr = $000c: integer&;
+mem   _mrunerr = $000c: integer&;
 begin
-  _runerr:=e;
+  _mrunerr:=e;
   call(stopcode);
 end;
 

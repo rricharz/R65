@@ -12,6 +12,8 @@
 { the last entry (255). The last          }
 { used entry has filtyp=DEND              }
 
+{$U+}
+
 library filelib;
 
 mem

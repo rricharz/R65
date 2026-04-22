@@ -1,5 +1,3 @@
-library teklib;
-
 { plot routines for Tektronix 4010 graphics      }
 {  on the R65 PRINTER port. On the original      }
 {  R65 computer, a PRINTER or PLOTTER could      }
@@ -13,6 +11,10 @@ library teklib;
 {  tek4010 is put in the R65-emulator folder.    }
 
 {    ./tek4010 tail -f printout.txt              }
+
+{$U+}
+
+library teklib;
 
 const MAXX = 1023; { Tektronix 4010 graphics     }
       MAXY = 780;

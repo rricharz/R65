@@ -10,6 +10,8 @@
 
 }
 
+{$U+}
+
 library plotlib;
 
 const XSIZE=223;
@@ -142,34 +144,35 @@ mem grxinc=$03b6: integer;
     gry=$03af: integer&;
     grc=$03b0: integer&;
     grn=$03b1: integer;
+
 var x_new,y_new,xstep,ystep,xl,yl,i,cnt:integer;
 
-  proc _drawx(x,y,c,n:integer);
+  proc _drawx(x0,y0,c0,n:integer);
   const a_drawx=$c81e;
   begin
-    grx:=x;
-    gry:=y;
-    grc:=c;
+    grx:=x0;
+    gry:=y0;
+    grc:=c0;
     grn:=n;
     call(a_drawx);
   end;
 
-  proc _drawy(x,y,c,n:integer);
+  proc _drawy(x0,y0,c0,n:integer);
   const a_drawy=$c821;
   begin
-    grx:=x;
-    gry:=y;
-    grc:=c;
+    grx:=x0;
+    gry:=y0;
+    grc:=c0;
     grn:=n;
     call(a_drawy);
   end;
 
-  proc _drawxy(x,y,c,n,xi,yi:integer);
+  proc _drawxy(x0,y0,c0,n,xi,yi:integer);
   const a_drawxy=$c824;
   begin
-    grx:=x;
-    gry:=y;
-    grc:=c;
+    grx:=x0;
+    gry:=y0;
+    grc:=c0;
     grn:=n;
     grxinc:=xi;
     gryinc:=yi

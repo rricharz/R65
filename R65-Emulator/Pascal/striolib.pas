@@ -2,6 +2,8 @@
 {* striolib - file io using cpnt strings *}
 {*****************************************}
 
+{$U+}
+
 library striolib;
 
 { prepare read/write to file }

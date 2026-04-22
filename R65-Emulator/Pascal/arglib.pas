@@ -12,6 +12,7 @@
 { gets arguments given to app               }
 { prepares system disk io                   }
 
+{$U+}
 
 library arglib;
 

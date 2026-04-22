@@ -25,18 +25,27 @@ program compile1;
 
 uses syslib, arglib, filelib;
 
-const version='4.6';
-    idlength  =64;    {max. length of ident}
-    stacksize =256;   {stack size}
-    pagelenght=60;    {no of lines per page}
-    nooutput  =@0;
-    maxfi     =3;     {max number of ins fls}
-    yesOUTPUT=@255;
+const
+    version='4.7';
 
-    nresw      = 63;    {number of res. words, max 64}
-    symbsize   = 256;   {id table entries}
+    IDLENGTH  = 64;   {max. length of ident buffer}
+    IDSIZE    = 16;   {chars per identifier in idtab}
+    PIDSIZE   = 8;    {packed chars per identifier}
+    SYMBSIZE  = 256;  {id table entries}
+    IDTABSIZE = 2048; {SYMBSIZE * IDSIZE / 2 (packed)}
+
+    stacksize = 256;   {stack size}
+    pagelenght= 60;    {no of lines per page}
+    nooutput  = @0;
+    maxfi     = 3;     {max number of ins fls}
+    yesOUTPUT = @255;
+    nresw     = 63;    {number of res. words, max 64}
+
 var reswtab: array[ 512] of char; {8*(nresw+1)}
-    idtab:   array[2048] of char; {8*symbsize}
+
+    idtab:   array[2048] of packed char;
+    ident: array[IDLENGTH] of char;
+    idpack:  array[PIDSIZE] of packed char;
 
     tpos,pc,level,line,offset,dpnt,spnt,fipnt,
     npara,i,stackpnt,stackmax,spntmax,numerr,
@@ -51,11 +60,8 @@ var reswtab: array[ 512] of char; {8*(nresw+1)}
     fno,ofno,savefno: file;
     incname: array[15] of char;
     filstk: array[maxfi] of file;
-    ident: array[idlength] of char;
-    { Only the first 8 characters are        }
-    { used to find and differentiate ids!    }
 
-    stype: array[symbsize] of packed char;
+    stype: array[SYMBSIZE] of packed char;
 {   type of symbol                           }
 {   High letter:                             }
 {     a:array, c:constant, d;const parameter }
@@ -77,11 +83,11 @@ var reswtab: array[ 512] of char; {8*(nresw+1)}
 {     s:const cpnt                           }
 {     f:file, b:boolean, u:undefined         }
 
-    slevel: array[symbsize] of integer;
+    slevel: array[SYMBSIZE] of integer;
          {level}
-    svda: array[symbsize] of integer;
+    svda: array[SYMBSIZE] of integer;
          {val,dis,addr}
-    sspsz: array[symbsize] of integer;
+    sspsz: array[SYMBSIZE] of integer;
          {stack pointer,size of array}
 
     reswcod:array[nresw] of packed char;
@@ -116,7 +122,7 @@ begin
   line:=succ(line); lineinc:=succ(lineinc);
   linepage:=succ(linepage);
   if ((linepage div pagelenght)
-    * pagelength)=linepage then newpage;
+    * pagelenght)=linepage then newpage;
 end {crlf};
 
 {#################################}
@@ -156,7 +162,8 @@ begin
     22: write('Unexpected EOF');
     23: write('End mark for comment or string');
     24: write('Identifier already defined');
-    25: write('Formatted write')
+    25: write('Formatted write');
+    26: write('Wrong library version')
   end {case};
   writeln(NORVID);
   if (ofno<>nooutput) and (ofno<>yesOUTPUT)
@@ -168,6 +175,31 @@ end {merror};
 proc error(x: integer);
 begin
   merror(x,'##')
+end;
+
+{#############################}
+{ pack and unpack identifiers }
+{#############################}
+
+proc packid;
+var i,j: integer;
+begin
+  j := 1;
+  for i := 1 to PIDSIZE do begin
+    idpack[i] := packed(ident[j],ident[j+1]);
+    j := j + 2
+  end
+end;
+
+proc unpackid;
+var i,j: integer;
+begin
+  j := 1;
+  for i := 1 to PIDSIZE do begin
+    ident[j]   := high(idpack[i]);
+    ident[j+1] := low(idpack[i]);
+    j := j + 2
+  end
 end;
 
 {############}
@@ -394,6 +426,16 @@ begin {init}
   write('   1 (    4) '); getchr
 end {init};
 
+{################}
+{ clear (global) }
+{################}
+
+proc clear; {clears IDSIZE chars of identifier}
+var i: integer;
+begin
+  for i:=1 to IDSIZE do ident[i]:=' '
+end;
+
 {###############}
 { scan (global) }
 { ############# }
@@ -417,16 +459,6 @@ begin
   until (ci<>0) or (i>=8);
   compresw:=ci
 end {compresw};
-
-{#################}
-{ clear (of scan) }
-{#################}
-
-proc clear; {clears 8 chars of identifier}
-var i: integer;
-begin
-  for i:=1 to 8 do ident[i]:=' '
-end;
 
 {################}
 { pack (of scan) }
@@ -559,7 +591,7 @@ end;
 
 proc setid; {sets one char to ident}
 begin
-  if count<=idlength then begin
+  if count<=IDLENGTH then begin
     ident[count]:=ch; count:=succ(count)
   end;
   getchr0;
@@ -696,16 +728,40 @@ begin
   write(PRTOFF);
   _asetfile(name&'        ',0,cdrive,'L');
   openr(libfil);  { get table file }
+
+  { read and check header }
+
+  read(@libfil,ch); if ch<>'L' then error(26);
+  read(@libfil,ch); if ch<>'I' then error(26);
+  read(@libfil,ch); if ch<>'B' then error(26);
+  read(@libfil,ch); if ch<>'2' then error(26);
+  read(@libfil,ch); if ch<>',' then error(26);
   read(@libfil,nent,size);
-  {including cr,lf}
+
+  { including cr,lf }
+
   for i:=succ(spnt) to spnt+nent do begin
-    if spnt>symbsize then error(7);
-    spnt:=succ(spnt); addr:=8*i+1;
-    for j:=0 to 7 do begin
-      read(@libfil,ch);
-      idtab[addr+j]:=ch
-    end;
+    if spnt>=SYMBSIZE then error(7);
+    spnt:=succ(spnt);
+
+    clear;
+    j := 1;
+
     read(@libfil,ch);
+    while ch<>',' do begin
+      if j<=IDSIZE then begin
+        ident[j] := ch;
+        j := succ(j)
+      end;
+      read(@libfil,ch)
+    end;
+
+    packid;
+
+    addr := PIDSIZE * i + 1;
+    for j:=0 to PIDSIZE-1 do
+      idtab[addr+j] := idpack[j+1];
+
     read(@libfil,stype[i],dummy,slevel[i],
       svda[i],sspsz[i]);
     slevel[i]:=slevel[i]+level;
@@ -748,25 +804,28 @@ var l,f9,i,n,stackpn1,forwpn,find,cproc,
 
 func findid;
 var k,i: integer;
-    id1: char;
+    id1: packed char;
 begin
-  i:=1; k:=8*spnt+9; id1:=ident[1];
+  packid;
+  i := 1;
+  k := PIDSIZE * spnt + PIDSIZE + 1;
+  id1 :=idpack[1];
 
   repeat
-    k:=k-8;
-    while (idtab[k]<>id1) and (k>0) do k:=k-8;
+    k:=k-PIDSIZE;
+    while (idtab[k]<>id1) and (k>0) do k:=k-PIDSIZE;
     if k>0 then begin
-       i:=1;
-       repeat i:=succ(i)
-         until (i>8) or
-             (idtab[k+i-1]<>ident[i]);
-    end;
-    until (i>8) or (k<=0);
+      i:=1;
+      repeat i:=succ(i)
+        until (i>PIDSIZE) or
+          (idtab[k+i-1]<>idpack[i]);
+    end
+  until (i>PIDSIZE) or (k<=0);
+
   if k<=0 then begin
-    findid:=0;
-  end
-  else
-    findid:=(k-1) shr 3;
+    findid:=0
+  end else
+    findid:=(k-1) div PIDSIZE;
 end;
 
 {##################}
@@ -835,7 +894,7 @@ begin
       then error(24);
   end;
 
-  if spnt>=symbsize then error(7)
+  if spnt>=SYMBSIZE then error(7)
   else spnt:=succ(spnt);
 
   if spnt>spntmax then spntmax:=spnt;
@@ -843,8 +902,9 @@ begin
   stype[spnt]:=packed(ltyp1,ltyp2);
   sspsz[spnt]:=0;
 
-  addr:=8*spnt;
-  for i:=1 to 8 do idtab[addr+i]:=ident[i];
+  addr := PIDSIZE * spnt;
+  packid;
+  for i:=1 to PIDSIZE do idtab[addr+i] := idpack[i];
 
   if ltyp1='v' then begin
     svda[spnt]:=dpnt;
@@ -2402,24 +2462,24 @@ var i,j,sav1: integer;
     done: boolean;
 
   func found(start: integer):boolean;
-  var ii,i9: integer;
+  var ii: integer;
   begin {compare}
-    ii:= 0;
+    ii:=0;
     repeat
       ii:=succ(ii);
-    until (ii >= 8) or
-      (ident[ii] <> idtab[start+ii]);
-    found:=(ii >= 8);
+    until (ii >= PIDSIZE) or
+      (idpack[ii] <> idtab[start+ii-1]);
+    found:=(ii >= PIDSIZE);
   end {compare};
 
-
 begin {findforw}
+  packid;
   i:=succ(forwpn);
   repeat
     i:=prec(i);
     done := (i = 0);
     if not done then
-      done := found(8*fortab[i]);
+      done := found(PIDSIZE * fortab[i] + 1);
   until done;
   findforw:=i;
   if i>0 then
@@ -2535,17 +2595,22 @@ end {block};
 
 proc savtable; { save lib table in @ofno }
 
-var i,j,num: integer;
+var i, j, k, num, addr: integer;
     vtype1: char;
 
 begin
-  writeln(@ofno,spnt,',',pc+2);
+  writeln(@ofno,'LIB2,',spnt,',',pc+2);
   for i:=1 to spnt do begin {for every entry }
-    for j:=1 to 8 do begin
-      write(@ofno,idtab[8*i+j])
-    end;
-    writeln(@ofno,',',stype[i],',',slevel[i],',',
-      svda[i],',',sspsz[i]);
+    addr := PIDSIZE * i;
+    for j:=1 to PIDSIZE do
+      idpack[j] := idtab[addr+j];
+    unpackid;
+    j := IDSIZE;
+    while (j>1) and (ident[j]=' ') do j := j-1;
+    for k:=1 to j do
+      write(@ofno,ident[k]);
+      writeln(@ofno,',',stype[i],',',slevel[i],',',
+        svda[i],',',sspsz[i]);
     vtype1:=high(stype[i]);
     if ((vtype1='p') or (vtype1='f') or
       (vtype1='g')) and (sspsz[i]<>0) then begin
