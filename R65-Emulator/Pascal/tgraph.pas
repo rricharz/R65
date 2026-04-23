@@ -90,7 +90,7 @@ begin
   ys:=border;
   yw:=MAXY-2*border;
 
-  drawrectange(xs,ys,xs+xw,ys+yw);
+  _drawrectange(xs,ys,xs+xw,ys+yw);
 
   _setlinemode(DOTTED);
   _setchsize(2);

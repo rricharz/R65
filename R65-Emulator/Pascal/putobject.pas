@@ -16,7 +16,9 @@
 program putobject;
 uses syslib, arglib, filelib;
 
-const afloppy=$c827; { exdos vector }
+const
+    afloppy=$c827; { exdos vector }
+    VERBOSE = false;
 
 mem filerr=$db: integer&;
 
@@ -25,6 +27,7 @@ var cyclus,drive,k: integer;
     default,ok,libflag: boolean;
 
 {$I IFILE:P}
+{$I ISILENT}
 
 begin
   ok:=true;
@@ -36,13 +39,15 @@ begin
     writeln('Usage: putobject filename')
   else begin
     { make sure that WORK is on drive 1 }
-    writeln('Putting disk WORK in drive 1');
+    if VERBOSE then
+      writeln('Putting disk WORK in drive 1');
     cyclus:=0; drive:=1;
     _asetfile('WORK            ',cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
     { make sure that PASCAL is on drive 0 }
-    writeln('Putting disk PASCAL in drive 0');
+    if VERBOSE then
+      writeln('Putting disk PASCAL in drive 0');
     cyclus:=0; drive:=0;
     _asetfile('PASCAL          ',cyclus,drive,' ');
     call(afloppy);
@@ -54,7 +59,8 @@ begin
     ARGLIST[10]:=0; {copy to drive 0}
     ARGTYPE[11]:=chr(0);
     cyclus:=0; drive:=0; filerr:=0;
-    writeln('Copying the file(s)');
+    if VERBOSE then
+      writeln('Copying object file(S):');
     if libflag then begin
       setsubtype('L');
       setargs(fname,0,0,1);
@@ -99,9 +105,9 @@ begin
         end;
       end;
       { delete any remaining :Q files }
-      writeln('Deleting any remaining temporary files'
-);
-       setsubtype('Q');
+      if VERBOSE then
+        writeln('Deleting remaining temporary files');
+      setsubtype('Q');
       fname[0]:='*';
       setargs(fname,0,0,1);
       runprog('DELETE:R        ',cyclus,drive);

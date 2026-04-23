@@ -16,13 +16,16 @@ program delete;
 uses syslib, arglib, filelib, wildlib;
 
 const adelete  = $c80c; { exdos vector }
-      prflab   = $ece3;
+      prflb1   = $f151;
+      CUP      = chr($1a);
 
 mem filerr=$db: integer&;
 
 var cyclus,scyclus,drive,entry,fcount,i: integer;
     name,savename: array[15] of char;
-    default,found,last: boolean;
+    default,found, last: boolean;
+
+{$I ISILENT:P}
 
 proc bcderror(e:integer);
 begin
@@ -41,6 +44,7 @@ begin
 end;
 
 begin
+  write(CUP);
   cyclus:=0; drive:=1; filerr:=0;
   _agetstring(name,default,cyclus,drive);
   scyclus:=cyclus;
@@ -55,9 +59,11 @@ begin
         name[i]:=FILNAM[i];
       end;
       _asetfile(name,FILCYC,drive,' ');
-      call(prflab); writeln;
+      silent(false);
+      call(prflb1);
       call(adelete);
       if filerr<>0 then begin
+        writeln;
         bcderror(filerr);
         last:=true;
       end;
@@ -66,10 +72,11 @@ begin
         name[i]:=savename[i];
     end;
   end;
-  if fcount=0 then begin
-    if not haswildcard(name) then
-    writeln(INVVID,'File not found',NORVID)
-    else writeln('No files deleted');
+  writeln;
+  if (fcount = 0) then begin
+    if not haswildcard(name) then begin
+      writeln(INVVID,'File not found',NORVID)
+    end
   end else
     writeln(fcount, ' file(s) deleted');
 end.

@@ -8,6 +8,8 @@
 {                                    }
 {   rricharz 2019                    }
 
+{$U+}
+
 program maketable;
 uses syslib,ralib,mathlib;
 
@@ -108,4 +110,4 @@ begin
   writeln;
   writeln('Table written');
 
-end. 
+end. 

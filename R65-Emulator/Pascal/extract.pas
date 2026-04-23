@@ -1,7 +1,6 @@
 program extract;
 uses syslib, arglib, filelib, strlib;
 
-{$R+}
 {$U+}
 
 const TOK_OTHER = 0;
@@ -956,7 +955,8 @@ begin
 
   runpass(1);
 
-  runpass(2);
+  { do not make a nroff source file }
+  { runpass(2); }
 
   _release(body);
   _release(addrpad);

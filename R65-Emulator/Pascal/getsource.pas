@@ -20,6 +20,7 @@ program getsource;
 uses syslib,arglib,filelib;
 
 const afloppy=$c827; { exdos vector }
+  VERBOSE = false;
 
 mem filerr=$db: integer&;
 
@@ -41,22 +42,27 @@ begin
     setsubtype('P');
     dname:='PSOURCE         ';
     { make sure that WORK is on drive 1 }
-    writeln('Putting disk WORK in drive 1');
+    if VERBOSE then
+      writeln('Putting disk WORK in drive 1');
     cyclus:=0; drive:=1;
     _asetfile('WORK            ',cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
     { make sure that dname is on drive 0 }
-    write('Putting disk ');  _writename(dname);
-    writeln(' in drive 0');
+    if VERBOSE then begin
+      write('Putting disk ');  _writename(dname);
+      writeln(' in drive 0');
+    end;
     cyclus:=0; drive:=0;
     _asetfile(dname,cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
     { copy the source file }
-    write('Copying ');
-    _writename(fname);
-    writeln(',0,1');
+    if VERBOSE then begin
+      write('Copying ');
+      _writename(fname);
+      writeln(',0,1');
+    end;
     setargs(fname,0,0,0);
     ARGTYPE[10]:='i';
     ARGLIST[10]:=1; {copy to drive 1}
@@ -71,7 +77,8 @@ begin
         'Copy failed',NORVID);
     end;
     { make sure that PASCAL is on drive 0 }
-    writeln('Putting disk PASCAL in drive 0');
+    if VERBOSE then
+      writeln('Putting disk PASCAL in drive 0');
     cyclus:=0; drive:=0;
     _asetfile('PASCAL          ',cyclus,drive,' ');
     call(afloppy);

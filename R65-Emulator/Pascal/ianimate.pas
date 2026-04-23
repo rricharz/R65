@@ -1,8 +1,8 @@
-{ ianimate - run animation in loop
-  proc expaint;
-    Called to paint one picture and apply motion.
-  func exkey(ch:char):boolean;
-    Called to check for KEY and stop loop if true  }
+{ ianimate - run animation in loop                  }
+{  proc expaint;                                    }
+{    Called to paint one picture and apply motion.  }
+{  func exkey(ch:char):boolean;                     }
+{    Called to check for KEY and stop loop if true  }
 
 proc animate(arepeat:boolean);
 { arepeat: auto repeat cursor keys without _delay }

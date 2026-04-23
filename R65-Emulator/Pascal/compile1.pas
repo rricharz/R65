@@ -163,7 +163,8 @@ begin
     23: write('End mark for comment or string');
     24: write('Identifier already defined');
     25: write('Formatted write');
-    26: write('Wrong library version')
+    26: write('Wrong library version');
+    27: write('Identifier too long')
   end {case};
   writeln(NORVID);
   if (ofno<>nooutput) and (ofno<>yesOUTPUT)
@@ -673,7 +674,7 @@ begin
     else setval {numeric value}
   end {main if}
   else begin { is_id_letter }
-        clear;
+    clear;
     repeat
       setid; if ch=CR then ch:=' ';
     until not
@@ -685,9 +686,12 @@ begin
       else ll:=succ(i);
       until (co=0) or (ll>hh);
     if (co=0) then
-      token:=reswcod[i] {reserved word found}
-    else token:='id' {ident}
-  end {odent}
+      token := reswcod[i] {reserved word}
+    else begin
+      if count>succ(IDSIZE) then error(27);
+      token := 'id' {identifier}
+    end;
+  end {identifier or reserved word}
 end {scan};
 
 {##############}
@@ -884,14 +888,18 @@ proc putsym(ltyp1,ltyp2: char);
 var i,addr,oldid: integer;
 
 begin
-  if ucheck then begin
-    oldid:=findid;
-    if oldid<>0 then
-      if not ((ltyp1='f') and
-            (oldid=spnt) and
-            (high(stype[oldid])='f') and
-            (level=slevel[oldid]+1))
-      then error(24);
+  oldid:=findid;
+  if oldid<>0 then begin
+    if not ((ltyp1='f') and
+          (oldid=spnt) and
+          (high(stype[oldid])='f') and
+          (level=slevel[oldid]+1))
+    then begin
+      if slevel[oldid]=level then
+        error(24)
+      else if ucheck then
+        error(24);
+    end;
   end;
 
   if spnt>=SYMBSIZE then error(7)

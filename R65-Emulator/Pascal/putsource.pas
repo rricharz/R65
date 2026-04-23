@@ -22,7 +22,8 @@ uses syslib,arglib,filelib;
 
 const afloppy = $c827; { exdos vector }
       aexport = $c82a; { exdos vector }
-      VERBOSE = true;
+      CUP    = chr($1a);
+      VERBOSE = false;
 
 mem filerr=$db: integer&;
 
@@ -62,11 +63,9 @@ begin
     if (filerr<>0) then ok:=false;
     { copy the source file }
     if ok then begin
-      if VERBOSE then begin
-        write('Copying the source file ');
-        _writename(fname);
-        writeln;
-      end;
+      write('Saving and exporting ');
+      _writename(fname);
+      writeln;
       setargs(fname,0,0,1);
       ARGTYPE[10]:='i';
       ARGLIST[10]:=0; {copy to drive 0}
@@ -82,6 +81,7 @@ begin
       else
         writeln(INVVID,'Copy failed',NORVID);
     end else begin {if successfull}
+      write(CUP); {avoid empty line}
       setargi(FILCYC,8);
       { export the source file }
       if VERBOSE then
@@ -91,8 +91,7 @@ begin
       writeln;
 
       { delete the source file               }
-      if VERBOSE then
-        writeln('Deleting the source file');
+      writeln('Deleting the source file(s)');
       drive:=0; filerr:=0;
       setargi(0,8);
       runprog('DELETE:R        ',cyclus,drive);

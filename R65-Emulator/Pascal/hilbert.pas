@@ -1,5 +1,5 @@
 program hilbert;
-  {plot Hilbert curves of orders 1 to n}
+  {_plot Hilbert curves of orders 1 to n}
   {adapted from N. Wirth,}
   { Algorithms+Data Structures=Programs,p132}
   {76/11/18.  JFM.}
@@ -18,8 +18,8 @@ program hilbert;
     bq = 96     {ascii back - quote};
     at = 64     {ascii at - sign};
     esc= 27     {ascii escape};
-    ff = 12     {ascii form feed};
-    cr = 13     {ascii carriage return};
+    FF = 12     {ascii form feed};
+    CR = 13     {ascii carriage return};
 
     tek = @1;
 
@@ -30,25 +30,25 @@ program hilbert;
   proc startplot {clear the screen};
   begin
     write(@tek,chr(17)); { raw mode }
-    write(@tek,chr(esc),chr(ff))
+    write(@tek,chr(esc),chr(FF))
   end;
 
-  proc plot {plot a vector};
+  proc _plot {_plot a vector};
   begin
     write(@tek,
       chr(sp + (y + yoffset) div 32),
       chr(bq + (y + yoffset) and 31),
       chr(sp + (x + xoffset) div 32),
       chr(at + (x + xoffset) and 31))
-  end {plot};
+  end {_plot};
 
-  proc move;
-  {move the pen to (x,y) - -  dark vector}
-  begin write(@tek, chr(gs)); plot end{move};
+  proc _move;
+  {_move the pen to (x,y) - -  dark vector}
+  begin write(@tek, chr(gs)); _plot end{_move};
 
   proc endplot {leave graph mode};
   begin
-    write(@tek, chr(cr))
+    write(@tek, chr(CR))
     write(@tek,chr(18)); { end raw mode }
   end {endplot};
 
@@ -60,9 +60,9 @@ program hilbert;
   begin
     if i > 0 then
       begin
-        d(i - 1); x := x - h; plot;
-        a(i - 1); y := y - h; plot;
-        a(i - 1); x := x + h; plot;
+        d(i - 1); x := x - h; _plot;
+        a(i - 1); y := y - h; _plot;
+        a(i - 1); x := x + h; _plot;
         b(i - 1)
       end
   end {a};
@@ -71,9 +71,9 @@ program hilbert;
   begin
     if i > 0 then
       begin
-        c(i - 1); y := y + h; plot;
-        b(i - 1); x := x + h; plot;
-        b(i - 1); y := y - h; plot;
+        c(i - 1); y := y + h; _plot;
+        b(i - 1); x := x + h; _plot;
+        b(i - 1); y := y - h; _plot;
         a(i - 1)
       end
   end {b};
@@ -82,9 +82,9 @@ program hilbert;
   begin
     if i > 0 then
       begin
-        b(i - 1); x := x + h; plot;
-        c(i - 1); y := y + h; plot;
-        c(i - 1); x := x - h; plot;
+        b(i - 1); x := x + h; _plot;
+        c(i - 1); y := y + h; _plot;
+        c(i - 1); x := x - h; _plot;
         d(i - 1)
       end
   end {c};
@@ -93,9 +93,9 @@ program hilbert;
   begin
     if i > 0 then
       begin
-        a(i - 1); y := y - h; plot;
-        d(i - 1); x := x - h; plot;
-        d(i - 1); y := y + h; plot;
+        a(i - 1); y := y - h; _plot;
+        d(i - 1); x := x - h; _plot;
+        d(i - 1); y := y + h; _plot;
         c(i - 1)
       end
   end {d};
@@ -119,12 +119,12 @@ begin {Hilbert}
         y0 := y0 + (h div 2)
       end;
   repeat
-    {plot Hilbert curve of order i + 1}
+    {_plot Hilbert curve of order i + 1}
     i := i + 1;
     h := h div 2;
     x0 := x0 + (h div 2);
     y0 := y0 + (h div 2);
-    x := x0;   y := y0;   move;
+    x := x0;   y := y0;   _move;
     a(i)
   until i = n;
   endplot

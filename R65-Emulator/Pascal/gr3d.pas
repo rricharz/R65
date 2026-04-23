@@ -1,6 +1,8 @@
 { GR3d3D:P R65 Pascal math demo
   rricharz 2019 }
 
+{$U+}
+
 program gr3d;
 uses syslib,mathlib,plotlib;
 

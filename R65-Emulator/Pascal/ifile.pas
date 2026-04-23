@@ -10,10 +10,9 @@ begin
   run
 end;
 
-proc _writename(text: array[15] of char);
+proc writename_nobl(text: array[15] of char);
 { write name without blanks }
 var i: integer;
-
 begin
   for i:=0 to 15 do
     if text[i]<>' ' then write(text[i]);
