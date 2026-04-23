@@ -1,21 +1,21 @@
 {
- 
+
                 REVERSI
- 
+
 Pascal Program for Tiny Pascal
 Adapted from Byte 4,11 (1979)
 Original Basic version by Peter B. Maggs
- 
+
 Last change 06/02/80 rricharz
 Recovered 2018-2023 by rricharz               }
- 
+
 program reversi;
 uses syslib;
- 
-const tab8=chr($09);
-      hom=chr($01);
+
+const TAB8=chr($09);
+      HOM=chr($01);
       csc=chr($11);
- 
+
 var f {value for opponent's best reply
        to computer's best best play},
     g {value for opponent's best reply
@@ -24,39 +24,39 @@ var f {value for opponent's best reply
     j,k,l {counters},
     m,m1 {play},
     n {counter},
-    p {player, black=-1, white=1},
+    p {player, BLACK=-1, WHITE=1},
     q {total moves},
     t,t3 {logical value},
     u {counter},
     v,w {to save play},
     z {counter}
- 
+
         : integer;
- 
+
     us {user colour},
     nextplay
- 
+
         : char;
- 
+
     b {board},
     e {value for board squares}
- 
+
         : array[100] of integer;
- 
+
     d {distance to next squares}
- 
+
         : array[8] of integer;
- 
+
     endplay {end of game flag}
         : boolean;
- 
+
 proc init; {initialize the game}
 var n1,n2: integer;
 begin
-  writeln(hom,csc,tab8,'The game of Reversi');
-  writeln(tab8,'*******************');
+  writeln(HOM,csc,TAB8,'The game of Reversi');
+  writeln(TAB8,'*******************');
   writeln;
- 
+
   e[11]:=0; e[12]:= 64; e[13]:=-30;
             e[14]:= 10; e[15]:=  5;
   e[21]:=0; e[22]:=-30; e[23]:=-40;
@@ -65,30 +65,30 @@ begin
             e[34]:=  5; e[35]:=  1;
   e[41]:=0; e[42]:=  5; e[43]:=  2;
             e[44]:=  1; e[45]:=  1;
- 
+
   for n1:=1 to 4 do {horizontal axis}
     for n2:=1 to 5 do
       e[10*n1+11-n2]:=e[10*n1+n2];
- 
+
   for n2:=1 to 10 do {vertical axis}
     for n1:=1 to 4 do
       e[90-10*n1+n2]:=e[10*n1+n2];
- 
+
   for n1:=1 to 100 do b[n1]:=0;
   for n1:=1 to 10 do begin
     b[n1]:=3; b[90+n1]:=3; b[10*n1-9]:=3;
     b[10*n1]:=3
   end;
   b[45]:=2; b[46]:=2; b[55]:=2; b[56]:=2;
- 
+
   u:=5; q:=1; p:=1; m1:=0; t3:=0;
   endplay:=false;
- 
+
   write('Would you like to be');
   write(' Black or White?');
   read(us);
 end {init};
- 
+
 proc display; {display the board}
 var mm,x,y: integer;
 begin
@@ -97,19 +97,19 @@ begin
     write('     ',y);
     for mm:=10*y+2 to 10*y+9 do begin
       write('  ');
-      if mm=m1 then write(invvid);
+      if mm=m1 then write(INVVID);
       case b[mm] of
          1: write('W');
         -1: write('B')
         else write('-')
       end {case};
-      write(norvid);
+      write(NORVID);
     end {for};
     writeln('  ',y)
   end {for};
   writeln('        1  2  3  4  5  6  7  8');
 end;
- 
+
 proc adjust; {adjust corner values}
 begin
   case m of
@@ -119,7 +119,7 @@ begin
     89: begin e[77]:=5; e[78]:=5; e[88]:=5 end
   end {case}
 end;
- 
+
 proc evaluate;
 var stop: boolean;
 begin
@@ -134,7 +134,7 @@ begin
     end
   end
 end;
- 
+
 proc makeplay; {make a play}
 var j,n,k: integer;
 begin
@@ -157,7 +157,7 @@ begin
     end {while}
   end {if}
 end {makeplay};
- 
+
 proc checkop; {check opponent's replies}
 var z: integer;
     stop: boolean;
@@ -182,7 +182,7 @@ begin
   m:=v;
   p:=-p
 end {checkop};
- 
+
 proc checkco; {check computer's play}
 var c: array[100] of integer;
 begin
@@ -196,7 +196,7 @@ begin
     makeplay;
     if t<>0 then begin
       checkop;
-      if (h<f) or ((h=f) and (random<127))
+      if (h<f) or ((h=f) and (_random<127))
       then begin {better found}
         f:=h; w:=v
       end;
@@ -207,7 +207,7 @@ begin
   m:=w;
   writeln
 end {checkco};
- 
+
 proc checkplay; {check for legal play}
 var stop: boolean;
 begin
@@ -234,7 +234,7 @@ begin
   end {while};
   writeln
 end {checkplay};
- 
+
 proc getplay;
 var x,y: integer;
 begin
@@ -251,13 +251,13 @@ begin
       m:=x+1+10*y;
   end
 end {getplay};
- 
+
 begin {main}
   d[1]:=1; d[2]:=11; d[3]:=10 d[4]:=9;
   d[5]:=-1; d[6]:=-11; d[7]:=-10; d[8]:=-9;
   repeat {main loop for game}
     init;
-    write(hom,csc); display;
+    write(HOM,csc); display;
     repeat
       if (q>=5) then checkplay;
       if (q>=5) and (t<>1) then begin
@@ -277,7 +277,7 @@ begin {main}
               ' points');
             endplay:=true
           end else begin {t3<2}
-            write(hom,csc);
+            write(HOM,csc);
             if (p=1) then write('White')
             else write('Black');
             writeln(' cannot play');
@@ -305,12 +305,12 @@ begin {main}
               makeplay
           end;
           if t=0 then begin
-            write(hom,csc);
+            write(HOM,csc);
             writeln('Illegal play!');
             display
           end
         until t<>0;
-        write(hom,csc);
+        write(HOM,csc);
         display
       end;
       p:=-p;

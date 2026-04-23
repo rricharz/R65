@@ -235,15 +235,6 @@ begin
     end;
 end;
 
-proc ladderup;
-begin
-  if (ffloor<nfloors) and onupladder(ffloor,fx)
-  then begin
-    fx:=conv(ladders[ffloor]+1);
-    fyspeed:=1; fxspeed:=0.0;
-  end;
-end;
-
 proc ladderdown;
 begin
   if (ffloor>0) and ondownladder(ffloor,fx)

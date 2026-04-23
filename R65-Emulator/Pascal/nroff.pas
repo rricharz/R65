@@ -73,7 +73,8 @@ var
   textseen : boolean;
         { true after first real text output }
 
-  thname   : array[LINEMAX] of char; { title from .TH }
+  thname   : array[LINEMAX] of char; { title from .TH
+}
   thlen    : integer; { length of title text }
 
 proc errec(pos,code:integer);
@@ -444,7 +445,7 @@ begin
   end;
 end;
 
-proc formatfillfromline;
+proc ffillfromline;
 {**********************}
 var i, wstart, wlen: integer;
 begin
@@ -923,7 +924,7 @@ begin
       emitquotedline;
       exit;
     end;
-    if fillmode then formatfillfromline
+    if fillmode then ffillfromline
     else emittextnofill;
   end;
 end;

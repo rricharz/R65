@@ -27,9 +27,12 @@ mem filerr=$db: integer&;
 
 var cyclus,drive,free: integer;
     name: array[15] of char;
-    default: boolean;
+    default,silentflag: boolean;
+
+{$I ISILENT:P}
 
 proc bcderror(e:integer);
+{**********************}
 begin
   writeln;
   write(INVVID,'ERROR ');
@@ -38,6 +41,7 @@ begin
 end;
 
 proc setsubtype(subtype:char);
+{****************************}
 { only set subtype if not already there }
 mem filstp=$312:char&;
 var i:integer;
@@ -61,11 +65,15 @@ begin { main }
   _agetstring(name,default,cyclus,drive);
   setsubtype('P');
   _asetfile(name,cyclus,drive,' ');
-  { _delay10msec(3); } { allow R65 display to update }
+  silentflag := false;
+  if ARGTYPE[_carg]='s' then
+    silentflag := option('S');
+  silent(silentflag);
   bestmatch;
   writeln;
   emucom := ECEXPORT;
   filerr := emures;
   if filerr<>0 then bcderror(filerr);
+    silent(false);
 end.
   

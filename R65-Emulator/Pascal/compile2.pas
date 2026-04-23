@@ -32,6 +32,7 @@ var pointer,address,maxsize,dummy,
     stop,def: boolean;
     name: array[15] of char;
 
+{$I ISILENT}
 
 { * error * }
 
@@ -151,9 +152,12 @@ proc getbl(base:integer);  {get block }
 
     { loading library from same drive }
     { as program compile2             }
+    silent(true);
     _asetfile(lname&'        ',
       lcyclus,ldrive,'T');
+    silent(true);
     openr(source);
+    silent(false);
     getbl(offset-2);
     close(source);
     source:=savsr;

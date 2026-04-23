@@ -33,7 +33,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define MAXENTRIES 127       // 16 sectors of 256 bytes, 32 bytes per entry
+#define MAXENTRIES 255       // 16 sectors of 256 bytes, 32 bytes per entry
 
 #include "time.h"
 

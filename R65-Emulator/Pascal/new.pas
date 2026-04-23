@@ -18,8 +18,9 @@ Usage:  new FILNAM[:x][.cy[,drive]]
   [drive]: disk drive (0,1), default 1
 }
 
+
 program new;
-uses syslib,arglib;
+uses syslib, arglib, filelib;
 
 const anew=$c812; { exdos vector }
       cup=chr($1a);

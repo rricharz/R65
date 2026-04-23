@@ -1,5 +1,5 @@
 program view;
-uses syslib, arglib;
+uses syslib, arglib, filelib;
 
 { written 2026 by rricharz and ChatGPT }
 

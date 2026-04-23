@@ -17,12 +17,14 @@
 
     W              write canvas to disk
     Q              write canvas to disk and quit
-    K              kill program without writing to disk
+    K              kill program without writing to dis
+k
 
   2024 rricharz                                   }
 
+
 program paint;
-uses syslib,arglib,wildlib,plotlib,strlib;
+uses syslib,arglib,wildlib,plotlib,strlib,filelib;
 
 const startcanvas=$700; sizecanvas=3304; {224x118/8}
       rdfile=$e815; wrfile=$e81b;
@@ -110,7 +112,8 @@ begin
               _plot(ax,ay,INVERSE);
             end;
     dline:  begin
-              _move(startx,starty); _draw(x,y,INVERSE);
+              _move(startx,starty); _draw(x,y,INVERSE)
+;
             end;
     drect:  begin
               _move(startx,starty);

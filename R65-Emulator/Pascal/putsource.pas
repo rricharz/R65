@@ -18,7 +18,7 @@
 
 
 program putsource;
-uses syslib,arglib,filelib;
+uses syslib,arglib,filelib,wildlib;
 
 const afloppy = $c827; { exdos vector }
       aexport = $c82a; { exdos vector }

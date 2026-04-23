@@ -23,7 +23,7 @@ mem filerr=$db: integer&;
 
 var cyclus,scyclus,drive,entry,fcount,i: integer;
     name,savename: array[15] of char;
-    default,found, last: boolean;
+    default,found,last,silentflag: boolean;
 
 {$I ISILENT:P}
 
@@ -44,11 +44,13 @@ begin
 end;
 
 begin
-  write(CUP);
   cyclus:=0; drive:=1; filerr:=0;
   _agetstring(name,default,cyclus,drive);
   scyclus:=cyclus;
   fcount:=0; last:=false; entry:= 0;
+  silentflag := false;
+  if ARGTYPE[_carg]='s' then
+    silentflag := option('S');
   while (entry<NUMENTRIES) and not last do begin
     cyclus:=scyclus;
     _findentry(name,drive,entry,found,last);
@@ -59,8 +61,10 @@ begin
         name[i]:=FILNAM[i];
       end;
       _asetfile(name,FILCYC,drive,' ');
-      silent(false);
+      silent(silentflag);
+      if not silentflag then write(CUP);
       call(prflb1);
+      if not silentflag then writeln;
       call(adelete);
       if filerr<>0 then begin
         writeln;
@@ -72,11 +76,13 @@ begin
         name[i]:=savename[i];
     end;
   end;
-  writeln;
-  if (fcount = 0) then begin
-    if not haswildcard(name) then begin
-      writeln(INVVID,'File not found',NORVID)
-    end
-  end else
-    writeln(fcount, ' file(s) deleted');
+  if not silentflag then begin
+    if (fcount = 0) then begin
+      if not haswildcard(name) then begin
+        writeln(INVVID,'File not found',NORVID)
+      end
+    end else
+      writeln(fcount, ' file(s) deleted');
+  end;
+  silent(false);
 end.

@@ -1,6 +1,4 @@
- {
-   ledtest.pas - _test program for ledlib
-}
+ { ledtest.pas - _test program for ledlib }
 
 program ledtest;
 uses syslib,ledlib;

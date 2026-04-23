@@ -1,4 +1,4 @@
-{ _test15.pas - graphics }
+{ grtest.pas - test graphics }
 
 program grtest;
 uses syslib,plotlib;
