@@ -36,7 +36,7 @@ end;
 proc findond(nm:array[15] of char; drv:integer);
 {********************************************}
 
-const  prflab     = $ece3;
+const  prflab     = $e82d;
 
 var first: boolean;
     i: integer;

@@ -28,6 +28,8 @@ const
   FF       = chr($c);   {form feed}
   CR       = chr($d);   {carriage return}
   EOF      = chr($7f);  {end of file}
+  CUP      = chr($1a);
+  CLRLIN   = chr($17);
   NORVID   = chr($0b);  {normal video}
   INVVID   = chr($0e);  {inverse video}
   PRTON    = chr($12);  {autoprint on}
@@ -141,6 +143,13 @@ func _random: integer;
 { pseudo random generator, result is 0..255 }
 begin
   _random:=mem[$1706] and 255;
+end;
+
+proc _erase_lastline;
+{*******************}
+{ erase last printed line for dense display }
+begin
+  write(CR, CLRLIN, CUP);
 end;
 
 proc __wrintf(value, width: integer);

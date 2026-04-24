@@ -6,16 +6,17 @@
 {  *                            *  }
 {  ******************************  }
 
-{ 03/31/206 cleaned up printing to disk }
+{ 03/31/2026 cleaned up printing to disk }
 
 program compile2;
 uses syslib,arglib,filelib;
 
 const
     title='R65 PASCAL COMPILER Version 4.2, Pass 2';
-    wrfile=$e81b;
-    sblock=$6000;
-    eblock=TOPMEM;
+    wrfile = $e81b;
+    prflab = $ece3;
+    sblock = $6000;
+    eblock = TOPMEM;
 
 mem ENDSTK=$e,
     stprog=$11: integer;
@@ -32,7 +33,6 @@ var pointer,address,maxsize,dummy,
     stop,def: boolean;
     name: array[15] of char;
 
-{$I ISILENT}
 
 { * error * }
 
@@ -77,6 +77,9 @@ begin
   FILSA1:=lowlim;
   FILTYP:='B';
   call(wrfile);
+  FILTYP := 'B';
+  call(prflab);
+  write('+');
   testerr
 end {blocksave};
 
@@ -152,12 +155,10 @@ proc getbl(base:integer);  {get block }
 
     { loading library from same drive }
     { as program compile2             }
-    silent(true);
     _asetfile(lname&'        ',
       lcyclus,ldrive,'T');
-    silent(true);
     openr(source);
-    silent(false);
+    _erase_lastline; { do not show file label }
     getbl(offset-2);
     close(source);
     source:=savsr;
@@ -239,18 +240,19 @@ end;
 { * main * }
 
 begin {main}
+  _erase_lastline;
   init; maxsize:=eblock-sblock-2;
   pointer:=sblock+2; offset:=2;
   getbl(0);
+  writeln;
   mem[pointer-1]:=0;
   mem[pointer]:=255;
   mem[pointer+1]:=255;
   pointer:=pointer+1;
   close(source);
   { writeln; }
-  showused;
   blocksave(sblock,pointer);
-  { writeln('Program has been stored'); }
+  showused;
   ENDSTK:=TOPMEM-144;
   dummy:=_freedrv(sdrive,true);
 end.

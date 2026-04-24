@@ -61,17 +61,22 @@ begin
   FILFLG:=$40; { Do not show file entry }
 end;
 
-proc bestmatch;
-{*************}
+func _bestmatch: boolean;
+{***********************}
 {find the best (highers cyclus) entry in directory}
 const
   preprd = $f62c;
-  prflb1 = $f151;
-  cup = chr($1a);
+  prflab = $ece3;
+  CUP = chr($1a);
+  mem filerr = $00db: integer&;
 begin
+  filerr := 0;
   call(preprd); { find entry with system subroutine }
-  write(cup);   { get rid of empty line }
-  call(prflb1); { print info with system subroutine }
+  if (filerr = 0) then begin
+    write(CUP);   { get rid of empty line }
+    call(prflab); { print info with system subroutine}
+  end;
+  _bestmatch := (filerr = 0);
 end;
 
 func _freedrv(drive:integer; printit:boolean);

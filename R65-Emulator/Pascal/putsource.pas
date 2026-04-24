@@ -63,9 +63,11 @@ begin
     if (filerr<>0) then ok:=false;
     { copy the source file }
     if ok then begin
-      write('Saving and exporting ');
-      _writename(fname);
-      writeln;
+      if VERBOSE then begin
+        write('Saving and exporting ');
+        _writename(fname);
+        writeln;
+        end;
       setargs(fname,0,0,1);
       ARGTYPE[10]:='i';
       ARGLIST[10]:=0; {copy to drive 0}
@@ -88,10 +90,11 @@ begin
         write('Exporting the source file');
       FILDRV:=1;
       call(aexport);
+      _erase_lastline;
       writeln;
 
       { delete the source file               }
-      writeln('Deleting the source file(s)');
+      writeln('Deleting the source file(s) on WORK');
       drive:=0; filerr:=0;
       setargi(0,8);
       runprog('DELETE:R        ',cyclus,drive);

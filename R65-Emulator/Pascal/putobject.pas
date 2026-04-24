@@ -27,7 +27,6 @@ var cyclus,drive,k: integer;
     default,ok,libflag: boolean;
 
 {$I IFILE:P}
-{$I ISILENT}
 
 begin
   ok:=true;
@@ -66,7 +65,7 @@ begin
       setargs(fname,0,0,1);
       runprog('COPY:R          ',cyclus,drive);
       if (filerr <> 0) or (RUNERR <> 0) then begin
-        write('COPY completed with error');
+        writeln('COPY completed with error');
         ok:=false;
       end else begin
         setsubtype('T');
