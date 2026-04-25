@@ -103,7 +103,7 @@ begin
   _enddraw;
 end;
 
-proc _drawrectange(x1,y1,x2,y2:integer);
+proc _drawrectangle(x1,y1,x2,y2:integer);
 begin
   _startdraw(x1,y1);
   _draw(x2,y1);

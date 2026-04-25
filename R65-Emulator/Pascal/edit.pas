@@ -6,7 +6,7 @@
 {         *****************             }
 
 {    2018 rricharz (r77@bluewin.ch)     }
-{ 2026/4 Use Emucom commands directly.  }
+{ 2026/4 Use Emucom commands directly   }
 
 { Edit a text file.                     }
 
@@ -63,10 +63,12 @@ begin { main }
   _agetstring(name,default,cyclus,drive);
   setsubtype('P');
   _asetfile(name,cyclus,drive,filstp);
+  writeln;
   if not _bestmatch then begin
-    writeln('File not found');
+    writeln(CUP,INVVID,'File not found',NORVID);
     exit;
   end;
+  writeln;
   emucom := ECEXPORT;
   filerr := emures;
   if filerr<>0 then begin
@@ -74,13 +76,15 @@ begin { main }
     writeln;
     exit;
   end;
-  writeln;
-
   emucom := ECEDIT;
   filerr := emures;
   if filerr<>0 then begin
-    bcderror(filerr);
-    writeln;
+    if filerr=$69 then
+      writeln(INVVID,'File not stored',NORVID)
+    else begin
+      bcderror(filerr);
+      writeln;
+      end;
     exit;
   end;
 

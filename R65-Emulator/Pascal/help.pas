@@ -12,7 +12,7 @@ program help;
 uses syslib, arglib, strlib, wildlib, striolib;
 
 const
-    debug = true;
+    DEBUG = false;
 
 var
     fname, diskname: cpnt;
@@ -65,6 +65,9 @@ begin
     drive:=1; entry:=0;
     _sfindentry(fname, drive, entry, found, last);
   end;
+
+  if DEBUG then writeln('fname=', fname,
+    ' found=', found);
 
   if found then begin
     copyback;

@@ -160,11 +160,14 @@ begin {main}
       _carg:=10;
     end else _carg:=0;
   end;
+  { check for options }
   if ARGTYPE[_carg]='s' then begin
-    writeln('options found');
-    { check for option }
     sortit  := option('S');
     full    := option('F');
+    if not (sortit or full) then begin
+      writeln('option must be /S or /F or /FS');
+      exit;
+    end;
   end;
 
 { read disk name (FILNAM of last directory entry) }

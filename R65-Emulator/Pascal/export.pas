@@ -64,11 +64,11 @@ begin { main }
   _agetstring(name,default,cyclus,drive);
   setsubtype('P');
   _asetfile(name,cyclus,drive,filstp);
+  writeln;
   if not _bestmatch then begin
-    writeln('File not found');
+    writeln(CUP,INVVID,'File not found',NORVID);
     exit;
   end;
-  call(prflab);
   writeln;
   emucom := ECEXPORT;
   filerr := emures;

@@ -8,8 +8,6 @@
 {                                    }
 {   rricharz 2019                    }
 
-{$U+}
-
 program maketable;
 uses syslib,ralib,mathlib;
 
@@ -54,7 +52,7 @@ func fu5(i:integer):real;
 var x:real;
 begin
   x:=xsize*conv(i)/conv(fsize)+xmin;
-  fu5:=sin(5.0*x)*sin(11.0*x);
+  fu5:=sin(2.0*x)*sin(40.0*x);
 end;
 
 proc setlimits(l,r:real);

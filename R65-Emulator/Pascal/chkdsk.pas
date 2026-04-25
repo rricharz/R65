@@ -3,7 +3,7 @@
 {  ***************************************         }
 
 {  usage: chkdsk [d]      check drive d            }
-{         chkdsk [d] /f   check and fix drive d    }
+{         chkdsk [d] /F   check and fix drive d    }
 
 {         Default for d is disk 1                  }
 
@@ -33,7 +33,7 @@ mem   filerr   = $00db:integer&;
       scyfc    = $037c:integer&;
 
 var entry, sector,drive: integer;
-    done,fixit,default,notok: boolean;
+    done,default,notok: boolean;
 
 proc checkfilerr;
 {***************}
@@ -86,7 +86,7 @@ proc check;
 var i:integer;
     ok:boolean;
 begin
-  write(entry+1,' ');
+  write(entry+1:3,' ');
   if (fillnk and 255) >= 128 then
     write('DELETED SPACE       ')
   else begin
@@ -96,7 +96,8 @@ begin
       hex(FILCYC and 15),' ');
   end;
   ok:=(sector=filloc);
-  write(sector,'-',sector+((filsiz+1) shr 8),'   ');
+  write(sector:3,'-',
+    sector+((filsiz+1) shr 8):3,'   ');
   sector:=sector+((filsiz+1) shr 8);
   if sector>TSECTORS then begin
     writeln(INVVID,'END OF DISK SPACE',NORVID);
@@ -114,17 +115,7 @@ begin {main}
   sector:=0;
   entry:=0;
   getdrive;
-  if option('H') then begin
-    writeln('/F    fix errors');
-    call(aenddo);
-    exit;
-  end;
-  fixit:=option('F');
-  if fixit then begin
-    writeln('Fix errors not yet implemented');
-    call(aenddo);
-    exit;
-  end;
+
   notok:=false;
   scyfc:=entry;
   call(agetentx);
