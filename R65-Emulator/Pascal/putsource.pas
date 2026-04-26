@@ -61,7 +61,7 @@ begin
     _asetfile(dname,cyclus,drive,' ');
     call(afloppy);
     if (filerr<>0) then ok:=false;
-    { copy the source file }
+{ copy the source file }
     if ok then begin
       if VERBOSE then begin
         write('Saving and exporting ');
@@ -83,14 +83,12 @@ begin
       else
         writeln(INVVID,'Copy failed',NORVID);
     end else begin {if successfull}
-      write(CUP); {avoid empty line}
       setargi(FILCYC,8);
-      { export the source file }
-      if VERBOSE then
-        write('Exporting the source file');
+{ export the source file }
+      write('Exporting the source file');
       FILDRV:=1;
       call(aexport);
-      writeln;
+      writeln('=');
 
       { delete the source file               }
       writeln('Deleting the source file(s) on WORK');

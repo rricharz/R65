@@ -95,6 +95,7 @@ begin
   cdrive:=FILDRV; { drive of compile program }
   ENDSTK:=sblock-144;   {reserve memory }
   writeln;
+  writeln;
   write(title);
   scyclus:=0; sdrive:=1;
   _agetstring(name,default,scyclus,sdrive);

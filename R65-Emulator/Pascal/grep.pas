@@ -58,8 +58,8 @@ var nchar, linecount, stop,
 
           if ok then begin
             { highlight whole match }
-            for j := 0 to pattern_length-1 do
-              line[i+j] := chr(ord(line[i+j]) or 128);
+            { for j := 0 to pattern_length-1 do
+              line[i+j]:=chr(ord(line[i+j]) or 128); }
 
             find_pattern := true;
             exit;

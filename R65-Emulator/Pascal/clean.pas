@@ -67,7 +67,7 @@ proc mark(i3: integer);
 {mark entry for delete}
 var j: integer;
 begin
-  write('Found ');
+  write('Deleting ');
   for j:=0 to maxlen do
     write(nametab[16*i3+j]);
   write('.');
@@ -104,11 +104,6 @@ begin { mani }
 
   scyfc:=255; { write disk name }
   call(agetentx);
-  write('Cleaning drive ',
-      drive,': ');
-  for i:=0 to 15 do
-    write(FILNAM[i]);
-  writeln;
 
   index:=0; ti:=0; maxlen:=0;
   sdel:=0; sfound:=0;

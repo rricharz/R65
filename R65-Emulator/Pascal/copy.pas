@@ -18,7 +18,6 @@ const MAXLINES = 13;
       wrfile=$eb2c; {keep date}
       sblock=$6000;
       eblock=TOPMEM;
-      cup=chr($1a);
 
 mem   filerr=$db: integer&;
       filsa=$031a,
@@ -49,7 +48,7 @@ begin
     end
   else
     begin
-      writeln('Cannot copy file type',nm[j+1]);
+      writeln(INVVID,'Cannot copy',NORVID);
       _abort;
     end;
 end;
@@ -60,11 +59,12 @@ proc blockload(lowlim: integer);
 var i: integer;
 begin
   _asetfile(name,cyclus,drive,' ');
-  FILFLG:=0;
+  FILFLG:=$40;
   filsa:=lowlim;
   filsa1:=lowlim;
   filtyp:='B';
   filerr:=0;
+  FILFLG := $40;
   call(rdfile);
 end {blockload};
 
@@ -74,7 +74,7 @@ proc blocksave(lowlim,highlim: integer);
 var i: integer;
 begin
   _asetfile(name,cyclus,ddrive,' ');
-  FILFLG:=0;
+  FILFLG:=$40;
   filsa:=lowlim;
   filea:=highlim;
   filsa1:=lowlim;
@@ -98,9 +98,10 @@ proc copyfile;
 begin
   if isblockf(name) then
     begin
-      write(cup); { hack to avoid empty line }
       ENDSTK:=sblock-144; {reserve memory}
       blockload(sblock);
+      _write_label;
+      write('=');
       if ord(filerr)<>0 then
         begin
           error(filerr);
@@ -124,23 +125,22 @@ begin
 
   else
     begin
-      write(cup); { hack to avoid empty line }
       _asetfile(name,cyclus,drive,' ');
       openr(fno);
+      _write_label;
+      writeln('=');
       FILCY1:=FILCYC;
       FILDRV:=ddrive;
       openw(ofno);
       { write('.'); }
       repeat
         read(@fno,ch);
-        write(@ofno,ch);
-        { if ch=CR then write('.') }
+{chr(31) for compatibility with old files; and fix it}
+        if (ch <> chr(31)) then write(@ofno,ch);
         until (ch=EOF) or (ch=chr(31));
-        { chr(31) for compatibility with old files }
       write(@ofno,EOF);
       close(ofno);
       close(fno);
-      writeln;
     end;
 end;
 
@@ -206,7 +206,7 @@ begin
           name[ii]:=savename[ii];
       end;
     end;
-      if fcount=0 then writeln('no files found')
+      if fcount=0 then writeln('No files copied')
       else writeln(fcount, ' files copied');
   end else
     copyfile;

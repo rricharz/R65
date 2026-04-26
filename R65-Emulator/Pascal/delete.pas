@@ -55,8 +55,8 @@ begin
         name[i]:=FILNAM[i];
       end;
       _asetfile(name,FILCYC,drive,' ');
-      call(prflab);
-      writeln('-');
+  {    call(prflab);
+       writeln('-');        }
       call(adelete);
       if filerr<>0 then begin
         writeln;

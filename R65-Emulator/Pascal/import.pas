@@ -17,7 +17,6 @@ uses syslib, arglib, filelib;
 
 const
     ECIMPORT = 2;
-    PRFLAB = $ece3;
 
 mem filerr = $db: integer&;
     emucom = $1430: integer&;
@@ -73,9 +72,9 @@ begin { main }
   _delay10msec(3); { allow R65 display to updatee }
   emucom := ECIMPORT;
   filerr := emures;
-  call(PRFLAB);
-  writeln;
   if filerr<>0 then bcderror(filerr);
+  _write_label;
+  writeln('+')
   free:=_freedrv(FILDRV,true);
 end.
  

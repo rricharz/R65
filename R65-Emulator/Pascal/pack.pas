@@ -33,8 +33,6 @@ begin
     writeln('Drive must be 0 or 1');
     _abort
   end;
-  writeln('Packing drive ',drive);
-  FILDRV:=drive;
   call(apack);
   if filerr<>0 then bcderror(filerr);
   if CURPOS>1 then writeln;

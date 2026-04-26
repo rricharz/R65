@@ -33,7 +33,7 @@ program system;
 uses syslib;
 
 const
-  title='R65 PASCAL VERSION 5.6';
+  title='R65 PASCAL VERSION 5.7';
   stopcode=$2010;
 
 mem
@@ -307,10 +307,10 @@ begin {main}
       end;
       ENDSTK:=TOPMEM-144;
       IOCHECK:=true;
-      if RUNERR<>0 then begin
+{     if RUNERR<>0 then begin
         writeln;
         writeln(INVVID,'Program aborted',NORVID);
-      end
+      end                                          }
     end
   until false;
 end.

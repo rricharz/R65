@@ -123,5 +123,13 @@ begin
   end;
 end;
 
+proc _write_label;
+{****************}
+{ print label without leading and trailing linefeed }
+const prflab   = $ece3;
+begin
+  call(prflab);
+end;
+
 begin
 end.

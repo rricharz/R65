@@ -41,7 +41,7 @@ begin
   _ssetsubtype(name,'P', false);
   _strfio(name, cyclus, drive);
   openr(f);
-  writeln;
+  { writeln; }
 
   { skip lines }
   line := 0;
