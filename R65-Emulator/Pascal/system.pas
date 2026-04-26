@@ -16,16 +16,16 @@ call other programs by names and with
 arguments.
 
 Examples:
-  compile test1:p
-  compile test1:p:04,1
-  copy test3:P,0,1
-  copy test3:P,0 1
-  find test*
+  cCOMPILE TEST1:P
+  COMPILE TEST1:P.1F,1
+  COMPILE TEST1
+  COPY TEST3,0,1
+  FIND TEST*
 
 First tries to run program from drive 1,
 unless a drive is specified in the call.
 If not found there and not specified,
-tries to run in from drive 0.
+tries to run it from drive 0.
 Default for arguments is drive 1.
 }
 
@@ -33,13 +33,20 @@ program system;
 uses syslib;
 
 const
-  title='R65 PASCAL VERSION 5.5';
+  title='R65 PASCAL VERSION 5.6';
   stopcode=$2010;
 
 mem
   FILCY1 = $0330: integer&;
   FIDRTB = $0339: array[8] of integer&;
+  FILNM1 = $0320: array[15] of char&;
   NUMARG   =$005f: integer&;
+  FILDRV = $00dc: integer&;
+  FILFLG = $da:   integer&;
+  MAXSEQ = $0336: integer&;
+  ARGLIST = $0060: array[10] of integer;
+  ARGLISTS = $0060: array[63] of char&;
+  ARGTYPE = $00a0: array[31] of char&;
 
 var
   i, m, n: integer;
@@ -82,6 +89,14 @@ proc next;
 begin
   read(@INPUT,ch);
   ch:=_uppercase(ch);
+end;
+
+{ * nextraw * }
+
+proc nextraw;
+
+begin
+  read(@INPUT,ch);
 end;
 
 { * getnum * }
@@ -173,7 +188,7 @@ end;
 { * main * }
 
 begin {main}
-  MAXSEQ:=MMAXSEQ-1;
+  MAXSEQ := MMAXSEQ - 1;
   for i:=0 to MMAXSEQ-1 do FIDRTB[i]:=0;
   clearinput; writeln;
   writeln(title);
@@ -195,7 +210,35 @@ begin {main}
       if ch=' ' then begin  {arguments}
         repeat
           next;
-          if (ch>='0') and (ch<='9') then
+          if ch='"' then
+          begin {quoted argument}
+            ARGTYPE[n]:='q';
+            if n>23 then argerr:=107
+            else begin
+              for i:=0 to 15 do aname[i]:=' ';
+              i:=0;
+              nextraw;
+              while (ch<>'"') and (ch<>CR) do begin
+                if i<=15 then begin
+                  aname[i]:=ch;
+                  i:=succ(i);
+                end
+                else
+                  argerr:=106;
+                nextraw;
+              end;
+              if ch<>'"' then
+                argerr:=106
+              else
+                next;
+              for i:=0 to 7 do
+                ARGLIST[n+i]:=
+                  ord(packed(aname[2*i+1],
+                  aname[2*i]));
+              n:=n+7;
+            end
+          end {quoted argument}
+          else if (ch>='0') and (ch<='9') then
           begin {number}
             getnum(m);
             ARGLIST[n]:=m;
@@ -244,7 +287,8 @@ begin {main}
 
     if argerr<>0 then begin
       writeln;
-      writeln(INVVID,'Argument error ', argerr,NORVID);
+      writeln(INVVID,'Argument error ', argerr,NORVID)
+;
       clearinput;
     end
     else begin

@@ -145,13 +145,6 @@ begin
   _random:=mem[$1706] and 255;
 end;
 
-proc _erase_lastline;
-{*******************}
-{ erase last printed line for dense display }
-begin
-  write(CR, CLRLIN, CUP);
-end;
-
 proc __wrintf(value, width: integer);
 {***********************************}
 { Write value right justified in a field of width.

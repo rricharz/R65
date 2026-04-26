@@ -152,7 +152,8 @@ begin
   done := false;
   while not done do begin
     read(@f, ch);
-    if ch = chr($7f) then begin { EOF }
+    if (ch = chr($7f)) or (ch = chr($1f))
+      then begin { EOF, also for old files }
       ateof0 := true;
       done := true;
     end;

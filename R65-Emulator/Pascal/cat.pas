@@ -22,7 +22,6 @@ var name :          cpnt;
     default:        boolean;
 
 begin
-  _erase_lastline; { no empty line }
   name := _new;
   cyclus    := 0;
   drive     := 1;
@@ -42,7 +41,6 @@ begin
   _ssetsubtype(name,'P', false);
   _strfio(name, cyclus, drive);
   openr(f);
-  _erase_lastline; { do not show file label }
   writeln;
 
   { skip lines }

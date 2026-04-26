@@ -46,4 +46,4 @@ begin
   _moveto(10,10);
 
   _endtek;
-end. 
+end.

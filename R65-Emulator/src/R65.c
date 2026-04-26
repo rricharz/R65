@@ -85,6 +85,8 @@ int T = 0;
 
 int rawPrint = 0;       // for Tektronix plotter
 
+static int in_quote = 0;  // static means it is only visible in this module
+
 // source input file
 FILE *sourceFile;
 #define M_INBUFF 0x0000 // assembler input line
@@ -168,29 +170,46 @@ int translateKey(int key)
         case 0xFF09: chr = 0x08; break;     // tab key
         case 0xFF51: chr = 0x03; break;     // cursor left key
         case 0xFF53: chr = 0x16; break;     // cursor right key
-        case 0xFF52: chr = 0x1A; break;     // cursor up key
-        case 0xFF54: chr = 0x18; break;     // cursor down key
+        case 0xFF52: chr = 0x1A; in_quote = 0; break;     // cursor up key
+        case 0xFF54: chr = 0x18; in_quote = 0; break;     // cursor down key
         case 0xFFFF: chr = 0x19; break;     // del key
         case 0xFEFF: chr = 0x15; break;     // shift del key: insert
-        case 0xFF0D: chr = 0x0D; break;     // return key
-        case 0xFF1B: chr = 0x91; break;     // escape key
-        case 0xFF50: chr = 0x01; break;     // home key
+        case 0xFF0D: chr = 0x0D; in_quote = 0; break;     // return key
+        case 0xFF1B: chr = 0x91; in_quote = 0; break;     // escape key
+        case 0xFF50: chr = 0x01; in_quote = 0; break;     //  home key
         case 0xFF55: chr = 0x08; break;     // page up key: (scroll up)
         case 0xFF56: chr = 0x02; break;     // page down key: (scroll down)
         case 0xFF57: chr = 0x10; break;     // end key
+        
         default: {
-            if (key & 0xFF00)                           // ignore all other special keys
-                chr = 0;
-            else if ((key >= 0x61) && (key <= 0x7A)) {  // translate all chars to upper case
-                if (NUMCHAR==48) chr = (key - 0x20);
-                else chr = key;
-                }
-            else
-                chr = key;
-        }
-    }
-    // printf("translate %04X > %04X\n", key, chr);
-    return chr;
+			/* ignore all other special keys */
+			if (key & 0xFF00)
+				return 0;
+
+			/* outside Pascal, quote state is irrelevant; capitalize */
+			if (!(memory[M8_SFLAG] & 1)) {
+				in_quote = 0;
+				if ((NUMCHAR == 48) && (key >= 'a') && (key <= 'z'))
+					return key - 0x20;
+				return key;
+			}
+
+			/* Pascal: quote toggles literal mode */
+			if (key == '"') {
+				in_quote = !in_quote;
+				return key;
+			}
+
+			/* Pascal outside quotes: keep old uppercase behaviour */
+			if (!in_quote && (NUMCHAR == 48) &&
+				(key >= 'a') && (key <= 'z'))
+				return key - 0x20;
+			
+			/* Pascal inside quotes, or non-lowercase char */
+			return key;
+		}  // end of default
+	} // end of case
+	return chr;
 }
 
 /************************/

@@ -1136,8 +1136,8 @@ FNAM    JSR PRTINF
 *
 * NO AUTOMATIC ERROR TESTING
 *
-OPNR    LDA =0
-        STA FILFLG
+OPNR    LDA =$40      silent read open
+OPNR2   STA FILFLG    
         JSR COPY
         JSR OPEN
         INY
@@ -1149,8 +1149,8 @@ OPNR    LDA =0
 * P-CODE 30: OPNW
 *****************
 *
-OPNW    LDA =$20
-        JMP OPNR+2
+OPNW    LDA =$60      silent write open
+        JMP OPNR2
 *
 * P-CODE 31: CLOS
 *****************

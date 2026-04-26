@@ -1,4 +1,5 @@
-{ display argument list }
+{ display argument list            }
+{ test program for argument parser }
 
 {$U+}
 
@@ -9,27 +10,26 @@ var string: array[15] of char;
     i, val: integer;
 
 begin
-  if ARGTYPE[_carg]=chr(0) then
+  if ARGTYPE[_carg]=chr(0) then begin
     writeln('Usage: ARGLIST arguments');
+    exit;
+  end;
   while ARGTYPE[_carg]<>chr(0) do begin
     if _carg < 10 then write(' ');
     write(_carg, ': ', ARGTYPE[_carg],' ');
     case ARGTYPE[_carg] of
-    's': begin
-           for i:=0 to 15 do
-             string[i]:=ARGLISTS[2*_carg+i];
-           _carg:=_carg+8;
-           _prtext16(OUTPUT,string);
-         end;
-    'i': begin val:=ARGLIST[_carg];
-           _carg:=succ(_carg);
-           write(val);
-         end;
-    'd': begin
-           _carg:= succ(_carg);
-           write(val);
-         end
-    end;
+    's','q':  begin
+                for i:=0 to 15 do
+                  string[i]:=ARGLISTS[2*_carg+i];
+                _carg:=_carg+8;
+                _prtext16(OUTPUT,string);
+              end;
+    'i','d':  begin
+                val:=ARGLIST[_carg];
+                _carg:=succ(_carg);
+                write(val);
+              end
+    end {case};
     writeln;
   end
 end.

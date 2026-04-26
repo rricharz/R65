@@ -90,7 +90,6 @@ begin
         write('Exporting the source file');
       FILDRV:=1;
       call(aexport);
-      _erase_lastline;
       writeln;
 
       { delete the source file               }

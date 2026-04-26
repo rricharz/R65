@@ -158,7 +158,6 @@ proc getbl(base:integer);  {get block }
     _asetfile(lname&'        ',
       lcyclus,ldrive,'T');
     openr(source);
-    _erase_lastline; { do not show file label }
     getbl(offset-2);
     close(source);
     source:=savsr;
@@ -240,7 +239,6 @@ end;
 { * main * }
 
 begin {main}
-  _erase_lastline;
   init; maxsize:=eblock-sblock-2;
   pointer:=sblock+2; offset:=2;
   getbl(0);
