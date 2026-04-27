@@ -2,7 +2,7 @@
 {* cat - show text file *}
 {************************}
 
-{ maximal 40 lines are shown      }
+{ maximal 39 lines are shown      }
 { usage: cat filename [firstline] }
 
 program cat;
@@ -54,7 +54,7 @@ begin
 
   { show max 40 lines }
   line := 0;
-  while (ch <> EOF) and (line < 40) do begin
+  while (ch <> EOF) and (line < 39) do begin
     if (ch = CR) then begin
       writeln;
       line := line + 1;
@@ -63,5 +63,6 @@ begin
     read(@f, ch);
   end;
   close(f);
+  writeln;
   _release(name);
 end.

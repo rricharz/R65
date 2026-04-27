@@ -21,7 +21,7 @@ proc runprog(rname: array[15] of char);
 var i: integer;
 begin
   for i:=0 to 15 do FILNM1[i]:=rname[i];
-  FILCY1:=0; FILCYC:=0; FILDRV:=0;
+  FILCY1:=0; FILCYC:=0; FILDRV:=0; FILFLG := $40;
   run
 end;
 

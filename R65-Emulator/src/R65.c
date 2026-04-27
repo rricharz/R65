@@ -128,17 +128,23 @@ void checkMinTimeout()
         timeOfSpMin = now;
         global_pendingCrtUpdate = 1;
     }
-    if ((now - timeOfPascalMin) > 3) {
-        if (memory[M8_SFLAG] & 1) {
-            int pascalSp = memory[0x0a] + (memory[0x0b] << 8);
-            int pascalEndstk = memory[0x0e] + (memory[0x0f] << 8);
-            pascalMinFree = pascalEndstk - pascalSp;
-            timeOfPascalMin = time(NULL) % 86400;
+    if (memory[M8_SFLAG] & 1) {  // if Pascal runs
+        int psp = memory[0x08] + (memory[0x09] << 8);
+        int pend = memory[0x0e] + (memory[0x0f] << 8);
+        int free = pend - psp;
+        int now = time(NULL) % 86400;
+
+        if (free < 0)
+            free = 0;
+
+        if ((free < pascalMinFree) || ((now - timeOfPascalMin) > 3)) {
+            pascalMinFree = free;
+            timeOfPascalMin = now;
         }
-        else {
-            pascalMinFree = 0xFFFF;
-            timeOfPascalMin = time(NULL) % 86400; 
-        }
+    }
+    else {
+        pascalMinFree = 0xFFFF;
+        timeOfPascalMin = time(NULL) % 86400;
     }
 }
 
@@ -603,14 +609,7 @@ void write6502(uint16_t address, uint8_t value)
             memory[R8_EMUCOM] = 0;          // and clear command
         }
         else if (value == 5) {
-            int pascalSp = memory[0x0a] + (memory[0x0b] << 8);
-            int pascalEndstk = memory[0x0e] + (memory[0x0f] << 8);
-            int now = time(NULL) % 86400;
-            if ((pascalMinFree > pascalEndstk - pascalSp)
-                || ((now - timeOfPascalMin) > 5)){
-                pascalMinFree = pascalEndstk - pascalSp;
-                timeOfPascalMin = time(NULL) % 86400;
-            }
+			// obsolete emulator command, did let the emulator know of a stack overflow
         }
         else if (value == 6) {              // wait 10 msec
             if (global_pendingCrtUpdate)

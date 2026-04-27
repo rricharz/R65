@@ -1,12 +1,16 @@
-{ ************************************* }
-{ *                                   * }
-{ * Copy(filename,source,destination) * }
-{ *                                   * }
-{ ************************************* }
+{ *************************************** }
+{ *                                     * }
+{ * COPY filename, source, destination) * }
+{ *                                     * }
+{ *************************************** }
 
 {  2019 rricharz                        }
 {  2023 RR: Added wildcard handling     }
 {  2024-2026 RR: small improvements     }
+
+{  COPY fixes the following problems silently:    }
+{  Old style EOF ($1F) is replaced with new ($7F) }
+{  $00 is removed                                 }
 
 {$U+}
 
@@ -136,7 +140,8 @@ begin
       repeat
         read(@fno,ch);
 {chr(31) for compatibility with old files; and fix it}
-        if (ch <> chr(31)) then write(@ofno,ch);
+        if (ch<>chr(31)) and (ch<>chr(0)) then
+          write(@ofno,ch);
         until (ch=EOF) or (ch=chr(31));
       write(@ofno,EOF);
       close(ofno);

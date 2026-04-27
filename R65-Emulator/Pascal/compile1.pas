@@ -26,25 +26,27 @@ program compile1;
 uses syslib, arglib, filelib;
 
 const
-    version='4.7';
+    version='4.8';
 
     IDLENGTH  = 64;   {max. length of ident buffer}
-    IDSIZE    = 16;   {chars per identifier in idtab}
+    IDSIZE    = 16;   {chars per identifier in s_id}
     PIDSIZE   = 8;    {packed chars per identifier}
     SYMBSIZE  = 256;  {id table entries}
-    IDTABSIZE = 2048; {SYMBSIZE * IDSIZE / 2 (packed)}
+    IDTABSIZE = 2048; {SYMBSIZE * PIDSIZE}
 
-    stacksize = 256;   {stack size}
-    pagelenght= 60;    {no of lines per page}
-    nooutput  = @0;
-    maxfi     = 3;     {max number of ins fls}
-    yesOUTPUT = @255;
-    nresw     = 63;    {number of res. words, max 64}
+    STACKSIZE = 256;   {stack size}
+    PAGELENGHT= 60;    {no of lines per page}
+    NO_OUTPUT = @0;
+    YES_OUTPUT= @255;
+    MAXFI     = 3;     {max nbr  of nested input files
+}
+    NRESW     = 63;    {number of res. words, max 64}
 
-var reswtab: array[ 512] of char; {8*(nresw+1)}
+    SAT_EXPORT = 1;    {Bit mask for s_attr}
 
-    idtab:   array[2048] of packed char;
-    ident: array[IDLENGTH] of char;
+var reswtab: array[ 512] of char; {8*(NRESW+1)}
+
+    ident:   array[IDLENGTH] of char;
     idpack:  array[PIDSIZE] of packed char;
 
     tpos,pc,level,line,offset,dpnt,spnt,fipnt,
@@ -59,39 +61,56 @@ var reswtab: array[ 512] of char; {8*(nresw+1)}
     ucheck,lineflg,nlflg: boolean;
     fno,ofno,savefno: file;
     incname: array[15] of char;
-    filstk: array[maxfi] of file;
+    filstk: array[MAXFI] of file;
 
-    stype: array[SYMBSIZE] of packed char;
-{   type of symbol                           }
-{   High letter:                             }
-{     a:array, c:constant, d;const parameter }
-{     e:constant array parameter, f:function }
-{     g:array function, h;8-bit memory var   }
-{     i:8-bit array memory variable          }
-{     m:16-bit memory variable               }
-{     n:16-bit array memory variable         }
-{     p:procedure                            }
-{     q:indexed cpnt                         }
-{     r,t:function result                    }
-{     s,u:array function result              }
-{     v:variable, w:variable parameter       }
-{     x:variable array parameter             }
-{   Low letter:                              }
-{     i:integer, c:char, p:packed char       }
-{     q:cpnt (pointer to chars)              }
-{     r:real(array multiple of two)          }
-{     s:const cpnt                           }
-{     f:file, b:boolean, u:undefined         }
+{ ****. START IF IDENTIFIER TABLE ****}
 
-    slevel: array[SYMBSIZE] of integer;
-         {level}
-    svda: array[SYMBSIZE] of integer;
-         {val,dis,addr}
-    sspsz: array[SYMBSIZE] of integer;
-         {stack pointer,size of array}
+    s_id:   array[IDTABSIZE] of packed char;
+    { flat array of symbol names }
 
-    reswcod:array[nresw] of packed char;
-    stack: array[stacksize] of integer;
+    s_typ: array[SYMBSIZE] of packed char;
+{  Type of symbol
+   High letter:
+     a: arrayc:constant
+     d: const parameter
+     e: constant array parameter
+     f: function
+     g: array function
+     h: 8-bit memory variable
+     i: 8-bit array memory variable
+     m: 16-bit memory variable
+     n: 16-bit array memory variable
+     p: procedure
+     q: indexed cpnt
+     r,t: function result
+     s,u: array function result
+     v: variable,
+     w: variable parameter
+     x: variable array parameter
+   Low letter:
+     b: boolean
+     c: char
+     f: file
+     i: integer
+     p: packed char
+     q: cpnt (pointer to chars)
+     r: real(array of two)
+     s: const cpnt
+     u: undefined         }
+
+    s_lvl: array[SYMBSIZE] of integer;
+    {level}
+
+    s_vda: array[SYMBSIZE] of integer;
+    {val,dis,addr}
+
+    s_spz: array[SYMBSIZE] of integer;
+    {stack pointer,size of array}
+
+{ **** END OF IDENTIFIER TABLE ****}
+
+    reswcod: array[NRESW] of packed char;
+    stack:   array[STACKSIZE] of integer;
 
 {###########################}
 { global forward references }
@@ -105,7 +124,7 @@ proc newpage; forward;
 
 proc savebyte(x: integer);
 begin
-    if ofno<>nooutput then begin
+    if ofno<>NO_OUTPUT then begin
       write(@ofno,
         chr(((x and 255) shr 4)+ord('0')));
       write(@ofno,chr((x and 15)+ord('0')))
@@ -121,8 +140,8 @@ begin
   writeln;
   line:=succ(line); lineinc:=succ(lineinc);
   linepage:=succ(linepage);
-  if ((linepage div pagelenght)
-    * pagelenght)=linepage then newpage;
+  if ((linepage div PAGELENGHT)
+    * PAGELENGHT)=linepage then newpage;
 end {crlf};
 
 {#################################}
@@ -167,9 +186,9 @@ begin
     27: write('Identifier too long')
   end {case};
   writeln(NORVID);
-  if (ofno<>nooutput) and (ofno<>yesOUTPUT)
+  if (ofno<>NO_OUTPUT) and (ofno<>YES_OUTPUT)
     then close(ofno);
-  ofno:=nooutput;
+  ofno:=NO_OUTPUT;
   _abort;
 end {merror};
 
@@ -209,7 +228,7 @@ end;
 
 proc push(x: %integer);
 begin
-  if stackpnt>=stacksize then error(8)
+  if stackpnt>=STACKSIZE then error(8)
   else stackpnt:=succ(stackpnt);
   if stackpnt>stackmax then stackmax:=stackpnt;
   stack[stackpnt]:=x;
@@ -241,7 +260,7 @@ begin
   write(' ');
   _prtdate(OUTPUT);
   writeln(' page ',
-    (linepage div pagelenght)+1);
+    (linepage div PAGELENGHT)+1);
   writeln;
 end {newpage};
 
@@ -360,13 +379,13 @@ begin {init}
   npara:=0; level:=0;
   stackpnt:=0; libflg:=false;
   stackmax:=0;spntmax:=0; numerr:=0;
-  stype[0]:='vi'; slevel[0]:=0;
-  svda[0]:=0; sspsz[0]:=0;
+  s_typ[0]:='vi'; s_lvl[0]:=0;
+  s_vda[0]:=0; s_spz[0]:=0;
   { prepare resword table }
   writeln('Reading list of reserved words');
   _asetfile('RESWORDS:W      ',0,cdrive,'W');
   openr(fno);
-  for i:=0 to nresw do begin
+  for i:=0 to NRESW do begin
     read(@fno,pch,dch);
     reswcod[i]:=pch;
     for j:=0 to 7 do reswtab[8*i+j]:=' ';
@@ -393,7 +412,7 @@ begin {init}
   rcheck:=false;
   ucheck:=false;
   prt:=true;
-  ofno:=yesOUTPUT;
+  ofno:=YES_OUTPUT;
   lineflg:=false;
   if not default then begin
     if request[0]<>'/' then _argerror(103);
@@ -402,7 +421,7 @@ begin {init}
         'P': prt:=false;
         'L': lineflg:=true;
         'R': rcheck:=true;
-        'N': ofno:=nooutput;
+        'N': ofno:=NO_OUTPUT;
         'F': begin end;
         ' ': begin end
         else _argerror(104)
@@ -679,7 +698,7 @@ begin
       setid; if ch=CR then ch:=' ';
     until not
       (isidletter or ((ch>='0') and (ch<='9')));
-    ll:=0; hh:=nresw; {look up in resword table}
+    ll:=0; hh:=NRESW; {look up in resword table}
     repeat
       i:=(ll+hh) shr 1; co:=compresw(i);
       if (co<0) then hh:=prec(i)
@@ -723,10 +742,10 @@ begin
   scan; if token=' ,' then scan;
   testto('id');
   base:=pc-2;
-  if (ofno<>nooutput) then write(@ofno,'L');
+  if (ofno<>NO_OUTPUT) then write(@ofno,'L');
   for i:=0 to 7 do begin
     name[i]:=ident[succ(i)];
-    if ofno<>nooutput then
+    if ofno<>NO_OUTPUT then
       write(@ofno,ident[succ(i)])
   end;
   write(PRTOFF);
@@ -764,18 +783,18 @@ begin
 
     addr := PIDSIZE * i + 1;
     for j:=0 to PIDSIZE-1 do
-      idtab[addr+j] := idpack[j+1];
+      s_id[addr+j] := idpack[j+1];
 
-    read(@libfil,stype[i],dummy,slevel[i],
-      svda[i],sspsz[i]);
-    slevel[i]:=slevel[i]+level;
-    ltyp2:=high(stype[i]);
+    read(@libfil,s_typ[i],dummy,s_lvl[i],
+      s_vda[i],s_spz[i]);
+    s_lvl[i]:=s_lvl[i]+level;
+    ltyp2:=high(s_typ[i]);
     if (ltyp2='p')or(ltyp2='f')
       or(ltyp2='g') then begin
-      svda[i]:=svda[i]+base;
-      if sspsz[i]<>0 then begin {stack data}
+      s_vda[i]:=s_vda[i]+base;
+      if s_spz[i]<>0 then begin {stack data}
         read(@libfil,num);
-        push(num); sspsz[i]:=stackpnt;
+        push(num); s_spz[i]:=stackpnt;
         for j:=1 to num do begin
           read(@libfil,x);
           push(x);
@@ -817,12 +836,12 @@ begin
 
   repeat
     k:=k-PIDSIZE;
-    while (idtab[k]<>id1) and (k>0) do k:=k-PIDSIZE;
+    while (s_id[k]<>id1) and (k>0) do k:=k-PIDSIZE;
     if k>0 then begin
       i:=1;
       repeat i:=succ(i)
         until (i>PIDSIZE) or
-          (idtab[k+i-1]<>idpack[i]);
+          (s_id[k+i-1]<>idpack[i]);
     end
   until (i>PIDSIZE) or (k<=0);
 
@@ -892,10 +911,10 @@ begin
   if oldid<>0 then begin
     if not ((ltyp1='f') and
           (oldid=spnt) and
-          (high(stype[oldid])='f') and
-          (level=slevel[oldid]+1))
+          (high(s_typ[oldid])='f') and
+          (level=s_lvl[oldid]+1))
     then begin
-      if slevel[oldid]=level then
+      if s_lvl[oldid]=level then
         error(24)
       else if ucheck then
         error(24);
@@ -907,19 +926,19 @@ begin
 
   if spnt>spntmax then spntmax:=spnt;
 
-  stype[spnt]:=packed(ltyp1,ltyp2);
-  sspsz[spnt]:=0;
+  s_typ[spnt]:=packed(ltyp1,ltyp2);
+  s_spz[spnt]:=0;
 
   addr := PIDSIZE * spnt;
   packid;
-  for i:=1 to PIDSIZE do idtab[addr+i] := idpack[i];
+  for i:=1 to PIDSIZE do s_id[addr+i] := idpack[i];
 
   if ltyp1='v' then begin
-    svda[spnt]:=dpnt;
+    s_vda[spnt]:=dpnt;
     dpnt:=succ(dpnt);
   end;
 
-  slevel[spnt]:=level
+  s_lvl[spnt]:=level
 end {putsym};
 
 {#######################}
@@ -985,12 +1004,12 @@ begin
           end
     else begin
       testto('id'); idpnt:=findid;
-      if (idpnt>0) and (high(stype[idpnt])='c')
+      if (idpnt>0) and (high(s_typ[idpnt])='c')
       then begin
-        val:=svda[idpnt];
-        restype:=low(stype[idpnt]);
+        val:=s_vda[idpnt];
+        restype:=low(s_typ[idpnt]);
         if restype='r' then
-          value[1]:=sspsz[idpnt];
+          value[1]:=s_spz[idpnt];
       end
       else begin error(4); val:=0;
         restype:='i'
@@ -1020,10 +1039,10 @@ begin
   testto('id');
   putsym('c','i');
   parse(' ='); scan;
-  svda[spnt]:=getcon;
-  if (restype='r') then sspsz[spnt]:=value[1];
+  s_vda[spnt]:=getcon;
+  if (restype='r') then s_spz[spnt]:=value[1];
   if restype<>'i' then
-    stype[spnt]:=packed('c',restype);
+    s_typ[spnt]:=packed('c',restype);
   scan
 end {deccon};
 
@@ -1095,12 +1114,12 @@ begin
     if typ1='a' then begin {array}
        dpnt:=dpnt-l; {variable has been assumed}
        for i:=succ(spnt-l) to spnt do begin
-         svda[i]:=dpnt; sspsz[i]:=n;
+         s_vda[i]:=dpnt; s_spz[i]:=n;
          dpnt:=succ(dpnt+n);
       end
     end {array};
     for i:=succ(spnt-l) to spnt do
-      stype[i]:=packed(typ1,typ2);
+      s_typ[i]:=packed(typ1,typ2);
     parse(' ;');scan
   until token<>'id' {end main loop}
 end {variable};
@@ -1111,7 +1130,7 @@ end {variable};
 
 proc fixup(x: integer);
 begin
-  if ofno<>nooutput then begin
+  if ofno<>NO_OUTPUT then begin
     write(@ofno,'F');
     savebyte(succ(x-offset) and 255);
     savebyte(succ(x-offset) shr 8);
@@ -1137,15 +1156,15 @@ begin
     scan
   end;
   if aflag then begin
-    typ1:='s'; sspsz[succ(cproc)]:=n;
-    svda[succ(cproc)]:=svda[succ(cproc)]-n
+    typ1:='s'; s_spz[succ(cproc)]:=n;
+    s_vda[succ(cproc)]:=s_vda[succ(cproc)]-n
   end
   else typ1:='r';
-  stype[succ(cproc)]:=packed(typ1,typ2);
+  s_typ[succ(cproc)]:=packed(typ1,typ2);
   if uflag then typ2:='u';
   if aflag then typ1:='g'
   else typ1:='f';
-  stype[cproc]:=packed(typ1,typ2);
+  s_typ[cproc]:=packed(typ1,typ2);
 end {function};
 
 {########################}
@@ -1161,7 +1180,7 @@ var counter1,counter2,i,n,bs: integer;
 
 begin
   push(0); { dummy size, fixed later }
-  if find=0 then sspsz[spnt-npara]:=stackpnt
+  if find=0 then s_spz[spnt-npara]:=stackpnt
   else bs:=stackpnt;
   counter1:=0
   repeat {main loop}
@@ -1174,7 +1193,7 @@ begin
     end;
     repeat {inner loop}
       decvar(vtype1,vtype2);
-      svda[spnt]:=parlevel;
+      s_vda[spnt]:=parlevel;
       parlevel:=succ(parlevel);
       npara:=succ(npara);
       counter2:=succ(counter2);
@@ -1196,21 +1215,21 @@ begin
       if uflag then push(packed(vtype1,'u'))
       else push(vtype);
       if aflag then begin
-        push(n); sspsz[spnt-counter2+i]:=n;
-        svda[spnt-counter2+i]:=parlevel;
+        push(n); s_spz[spnt-counter2+i]:=n;
+        s_vda[spnt-counter2+i]:=parlevel;
         parlevel:=succ(parlevel)+n;
       end {then};
-      stype[spnt-counter2+i]:=vtype;
+      s_typ[spnt-counter2+i]:=vtype;
     end {for};
     if aflag then counter2:=2*counter2;
     counter1:=counter1+counter2;
     until token<>' ;'; {outer loop}
   testto(' )'); scan;
   if find=0 then
-    stack[sspsz[spnt-npara]]:=counter1
+    stack[s_spz[spnt-npara]]:=counter1
   else begin {information is allready there}
     stack[bs]:=counter1;
-    n:=sspsz[fortab[find]]; {existing stack data}
+    n:=s_spz[fortab[find]]; {existing stack data}
     for i:=0 to stackpnt-bs do
       if stack[bs+i]<>stack[n+i]
         then merror(13,'pa'); {parameter wrong}
@@ -1236,7 +1255,7 @@ begin
       decvar('m','i');
       l:=succ(l); testto(' ='); scan;
       n:=getcon; testtype('i');
-      scan; svda[spnt]:=n;
+      scan; s_vda[spnt]:=n;
     until token<>' ,';
     testto(' :');
     gettype(typ2,aflag,uflag,n);
@@ -1248,8 +1267,8 @@ begin
     else typ1:='m';
     if aflag then typ1:=succ(typ1);
     for i:=succ(spnt-l) to spnt do begin
-      stype[i]:=packed(typ1,typ2);
-      sspsz[i]:=n;
+      s_typ[i]:=packed(typ1,typ2);
+      s_spz[i]:=n;
     end;
     testto(' ;'); scan;
   until token<>'id';
@@ -1300,27 +1319,27 @@ var d: integer;
 begin {gpval}
   if dir then d:=1 else d:=0;
   case typ of
-  'h':  begin code3($22,svda[idpnt]);
+  'h':  begin code3($22,s_vda[idpnt]);
           if dir then code1($3f);
           code1($17+d) end;
-  'm':  begin code3($22,svda[idpnt]);
+  'm':  begin code3($22,s_vda[idpnt]);
           code1($3d+d) end;
   'i':  begin
           if dir then code1($3f);
-          code3($22,svda[idpnt]);
+          code3($22,s_vda[idpnt]);
           code1(3);
           if dir then code1($3f);
           code1($17+d) end;
   'n':  begin if dir then code1($3f);
           code3($22,1); code1($12);
-          code3($22,svda[idpnt]);
+          code3($22,s_vda[idpnt]);
           code1(3); code1($3d+d) end
   else begin
     if typ='q' then
-      code4($55,level-slevel[idpnt],2*svda[idpnt])
+      code4($55,level-s_lvl[idpnt],2*s_vda[idpnt])
     else
-      code4($27+2*d+relad,level-slevel[idpnt],
-        2*svda[idpnt]);
+      code4($27+2*d+relad,level-s_lvl[idpnt],
+        2*s_vda[idpnt]);
     end {else}
   end {case}
 end;
@@ -1361,8 +1380,8 @@ end;
 
 proc getvar;
 begin
-  vartyp2:=high(stype[idpnt]);
-  vartype:=low(stype[idpnt]);
+  vartyp2:=high(s_typ[idpnt]);
+  vartype:=low(s_typ[idpnt]);
   scan;
   if (vartype='q') and (token=' [') and
     ((vartyp2='v') or (vartyp2='d')) then begin
@@ -1377,10 +1396,10 @@ begin
             relad:=3;
             code3($22,1); code1($12)
           end;
-          if (vartyp2='q') and (sspsz[idpnt]=0) then
+          if (vartyp2='q') and (s_spz[idpnt]=0) then
             checkindex(0,63)
           else
-            checkindex(0,sspsz[idpnt]);
+            checkindex(0,s_spz[idpnt]);
           testtype('i'); testto(' ]'); scan;
         end else relad:=2;
       end;
@@ -1445,13 +1464,13 @@ begin {prcall1}
             if relad<>2 then merror(14,'03');
             if vartyp2='i' then error(16);
             i:=succ(i);
-            if stack[i]<>sspsz[idpnt] then
+            if stack[i]<>s_spz[idpnt] then
               error(15);
             if vartyp2='n' then begin
-              code3($22,svda[idpnt]);
+              code3($22,s_vda[idpnt]);
               code1($3d);
-            end else code4($27,level-slevel[idpnt],
-              2*svda[idpnt]);
+            end else code4($27,level-s_lvl[idpnt],
+              2*s_vda[idpnt]);
             code2($3b,stack[i]);
           end
     else merror(14,'04')
@@ -1473,8 +1492,8 @@ end {prcall2};
 {################}
 
 begin {body of prcall}
-  if sspsz[idpn1]<>0 then begin
-    bstack:=sspsz[idpn1];
+  if s_spz[idpn1]<>0 then begin
+    bstack:=s_spz[idpn1];
     numpar:=stack[bstack];
     parse(' ('); scan;
     for i:=succ(bstack) to bstack+numpar do
@@ -1486,8 +1505,8 @@ begin {body of prcall}
     end;
     testto(' )');
   end {then};
-  code4(43,level-slevel[idpn1],svda[idpn1]);
-  if sspsz[idpn1]<>0 then begin
+  code4(43,level-s_lvl[idpn1],s_vda[idpn1]);
+  if s_spz[idpn1]<>0 then begin
     n:=0; i:=bstack+numpar;
     repeat
       case chr(stack[i] shr 8) of
@@ -1495,7 +1514,7 @@ begin {body of prcall}
       'w':  begin
               prcall2; idpnt:=pop;
               gpval(idpnt,true,
-                  high(stype[idpnt]));
+                  high(s_typ[idpnt]));
             end;
       chr(0): begin
             n2:=stack[i];
@@ -1505,17 +1524,17 @@ begin {body of prcall}
               'x':  begin
                       prcall2;
                       idpnt:=pop;
-                      if high(stype[idpnt])='n'
+                      if high(s_typ[idpnt])='n'
                       then begin
-                        code3($22,svda[idpnt]+
-                          2*sspsz[idpnt]);
+                        code3($22,s_vda[idpnt]+
+                          2*s_spz[idpnt]);
                         code1($3e)
                       end else
                         code4(41,
-                          level-slevel[idpnt],
-                          2*(svda[idpnt]+
-                          sspsz[idpnt]));
-                      code2($3c,sspsz[idpnt])
+                          level-s_lvl[idpnt],
+                          2*(s_vda[idpnt]+
+                          s_spz[idpnt]));
+                      code2($3c,s_spz[idpnt])
                     end
               end {case}
             end
@@ -1593,11 +1612,11 @@ begin {index}
     code3($22,1); code1($12);
   end;
   if chk then begin
-    if (savtype='q') and (sspsz[idpnt]=0) then
+    if (savtype='q') and (s_spz[idpnt]=0) then
       { is an arrayed cpnt }
       checkindex(0,63)
     else
-      checkindex(0,sspsz[idpnt]);
+      checkindex(0,s_spz[idpnt]);
   end;
   restype:=savtype; scan
 end;
@@ -1612,8 +1631,8 @@ begin
     'id': begin {identifier }
             idpnt:=findid;
             if idpnt=0 then error(5);
-            restype:=low(stype[idpnt]);
-            h:=high(stype[idpnt]);
+            restype:=low(s_typ[idpnt]);
+            h:=high(s_typ[idpnt]);
             case h of
               'v','w','d':
                     begin
@@ -1621,19 +1640,19 @@ begin
                       if (restype='q') and (token=' ['
 )
                       then begin
-                        code4(39,level-slevel[idpnt],
-                          2*svda[idpnt]);
+                        code4(39,level-s_lvl[idpnt],
+                          2*s_vda[idpnt]);
                         index(true);
                         code1($03);
                         code1($54);
                         restype:='c';
                       end else
-                        code4(39,level-slevel[idpnt],
-                          2*svda[idpnt]);
+                        code4(39,level-s_lvl[idpnt],
+                          2*s_vda[idpnt]);
                     end;
-              'h':  begin code3($22,svda[idpnt]);
+              'h':  begin code3($22,s_vda[idpnt]);
                       code1($17); scan end;
-              'i':  begin code3($22,svda[idpnt]);
+              'i':  begin code3($22,s_vda[idpnt]);
                       scan;
                       if token=' [' then begin
                         index(true); code1($03);
@@ -1642,10 +1661,10 @@ begin
                         error(16)
                       end
                     end;
-              'm':  begin code3($22,svda[idpnt]);
+              'm':  begin code3($22,s_vda[idpnt]);
                       code1($3d); scan
                     end;
-              'n':  begin code3($22,svda[idpnt]);
+              'n':  begin code3($22,s_vda[idpnt]);
                       scan;
                       if token=' [' then begin
                         index(true);
@@ -1658,19 +1677,19 @@ begin
                         end
                       end else begin
                         code1($3d);
-                        code2($3b,sspsz[idpnt]);
-                        arsize3:=sspsz[idpnt];
+                        code2($3b,s_spz[idpnt]);
+                        arsize3:=s_spz[idpnt];
                       end
                     end;
               'r','t': begin
                       code3(35,2);
                       idpnt:=prec(idpnt);
                       prcall(idpnt); scan;
-                      restype:=low(stype[idpnt]);
+                      restype:=low(s_typ[idpnt]);
                     end;
-              'c':  if low(stype[idpnt])<>'r' then
+              'c':  if low(s_typ[idpnt])<>'r' then
                     begin
-                      code3(34,svda[idpnt]);
+                      code3(34,s_vda[idpnt]);
                       scan;
                       if restype='s' then begin
                         if token=' [' then begin
@@ -1687,10 +1706,10 @@ begin
                       {scan;}
                     end else begin
                       code2($3a,2);
-                      code2(svda[idpnt] and 255,
-                        svda[idpnt] shr 8);
-                      code2(sspsz[idpnt] and 255,
-                        sspsz[idpnt] shr 8);
+                      code2(s_vda[idpnt] and 255,
+                        s_vda[idpnt] shr 8);
+                      code2(s_spz[idpnt] and 255,
+                        s_spz[idpnt] shr 8);
                       arsize3:=1; scan
                     end;
               'a','e','x':
@@ -1698,8 +1717,8 @@ begin
                       if token=' [' then begin
                         index(true);
                         code4($28,
-                            level-slevel[idpnt],
-                            2*svda[idpnt]);
+                            level-s_lvl[idpnt],
+                            2*s_vda[idpnt]);
                         if restype='r' then
                         begin
                           code2($3b,1);
@@ -1707,20 +1726,20 @@ begin
                         end
                       end else begin
                         code4($27,
-                            level-slevel[idpnt],
-                            2*svda[idpnt]);
-                        code2($3b,sspsz[idpnt]);
-                        arsize3:=sspsz[idpnt];
+                            level-s_lvl[idpnt],
+                            2*s_vda[idpnt]);
+                        code2($3b,s_spz[idpnt]);
+                        arsize3:=s_spz[idpnt];
                       end
                     end;
               's','u':
                     begin
-                      code3(35,2*sspsz[idpnt]+2);
+                      code3(35,2*s_spz[idpnt]+2);
                       idpnt:=prec(idpnt);
                       prcall(idpnt); scan;
-                      restype:=low(stype[idpnt]);
+                      restype:=low(s_typ[idpnt]);
                       idpnt:=succ(idpnt);
-                      arsize3:=sspsz[idpnt]
+                      arsize3:=s_spz[idpnt]
                     end
               else error(1)
             end {case}
@@ -1743,8 +1762,7 @@ begin
                 code3(34,ord(ident[1]));
                 restype:='c'
               end else begin
-                code3(34,packed(ident[1],
-                  ident[2]));
+                code3(34,packed(ident[1],ident[2]));
                 restype:='p'
               end
             end else begin
@@ -2033,7 +2051,7 @@ var sid: integer;
 begin {assign}
   idpnt:=findid;
   if idpnt=0 then error(5);
-  if stype[idpnt]='pr' then begin
+  if s_typ[idpnt]='pr' then begin
     prcall(idpnt); scan
   end else begin
     getvar;
@@ -2052,21 +2070,21 @@ begin {assign}
         if sknd='n' then begin
           code1($3f);
           code3($22,1); code1($12);
-          code3($22,svda[sid]+2);
+          code3($22,s_vda[sid]+2);
           code1($3); code1($3e)
         end else
-          code4($2a,level-slevel[sid],
-            2*svda[sid]+2);
+          code4($2a,level-s_lvl[sid],
+            2*s_vda[sid]+2);
         code2($3c,1)
       end else begin
-        arrayexp(sspsz[sid],styp);
+        arrayexp(s_spz[sid],styp);
         if sknd='n' then begin
-          code3($22,svda[sid]+2*sspsz[sid]);
+          code3($22,s_vda[sid]+2*s_spz[sid]);
           code1($3e);
         end else
-          code4($29,level-slevel[sid],
-            2*(svda[sid]+sspsz[sid]));
-        code2($3c,sspsz[sid]);
+          code4($29,level-s_lvl[sid],
+            2*(s_vda[sid]+s_spz[sid]));
+        code2($3c,s_spz[sid]);
       end
     end
   end
@@ -2309,10 +2327,10 @@ begin {body of statement }
                     ident[7]:='t'; ident[8]:='f';
                     idpnt:=findid;
                     if (idpnt=0) or
-                      (stype[idpnt]<>'pr')
+                      (s_typ[idpnt]<>'pr')
                       then error(25);
-                  code4(43, level-slevel[idpnt],
-                    svda[idpnt]);
+                  code4(43, level-s_lvl[idpnt],
+                    s_vda[idpnt]);
                     code2(33,252)
                   end
                   else begin
@@ -2362,8 +2380,8 @@ begin {body of statement }
 
     'fo': begin {for}
             parse('id'); assign;
-            if stype[idpnt]='pr' then error(1);
-            savtp1:=low(stype[idpnt]);
+            if s_typ[idpnt]='pr' then error(1);
+            savtp1:=low(s_typ[idpnt]);
             case token of
               'to': k2:=1;
               'dw': k2:=0
@@ -2476,7 +2494,7 @@ var i,j,sav1: integer;
     repeat
       ii:=succ(ii);
     until (ii >= PIDSIZE) or
-      (idpack[ii] <> idtab[start+ii-1]);
+      (idpack[ii] <> s_id[start+ii-1]);
     found:=(ii >= PIDSIZE);
   end {compare};
 
@@ -2507,7 +2525,7 @@ end {findforw};
 {###############}
 
 begin
-  dpnt:=3; svda[bottom]:=pc;
+  dpnt:=3; s_vda[bottom]:=pc;
   code3(36,0);
   stackpn1:=stackpnt; forwpn:=0;
 
@@ -2535,7 +2553,7 @@ begin
               cproc:=spnt;
             end else begin
               cproc:=fortab[find];
-              fixup(svda[cproc]);
+              fixup(s_vda[cproc]);
             end;
             level:=succ(level);
           end;
@@ -2547,13 +2565,13 @@ begin
               putsym('f','i');
               cproc:=spnt; level:=succ(level);
               putsym('f','i');
-              svda[spnt]:=parlevel;
+              s_vda[spnt]:=parlevel;
               parlevel:=succ(parlevel);
             end else begin
               cproc:=fortab[find];
               level:=succ(level);
               parlevel:=1;
-              fixup(svda[cproc]);
+              fixup(s_vda[cproc]);
             end;
           end
     end; {case of token}
@@ -2563,30 +2581,30 @@ begin
     if isfunc then function;
     testto(' ;');
     for i:=1 to npara do
-    svda[succ(spnt-i)]:=svda[succ(spnt-i)]
+    s_vda[succ(spnt-i)]:=s_vda[succ(spnt-i)]
           -parlevel;
     scan;
     if token='fw' then begin
       if forwpn=8 then merror(13,'ov');
       forwpn:=succ(forwpn);
       fortab[forwpn]:=cproc;
-      svda[cproc]:=pc;
+      s_vda[cproc]:=pc;
       code3(36,0);
       scan
     end else block(cproc);
     level:=prec(level);
     dpnt:=dpnt1; spnt:=spnt1;
-    case high(stype[spnt]) of
-      'r':  stype[spnt]:=packed('t',low(stype[spnt]));
-      's':  stype[spnt]:=packed('u',low(stype[spnt]))
+    case high(s_typ[spnt]) of
+      'r':  s_typ[spnt]:=packed('t',low(s_typ[spnt]));
+      's':  s_typ[spnt]:=packed('u',low(s_typ[spnt]))
     end {case};
     testto(' ;'); scan
   end {procedure of function};
 
   testto('be');     { * begin * }
   if forwpn<>0 then merror(13,'ur');
-  fixup(svda[bottom]);
-  svda[bottom]:=pc;
+  fixup(s_vda[bottom]);
+  s_vda[bottom]:=pc;
   scan;
   code3(35,2*dpnt);
   repeat
@@ -2611,21 +2629,21 @@ begin
   for i:=1 to spnt do begin {for every entry }
     addr := PIDSIZE * i;
     for j:=1 to PIDSIZE do
-      idpack[j] := idtab[addr+j];
+      idpack[j] := s_id[addr+j];
     unpackid;
     j := IDSIZE;
     while (j>1) and (ident[j]=' ') do j := j-1;
     for k:=1 to j do
       write(@ofno,ident[k]);
-      writeln(@ofno,',',stype[i],',',slevel[i],',',
-        svda[i],',',sspsz[i]);
-    vtype1:=high(stype[i]);
+      writeln(@ofno,',',s_typ[i],',',s_lvl[i],',',
+        s_vda[i],',',s_spz[i]);
+    vtype1:=high(s_typ[i]);
     if ((vtype1='p') or (vtype1='f') or
-      (vtype1='g')) and (sspsz[i]<>0) then begin
-      num:=stack[sspsz[i]];
+      (vtype1='g')) and (s_spz[i]<>0) then begin
+      num:=stack[s_spz[i]];
       write(@ofno,num);
       for j:=1 to num do
-        write(@ofno,',',stack[sspsz[i]+j]);
+        write(@ofno,',',stack[s_spz[i]+j]);
       write(@ofno,CR,LF);
     end {then};
   end {for}
@@ -2661,7 +2679,7 @@ begin {main}
     merror(2,packed(pname[0],pname[1]));
     { name differs from filename }
   parse(' ;');
-  if ofno<>nooutput then openw(ofno);
+  if ofno<>NO_OUTPUT then openw(ofno);
   scan;
   if (token='us') and (libflg=false) then begin
     repeat
@@ -2670,7 +2688,7 @@ begin {main}
     testto(' ;'); scan
   end;
   block(0); testto(' .');
-  if ofno<>nooutput then begin
+  if ofno<>NO_OUTPUT then begin
     write(@ofno,'E');
     savebyte(pc and 255);
     savebyte(pc shr 8);

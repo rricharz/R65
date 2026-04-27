@@ -60,6 +60,7 @@ begin
 end;
 
 begin { main }
+writeln;
   cyclus:=0; drive:=1;
   _agetstring(name,default,cyclus,drive);
   setsubtype('P');
