@@ -1,5 +1,6 @@
 program fixup;
-{ Fixup a pascal source file }
+{ Sceleton to fixup a pascal source file }
+{ does not do naything at present }
 
 {$U+}
 
@@ -69,23 +70,13 @@ begin
   pos := 0;
   read(@fno,ch1);
   sline[0] := ENDMARK;
-{
-  if (ch1 = EOF) then begin
-    readline := true;
-    exit;
-  end;
-}
   while (ch1 >= ' ') and (ch1 < EOF) and
       (pos<(STRSIZE - 2)) do begin
     sline[pos] := ch1;
-    {write(pos, ': ', ch1);}
     pos := pos + 1;
     read(@fno, ch1);
   end;
   sline[pos] := ENDMARK;
-{
-  if ch1 = chr(13) then read(@fno,ch1);
-}
   readline:= (ch1 = EOF);
 end;
 
@@ -165,158 +156,6 @@ proc fixup_line;
 begin
   lline := _strlen(sline);
   modified := false;
-
-{ syslib }
-  upper('numarg');
-  upper('aglists');
-  upper('arglist');
-  upper('argtype');
-  upper('filflg');
-  upper('fildrv');
-  upper('filcyc');
-  upper('filcy1');
-  upper('filnam');
-  upper('filnm1');
-  upper('filstp');
-  upper('tab8');
-  upper('hom');
-  upper('csv');
-  upper('lf');
-  upper('ff');
-  upper('cr');
-  upper('lf');
-  upper('norvid');
-  upper('invvid');
-  upper('prton');
-  upper('prtoff');
-  upper('mmaxseq');
-  upper('topmem');
-  upper('maxint');
-  upper('input');
-  upper('output');
-  upper('key');
-  upper('printer');
-  upper('runerr');
-  upper('endstk');
-  upper('buffpn');
-  upper('iocheck');
-{ arglib }
-  upper('numarg');
-  upper('arglist');
-  upper('arglists');
-  upper('argtype');
-  upper('curpos');
-  upper('maxseq');
-  upper('fidrtb');
-{ strlib }
-  upper('strsize');
-  upper('endmark');
-{ plotlib }
-  { upper('xsize'); }
-  upper('ysize');
-  upper('xwords');
-  upper('white');
-  upper('inverse');
-  upper('black');
-  upper('plotdev');
-  upper('keypressed');
-{ teklib }
-  upper('maxx');
-  upper('maxy');
-  upper('maxcolumns');
-  upper('maxlines');
-  upper('solid');
-  upper('dotted');
-  upper('dotdash');
-  upper('shortdash');
-  upper('longdash');
-  upper('plotter');
-{ ralib }
-  upper('fread');
-  upper('fwrite');
-  upper('fnew');
-{ wildlib }
-  upper('numentries');
-  upper('namesize');
-
-{ syslib }
-  underscore('setemucom');
-  underscore('getbcd');
-  underscore('getdate');
-  underscore('abs');
-  underscore('mod');
-  underscore('tab');
-  underscore('abort');
-  underscore('prtext8');
-  underscore('prtext16');
-  underscore('random');
-{ arglib }
-  underscore('argerror');
-  underscore('agetval');
-  underscore('agetstring');
-  underscore('uppercase');
-  underscore('asetfile');
-  underscore('runerr');
-  underscore('carg');
-{ strlib }
-  underscore('new');
-  underscore('release');
-  underscore('strlen');
-  underscore('strcpy');
-  underscore('stradd');
-  underscore('strcmp');
-  underscore('strpos');
-  underscore('strread');
-  underscore('hexstr');
-  underscore('strinsc');
-  underscore('strdelch');
-  underscore('intstr');
-{plotlib }
-  underscore('delay');
-  underscore('syncscreen');
-  underscore('grinit');
-  underscore('grend');
-  underscore('cleargr');
-  underscore('fullview');
-  underscore('splitview');
-  underscore('plot');
-  underscore('move');
-  underscore('draw');
-  underscore('plotmap');
-  underscore('waitforkey');
-{ teklib }
-  underscore('clearscreen');
-  underscore('starttek');
-  underscore('endtek');
-  underscore('startdraw');
-  underscore('enddraw');
-  underscore('draw');
-  underscore('drawrectangle');
-  underscore('drawvector');
-  underscore('moveto');
-  underscore('delay10msec');
-  underscore('setchsize');
-  underscore('setlinemode');
-{ ralib }
-  underscore('uppercase');
-  underscore('attach');
-  underscore('getsize');
-  underscore('getword');
-  underscore('putword');
-  underscore('getreal');
-  underscore('putreal');
-{ wildlib }
-  underscore('test');
-  underscore('findentry');
-  underscore('writename');
-{ filelib }
-  underscore('freedrv');
-{ ledlib }
-  underscore('ledstring');
-  underscore('ledstop');
-  underscore('ledhex');
-  underscore('ledbyte');
-
 end;
 
 proc putline;

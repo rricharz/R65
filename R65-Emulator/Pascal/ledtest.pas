@@ -1,22 +1,12 @@
  { ledtest.pas - _test program for ledlib }
 
 program ledtest;
-uses syslib,ledlib;
+uses syslib, ledlib, plotlib;
+{ plotlib provides _delay_10msec }
 
 mem KEYPRESSED=$1785: char&;
 
 var mask,j,h: integer;
-
-proc _delay10msec(time:integer);
-{*****************************}
-{ _delay10msec: _delay 10 msec }
-{ process is suspended during _delay }
-mem emucom=$1430: integer&;
-var i:integer;
-begin
-  for i:=1 to time do
-    emucom:=6;
-end;
 
 begin
   writeln('LEDTEST: Test led library');

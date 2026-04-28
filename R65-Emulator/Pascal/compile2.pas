@@ -151,11 +151,8 @@ proc getbl(base:integer);  {get block }
       lname[i]:=ch1
     end;
     lcyclus:=0; ldrive:=cdrive;
-    { write('Loading library ');      }
-    { _prtext8(OUTPUT,lname);         }
 
     { loading library from same drive }
-    { as program compile2             }
     _asetfile(lname&'        ',
       lcyclus,ldrive,'T');
     openr(source);

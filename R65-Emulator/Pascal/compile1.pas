@@ -438,7 +438,7 @@ begin {init}
 
   if prt then begin
     write(PRTON);
-    _setemucom(8);
+    RUNERR := _emulator(8);
   end
 
   line:=0; lineinc:=0; linepage:=0;
@@ -2713,7 +2713,7 @@ begin {main}
   writeln(numerr,NORVID);
   if prt then begin
     write(PRTOFF);
-    _setemucom(9);
+    RUNERR := _emulator(9);
   end;
   close(fno);
   { check whether second pass is not required }

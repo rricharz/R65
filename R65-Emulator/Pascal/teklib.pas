@@ -123,7 +123,8 @@ end;
 proc _delay10msec(time:integer);
 { _delay10msec: delay 10 msec }
 { process is suspended during delay }
-mem emucom=$1430: integer&;
+mem
+{$I IHIDDENMEM}
 var i:integer;
 begin
   for i:=1 to time do

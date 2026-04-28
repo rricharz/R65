@@ -45,6 +45,11 @@ const
   KEY      = @1;        {unbuffered kb input}
   PRINTER  = @1;        {hardcopy output}
 
+  ECEXPORT = 1;         {emulator commands}
+  ECIMPORT = 2;
+  ECEDIT   = 3;
+  EC_CLR_PRTOUT = 9;
+
 mem
   { The & below is required for 8-bit }
   RUNERR   = $000c: integer&;
@@ -58,12 +63,14 @@ var
   _month:  integer;
   _year:   integer;
 
-proc _setemucom(i:integer);
+func _emulator(i:integer): integer;
 {*************************}
 { set emulator command register }
-mem emucom=$1430:integer&;
+mem
+{$I IHIDDENMEM:P}
 begin
-  emucom:=i;
+  emucom := i;
+  _emulator := emures;
 end;
 
 func _getbcd(address: integer): integer;

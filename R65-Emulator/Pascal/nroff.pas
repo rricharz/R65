@@ -226,10 +226,11 @@ end;
 
 proc clearprintout;
 {*****************}
+var dummy: integer;
 begin
   { erase the current printout.txt file }
   { this is a command to the emulator }
-  _setemucom(9);
+  dummy := _emulator(9);
 end;
 
 func nexttab(col: integer): integer;

@@ -30,7 +30,8 @@ var _xcursor, _ycursor: integer;
 { process is suspended during _delay }
 
 proc _delay10msec(time:integer);
-mem emucom=$1430: integer&;
+mem
+{$I IHIDDENMEM}
 var i:integer;
 begin
   for i:=1 to time do
@@ -38,11 +39,11 @@ begin
 end;
 
 func _syncscreen;
-{ synchronize sCReen and sleep
+{ synchronize screen and sleep
   up to 30 msec since last sync.
-  returns sleep time in msec    }
-mem emucom=$1430: integer&;
-    emures=$1431: integer&;
+  returns sleep time in msec   }
+mem
+{$I IHIDDENMEM}
 begin
   emucom := 7;
   _syncscreen := emures;

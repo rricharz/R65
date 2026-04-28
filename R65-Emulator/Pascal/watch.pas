@@ -1,5 +1,5 @@
 program watch;
-uses syslib,timelib,strlib,ledlib;
+uses syslib,timelib,strlib,ledlib, plotlib;
 
 const mquit = 0;        { values for mode }
       mtime = 1;
@@ -13,14 +13,6 @@ var s:cpnt;
     mode: integer;
     mh,mm,ms,mt: integer;
     sh,sm,ss,st: integer;
-
-proc _delay10msec(time:integer);
-mem emucom=$1430: integer&;
-var i:integer;
-begin
-  for i:=1 to time do
-    emucom:=6;
-end;
 
 proc timetostr(c:cpnt; h,m,s,t:integer);
   proc writebcd(i:integer);

@@ -19,8 +19,6 @@ const
     ECIMPORT = 2;
 
 mem filerr = $db: integer&;
-    emucom = $1430: integer&;
-    emures = $1431: integer&;
 
 var cyclus,drive,free: integer;
     name: array[15] of char;
@@ -32,17 +30,6 @@ begin
   write(INVVID,'ERROR ');
   write((e shr 4) and 15);
   write(e and 15,NORVID);
-end;
-
-proc _delay10msec(time:integer);
-{*****************************}
-{ _delay10msec: _delay 10 msec }
-{ process is suspended during _delay }
-mem emucom=$1430: integer&;
-var i:integer;
-begin
-  for i:=1 to time do
-    emucom:=6;
 end;
 
 proc setsubtype(subtype:char);
@@ -69,9 +56,7 @@ begin { main }
   _agetstring(name,default,cyclus,drive);
   setsubtype('P');
   _asetfile(name,cyclus,drive,' ');
-  _delay10msec(3); { allow R65 display to updatee }
-  emucom := ECIMPORT;
-  filerr := emures;
+  filerr := _emulator(ECIMPORT);
   if filerr<>0 then bcderror(filerr);
   _write_label;
   writeln('+')

@@ -23,22 +23,14 @@ var sinetable: array[90] of integer;
     shield,quit: boolean;
     phaserrange,step: integer;
 
-proc startwritethrough;
+proc startwrthrough;
 begin
-  write(@plotter,chr(27),'p');
+  write(@PLOTTER,chr(27),'p');
 end;
 
 proc endwritethrough;
 begin
-  write(@plotter,chr(27),'`');
-end;
-
-proc delay10msec(time:integer);
-mem emucom=$1430: integer&;
-var i:integer;
-begin
-  for i:=1 to time do
-    emucom:=6;
+  write(@PLOTTER,chr(27),'''); {'}
 end;
 
 func atan2(x,y:integer):real;
@@ -117,25 +109,25 @@ begin
         end;
         xi:=cx+trunc(x);
         yi:=cy+trunc(y);
-        startdraw(xi-3,yi-3);
-        draw(xi+3,yi-3);
-        draw(xi,yi+2);
-        draw(xi-3,yi-3);
-        enddraw;
-        moveto(xi+6,yi-7);
-        write(@plotter,i+1);
+        _startdraw(xi-3,yi-3);
+        _draw(xi+3,yi-3);
+        _draw(xi,yi+2);
+        _draw(xi-3,yi-3);
+        _enddraw;
+        _moveto(xi+6,yi-7);
+        write(@PLOTTER,i+1);
         if shipdamage[i]<100 then
-          write(@plotter,'d');
+          write(@PLOTTER,'d');
         if mode=1 then begin
-          moveto(20,maxy-16*i-78);
-          write(@plotter,i+1,': ');
-          writef0(plotter,0,conv(angle),
+          _moveto(20,MAXY-16*i-78);
+          write(@PLOTTER,i+1,': ');
+          writef0(PLOTTER,0,conv(angle),
             4,false);
-          writef0(plotter,1,conv(dist)*0.1,
+          writef0(PLOTTER,1,conv(dist)*0.1,
             6,false);
-          write(@plotter,' pc');
+          write(@PLOTTER,' pc');
           if shipdamage[i]<100 then
-            write(@plotter,' d');
+            write(@PLOTTER,' d');
         end;
       end;
     end;
@@ -148,15 +140,15 @@ var i,angle: integer;
 
   proc drawsegment;
   begin
-    startwritethrough;
-    drawvector(cx,cy,cx+trunc(x),cy+trunc(y));
+    startwrthrough;
+    _drawvector(cx,cy,cx+trunc(x),cy+trunc(y));
     endwritethrough;
-    drawvector(cx+trunc(x),
+    _drawvector(cx+trunc(x),
       cy+trunc(y),
       cx+trunc(ticfactor*x),
       cy+trunc(ticfactor*y));
     if mode=0 then begin
-      drawvector(cx+trunc(ticf1*x),
+      _drawvector(cx+trunc(ticf1*x),
       cy+trunc(ticf1*y),
       cx+trunc(ticf2*x),
       cy+trunc(ticf2*y));
@@ -165,52 +157,52 @@ var i,angle: integer;
   end;
 
 begin
-  setchsize(1);
+  _setchsize(1);
   if mode=0 then begin
     step:=6;
-    cx:=maxx-130;
+    cx:=MAXX-130;
     cy:=150;
-    moveto((maxx div 2)-72,maxy-25);
+    _moveto((MAXX div 2)-72,MAXY-25);
     radarsize:=100;
     ticfactor:=1.0+3.0/conv(radarsize);
     ticf1:=conv(phaserrange)/10.0;
     ticf2:=0.01+conv(phaserrange)/10.0;
     csize:=conv(radarsize)/32000.0;
-    moveto(cx-130,cy-radarsize-28);
-    write(@plotter,'Phaser range');
-    writef0(plotter,1,
+    _moveto(cx-130,cy-radarsize-28);
+    write(@PLOTTER,'Phaser range');
+    writef0(PLOTTER,1,
       conv(phaserrange)/10.0,
       4,false);
-    write(@plotter,' pc');
+    write(@PLOTTER,' pc');
   end else begin
     step:=3;
-    cx:=maxx div 2;
-    cy:=maxy div 2;
-    moveto((maxx div 2)-72,maxy-25);
-    write(@plotter,'R65 Starship');
+    cx:=MAXX div 2;
+    cy:=MAXY div 2;
+    _moveto((MAXX div 2)-72,MAXY-25);
+    write(@PLOTTER,'R65 Starship');
     radarsize:=(310*damage[0]) div 100;
     ticfactor:=1.0+3.0/conv(radarsize);
     csize:=conv(radarsize)/32000.0;
-    moveto(cx-150,cy-radarsize-28);
-    write(@plotter,'Long range scan');
-    writef0(plotter,1,conv(radarsize)*0.1,
+    _moveto(cx-150,cy-radarsize-28);
+    write(@PLOTTER,'Long range scan');
+    writef0(PLOTTER,1,conv(radarsize)*0.1,
       4,false);
-    write(@plotter,' pc');
+    write(@PLOTTER,' pc');
   end;
   angle:=0;
-  setlinemode(2);
-  setchsize(2);
-  drawvector(cx-radarsize,cy,cx+radarsize,cy);
-  drawvector(cx,cy-radarsize,cx,cy+radarsize);
-  setlinemode(1);
+  _setlinemode(2);
+  _setchsize(2);
+  _drawvector(cx-radarsize,cy,cx+radarsize,cy);
+  _drawvector(cx,cy-radarsize,cx,cy+radarsize);
+  _setlinemode(1);
   if (mode=1) then begin
-    drawrectange(10,maxy-200,240,maxy-10);
-    moveto(20,maxy-30);
-    write(@plotter,'SCANNER');
-    moveto(20,maxy-46);
-    write(@plotter,'Objects located:');
-    moveto(20,maxy-60);
-    write(@plotter,'   angle distance');
+    _drawrectangle(10,MAXY-200,240,MAXY-10);
+    _moveto(20,MAXY-30);
+    write(@PLOTTER,'SCANNER');
+    _moveto(20,MAXY-46);
+    write(@PLOTTER,'Objects located:');
+    _moveto(20,MAXY-60);
+    write(@PLOTTER,'   angle distance');
   end;
   angle:=0;
   i:=0
@@ -250,48 +242,48 @@ end;
 proc showEnergy;
 var i: integer;
 begin
-  setlinemode(1);
-  setchsize(2);
-  drawrectange(10,10,240,116);
-  moveto(20,90);
-  write(@plotter,'ENERGY');
+  _setlinemode(1);
+  _setchsize(2);
+  _drawrectangle(10,10,240,116);
+  _moveto(20,90);
+  write(@PLOTTER,'ENERGY');
   for i:= 0 to 3 do begin
-    moveto(20,74-16*i);
+    _moveto(20,74-16*i);
     case i of
-      0: write(@plotter,'Scanner:    ');
-      1: write(@plotter,'Shield:     ');
-      2: write(@plotter,'Phaser:     ');
-      3: write(@plotter,'Warp Engine:')
+      0: write(@PLOTTER,'Scanner:    ');
+      1: write(@PLOTTER,'Shield:     ');
+      2: write(@PLOTTER,'Phaser:     ');
+      3: write(@PLOTTER,'Warp Engine:')
     end;
-    writef0(plotter,0,conv(energy[i]),4,false);
-    write(@plotter,'%');
+    writef0(PLOTTER,0,conv(energy[i]),4,false);
+    write(@PLOTTER,'%');
     if charging=i then
-      write(@plotter,'^');
+      write(@PLOTTER,'^');
   end;
 end;
 
 proc showStatus;
 var i: integer;
 begin
-  setchsize(2);
-  setlinemode(1);
-  drawrectange(maxx-240,maxy-116,
-    maxx-10,maxy-10);
-  moveto(maxx-230,maxy-36);
-  write(@plotter,'STATUS/DAMAGE');
+  _setchsize(2);
+  _setlinemode(1);
+  _drawrectangle(MAXX-240,MAXY-116,
+    MAXX-10,MAXY-10);
+  _moveto(MAXX-230,MAXY-36);
+  write(@PLOTTER,'STATUS/DAMAGE');
   for i:= 0 to 3 do begin
-    moveto(maxx-230,maxy-52-16*i);
+    _moveto(MAXX-230,MAXY-52-16*i);
     case i of
-      0: write(@plotter,'Scanner:    ');
+      0: write(@PLOTTER,'Scanner:    ');
       1: if shield then
-           write(@plotter,'Shield: Up  ')
+           write(@PLOTTER,'Shield: Up  ')
          else
-           write(@plotter,'Shield: Down');
-      2: write(@plotter,'Phaser:     ');
-      3: write(@plotter,'Warp Engine:')
+           write(@PLOTTER,'Shield: Down');
+      2: write(@PLOTTER,'Phaser:     ');
+      3: write(@PLOTTER,'Warp Engine:')
     end;
-    writef0(plotter,0,conv(damage[i]),4,false);
-    write(@plotter,'%');
+    writef0(PLOTTER,0,conv(damage[i]),4,false);
+    write(@PLOTTER,'%');
   end;
 end;
 
@@ -308,8 +300,8 @@ begin
   if (select>=1) and (select<=4) then
     charging:=select-1
   else
-    writeln(invvid,'Illegal selection',
-      norvid);
+    writeln(INVVID,'Illegal selection',
+      NORVID);
   write('Charging ');
   case charging of
     0: writeln('Scanner');
@@ -322,11 +314,11 @@ end;
 proc doscan;
 begin
   if damage[0]<5 then
-    writeln(invvid,
-      'Scanner defective',norvid)
+    writeln(INVVID,
+      'Scanner defective',NORVID)
   else if energy[0]<8 then
-    writeln(invvid,
-      'Not enough energy for scan',norvid)
+    writeln(INVVID,
+      'Not enough energy for scan',NORVID)
   else begin
     energy[0]:=energy[0]-8;
     if energy[0]<0 then energy[0]:=0;
@@ -357,7 +349,7 @@ begin
       3: write('Warp Engine')
     end
   end else
-    write(invvid,'Illegal selection',norvid);
+    write(INVVID,'Illegal selection',NORVID);
   writeln;
 end;
 
@@ -367,8 +359,8 @@ var i,angle,required:integer;
     done:boolean;
 begin
   if damage[3]<10 then
-    writeln(invvid,
-      'Warp engine damaged',norvid)
+    writeln(INVVID,
+      'Warp engine damaged',NORVID)
   else begin
     done:=false;
     write('Warp direction? ');
@@ -377,12 +369,12 @@ begin
     if angle>360 then angle:=360;
     repeat
       write('Warp distance in pc? ');
-      distance:=readflo(input);
+      distance:=readflo(INPUT);
       required:=trunc(2.0*distance);
       writeln('Energy required: ',required);
       if energy[3]<required then
-        writeln(invvid,'Not enough energy (',
-          required,'% required)',norvid)
+        writeln(INVVID,'Not enough energy (',
+          required,'% required)',NORVID)
       else begin
         done:=true;
         energy[3]:=energy[3]-required;
@@ -408,15 +400,15 @@ proc shoot;
 var i,angle:integer;
 begin
   if shield then begin
-    writeln(invvid,'Lowering shield',norvid);
+    writeln(INVVID,'Lowering shield',NORVID);
     shield:=false;
   end;
   if damage[2]<10 then
-    writeln(invvid,
-      'Phaser damaged',norvid)
+    writeln(INVVID,
+      'Phaser damaged',NORVID)
   else if energy[2]<20 then
-    writeln(invvid,
-      'Not enough energy for phaser',norvid)
+    writeln(INVVID,
+      'Not enough energy for phaser',NORVID)
   else begin
     energy[2]:=energy[2]-20;
     write('Phaser direction? ');
@@ -424,21 +416,21 @@ begin
     if angle<0 then angle:=360-angle;
     if angle>360 then angle:=360;
     for i:=0 to 7 do begin
-      if (abs(angle-ashiptable[i])<4) and
+      if (_abs(angle-ashiptable[i])<4) and
         (dshiptable[i]<phaserrange) then begin
         shipdamage[i]:=shipdamage[i]-50;
         if shipdamage[i]>0 then begin
-          writeln(invvid,'Ship ',i+1,
-          ' damaged',norvid);
+          writeln(INVVID,'Ship ',i+1,
+          ' damaged',NORVID);
         score:=score+1;
         end else begin
-          writeln(invvid,'Ship ',i+1,
-            ' destroyed',norvid);
+          writeln(INVVID,'Ship ',i+1,
+            ' destroyed',NORVID);
           score:=score+10;
-          { Create new ship far away }
+          { Create _new ship far away }
           dshiptable[i]:=20000;
           ashiptable[i]:=
-            trunc(conv(random)*360.0/256.0);
+            trunc(conv(_random)*360.0/256.0);
           shipdamage[i]:=100;
         end;
       end;
@@ -451,7 +443,7 @@ var impact,station: integer;
 begin
   impact:=impact0;
   if impact<5 then impact:=5;
-  write(invvid,'Starship hit, ');
+  write(INVVID,'Starship hit, ');
   if shield then begin
     if energy[1]>=impact then begin
       energy[1]:=energy[1]-impact;
@@ -464,7 +456,7 @@ begin
     end
   end;
   if impact>0 then begin
-    station:=random div 64;
+    station:=_random div 64;
     case station of
       0: write('Scanner');
       1: write('Shield generator');
@@ -479,7 +471,7 @@ begin
     writeln(' damaged (',
       damage[station],'%)');
   end;
-  write(norvid);
+  write(NORVID);
 end;
 
 proc enemy;
@@ -488,13 +480,13 @@ begin
   for i:=0 to 7 do begin
     if dshiptable[i]>10 then begin
       { warp }
-      if random<128 then begin
-        distance:=random div 2;
+      if _random<128 then begin
+        distance:=_random div 2;
         dshiptable[i]:=dshiptable[i]-
-          (random div 2);
+          (_random div 2);
         if dshiptable[i]<3 then
           dshiptable[i]:=3;
-        dangle:=(random-128) div dshiptable[i];
+        dangle:=(_random-128) div dshiptable[i];
         ashiptable[i]:=ashiptable[i]+
           dangle;
         if ashiptable[i]<0 then
@@ -504,8 +496,8 @@ begin
       end
     end;
     if dshiptable[i]<10 then begin
-      if random<128 then
-        hit(random div 6);
+      if _random<128 then
+        hit(_random div 6);
     end;
   end;
 end;
@@ -516,10 +508,10 @@ var i,s:integer;
     select:char;
 begin
   sshield:=shield;
-  writeln(invvid,'Current score: ',
-    score,norvid);
+  writeln(INVVID,'Current score: ',
+    score,NORVID);
   if not shield then
-    writeln(invvid,'Shield is down',norvid);
+    writeln(INVVID,'Shield is down',NORVID);
   writeln('Select action:');
   writeln('R: Repair stations');
   if shield then
@@ -527,7 +519,7 @@ begin
   else
     writeln('S: Rase shield');
   write('P: Phaser (range ');
-  writef0(output,1,conv(phaserrange)/10.0,
+  writef0(OUTPUT,1,conv(phaserrange)/10.0,
     2,false);
   writeln(' pc)');
   writeln('W: Warp');
@@ -542,8 +534,8 @@ begin
     'W': warp;
     'C': setcharging;
     'Q': quit:=true
-    else writeln(invvid,'No action taken',
-      norvid)
+    else writeln(INVVID,'No action taken',
+      NORVID)
   end;
   energy[charging]:=energy[charging]+10;
   if energy[charging]>damage[charging] then
@@ -555,8 +547,8 @@ begin
   end;
   if shield then begin
     if energy[1]<10 then begin
-       writeln(invvid,'Not enough energy, ',
-         'shield down',norvid);
+       writeln(INVVID,'Not enough energy, ',
+         'shield down',NORVID);
       shield:=false;
     end else begin
       energy[1]:=energy[1]-10;
@@ -565,18 +557,18 @@ begin
     end;
   end;
   if not quit then begin
-    clearscreen;
+    _clearscreen;
     enemy;
     if (select='P') and (shield<>sshield)
     then begin
-      writeln(invvid,'Raising shield',norvid);
+      writeln(INVVID,'Raising shield',NORVID);
       shield:=sshield;
     end;
     phaserrange:=10*damage[2] div 100;
     showEnergy;
     showStatus;
     doscan;
-    moveto(5,maxx-20);
+    _moveto(5,MAXX-20);
     s:=0;
     for i:=1 to 3 do
       s:=s+damage[i];
@@ -623,8 +615,8 @@ begin
   charging:=1;
   for i:=0 to maxships-1 do begin
     ashiptable[i]:=
-      trunc(conv(random)*360.0/256.0);
-    dshiptable[i]:=random div 2 +
+      trunc(conv(_random)*360.0/256.0);
+    dshiptable[i]:=_random div 2 +
        radarsize-128;
     shipdamage[i]:=100;
   end;
@@ -643,16 +635,16 @@ begin
 end;
 
 begin {main}
-  starttek;
+  _starttek;
   initialize;
   showEnergy;
   showStatus;
   scan(1);
   scan(0);
-  moveto(5,maxx-20);
+  _moveto(5,MAXX-20);
   repeat
     action;
   until quit;
-  writeln(invvid,'Final score: ',score,norvid);
-  endtek;
+  writeln(INVVID,'Final score: ',score,NORVID);
+  _endtek;
 end. 

@@ -19,13 +19,10 @@ uses syslib, arglib, filelib;
 
 const
     cup = chr($1a);
-    ECEXPORT = 1;
     prflab   = $e82d;
 
 mem filerr=$db: integer&;
     filstp=$312:char&;
-    emucom=$1430: integer&;
-    emures=$1431: integer&;
 
 var cyclus,drive,free: integer;
     name: array[15] of char;
@@ -70,8 +67,7 @@ writeln;
     exit;
   end;
   writeln('=');
-  emucom := ECEXPORT;
-  filerr := emures;
+  filerr := _emulator(ECEXPORT);
   if filerr<>0 then bcderror(filerr);
 end.
   
