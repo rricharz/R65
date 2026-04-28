@@ -1,9 +1,9 @@
 {
-         *******************
-         *                 *
-         *   dir <drive>   *
-         *                 *
-         *******************
+    *******************************
+    *                             *
+    *   dir - display directory   *
+    *                             *
+    *******************************
 
     2018,2019 rricharz (r77@bluewin.ch)
     2023 removed INVERSE video display
@@ -14,20 +14,20 @@ Display the directory of a disk drive.
 Uses EPROM (disk.asm) calls to get info
 from disk directory.
 
-Written 2018 for Micro Pascal.
-
 Makes a table to find out how long the
 longest name is. Then computes the number
 of columns which can be displayed and
 displays the directory.
 
 option /S sorts the directory
+       /F full directory date
+       /D include deleted files
 
 Usage:
-  DIR drive [/s]
+  DIR drive [/options]
      where drive is the drive number 1 (default) or 0
-  DIR name
-     where name is the name of a floppy disk
+  DIR diskname [/options]
+     where disknamename is the name of a floppy disk
 
 The directory table has 256 entries of 32 bytes
 The disk name is stored in the last entry (255)
@@ -56,6 +56,7 @@ mem   filtyp  = $0300: char&;
       scyfc   = $037c: integer&;
 
 var default, name_given,
+    show_deleted, entry_deleted,
     sortit, full:             boolean;
     drive, index, i, l, ti:   integer;
     maxlen, nument, col:      integer;
@@ -118,22 +119,22 @@ begin
   j := 0;
   while (j <= NAMESIZE) and (FILNAM[j] <> ' ') do
   begin
-    str[j] := FILNAM[j];
+    write(@str, FILNAM[j]);
     j := j + 1;
   end;
-  str[j] := ENDMARK;
 end;
 
 begin {main}
 {**********}
-  cfloppy:=_new;
-  newname:=_new;
-  name_given:=false;
-  drive:=1;
-  filerr:=0;
-  sortit:=false;
-  full:=false;
-  _carg:=0;
+  cfloppy := _new;
+  newname := _new;
+  name_given := false;
+  drive := 1;
+  filerr := 0;
+  sortit := false;
+  full := false;
+  show_deleted := false;
+  _carg := 0;
 { Process arguments }
   if ARGTYPE[_carg]=chr(0) then begin
     { no argument }
@@ -164,8 +165,10 @@ begin {main}
   if ARGTYPE[_carg]='s' then begin
     sortit  := option('S');
     full    := option('F');
-    if not (sortit or full) then begin
-      writeln('option must be /S or /F or /FS');
+    show_deleted := option('D');
+    if not (sortit or full or show_deleted) then
+    begin
+      writeln('option must be /S or /F or /D');
       exit;
     end;
   end;
@@ -205,9 +208,17 @@ begin {main}
     call(agetentx);
     checkfilerr;
     if filtyp<>chr(0) then begin { not end mark }
-      if (fillnk and 255)<128 then begin {not deleted}
+      entry_deleted := (fillnk and $80) = $80;
+      if not(entry_deleted) or show_deleted then
+      begin {not deleted}
         entry[ti] := _new;
         s := entry[ti];
+        if show_deleted and full then
+          write(@s, '(', ti, ')');
+        if entry_deleted then
+          write(@s, '[')
+        else if show_deleted then
+          write(@s,' ');
         filnam_to_str(s);
         write(@s, '.',
           hex(filcyc shr 4), hex(filcyc and 15));
@@ -219,6 +230,10 @@ begin {main}
           write(@s,'/',month shr 4, month and 15);
           write(@s,'/',year shr 4,year and 15);
         end;
+        if entry_deleted then
+          write(@s, ']')
+        else if show_deleted then
+          write(@s,' ');
         l := _strlen(s);
         if maxlen < l then maxlen := l;
         ti:=ti+1
