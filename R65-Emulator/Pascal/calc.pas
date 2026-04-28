@@ -15,6 +15,7 @@ program calc;
 uses syslib,mathlib,strlib,ledlib;
 
 mem vidpnt=$00e9:integer;
+    BUFFPN   = $0015: integer&;
 
 var ch: char;
     r,lastr: real;

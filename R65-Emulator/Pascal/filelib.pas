@@ -61,20 +61,25 @@ begin
   FILFLG:=$40; { Do not show file entry }
 end;
 
+proc _write_label;
+{****************}
+{ print label without leading and trailing linefeed }
+const prflbnolf   = $ece3;
+begin
+  call(prflbnolf);
+end;
+
 func _bestmatch: boolean;
 {***********************}
 {find the best (highers cyclus) entry in directory}
 const
   preprd = $f62c;
-  prflab = $ece3;
-  CUP = chr($1a);
   mem filerr = $00db: integer&;
 begin
   filerr := 0;
   call(preprd); { find entry with system subroutine }
   if (filerr = 0) then begin
-    write(CUP);   { get rid of empty line }
-    call(prflab); { print info with system subroutine}
+    _write_label;
   end;
   _bestmatch := (filerr = 0);
 end;
@@ -121,14 +126,6 @@ begin
     writeln( 'Free space on drive ', drive,
       ': ',s,'%',NORVID);
   end;
-end;
-
-proc _write_label;
-{****************}
-{ print label without leading and trailing linefeed }
-const prflab   = $ece3;
-begin
-  call(prflab);
 end;
 
 begin

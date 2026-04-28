@@ -16,7 +16,6 @@ program delete;
 uses syslib, arglib, filelib, wildlib;
 
 const adelete  = $c80c; { exdos vector }
-      prflab   = $ece3;
 
 mem filerr=$db: integer&;
 
@@ -55,8 +54,8 @@ begin
         name[i]:=FILNAM[i];
       end;
       _asetfile(name,FILCYC,drive,' ');
-  {    call(prflab);
-       writeln('-');        }
+      _write_label;
+      writeln('-');
       call(adelete);
       if filerr<>0 then begin
         writeln;

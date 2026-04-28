@@ -35,8 +35,6 @@ const
   PRTON    = chr($12);  {autoprint on}
   PRTOFF   = chr($14);  {autoprint off}
 
-  MMAXSEQ  = 8;         {max no of seq. files}
-
   TOPMEM   = $c780;     {top of user memory}
   MAXINT   = $7fff;     {max integer value}
 
@@ -54,7 +52,6 @@ mem
   { The & below is required for 8-bit }
   RUNERR   = $000c: integer&;
   ENDSTK   = $000e: integer;
-  BUFFPN   = $0015: integer&;
   IOCHECK  = $0023: boolean&;
   CURPOS   = $00ee: integer&;
 

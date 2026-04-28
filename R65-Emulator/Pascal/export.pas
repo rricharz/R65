@@ -17,10 +17,6 @@
 program export;
 uses syslib, arglib, filelib;
 
-const
-    cup = chr($1a);
-    prflab   = $e82d;
-
 mem filerr=$db: integer&;
     filstp=$312:char&;
 
@@ -57,7 +53,6 @@ begin
 end;
 
 begin { main }
-writeln;
   cyclus:=0; drive:=1;
   _agetstring(name,default,cyclus,drive);
   setsubtype('P');

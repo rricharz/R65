@@ -16,7 +16,7 @@ call other programs by names and with
 arguments.
 
 Examples:
-  cCOMPILE TEST1:P
+  COMPILE TEST1:P
   COMPILE TEST1:P.1F,1
   COMPILE TEST1
   COPY TEST3,0,1
@@ -30,23 +30,34 @@ Default for arguments is drive 1.
 }
 
 program system;
-uses syslib;
+{does not use libraries to save memory}
 
 const
-  title='R65 PASCAL VERSION 5.7';
-  stopcode=$2010;
+  title='R65 PASCAL VERSION 5.8';
+  STOPCODE = $2010;
+  INPUT    = @0;
+  CR       = chr(13);
+  NORVID   = chr($0b);  {normal video}
+  INVVID   = chr($0e);  {inverse video}
+  MMAXSEQ  = 8;         {max no of seq. files}
+  TOPMEM   = $c780;
 
 mem
-  FILCY1 = $0330: integer&;
-  FIDRTB = $0339: array[8] of integer&;
-  FILNM1 = $0320: array[15] of char&;
-  NUMARG   =$005f: integer&;
-  FILDRV = $00dc: integer&;
-  FILFLG = $da:   integer&;
-  MAXSEQ = $0336: integer&;
-  ARGLIST = $0060: array[10] of integer;
+  RUNERR   = $000c: integer&;
+  IOCHECK  = $0023: boolean&;
+  ENDSTK   = $000e: integer;
+  BUFFPN   = $0015: integer&;
+  FILCY1   = $0330: integer&;
+  FIDRTB   = $0339: array[8] of integer&;
+  FILNM1   = $0320: array[15] of char&;
+  NUMARG   = $005f: integer&;
+  FILDRV   = $00dc: integer&;
+  FILFLG   = $00da: integer&;
+  MAXSEQ   = $0336: integer&;
+  ARGLIST  = $0060: array[10] of integer;
   ARGLISTS = $0060: array[63] of char&;
-  ARGTYPE = $00a0: array[31] of char&;
+  ARGTYPE  = $00a0: array[31] of char&;
+
 
 var
   i, m, n: integer;
@@ -197,7 +208,7 @@ begin {main}
   repeat {main loop (endless)}
     write('P*');
     next;
-    if ch=CR then call(stopcode);
+    if ch=CR then call(STOPCODE);
     while (ch=' ') or (ch=chr(13)) do next;
     { default for program to run is drive 1,
       if not found, run from drive 0,

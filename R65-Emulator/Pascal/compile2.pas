@@ -14,7 +14,6 @@ uses syslib,arglib,filelib;
 const
     title='R65 PASCAL COMPILER Version 4.2, Pass 2';
     wrfile = $e81b;
-    prflab = $ece3;
     sblock = $6000;
     eblock = TOPMEM;
 
@@ -78,7 +77,7 @@ begin
   FILTYP:='B';
   call(wrfile);
   FILTYP := 'B';
-  call(prflab);
+  _write_label;
   write('+');
   testerr
 end {blocksave};

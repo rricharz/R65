@@ -36,8 +36,6 @@ end;
 proc findond(nm:array[15] of char; drv:integer);
 {********************************************}
 
-const  prflab     = $e82d;
-
 var first: boolean;
     i: integer;
     nm2: array[NAMESIZE] of char;
@@ -75,7 +73,7 @@ begin
           { find again because of _freedrv }
           _findentry(name,drv,entry,found,last);
         end;
-        call(prflab);
+        _write_label;
         writeln;
         nfound := succ(nfound);
         end;

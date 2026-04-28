@@ -21,13 +21,6 @@ mem
     ARGLIST  = $0060: array[10] of integer;
     ARGLISTS = $0060: array[63] of char&;
     ARGTYPE  = $00a0: array[31] of char&;
-    FILFLG   = $00da: integer&;
-    FILDRV   = $00dc: integer&;
-    FILCYC   = $0311: integer&;
-    FILCY1   = $0330: integer&;
-    FILNAM   = $0301: array[15] of char&;
-    FILNM1   = $0320: array[15] of char&;
-    FILSTP   = $0312: char&;
 
 var _carg: integer;
 

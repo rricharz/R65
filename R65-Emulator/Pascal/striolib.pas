@@ -8,27 +8,13 @@ library striolib;
 
 { prepare read/write to file }
 { Example:                   }
-{   strfio('TEXT':B,1);      }
+{   strfio('TEXT:B',1);      }
 {   openr;                   }
 
 const
     NAMESIZE = 15;
 mem
     filerr  =$00db: integer&;
-
-proc _argerror(e: integer);
-{*************************}
-{ display argument error e and stops app }
-const
-    STOP=$2010;
-mem
-    RUNERR=$000c: integer&;
-begin
-    writeln;
-    writeln('Argument error ',e);
-    RUNERR:=255;
-    call(STOP)
-end;
 
 proc _checkfilerr;
 {****************}
@@ -56,8 +42,21 @@ mem
     ARGLISTS = $0060: array[63] of char&;
     ARGTYPE  = $00a0: array[31] of char&;
 var
-    i: integer;
-    dummy: boolean;
+i: integer;
+dummy: boolean;
+
+  proc _argerror(e: integer);
+  const
+    STOP=$2010;
+  mem
+    RUNERR=$000c: integer&;
+  begin
+    writeln;
+    writeln('Argument error ',e);
+    RUNERR:=255;
+    call(STOP)
+  end;
+
 begin
   string[0] := ENDMARK;
   case ARGTYPE[scarg] of
