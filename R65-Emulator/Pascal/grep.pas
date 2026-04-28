@@ -78,9 +78,11 @@ begin
   linecount := 1;
   repeat
     line_length := _strread(f, line, ateof);
-    if find_pattern then
+    if find_pattern then begin
+      while line[0]=' ' do _strdelc(0, line);
       writeln(name,':',linecount,' ', line);
     linecount := linecount + 1;
+    end;
   until ateof;
 end;
 

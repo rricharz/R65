@@ -12,57 +12,6 @@ library wildlib;
 const NAMESIZE   = 15;
       NUMENTRIES = 255;
 
-mem   FILNAM=$0301: array[NAMESIZE] of char&;
-
-proc _test(s1:array[NAMESIZE] of char;
-      var found:boolean);
-var l1,l2:integer;
-
-func match(i0,i2:integer): boolean;
-var i1:integer;
-    b:boolean;
-begin
-  i1:=i0;
-  if (i1>=l1) and (i2>=l2) then
-    match:=true
-  else begin
-    if s1[i1]='*' then
-      while (i1<l1) and (s1[i1+1]='*') do i1:=i1+1;
-    if (s1[i1]='*') and (i1<l1-1) and (i2>=l2) then
-      match:=false
-    else begin
-      if (s1[i1]='?') or (s1[i1]=FILNAM[i2]) then
-        match:=match(i1+1,i2+1)
-      else begin
-        if (s1[i1]='*') and (i1<l1) then begin
-          b:=match(i1+1,i2);
-          if not b then
-            b:=match(i1,i2+1);
-          match:=b;
-        end else begin
-          match:=false;
-        end;
-      end;
-    end;
-  end;
-end;
-
-proc findends;
-var k:integer;
-begin
-  k:=NAMESIZE;
-  while (s1[k]=' ') and (k>0) do k:=k-1;
-  l1:=k+1;
-  k:=NAMESIZE;
-  while (FILNAM[k]=' ') and (k>0) do k:=k-1;
-  l2:=k+1;
-end;
-
-begin {test}
-  findends;
-  found:=match(0,0);
-end;
-
 proc _findentry(var nm:array[NAMESIZE] of char;
        drv:integer;var ent: integer;
        var fnd,lst:boolean);
@@ -74,20 +23,71 @@ mem   filtyp     = $0300: char&;
       fillnk     = $031e: integer&;
       scyfc      = $037c: integer&;
       fildrv     = $00dc: integer&;
+      FILNAM=$0301: array[NAMESIZE] of char&;
 
 var   i: integer;
 
-proc checkfilerr;
-const stopcode=$2010;
-mem filerr = $db: integer&;
-    runerr = $0c: integer&;
-begin
-  if filerr<>0 then begin
-    writeln('Directory error');
-    runerr:=$36;
-    call(stopcode);
+  proc _test(s1:array[NAMESIZE] of char;
+        var found:boolean);
+  var l1,l2:integer;
+
+    proc findends;
+    var k:integer;
+    begin
+      k:=NAMESIZE;
+      while (s1[k]=' ') and (k>0) do k:=k-1;
+      l1:=k+1;
+      k:=NAMESIZE;
+      while (FILNAM[k]=' ') and (k>0) do k:=k-1;
+      l2:=k+1;
+    end;
+
+    func match(i0,i2:integer): boolean;
+    var i1:integer;
+        b:boolean;
+    begin
+      i1:=i0;
+      if (i1>=l1) and (i2>=l2) then
+        match:=true
+      else begin
+        if s1[i1]='*' then
+          while (i1<l1) and (s1[i1+1]='*') do
+            i1:=i1+1;
+        if (s1[i1]='*') and (i1<l1-1) and (i2>=l2)
+        then match:=false
+        else begin
+          if (s1[i1]='?') or (s1[i1]=FILNAM[i2]) then
+            match:=match(i1+1,i2+1)
+          else begin
+            if (s1[i1]='*') and (i1<l1) then begin
+              b:=match(i1+1,i2);
+              if not b then
+                b:=match(i1,i2+1);
+              match:=b;
+            end else begin
+              match:=false;
+            end;
+          end;
+        end;
+      end;
+    end;
+
+  begin {test}
+    findends;
+    found:=match(0,0);
   end;
-end;
+
+  proc checkfilerr;
+  const stopcode=$2010;
+  mem filerr = $db: integer&;
+      runerr = $0c: integer&;
+  begin
+    if filerr<>0 then begin
+      writeln('Directory error');
+      runerr:=$36;
+      call(stopcode);
+    end;
+  end;
 
 begin
   fildrv:=drv;
@@ -106,7 +106,6 @@ begin
     lst:=(filtyp=chr(0));
     until fnd or lst or (ent>=NUMENTRIES);
   call (aenddo);
-
 end;
 
 proc _sfindentry(name: cpnt; drv:integer;
@@ -128,6 +127,8 @@ begin
 end;
 
 proc _writename(nm1:array[15] of char);
+{*************************************}
+{ write nm1 without trailing blanks }
 var j,k:integer;
 begin
   k:=15;

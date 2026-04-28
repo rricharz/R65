@@ -9,7 +9,7 @@
 {    Usage:  help subject               }
 
 program help;
-uses syslib, arglib, strlib, wildlib, striolib;
+uses syslib,arglib,filelib,strlib,wildlib,striolib;
 
 const
     DEBUG = false;
@@ -32,11 +32,6 @@ end;
 proc copyback;
 {************}
 { copy exact file name found back into argument }
-mem
-    ARGLIST  = $0060: array[31] of integer;
-    ARGLISTS = $0060: array[63] of char&;
-    ARGTYPE  = $00a0: array[31] of char&;
-    FILNAM   = $0301: array[NAMESIZE] of char&;
 var i: integer;
 begin
   ARGTYPE[0] := 's';
