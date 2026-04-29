@@ -1,24 +1,30 @@
-{ find filesentries. Wildcards * and ? }
-{  The cyclus is ignored.              }
-{  File type is required either as     }
-{  name:x, name* or name:?             }
+{*************************************}
+{* RESTORE - restores a deleted file *}
+{*************************************}
 
-{  2023 rricharz                       }
+program restore;
+uses syslib, arglib, filelib;
 
-{$U+}
+const
+    aenddo     = $f625;
+    putfentp3  = $f583;
+    NAMESIZE   = 15;
+    NUMENTRIES = 255;
 
-library wildlib;
+mem FILLNK     = $031e: integer&;
+    FILCN1     = $e5: integer&;
 
-const NAMESIZE   = 15;
-      NUMENTRIES = 255;
+var filename: array[NAMESIZE] of char;
+    cyclus, drive, entry: integer;
+    default, found, last: boolean;
+    i: integer;
 
-proc _findentry(var nm:array[NAMESIZE] of char;
+proc find_deleted(var nm:array[NAMESIZE] of char;
        drv:integer;var ent: integer;
        var fnd,lst:boolean);
-{*********************************************}
+{***********************************************}
 const aprepdo    = $f4a7;
       agetentx   = $f63a;
-      aenddo     = $f625;
 
 mem   filtyp     = $0300: char&;
       fillnk     = $031e: integer&;
@@ -79,15 +85,11 @@ var   i: integer;
   end;
 
   proc checkfilerr;
-
-  const stopcode=$2010;
   mem filerr = $db: integer&;
-      runerr = $0c: integer&;
   begin
     if filerr<>0 then begin
-      writeln('Directory error');
-      runerr:=$36;
-      call(stopcode);
+      writeln(INVVID,'Directory read error',NORVID);
+      _abort;
     end;
   end;
 
@@ -102,43 +104,40 @@ begin
     fnd:=true;
     i:=0;
     _test(nm,fnd);
-    if (fillnk and $80)<>0 then {deleted file}
+    if (fillnk and $80) = 0 then {not deleted file}
       fnd:=false;
     ent:=ent+1;
     lst:=(filtyp=chr(0));
     until fnd or lst or (ent>=NUMENTRIES);
-  call (aenddo);
 end;
 
-proc _sfindentry(name: cpnt; drv:integer;
-       var ent: integer;
-       var fnd,lst: boolean);
-{***************************************}
-{ wrapper for cpnt string }
-const ENDMARK = chr(0);
-var nm: array[NAMESIZE] of char;
-    i:  integer;
 begin
-  for i := 0 to NAMESIZE do nm[i] := ' ';
-  i := 0;
-  while (i <= NAMESIZE) and (name[i] <> ENDMARK) do
-  begin
-    nm[i] := name[i];
-    i := i + 1;
+
+  cyclus  := 0;
+  drive   := 1;
+  default := false;
+  last    := false;
+
+  if (ARGTYPE[_carg] <> 's') then begin
+    writeln(INVVID,'Usage: RESTORE filename',NORVID);
+    _abort;
   end;
-  _findentry(nm, drv, ent, fnd, lst);
-end;
+  _agetstring(filename, default, cyclus, drive);
 
-proc _writename(nm1:array[NAMESIZE] of char);
-{*******************************************}
-{ write nm1 without trailing blanks }
-var j,k:integer;
-begin
-  k:=NAMESIZE;
-  while (nm1[k]=' ') and (k>1) do k:=k-1;
-  for j:=0 to k do write(nm1[j]);
-end;
+  entry := 0;
+  while not last do begin
+    find_deleted(filename, drive, entry, found, last);
+    if found then begin
+      _write_label;
+      writeln;
+    end;
 
-begin
+    { clear deleted flag }
+    FILLNK := FILLNK and not $80;
+
+    call(putfentp3);
+    call(aenddo);
+    entry := entry + 1;
+  end;
+
 end.
-

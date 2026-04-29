@@ -37,7 +37,7 @@ The last currently used entry has filtyp=TEND
 {$U+}
 
 program dir;
-uses syslib, arglib, strlib, striolib;
+uses syslib, arglib, filelib, strlib, striolib;
 
 const aprepdo =$f4a7;
       agetentx=$f63a;
@@ -259,7 +259,7 @@ begin {main}
   if sortit then sort;
 
 { compute number of columns and spaces between them }
-  ncol:=48 div (maxlen+2);
+  ncol:=48 div (maxlen+3);
   if nument<8 then ncol:=2
   else if nument<8 then ncol:=1;
   nspaces:=(48 div ncol)-maxlen-1;
