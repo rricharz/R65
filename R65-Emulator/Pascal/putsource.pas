@@ -85,15 +85,20 @@ begin
     end else begin {if successfull}
       setargi(FILCYC,8);
 { export the source file }
-      write('Exporting the source file');
+      if VERBOSE then
+        write('Exporting the source file')
+      else
+        write(CUP);
       FILDRV:=1;
       call(aexport);
-      writeln('=');
+      writeln('e');
 
       { delete the source file               }
-      writeln('Deleting the source file(s) on WORK');
+      if VERBOSE then
+        writeln('Deleting source file(s) on WORK');
       drive:=0; filerr:=0;
       setargi(0,8);
+      setargs('/Q              ', 10, 0, 0);
       runprog('DELETE:R        ',cyclus,drive);
       if (filerr<>0) or (RUNERR<>0) then  begin
         ok:=false;

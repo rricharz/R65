@@ -66,8 +66,8 @@ begin
   ARGTYPE[_carg0]:='s';
     for k9:=0 to 7 do
       ARGLIST[_carg0+k9]:=
-        ord(packed(fname[2*k9+1],
-                    fname[2*k9]));
+        ord(packed(name[2*k9+1],
+                    name[2*k9]));
     ARGTYPE[_carg0+8]:='i';
     ARGLIST[_carg0+8]:=cyc;
     ARGTYPE[_carg0+9]:='i';

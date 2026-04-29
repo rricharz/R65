@@ -61,7 +61,7 @@ begin { main }
     writeln(INVVID,'File not found',NORVID);
     exit;
   end;
-  writeln('=');
+  writeln('v');
   filerr := _emulator(ECEXPORT);
   if filerr<>0 then bcderror(filerr);
 end.

@@ -87,8 +87,8 @@ begin
     end else begin {if successfull}
       { delete the original file }
       setargi(0,8);
-      writeln('Deleting the original file(s)');
       drive:=0; filerr:=0;
+      setargs('/Q              ', 10, 0, 0);
       runprog('DELETE:R        ',cyclus,drive);
       if (filerr <> 0) or (RUNERR <> 0) then begin
         write('DELETE completed with error');
@@ -97,6 +97,7 @@ begin
       if libflag then begin
         setsubtype('L');
         setargs(fname,0,0,1);
+        setargs('/Q              ', 10, 0, 0);
         runprog('DELETE:R        ',cyclus,drive);
         if (filerr <> 0) or (RUNERR <> 0) then begin
           write('DELETE completed with error');
@@ -109,11 +110,13 @@ begin
       setsubtype('Q');
       fname[0]:='*';
       setargs(fname,0,0,1);
+      setargs('/Q              ', 10, 0, 0);
       runprog('DELETE:R        ',cyclus,drive);
       { clean the destination drive }
       setargi(0,0);
       ARGTYPE[1]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
+      setargs('/Q              ', 1, 0, 0);
       runprog('CLEAN:R         ',cyclus,drive);
       if (filerr<>0) or (RUNERR<>0) then begin
          ok:=false;

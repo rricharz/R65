@@ -19,11 +19,13 @@ const adelete  = $c80c; { exdos vector }
 
 mem filerr=$db: integer&;
 
-var cyclus,scyclus,drive,entry,fcount,i: integer;
-    name,savename: array[15] of char;
-    default,found,last: boolean;
+var cyclus, scyclus, drive, entry,
+    fcount,i:                    integer;
+    name, savename:              array[15] of char;
+    default,found,last,quiet:    boolean;
 
-    proc bcderror(e:integer);
+proc bcderror(e:integer);
+{***********************}
 begin
   write(INVVID,'ERROR ');
   write((e shr 4) and 15);
@@ -31,6 +33,7 @@ begin
 end;
 
 func haswildcard(nm1:array[15] of char): boolean;
+{***********************************************}
 var k:integer;
 begin
   haswildcard:=false;
@@ -43,6 +46,9 @@ begin
   cyclus:=0; drive:=1; filerr:=0;
   _agetstring(name,default,cyclus,drive);
   scyclus:=cyclus;
+  quiet := false;
+  if ARGTYPE[_carg] = 's' then
+    quiet := option('Q');
   fcount:=0; last:=false; entry:= 0;
   while (entry<NUMENTRIES) and not last do begin
     cyclus:=scyclus;
@@ -54,8 +60,10 @@ begin
         name[i]:=FILNAM[i];
       end;
       _asetfile(name,FILCYC,drive,' ');
-      _write_label;
-      writeln('-');
+      if not quiet then begin
+        _write_label;
+        writeln('-');
+      end;
       call(adelete);
       if filerr<>0 then begin
         writeln;

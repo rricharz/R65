@@ -34,7 +34,7 @@ mem   filtyp  =$0300: char&;
       scyfc   =$037c: integer&;
       filerr  =$db: integer&;
 
-var default: boolean;
+var default, quiet: boolean;
     drive,index,i,ti,maxlen,nument,sfree,
     sdel,sfound : integer;
     { array size = 16 * 256 }
@@ -67,12 +67,14 @@ proc mark(i3: integer);
 {mark entry for delete}
 var j: integer;
 begin
-  write('Deleting ');
-  for j:=0 to maxlen do
-    write(nametab[16*i3+j]);
-  write('.');
-  writeln(hex(cyctab[i3] shr 4),
-          hex(cyctab[i3] and 15));
+  if not quiet then begin
+    write('Deleting ');
+    for j:=0 to maxlen do
+      write(nametab[16*i3+j]);
+    write('.');
+    writeln(hex(cyctab[i3] shr 4),
+            hex(cyctab[i3] and 15));
+  end;
   foundtab[i3]:=true
 end;
 
@@ -93,12 +95,16 @@ begin
 end;
 
 begin { mani }
-  drive:=1; {default drive}
-  _agetval(drive,default);
+  drive := 1; {default drive}
+  if ARGTYPE[_carg] = 'i' then
+    _agetval(drive,default);
   if (drive<0) or (drive>1) then begin
     writeln('Drive must be 0 or 1');
     _abort
   end;
+  if ARGTYPE[_carg] = 's' then
+    quiet := option('Q');
+
   FILDRV:=drive;
   call(aprepdo);
 
@@ -154,8 +160,9 @@ begin { mani }
     end
   end;
 
-  writeln('Free: ',sfree,', found: ',sfound,
-    ', now deleted: ',sdel+sfound);
+  if not quiet then
+    writeln('Free: ',sfree,', found: ',sfound,
+      ', now deleted: ',sdel+sfound);
 
 end.
 

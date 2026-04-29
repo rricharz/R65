@@ -58,12 +58,11 @@ begin { main }
   _agetstring(name,default,cyclus,drive);
   setsubtype('P');
   _asetfile(name,cyclus,drive,filstp);
-  writeln;
   if not _bestmatch then begin
     writeln(CUP,INVVID,'File not found',NORVID);
     exit;
   end;
-  writeln;
+  writeln('e');
   filerr := _emulator(ECEXPORT);
   if filerr<>0 then begin
     bcderror(filerr);

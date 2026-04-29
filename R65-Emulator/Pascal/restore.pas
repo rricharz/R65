@@ -127,9 +127,11 @@ begin
   entry := 0;
   while not last do begin
     find_deleted(filename, drive, entry, found, last);
+    if found and (cyclus <> 0) then
+      if FILCYC <> cyclus then found := false;
     if found then begin
       _write_label;
-      writeln;
+      writeln('+');
     end;
 
     { clear deleted flag }

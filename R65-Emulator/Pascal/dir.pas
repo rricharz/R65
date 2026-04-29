@@ -213,12 +213,10 @@ begin {main}
       begin {not deleted}
         entry[ti] := _new;
         s := entry[ti];
-        if show_deleted and full then
-          write(@s, '(', ti, ')');
         if entry_deleted then
           write(@s, '[')
         else if show_deleted then
-          write(@s,' ');
+          write(@s, ' ');
         filnam_to_str(s);
         write(@s, '.',
           hex(filcyc shr 4), hex(filcyc and 15));
