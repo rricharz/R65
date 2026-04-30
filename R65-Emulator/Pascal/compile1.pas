@@ -51,7 +51,7 @@ var reswtab: array[ 512] of char; {8*(NRESW+1)}
 
     tpos,pc,level,line,offset,dpnt,spnt,fipnt,
     npara,i,stackpnt,stackmax,spntmax,numerr,
-    lineinc,linepage: integer;
+    lineinc: integer;
     scyclus,sdrive,cdrive: integer;
     pname: array[15] of char;
     value: array[1] of integer;
@@ -112,12 +112,6 @@ var reswtab: array[ 512] of char; {8*(NRESW+1)}
     reswcod: array[NRESW] of packed char;
     stack:   array[STACKSIZE] of integer;
 
-{###########################}
-{ global forward references }
-{###########################}
-
-proc newpage; forward;
-
 {###################}
 { savebyte (global) }
 {###################}
@@ -139,9 +133,6 @@ proc crlf;
 begin
   writeln;
   line:=succ(line); lineinc:=succ(lineinc);
-  linepage:=succ(linepage);
-  if ((linepage div PAGELENGHT)
-    * PAGELENGHT)=linepage then newpage;
 end {crlf};
 
 {#################################}
@@ -240,48 +231,12 @@ begin
   stackpnt:=prec(stackpnt)
 end {pop};
 
-{#########}
-{ newpage }
-{#########}
-
-proc newpage;
-var i: integer;
-begin
-  if ((linepage)<>0) and prt then
-    write(@PRINTER,FF);
-  writeln; { Do not count this line}
-  if pname[0]<>'x' then begin
-    write('R65 COMPILE ');
-    write(version);
-    if libflg then write(': library ')
-    else write(': program ');
-    _prtext16(OUTPUT,pname);
-  end;
-  write(' ');
-  _prtdate(OUTPUT);
-  writeln(' page ',
-    (linepage div PAGELENGHT)+1);
-  writeln;
-end {newpage};
-
 {################}
 { code1 (global) }
 {################}
 proc code1(x: %integer);  {set one byte p-code}
 begin
   savebyte(x); pc:=succ(pc)
-end;
-
-{###################}
-{ writenum (global) }
-{###################}
-
-proc writenum(i: integer);
-begin
-  if i<=999 then write(' ');
-  if i<=99 then write(' ');
-  if i<=9 then write(' ');
-  write(i);
 end;
 
 {###################}
@@ -292,17 +247,16 @@ proc nextline;
 var i:integer;
 begin
   nlflg:=true;
-  if savefno=@0 then writenum(line)
+  if savefno=@0 then write(line:4)
   else begin
     write('{I:');
     for i:=0 to 5 do write(incname[i]);
     write('}');
     line:=line-1; { do not count line }
-    writenum(lineinc);
+    write(lineinc:3);
   end;
-  write(' (');
-  if (pc+2)<9999 then write(' ');
-  writenum(pc+2); write(') ');
+  write(' ');
+  write(@PRINTER,(pc+2):5,' '); { only on printer }
 end;
 
 {#############################}
@@ -382,8 +336,8 @@ begin {init}
   s_typ[0]:='vi'; s_lvl[0]:=0;
   s_vda[0]:=0; s_spz[0]:=0;
   { prepare resword table }
-  writeln('Reading list of reserved words');
-  _asetfile('RESWORDS:W      ',0,cdrive,'W');
+  writeln('Reading reserved words');
+  _asetfile('RESWORDS:W      ',0,0,'W');
   openr(fno);
   for i:=0 to NRESW do begin
     read(@fno,pch,dch);
@@ -441,9 +395,9 @@ begin {init}
     RUNERR := _emulator(8);
   end
 
-  line:=0; lineinc:=0; linepage:=0;
-  newpage; crlf; line:=1; linepage:=1;
-  write('   1 (    4) '); getchr
+  line:=0; lineinc:=0;
+  crlf; line:=1;
+  write('   1     4) '); getchr
 end {init};
 
 {################}
@@ -1279,9 +1233,10 @@ end {memory};
 {######################}
 
 proc statmnt;
-var idpnt,relad,k2,savpc,bottom1: integer;
-    device,wln: boolean;
-    savtp1,vartyp2,vtype1: char;
+var idpnt, relad, k2, savpc,
+    wrsize, bottom1: integer;
+    device, wln: boolean;
+    savtp1, vartyp2, vtype1: char;
     wl: boolean;
 
 {########################}
@@ -2211,6 +2166,21 @@ begin
   fixup(k2);
 end;
 
+{########################}
+{ findwproc of statement }
+{########################}
+
+proc findwproc(nm: array[7] of char);
+var i: integer;
+begin
+  for i := 1 to 8 do ident[i] := nm[i-1];
+  for i := 9 to 16 do ident[i] := ' ';
+
+  idpnt := findid;
+  if (idpnt=0) or (s_typ[idpnt]<>'pr') then
+    error(25);
+end;
+
 {###################}
 { body of statement }
 {###################}
@@ -2311,49 +2281,77 @@ begin {body of statement }
                       or 128);
                   scan
                 end else begin
-                  {expression}
-                  express;
+
+                  {start of expression }
+                  mainexp('n',wrsize);
                   vtype1 := restype;
+
+                  if (vtype1<>'r') and
+                    (wrsize<>0) then error(15);
+                  if (vtype1='r') and
+                    (wrsize<>1) then error(15);
+
                   if token=' :' then begin
-                    if vtype1<>'i' then
-                      merror(14,'09');
                     scan;
                     express;
                     testtype('i');
 
-                    ident[1]:='_'; ident[2]:='_';
-                    ident[3]:='w'; ident[4]:='r';
-                    ident[5]:='i'; ident[6]:='n';
-                    ident[7]:='t'; ident[8]:='f';
-                    idpnt:=findid;
-                    if (idpnt=0) or
-                      (s_typ[idpnt]<>'pr')
-                      then error(25);
-                  code4(43, level-s_lvl[idpnt],
-                    s_vda[idpnt]);
-                    code2(33,252)
+                    if vtype1='i' then begin
+                      findwproc('__wrintf');
+                      code4(43, level-s_lvl[idpnt],
+                        s_vda[idpnt]);
+                      code2(33,252)
+                    end
+                    else if vtype1='r' then begin
+                      if token=' :' then begin
+                        scan;
+                        express;
+                        testtype('i')
+                      end
+                      else
+                        code2(32,3);
+
+                      findwproc('__wrfix ');
+                      code4(43, level-s_lvl[idpnt],
+                        s_vda[idpnt]);
+                      code2(33,248)
+                    end
+                    else
+                      merror(14,'09')
                   end
                   else begin
-                    case vtype1 of
-                      'i':  code1(30);
-                      'c':  code1(29);
-                      'q':  code1($57);
-                      's':  begin
-                              code1($58);
-                              code1($57);
-                            end;
-                      'b':  writebool;
-                      'p':  begin
-                              code1(22);
-                              code1(51);
-                              code1(29);
-                              code1(52);
-                              code1(29);
-                            end
-                      else merror(14,'09')
+                    if vtype1='r' then begin
+                      code2(32,11);
+                      code2(32,3);
+                      findwproc('__wrfix ');
+                      code4(43, level-s_lvl[idpnt],
+                        s_vda[idpnt]);
+                      code2(33,248)
+                    end
+                    else begin
+                      case vtype1 of
+                        'i':  code1(30);
+                        'c':  code1(29);
+                        'q':  code1($57);
+                        's':  begin
+                                code1($58);
+                                code1($57);
+                              end;
+                        'b':  writebool;
+                        'p':  begin
+                                code1(22);
+                                code1(51);
+                                code1(29);
+                                code1(52);
+                                code1(29);
+                              end
+                        else merror(14,'09')
+                      end
                     end
                   end
-                end {expression}
+                end
+                {end of expression}
+
               until token<>' ,';
               if wln then begin {writeln(..)}
                 code2(32,13); code1(29);

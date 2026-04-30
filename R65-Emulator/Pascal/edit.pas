@@ -59,6 +59,7 @@ begin { main }
   setsubtype('P');
   _asetfile(name,cyclus,drive,filstp);
   if not _bestmatch then begin
+    writeln;
     writeln(CUP,INVVID,'File not found',NORVID);
     exit;
   end;

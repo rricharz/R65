@@ -37,14 +37,19 @@ end;
 
 func sqrt(n:real):real;
 {*********************}
-{ using Newton's approximation }
-const accuracy = 0.0001; {rel accuracy }
-var lower,upper,guess:real;
+{ using bisection }
+const accuracy = 0.0001; {rel accuracy}
+      STOPCODE = $2010;
+      NORVID   = chr($0b);
+      INVVID   = chr($0e);
+mem   RUNERR   = $000c: integer&;
+var   lower,upper,guess:real;
 begin
   if n=0.0 then begin sqrt:=0.0; exit end;
   if n<0.0 then begin
-    writeln('sqrt(x) for x<0 called');
-    sqrt:=0.0; exit;
+    writeln(INVVID,'sqrt(x) for x<0 called',NORVID);
+    RUNERR := 54;
+    call(STOPCODE);
     end;
   if n<1.0 then begin
     lower:=n; upper:=1.0
@@ -114,93 +119,147 @@ begin
   end else tan:=sin(x)/cos(x);
 end;
 
-proc writeflo(f:file;r:real);
-{***************************}
-{ write real in floating point format  }
-{ right justified in field of 11 chars }
-{ 3 digits after decimal point         }
+proc writeflo(r:real; fl:integer);
+{********************************}
+{ write real in floating point format
+  right justified in field of fl chars
+  more chars if necessary
+  4 digits after decimal point }
 
 var m: real;
-    e,i: integer;
+    e,i,n,width,fl1: integer;
     sign: char;
 begin
+  fl1:=fl;
+  if fl1<0 then fl1:=0;
+
   e:=0; m:=r; sign:=' ';
   if m<0. then begin sign:='-'; m:=-m; end;
+
   while m>=10. do begin e:=e+1; m:=m/10.; end;
   if m>0. then
     while m<1. do begin e:=e-1; m:=10.*m; end;
-  m:=m+0.0005; { round }
+
+  m:=m+0.00005; { round to 4 decimals }
   if m>=10. then begin e:=e+1; m:=m/10.; end;
-  write(@f,' ',sign,trunc(m),'.');
-  for i:=1 to 3 do begin
-    m:=10.*(m-conv(trunc(m))); write(@f,trunc(m));
+
+  width:=12; { sign, digit, dot, 4 decimals, e+xx }
+  if e<=-10 then width:=13;
+  if e>=100 then width:=13;
+  if e<=-100 then width:=14;
+
+  n:=fl1-width;
+  if n<0 then n:=0;
+  for i:=1 to n do write(' ');
+
+  write(sign,trunc(m),'.');
+  for i:=1 to 4 do begin
+    m:=10.*(m-conv(trunc(m)));
+    write(trunc(m));
   end;
-  if e<0 then begin write(@f,'e-'); e:=-e end
-  else write(@f,'e+');
-  if e>=10 then write(@f,e)
-  else if e>=1 then write(@f,'0',e)
-  else write(@f,'00');
+
+  if e<0 then begin write('e-'); e:=-e end
+  else write('e+');
+
+  if e>=10 then write(e)
+  else write('0',e);
 end;
 
-proc writef0(f:file;d:integer;
-    r:real;fl:integer;centered:boolean);
+proc writef0(r: real; fl, d:integer;
+    centered:boolean);
 {**************************************}
-{ write real in fixed point format     }
-{ right justified or centered in field }
-{ of fl chars (more if necessary)      }
-{ d digits after decimal point         }
-{ Warning! The floating point accuracy }
-{ is only approximately 5 digits!      }
+{ write real in fixed point format
+  right justified or centered in field
+  of fl chars (more if necessary)
+  d digits after decimal point
+  Real output is reliable to about 6 digits. }
 
-var m,rnd: real;
-    d1,i1,m1,n,n1:integer;
+var m,rnd,p: real;
+    d1,i1,digit,ndig,width,n,n1,fl1: integer;
     sign: char;
+    started: boolean;
 begin
   d1:=d;
   if d1<0 then d1:=0;
   if d1>3 then d1:=3;
+
+  fl1:=fl;
+  if fl1<0 then fl1:=0;
+
   case d1 of
-    0: rnd:=0.5;
-    1: rnd:=0.05;
-    2: rnd:=0.005;
-    3: rnd:=0.0005
+    0: rnd:=0.50001;
+    1: rnd:=0.05001;
+    2: rnd:=0.00501;
+    3: rnd:=0.00051
   end {case};
-  sign:=' '; m:=r;
-  if m<0. then begin sign:='-'; m:=-m; end;
+
+  sign:=' ';
+  m:=r;
+  if m<0. then begin
+    sign:='-';
+    m:=-m;
+  end;
+
   m:=m+rnd; { round }
-  if m>32767. then writeflo(f,r)
+
+  { avoid printing -0.000 etc. }
+  if m < 2.*rnd then sign:=' ';
+
+  if m >= 99999.5 then writeflo(r, fl1)
   else begin
-    { if m<2.*rnd then sign:=' ';}
-    m1:=trunc(m);
-    if m1<10 then n:=fl-3-d
-    else if m1<100 then n:=fl-4-d
-    else if m1<1000 then n:=fl-5-d
-    else if m1<10000 then n:=fl-6-d
-    else n:=fl-7-d;
-    if d=0 then n:=n+1;
+    if m<10. then ndig:=1
+    else if m<100. then ndig:=2
+    else if m<1000. then ndig:=3
+    else if m<10000. then ndig:=4
+    else ndig:=5;
+
+    width:=ndig;
+    if d1>0 then width:=width+d1+1;
+    if sign='-' then width:=width+1;
+
+    n:=fl1-width;
+    if n<0 then n:=0;
     n1:=n;
     if centered then n:=n div 2;
-    for i1:=1 to n do write(@f,' ');
-    write(@f,sign,m1);
-    m:=m-conv(m1);
-    if d1>0 then write(@f,'.');
-    for i1:=1 to d1 do begin
-      m:=10.*m; write(@f,trunc(m));
-      m:=m-conv(trunc(m));
+
+    for i1:=1 to n do write(' ');
+
+    if sign='-' then write('-');
+
+    p:=10000.;
+    started:=false;
+    for i1:=1 to 5 do begin
+      digit:=trunc(m/p);
+      if (digit<>0) or started or (i1=5) then begin
+        write(digit);
+        started:=true;
+      end;
+      m:=m-conv(digit)*p;
+      p:=p/10.;
     end;
-    for i1:=1 to n1-n do write(@f,' ');
+
+    if d1>0 then write('.');
+
+    for i1:=1 to d1 do begin
+      m:=10.*m;
+      digit:=trunc(m);
+      write(digit);
+      m:=m-conv(digit);
+    end;
+
+    for i1:=1 to n1-n do write(' ');
   end;
 end;
 
-proc writefix(f:file;d:integer;r:real);
-{*************************************}
-{ write real in fixed point format     }
-{ right justified in field of 11 chars }
-{ d digits after decimal point         }
-{ Warning! The floating point accuracy }
-{ is only approximately 5 digits!      }
+proc __wrfix(r:real; fl, d:integer);
+{**********************************}
+{ write real in fixed point format
+  right justified in field of 11 chars
+  d digits after decimal point.
+  Real output is reliable to about 6 digits.
+  This function is used by write(real). }
 begin
-  writef0(f,d,r,11,false);
+  writef0(r, fl, d, false);
 end;
 
 func readflo(f:file):real;
