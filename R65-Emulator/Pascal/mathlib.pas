@@ -4,7 +4,7 @@
 
 Pascal math library
 
-Version 1.1 RR 2019
+Version 1.2 RR 2019
 
 Math real functions:
   fabs(r)
@@ -13,14 +13,7 @@ Math real functions:
   cos(r)        r in deg
   tan(r)        r in deg
   ln(r),log(r)
-  exp(r)
-
-Real output functions:
-  _writeflo(f,r)         exponential format
-  _writefix(f,d,r)       fix point format
-  f     file to write to
-  d     digits after decimal point
-  r     real number to write             }
+  exp(r)                      }
 
 {$U+}
 
@@ -69,6 +62,8 @@ func cos(x:real):real;
 {********************}
 { argument x in degree }
 
+const eps = 0.0001;
+
 var m:real;
 
   func cos0(x0:real):real;
@@ -86,19 +81,21 @@ var m:real;
 
 begin
   if x<0. then m:=-x else m:=x;
-  while m>=(360.) do m:=m-360.;
-  if m=0. then cos:=1.
-  else if m=90. then cos:=0.
-  else if m=180. then cos:=-1.
-  else if m > 180. then begin
-    m:=m-180.;
-    if m>90. then cos:=cos0((180.-m)*PI/180.)
-    else cos:=-cos0(m*PI/180.);
-  end
-  else begin
-    if m>90. then cos:=-cos0((180.-m)*PI/180.)
-    else cos:=cos0(m*PI/180.);
-  end;
+
+  while m>=360. do m:=m-360.;
+
+  if fabs(m-0.) < eps then cos:=1.
+  else if fabs(m-90.) < eps then cos:=0.
+  else if fabs(m-180.) < eps then cos:=-1.
+  else if fabs(m-270.) < eps then cos:=0.
+  else if m>270. then
+    cos:=cos0((360.-m)*PI/180.)
+  else if m>180. then
+    cos:=-cos0((m-180.)*PI/180.)
+  else if m>90. then
+    cos:=-cos0((180.-m)*PI/180.)
+  else
+    cos:=cos0(m*PI/180.);
 end;
 
 func sin(x:real):real;
@@ -111,12 +108,16 @@ end;
 func tan(x:real):real;
 {********************}
 { argument x in degree }
+const eps = 0.0001;
+var s,c: real;
 begin
-  if cos(x)=0.0 then begin
-    writeln('tan(90) undefined');
-    if sin(x)>0.0 then tan:=1.0e+38
+  s:=sin(x);
+  c:=cos(x);
+  if fabs(c)<eps then begin
+    if s>=0.0 then tan:=1.0e+38
     else tan:=-1.0e+38
-  end else tan:=sin(x)/cos(x);
+  end else
+    tan:=s/c;
 end;
 
 proc writeflo(r:real; fl:integer);
@@ -297,7 +298,7 @@ begin
         '-': begin ems:=true; read(@f,ch) end
       end;
       n1:=0;
-      if (ch<='9') or (ch>='0') then begin
+      if (ch<='9') and (ch>='0') then begin
         n1:=ord(ch)-ord('0'); read(@f,ch);
         if (ch<='9') and (ch>='0') then begin
           n1:=10*n1+ord(ch)-ord('0'); read(@f,ch);
@@ -317,12 +318,16 @@ end;
 func ln(r:real):real;
 {*******************}
 { compute natural logarithm ln }
+const NORVID   = chr($0b);
+      INVVID   = chr($0e);
 var r0,rm1,rp1,a,b,res,d,q: real;
     e1:integer;
 
   proc getexp(var r1:array[1] of %integer;
     var e2: integer);
   { extract exponent and set it to 0 }
+  { extract binary exponent from internal real format
+}
   begin
     e2:=(r1[1] and $ff)-$7f;
     r1[1]:=(r1[1] and $ff00) or $7f;
@@ -331,7 +336,7 @@ var r0,rm1,rp1,a,b,res,d,q: real;
 begin
   if fabs(r-1.0)<0.0001 then begin ln:=0.0; exit end;
   if r<=0.0 then begin
-    writeln('ln(x) for x<=0 called');
+  writeln('ln: non-positive argument');
     ln:=-1.0e-38
   end else begin
     r0:=r;
@@ -344,7 +349,7 @@ begin
       q:=a/(d*b); res:=res+q;
       a:=a*rm1; b:=b*rp1;
       d:=d+2.0;
-    until (q<0.0001)and(q>-0.0001);
+    until fabs(q)<0.0001;;
     ln:=2.0*res+conv(e1)*0.69315;
   end
 end;
@@ -353,6 +358,8 @@ func exp(x:real):real;
 {********************}
 { compute exponential function }
 const ln2=0.69315;
+      NORVID   = chr($0b);
+      INVVID   = chr($0e);
 var x0,f,res:real;
     n,e2:integer;
 
@@ -374,13 +381,23 @@ begin
   for n:=1 to 7 do begin
     f:=f*x0/conv(n); res:=res+f;
   end;
-  { add e2 back into result }
-  addpof2(res,e2);
-  if x<0.0 then res:=1.0/res;
+  { add e2 back into result with bounds check }
+  if e2>126 then begin
+    if x<0.0 then res:=0.0
+    else begin
+     writeln(INVVID,'exp: argument too large',NORVID);
+      res:=1.0e+38
+    end
+  end
+  else begin
+    addpof2(res,e2);
+    if x<0.0 then res:=1.0/res;
+  end;
   exp:=res;
 end;
 
 func log(x:real):real;
+{********************}
 begin
   if fabs(x-10.0)<0.0001 then begin
     log:=1.0; exit end;

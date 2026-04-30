@@ -26,7 +26,6 @@ program compile1;
 uses syslib, arglib, filelib;
 
 const
-    version='4.8';
 
     IDLENGTH  = 64;   {max. length of ident buffer}
     IDSIZE    = 16;   {chars per identifier in s_id}
@@ -38,8 +37,7 @@ const
     PAGELENGHT= 60;    {no of lines per page}
     NO_OUTPUT = @0;
     YES_OUTPUT= @255;
-    MAXFI     = 3;     {max nbr  of nested input files
-}
+    MAXFI     = 3;     {max nbr of nested input files}
     NRESW     = 63;    {number of res. words, max 64}
 
     SAT_EXPORT = 1;    {Bit mask for s_attr}
@@ -62,6 +60,7 @@ var reswtab: array[ 512] of char; {8*(NRESW+1)}
     fno,ofno,savefno: file;
     incname: array[15] of char;
     filstk: array[MAXFI] of file;
+    lpr: file;
 
 { ****. START IF IDENTIFIER TABLE ****}
 
@@ -247,16 +246,16 @@ proc nextline;
 var i:integer;
 begin
   nlflg:=true;
-  if savefno=@0 then write(line:4)
+  if savefno=@0 then write(@lpr,line:4)
   else begin
-    write('{I:');
-    for i:=0 to 5 do write(incname[i]);
-    write('}');
+    write(@lpr,'{I:');
+    for i:=0 to 5 do write(@lpr,incname[i]);
+    write(@lpr,'}');
     line:=line-1; { do not count line }
-    write(lineinc:3);
+    write(@lpr,lineinc:3);
   end;
   write(' ');
-  write(@PRINTER,(pc+2):5,' '); { only on printer }
+  write(@lpr,(pc+2):5,' ');
 end;
 
 {#############################}
@@ -291,7 +290,7 @@ begin
       { for end. at end of file to work properly }
       ch:=' ';
     end
-    else write(ch);
+    else write(@lpr,ch);
   end;
 end {getchr};
 
@@ -324,8 +323,8 @@ var i,j,dummy: integer;
     request: array[15] of char;
     default: boolean;
 begin {init}
-  writeln('R65 PASCAL COMPILER version ', version,
-    ', Pass  1');
+  writeln('R65 PASCAL COMPILER, Pass  1');
+  lpr := PRINTER;
   ateof:=false; savefno:=@0;
   cdrive:=FILDRV; { drive of compile program }
   fipnt:=-1;
