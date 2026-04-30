@@ -1,5 +1,5 @@
 program pcodes;
-uses syslib,arglib,strlib,ralib,mathlib;
+uses syslib,arglib,strlib,ralib,mathlib,filelib;
 
 const npcodes=$59;
 
@@ -27,8 +27,10 @@ begin
   readline:=(ch1=EOF) or (ch1=alteof);
 end;
 
-proc setsubtype(var nm:array[15] of char;subtype:char);
-{#####################################################}
+proc setsubtype(var nm:array[15] of char;subtype:char)
+;
+{#####################################################
+}
 var i:integer;
 begin
   i:=0;
@@ -129,7 +131,8 @@ begin
              if not silent then write(' ',a,',');
              getbyte(fcode,pc+2,a);
              getbyte(fcode,pc+3,b);
-             if not silent then write(' ',a+(b shl 8));
+             if not silent then write(' ',a+(b shl 8))
+;
            end;
       5: begin
              getbyte(fcode,pc+1,a);
@@ -152,7 +155,7 @@ begin
            if not silent then begin
              if code=$3a then begin
                packreal(c, a+(b shl 8),r);
-                 write(' '); writeflo(OUTPUT,r);
+                 write(' '); write(r:11:3);
              end else begin
                write(' ',c,' ');
                write(' ',a+(b shl 8));

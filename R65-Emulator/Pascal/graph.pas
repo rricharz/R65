@@ -28,12 +28,8 @@ begin
     if v>max then max:=v;
     if v<min then min:=v;
   end;
-  write('Min: ');
-  writefix(OUTPUT,2,min);
-  writeln;
-  write('Max: ');
-  writefix(OUTPUT,2,max);
-  writeln;
+  writeln('Min: ',min:8:2);
+  writeln('Max: ', max:8:2);
   _grinit;
   _cleargr;
   _splitview;

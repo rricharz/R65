@@ -32,7 +32,5 @@ begin
   writeln;
   write('extime stop - ');;
   prttime(OUTPUT); writeln;
-  writeln('Execution time: ');
-  writefix(OUTPUT,2,etime)
-  writeln(' s');
+  writeln('Execution time: ',etime:2,' s');
 end.

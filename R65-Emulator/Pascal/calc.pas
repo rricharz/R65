@@ -168,11 +168,11 @@ begin
   if m<0. then begin
     sign:='-'; m:=-m;
   end;
-  if dotused and (m>=10000.0) then writeflo(f,r)
+  if dotused and (m>=10000.0) then write(@f,r:11:3)
   else if m=0. then write(@f,' 0')
   else if r=conv($8000) then write(@f,'-32768 ')
-  else if m>=32767.5 then writeflo(f,r)
-  else if m<0.01 then writeflo(f,r)
+  else if m>=32767.5 then write(@f,r:12:3)
+  else if m<0.01 then write(@f,r:12:3)
   else begin
     if m>=10000. then begin
       d1:=0; rnd:=0.5

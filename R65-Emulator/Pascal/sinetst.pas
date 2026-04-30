@@ -27,11 +27,6 @@ begin
   writeln(' angle',TAB8,'  sin',TAB8,'  cos');
   for i:=1 to 24 do begin
     a:=conv(i*15);
-    writefix(@0,0,a);
-    write(TAB8);
-    writefix(@0,3,sin(a));
-    write(TAB8);
-    writefix(@0,3,cos(a));
-    writeln;
+    writeln(a:3:0,sin(a):12:4,cos(a):12:4);
   end;
 end.

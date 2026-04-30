@@ -37,17 +37,10 @@ begin
     if v>max then max:=v;
     if v<min then min:=v;
   end;
-  write('Ymin:   ');
-  writefix(OUTPUT,3,min);
-  writeln;
-  write('Ymax:   ');
-  writefix(OUTPUT,3,max);
-  writeln;
-  write('Xmin:   ');
-  writefix(OUTPUT,3,xmin);
-  writeln;
-  write('Xmax:   ');
-  writefix(OUTPUT,3,xmax);
+  writeln('Ymin:   ',min);
+  writeln('Ymax:   ',max);
+  writeln('Xmin:   ',xmin);
+  writeln('Xmax:   ',xmax);
   writeln;
 
   daxis0:=(max-min)/2.;
@@ -100,13 +93,13 @@ begin
       _drawvector(xs,ys+y,xs+xw,ys+y);
     _moveto(5,ys+y-5);
     if daxis<0.001 then
-      writefix(PLOTTER,4,axis)
+      write(@PLOTTER,axis:10:4)
     else if daxis<0.01 then
-      writefix(PLOTTER,3,axis)
+      write(@PLOTTER,axis:10:3)
     else if daxis<0.1 then
-      writefix(PLOTTER,2,axis)
+      write(@PLOTTER,axis:10:2)
     else
-      writefix(PLOTTER,1,axis);
+      write(@PLOTTER,axis:10:1);
     axis:=axis+daxis;
     until axis>max;
 
@@ -117,13 +110,13 @@ begin
       _drawvector(xs+x,ys,xs+x,ys+yw);
     _moveto(xs+x-80,6);
     if xaxis<0.001 then
-      writef0(PLOTTER,4,xsaxis,12,true)
+      write(@PLOTTER,xsaxis:10:4)
     else if xaxis<0.01 then
-      writef0(PLOTTER,3,xsaxis,12,true)
+      write(@PLOTTER,xsaxis:10:3)
     else if xaxis<0.1 then
-      writef0(PLOTTER,2,xsaxis,12,true)
+      write(@PLOTTER,xsaxis:10:2)
     else
-      writef0(PLOTTER,1,xsaxis,12,true);
+      write(@PLOTTER,xsaxis:10:1);
     xsaxis:=xsaxis+xaxis;
     until xsaxis>xmax;
   _setlinemode(SOLID);
