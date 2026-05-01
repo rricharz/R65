@@ -24,2679 +24,2683 @@
   24     4 program compile1;
   25     4 
   26     4 uses syslib, arglib, filelib;
-  27  1780 
-  28  1780 const
-  29  1780     IDLENGTH  = 64;   {max. length of ident buffer}
-  30  1783     IDSIZE    = 16;   {chars per identifier in s_id}
-  31  1783     PIDSIZE   = 8;    {packed chars per identifier}
-  32  1783     SYMBSIZE  = 256;  {id table entries}
-  33  1783     IDTABSIZE = 2048; {SYMBSIZE * PIDSIZE}
-  34  1783 
-  35  1783     STACKSIZE = 256;   {stack size}
-  36  1783     PAGELENGHT= 60;    {no of lines per page}
-  37  1783     NO_OUTPUT = @0;
-  38  1783     YES_OUTPUT= @255;
-  39  1783     MAXFI     = 3;     {max nbr  of nested input files
-  40  1783 }
-  41  1783     NRESW     = 63;    {number of res. words, max 64}
-  42  1783 
-  43  1783     SAT_EXPORT = 1;    {Bit mask for s_attr}
-  44  1783 
-  45  1783 var reswtab: array[ 512] of char; {8*(NRESW+1)}
-  46  1783 
-  47  1783     ident:   array[IDLENGTH] of char;
-  48  1783     idpack:  array[PIDSIZE] of packed char;
-  49  1783 
-  50  1783     tpos,pc,level,line,offset,dpnt,spnt,fipnt,
-  51  1783     npara,i,stackpnt,stackmax,spntmax,numerr,
-  52  1783     lineinc: integer;
-  53  1783     scyclus,sdrive,cdrive: integer;
-  54  1783     pname: array[15] of char;
-  55  1783     value: array[1] of integer;
-  56  1783     ch,restype,vartype:char;
-  57  1783     token: packed char;
-  58  1783     libflg,rcheck,ateof: boolean;
-  59  1783     ucheck,lineflg,nlflg: boolean;
-  60  1783     fno,ofno,savefno,lpr: file;
-  61  1783     incname: array[15] of char;
-  62  1783     filstk: array[MAXFI] of file;
-  63  1783 
-  64  1783 { ****. START IF IDENTIFIER TABLE ****}
-  65  1783 
-  66  1783     s_id:   array[IDTABSIZE] of packed char;
-  67  1783     { flat array of symbol names }
-  68  1783 
-  69  1783     s_typ: array[SYMBSIZE] of packed char;
-  70  1783 {  Type of symbol
-  71  1783    High letter:
-  72  1783      a: arrayc:constant
-  73  1783      d: const parameter
-  74  1783      e: constant array parameter
-  75  1783      f: function
-  76  1783      g: array function
-  77  1783      h: 8-bit memory variable
-  78  1783      i: 8-bit array memory variable
-  79  1783      m: 16-bit memory variable
-  80  1783      n: 16-bit array memory variable
-  81  1783      p: procedure
-  82  1783      q: indexed cpnt
-  83  1783      r,t: function result
-  84  1783      s,u: array function result
-  85  1783      v: variable,
-  86  1783      w: variable parameter
-  87  1783      x: variable array parameter
-  88  1783    Low letter:
-  89  1783      b: boolean
-  90  1783      c: char
-  91  1783      f: file
-  92  1783      i: integer
-  93  1783      p: packed char
-  94  1783      q: cpnt (pointer to chars)
-  95  1783      r: real(array of two)
-  96  1783      s: const cpnt
-  97  1783      u: undefined         }
-  98  1783 
-  99  1783     s_lvl: array[SYMBSIZE] of integer;
- 100  1783     {level}
- 101  1783 
- 102  1783     s_vda: array[SYMBSIZE] of integer;
- 103  1783     {val,dis,addr}
- 104  1783 
- 105  1783     s_spz: array[SYMBSIZE] of integer;
- 106  1783     {stack pointer,size of array}
- 107  1783 
- 108  1783 { **** END OF IDENTIFIER TABLE ****}
- 109  1783 
- 110  1783     reswcod: array[NRESW] of packed char;
- 111  1783     stack:   array[STACKSIZE] of integer;
- 112  1783 
- 113  1783 {###################}
- 114  1783 { savebyte (global) }
- 115  1783 {###################}
- 116  1783 
- 117  1783 proc savebyte(x: integer);
- 118  1783 begin
- 119  1783     if ofno<>NO_OUTPUT then begin
- 120  1795       write(@ofno,
- 121  1798         chr(((x and 255) shr 4)+ord('0')));
- 122  1819       write(@ofno,chr((x and 15)+ord('0')))
- 123  1834     end
- 124  1837 end {savebyte};
- 125  1837 
- 126  1838 {###############}
- 127  1838 { crlf (global) }
- 128  1838 {###############}
- 129  1838 
- 130  1838 proc crlf;
- 131  1838 begin
- 132  1838   writeln(@lpr);
- 133  1855   line:=succ(line); lineinc:=succ(lineinc);
- 134  1868 end {crlf};
- 135  1873 
- 136  1874 {#################################}
- 137  1874 { merror and error: error message }
- 138  1874 {#################################}
- 139  1874 
- 140  1874 proc merror(x: integer; code: packed char);
- 141  1874 var k: integer;
- 142  1877     answer: char;
- 143  1877 begin
- 144  1877   crlf; numerr:=succ(numerr);
- 145  1887   write(INVVID,'ERROR: ');
- 146  1903   case x of
- 147  1903     01: write('Ident');
- 148  1920     02: write('Ident ',code,' expected');
- 149  1956     03: write('Var declaration');
- 150  1982     04: write('Const expected');
- 151  2007     05: write('Ident unknown');
- 152  2031     06: write('Cannot be assigned');
- 153  2060     07: write('Symbol table overflow');
- 154  2092     08: write('Stack overflow');
- 155  2117     09: write('Expression');
- 156  2138     10: write('Statement');
- 157  2158     11: write('Declaration');
- 158  2180     12: write('Constant');
- 159  2199     13: write('Forward reference: ',code);
- 160  2238     14: write('Type mismatch: ',code);
- 161  2273     15: write('Array size');
- 162  2294     16: write('Array (8-bit)');
- 163  2318     17: write('Real');
- 164  2333     18: write('File table overflow');
- 165  2363     19: write('Parameter');
- 166  2383     20: write('Compiler directive syntax');
- 167  2419     21: write('Nested include files');
- 168  2450     22: write('Unexpected EOF');
- 169  2475     23: write('End mark for comment or string');
- 170  2516     24: write('Identifier already defined');
- 171  2553     25: write('Formatted write');
- 172  2579     26: write('Wrong library version');
- 173  2611     27: write('Identifier too long')
- 174  2641   end {case};
- 175  2643   writeln(' at line ', line, ', pos ', tpos, NORVID);
- 176  2679   if (ofno<>NO_OUTPUT) and (ofno<>YES_OUTPUT)
- 177  2692     then close(ofno);
- 178  2703   ofno:=NO_OUTPUT;
- 179  2705   _abort;
- 180  2713 end {merror};
- 181  2713 
- 182  2714 proc error(x: integer);
- 183  2714 begin
- 184  2714   merror(x,'##')
- 185  2726 end;
- 186  2732 
- 187  2733 {#############################}
- 188  2733 { pack and unpack identifiers }
- 189  2733 {#############################}
- 190  2733 
- 191  2733 proc packid;
- 192  2733 var i,j: integer;
- 193  2736 begin
- 194  2736   j := 1;
- 195  2740   for i := 1 to PIDSIZE do begin
- 196  2761     idpack[i] := packed(ident[j],ident[j+1]);
- 197  2785     j := j + 2
- 198  2793   end
- 199  2795 end;
- 200  2814 
- 201  2815 proc unpackid;
- 202  2815 var i,j: integer;
- 203  2818 begin
- 204  2818   j := 1;
- 205  2822   for i := 1 to PIDSIZE do begin
- 206  2843     ident[j]   := high(idpack[i]);
- 207  2855     ident[j+1] := low(idpack[i]);
- 208  2875     j := j + 2
- 209  2884   end
- 210  2886 end;
- 211  2905 
- 212  2906 {############}
- 213  2906 { push & pop }
- 214  2906 {############}
- 215  2906 
- 216  2906 proc push(x: %integer);
- 217  2906 begin
- 218  2906   if stackpnt>=STACKSIZE then error(8)
- 219  2924   else stackpnt:=succ(stackpnt);
- 220  2937   if stackpnt>stackmax then stackmax:=stackpnt;
- 221  2954   stack[stackpnt]:=x;
- 222  2966 end {push};
- 223  2974 
- 224  2975 func pop: integer;
- 225  2975 begin
- 226  2975   pop:=stack[stackpnt];
- 227  2984   stackpnt:=prec(stackpnt)
- 228  2992 end {pop};
- 229  3001 
- 230  3002 {################}
- 231  3002 { code1 (global) }
- 232  3002 {################}
- 233  3002 proc code1(x: %integer);  {set one byte p-code}
- 234  3002 begin
- 235  3002   savebyte(x); pc:=succ(pc)
- 236  3017 end;
- 237  3026 
- 238  3027 {###################}
- 239  3027 { nextline (global) }
- 240  3027 {###################}
- 241  3027 
- 242  3027 proc nextline;
- 243  3027 var i:integer;
- 244  3030 begin
- 245  3030   nlflg:=true;
- 246  3034   if savefno=@0 then write(@lpr,line:4)
- 247  3059   else begin
- 248  3069     write(@lpr,'{I:');
- 249  3079     for i:=0 to 5 do write(@lpr,incname[i]);
- 250  3111     write(@lpr,'}');
- 251  3133     line:=line-1; { do not count line }
- 252  3144     write(@lpr,lineinc:3);
- 253  3162   end;
- 254  3162   write(@lpr,' ');
- 255  3170   write(@lpr,(pc+2):5,' ');
- 256  3193 end;
- 257  3193 
- 258  3194 {#############################}
- 259  3194 { getchr and getchr0 (global) }
- 260  3194 {#############################}
- 261  3194 
- 262  3194 proc getchr0;
- 263  3194 { does not eliminate CR }
- 264  3194 begin
- 265  3194   if ateof then begin
- 266  3203     if savefno<>@0 then begin
- 267  3213       { end of include file, close it }
- 268  3216       close(fno);
- 269  3222       fno:=savefno;
- 270  3222       { switch back to normal input file }
- 271  3230       savefno:=@0;
- 272  3232       ateof:=false;
- 273  3238       if ch=CR then ch:=' ';
- 274  3254     end else begin
- 275  3261       error(22);
- 276  3269       _abort
- 277  3269     end
- 278  3273   end else begin
- 279  3276     read(@fno,ch);
- 280  3286     if ch=CR then begin
- 281  3294       crlf;
- 282  3301       nextline;
- 283  3305     end {if}
- 284  3305     else if ch=EOF then begin
- 285  3315       ateof:=true;
- 286  3320       { we need to suppy one more char }
- 287  3324       { for end. at end of file to work properly }
- 288  3324       ch:=' ';
- 289  3326     end
- 290  3330     else write(@lpr,ch);
- 291  3344   end;
- 292  3344 end {getchr};
- 293  3344 
- 294  3345 proc getchr;
- 295  3345 { replaces CR with ' ' to make parsing easier }
- 296  3345 begin
- 297  3345   getchr0;
- 298  3354   if ch=CR then ch:=' ';
- 299  3366 end;
- 300  3370 
- 301  3371 {####################}
- 302  3371 { splitconv (global) }
- 303  3371 {####################}
- 304  3371 
- 305  3371 proc splitconv(a: array[1] of %integer;
- 306  3371   var b:array[1] of %integer);
- 307  3371 begin
- 308  3371   b:=a;
- 309  3376 end;
- 310  3388 
- 311  3389 {###############}
- 312  3389 { init (global) }
- 313  3389 {###############}
- 314  3389 
- 315  3389 proc init;
- 316  3389 const char96=chr(20);
- 317  3392 var i,j,dummy: integer;
- 318  3392     dch: char;
- 319  3392     pch: packed char;
- 320  3392     request: array[15] of char;
- 321  3392     default: boolean;
- 322  3392 begin {init}
- 323  3392   lpr := PRINTER;
- 324  3396   ateof:=false; savefno:=@0;
- 325  3408   cdrive:=FILDRV; { drive of compile program }
- 326  3419   fipnt:=-1;
- 327  3421   pc:=2; dpnt:=0; spnt:=0; offset:=2;
- 328  3446   npara:=0; level:=0;
- 329  3458   stackpnt:=0; libflg:=false;
- 330  3470   stackmax:=0;spntmax:=0; numerr:=0;
- 331  3488   s_typ[0]:='vi'; s_lvl[0]:=0;
- 332  3505   s_vda[0]:=0; s_spz[0]:=0;
- 333  3521   { prepare resword table }
- 334  3525   _asetfile('RESWORDS:W      ',0,0,'W');
- 335  3555   openr(fno);
- 336  3561   for i:=0 to NRESW do begin
- 337  3578     read(@fno,pch,dch);
- 338  3595     reswcod[i]:=pch;
- 339  3600     for j:=0 to 7 do reswtab[8*i+j]:=' ';
- 340  3639     j:=0;
- 341  3659     while (j<8) and (dch<>CR) do begin
- 342  3681       read(@fno,dch);
- 343  3691       if (dch<>CR) then
- 344  3699         reswtab[8*i+j]:=dch;
- 345  3714       j:=succ(j)
- 346  3722     end;
- 347  3731     while (dch<>CR) and (dch<>EOF) do
- 348  3748       read(@fno,dch)
- 349  3757   end;
- 350  3766   close(fno);
- 351  3786 
- 352  3786   sdrive:=1; {default drive for source }
- 353  3792   scyclus:=0;
- 354  3794   _agetstring(pname,default,scyclus,sdrive);
- 355  3838 
- 356  3838   _agetstring(request,default,dummy,dummy);
- 357  3878 
- 358  3878   rcheck:=false;
- 359  3880   ucheck:=false;
- 360  3886   ofno:=YES_OUTPUT;
- 361  3892   lineflg:=false;
- 362  3898   if not default then begin
- 363  3907     if request[0]<>'/' then _argerror(103);
- 364  3930     for i:=1 to 8 do
- 365  3938       case request[i] of
- 366  3951         'L': lineflg:=true;
- 367  3964         'R': rcheck:=true;
- 368  3980         'N': ofno:=NO_OUTPUT;
- 369  3996         'F': begin end;
- 370  4010         ' ': begin end
- 371  4020         else _argerror(104)
- 372  4025       end; {case}
- 373  4047   end;
- 374  4047 
- 375  4047   _asetfile(pname,scyclus,sdrive,'P');
- 376  4069   openr(fno);
- 377  4075   scyclus:=FILCYC; { may have changed }
- 378  4083   {save cyclus and drive for compile2}
- 379  4083   ARGLIST[8]:=scyclus;
- 380  4085   ARGLIST[9]:=sdrive;
- 381  4099   NUMARG:=1;
- 382  4113 
- 383  4117   RUNERR := _emulator(8);
- 384  4127 
- 385  4131   line:=0; lineinc:=0;
- 386  4139   line:=1;
- 387  4145   write(@lpr,'   1     4 '); getchr
- 388  4167 end {init};
- 389  4171 
- 390  4172 {################}
- 391  4172 { clear (global) }
- 392  4172 {################}
- 393  4172 
- 394  4172 proc clear; {clears IDSIZE chars of identifier}
- 395  4172 var i: integer;
- 396  4175 begin
- 397  4175   for i:=1 to IDSIZE do ident[i]:=' '
- 398  4198 end;
- 399  4218 
- 400  4219 {###############}
- 401  4219 { scan (global) }
- 402  4219 { ############# }
- 403  4219 { scan input and make tokens }
- 404  4219 
- 405  4219 proc scan;
- 406  4219 var count,ll,hh,i,i1,co: integer;
- 407  4222     name: array[7] of char;
- 408  4222 
- 409  4222 {####################}
- 410  4222 { compresw (of scan) }
- 411  4222 {####################}
- 412  4222 
- 413  4222 func compresw(index: integer);
- 414  4222 var addr,ci,i: integer;
- 415  4225 begin
- 416  4225   addr:=8*index; i:=0;
- 417  4240   repeat
- 418  4244     ci:=ord(ident[i+1])-ord(reswtab[addr+i]);
- 419  4268     i:=succ(i)
- 420  4273   until (ci<>0) or (i>=8);
- 421  4296   compresw:=ci
- 422  4300 end {compresw};
- 423  4308 
- 424  4309 {################}
- 425  4309 { pack (of scan) }
- 426  4309 {################}
- 427  4309 
- 428  4309 proc pack;  {packs token and ch to token }
- 429  4309 begin
- 430  4309   token:=packed(low(token),ch); getchr
- 431  4328 end;
- 432  4332 
- 433  4333 {##################}
- 434  4333 { setval (of scan) }
- 435  4333 {##################}
- 436  4333 
- 437  4333 proc setval;
- 438  4333 var r: real;
- 439  4336     n,n1: integer;
- 440  4336     ems: boolean;
- 441  4336 
- 442  4336   func times10(r:real):real;
- 443  4336   {########################}
- 444  4336   { slightly more accurate than 10.0*r }
- 445  4336   var r2,r4:real;
- 446  4339   begin
- 447  4339     r2:=r+r;
- 448  4347     r4:=r2+r2;
- 449  4366     times10:=r2+r4+r4;
- 450  4392   end;
- 451  4405 
- 452  4406 begin
- 453  4406   r:=0.0;
- 454  4414   repeat
- 455  4420     r:=times10(r)+conv(ord(ch)-ord('0'));
- 456  4441     getchr;
- 457  4453   until (ch<'0') or (ch>'9');
- 458  4467   if ch<>'.' then begin {numeric integer}
- 459  4481     token:='nu';
- 460  4484     value[0]:=trunc(r+0.5);
- 461  4503   end
- 462  4508   else begin {numeric real}
- 463  4511     n:=0; getchr;
- 464  4521     while (ch<='9') and (ch>='0') do begin
- 465  4539       r:=times10(r)+conv(ord(ch)-ord('0'));
- 466  4560       n:=prec(n); getchr
- 467  4577     end;
- 468  4581     if ch='e' then begin
- 469  4591       ems:=false; getchr;
- 470  4604       case ch of
- 471  4604         '+': getchr;
- 472  4619         '-': begin ems:=true; getchr end
- 473  4639       end;
- 474  4641       if (ch>'9') or (ch<'0') then error(17)
- 475  4661       else begin
- 476  4670         n1:=ord(ch)-ord('0');
- 477  4676         getchr;
- 478  4685         if (ch<='9') and (ch>='0') then begin
- 479  4700           n1:=10*n1+ord(ch)-ord('0');
- 480  4717           getchr
- 481  4722         end;
- 482  4726         if ems then n:=n-n1 else n:=n+n1
- 483  4753       end
- 484  4753     end;
- 485  4762     while n>0 do begin
- 486  4772       n:=prec(n);
- 487  4776       r:=times10(r);
- 488  4795     end;
- 489  4801     while n<0 do begin
- 490  4814       n:=succ(n); r:=0.1*r;
- 491  4829     end;
- 492  4842     splitconv(r,value);
- 493  4869     token:='ru'
- 494  4869   end
- 495  4872 end {setval};
- 496  4876 
- 497  4877 {#####################}
- 498  4877 { directive (of scan) }
- 499  4877 {#####################}
- 500  4877 
- 501  4877 proc directive;
- 502  4877 var i,icyclus:integer;
- 503  4880 
- 504  4880   proc onoff(var flag:boolean);
- 505  4880   begin
- 506  4880     getchr0; if ch=CR then error(23);
- 507  4907     case ch of
- 508  4907       '+': flag:=true;
- 509  4920       '-': flag:=false
- 510  4934     else error(20)
- 511  4945     end;
- 512  4953     getchr0; if ch=CR then error(23);
- 513  4975     if ch<>'}' then error(23);
- 514  4993     getchr; scan;
- 515  5001   end {onoff};
- 516  5001 
- 517  5002 begin
- 518  5002   getchr;
- 519  5008   case ch of
- 520  5008     'I': begin
- 521  5019            if savefno<>@0 then error(21);
- 522  5037            getchr0; if ch=CR then error(23);
- 523  5059            if ch<>' ' then error(20);
- 524  5077            i:=0;
- 525  5079            getchr0; if ch=CR then error(23);
- 526  5105            while (ch<>'}') and (i<16) do begin
- 527  5123              incname[i]:=ch; i:=i+1;
- 528  5141              getchr0; if ch=CR then error(23);
- 529  5168            end;
- 530  5168            if ch<>'}' then error(23);
- 531  5189            while (i<16) do begin
- 532  5199              incname[i]:=' '; i:=i+1;
- 533  5215            end;
- 534  5220            icyclus:=0;
- 535  5225            _asetfile(incname,icyclus,sdrive,'P');
- 536  5251            savefno:=fno;
- 537  5251            openr(fno);
- 538  5265            lineinc:=0;
- 539  5267            crlf;
- 540  5275            nextline;
- 541  5279            getchr; scan;
- 542  5287          end;
- 543  5287     'R': onoff(rcheck);
- 544  5309     'U': onoff(ucheck)
- 545  5319   else error(20)
- 546  5336   end {case}
- 547  5344 end;
- 548  5344 
- 549  5345 {#################}
- 550  5345 { setid (of scan) }
- 551  5345 {#################}
- 552  5345 
- 553  5345 proc setid; {sets one char to ident}
- 554  5345 begin
- 555  5345   if count<=IDLENGTH then begin
- 556  5357     ident[count]:=ch; count:=succ(count)
- 557  5372   end;
- 558  5381   getchr0;
- 559  5385 end {setid};
- 560  5385 
- 561  5386 {######################}
- 562  5386 { isidletter (of scan) }
- 563  5386 {######################}
- 564  5386 
- 565  5386 func isidletter: boolean;
- 566  5386 {allowed letters in idents}
- 567  5386 begin
- 568  5386   isidletter:=
- 569  5391         ( ((ch>='a') and (ch<='z')) or
- 570  5406           ((ch>='A') and (ch<='Z')) or
- 571  5421           (ch='_')
- 572  5428         );
- 573  5430 end;
- 574  5434 
- 575  5435 {##############}
- 576  5435 { body of scan }
- 577  5435 {##############}
- 578  5435 
- 579  5435 begin
- 580  5435   count:=1; while ch=' ' do getchr;
- 581  5457   tpos:=CURPOS;
- 582  5463 
- 583  5467   { delayed because of token lookahead }
- 584  5467   if nlflg then begin
- 585  5471     if lineflg and (pc>2) then begin
- 586  5486       code1($59);
- 587  5497       code1((line) and 255);
- 588  5510       code1((line) shr 8);
- 589  5523     end;
- 590  5523     nlflg:=false;
- 591  5525   end;
- 592  5529 
- 593  5529   if not isidletter then begin {main if}
- 594  5539 
- 595  5539     if (ch<'0') or (ch>'9') then begin {symb}
- 596  5557       token:=packed(' ',ch); getchr;
- 597  5572       case low(token) of
- 598  5576         '<': if (ch='=') or (ch='>') then pack;
- 599  5606         '>',':': if (ch='=') then pack;
- 600  5637         '{': begin
- 601  5647                if ch='$' then directive
- 602  5654                else begin
- 603  5664                  if ch<>'}' then
- 604  5670                  repeat
- 605  5671                    getchr0;
- 606  5678                    { if ch=CR then error(23); }
- 607  5678                    until ch='}';
- 608  5684                  getchr; scan
- 609  5692                end
- 610  5696              end;
- 611  5696         '$': begin {hex constant}
- 612  5706                token:='nu'; value[0]:=0;
- 613  5717                while ((ch>='0')and(ch<='9'))
- 614  5735                      or((ch>='a')and(ch<='f'))
- 615  5750                      do begin
- 616  5755                  if ch>'9' then
- 617  5761                    value[0]:=(value[0] shl 4)
- 618  5775                      +ord(ch)-ord('a')+10
- 619  5784                  else
- 620  5786                    value[0]:=(value[0] shl 4)
- 621  5804                      +ord(ch)-ord('0');
- 622  5812                  getchr
- 623  5817                end {do}
- 624  5821              end; {hex constant}
- 625  5827         chr(39): begin {string}
- 626  5834                token:='st';
- 627  5837                repeat
- 628  5841                  setid; if ch=CR then error(23);
- 629  5863                until ch=chr(39);
- 630  5869                value[0]:=prec(count); getchr
- 631  5885               end
- 632  5889       end {case of token}
- 633  5891     end {special symbols}
- 634  5891     else setval {numeric value}
- 635  5898   end {main if}
- 636  5898   else begin { is_id_letter }
- 637  5901     clear;
- 638  5905     repeat
- 639  5905       setid; if ch=CR then ch:=' ';
- 640  5921     until not
- 641  5925       (isidletter or ((ch>='0') and (ch<='9')));
- 642  5947     ll:=0; hh:=NRESW; {look up in resword table}
- 643  5963     repeat
- 644  5963       i:=(ll+hh) shr 1; co:=compresw(i);
- 645  5991       if (co<0) then hh:=prec(i)
- 646  6005       else ll:=succ(i);
- 647  6021       until (co=0) or (ll>hh);
- 648  6042     if (co=0) then
- 649  6053       token := reswcod[i] {reserved word}
- 650  6060     else begin
- 651  6071       if count>succ(IDSIZE) then error(27);
- 652  6090       token := 'id' {identifier}
- 653  6093     end;
- 654  6097   end {identifier or reserved word}
- 655  6097 end {scan};
- 656  6097 
- 657  6098 {##############}
- 658  6098 { testto/parse }
- 659  6098 {##############}
- 660  6098 
- 661  6098 { parce source for specific token; else error }
- 662  6098 
- 663  6098 proc testto(x: packed char); { current token }
- 664  6098 begin
- 665  6098   if token<>x then merror(2,x)
- 666  6117 end;
- 667  6127 
- 668  6128 proc parse(x: packed char); { next token }
- 669  6128 begin
- 670  6128   scan; testto(x);
- 671  6147 end;
- 672  6147 
- 673  6148 {########}
- 674  6148 { getlib }
- 675  6148 {########}
- 676  6148 
- 677  6148 proc getlib;  { read library data }
- 678  6148 var i,j,nent,addr,size,num,x,base: integer;
- 679  6151     libfil: file;
- 680  6151     ch,ltyp2,dummy: char;
- 681  6151     name: array[7] of char;
- 682  6151 begin
- 683  6151   scan; if token=' ,' then scan;
- 684  6172   testto('id');
- 685  6181   base:=pc-2;
- 686  6187   if (ofno<>NO_OUTPUT) then write(@ofno,'L');
- 687  6210   for i:=0 to 7 do begin
- 688  6227     name[i]:=ident[succ(i)];
- 689  6236     if ofno<>NO_OUTPUT then
- 690  6250       write(@ofno,ident[succ(i)])
- 691  6264   end;
- 692  6270   _asetfile(name&'        ',0,cdrive,'L');
- 693  6314   openr(libfil);  { get table file }
- 694  6320 
- 695  6320   { read and check header }
- 696  6320 
- 697  6320   read(@libfil,ch); if ch<>'L' then error(26);
- 698  6349   read(@libfil,ch); if ch<>'I' then error(26);
- 699  6378   read(@libfil,ch); if ch<>'B' then error(26);
- 700  6407   read(@libfil,ch); if ch<>'2' then error(26);
- 701  6436   read(@libfil,ch); if ch<>',' then error(26);
- 702  6465   read(@libfil,nent,size);
- 703  6480 
- 704  6481   { including cr,lf }
- 705  6481 
- 706  6481   for i:=succ(spnt) to spnt+nent do begin
- 707  6508     if spnt>=SYMBSIZE then error(7);
- 708  6527     spnt:=succ(spnt);
- 709  6531 
- 710  6536     clear;
- 711  6540     j := 1;
- 712  6542 
- 713  6546     read(@libfil,ch);
- 714  6556     while ch<>',' do begin
- 715  6567       if j<=IDSIZE then begin
- 716  6574         ident[j] := ch;
- 717  6581         j := succ(j)
- 718  6589       end;
- 719  6598       read(@libfil,ch)
- 720  6603     end;
- 721  6609 
- 722  6612     packid;
- 723  6616 
- 724  6616     addr := PIDSIZE * i + 1;
- 725  6625     for j:=0 to PIDSIZE-1 do
- 726  6640       s_id[addr+j] := idpack[j+1];
- 727  6666 
- 728  6688     read(@libfil,s_typ[i],dummy,s_lvl[i],
- 729  6713       s_vda[i],s_spz[i]);
- 730  6736     s_lvl[i]:=s_lvl[i]+level;
- 731  6749     ltyp2:=high(s_typ[i]);
- 732  6766     if (ltyp2='p')or(ltyp2='f')
- 733  6784       or(ltyp2='g') then begin
- 734  6794       s_vda[i]:=s_vda[i]+base;
- 735  6809       if s_spz[i]<>0 then begin {stack data}
- 736  6832         read(@libfil,num);
- 737  6842         push(num); s_spz[i]:=stackpnt;
- 738  6857         for j:=1 to num do begin
- 739  6884           read(@libfil,x);
- 740  6894           push(x);
- 741  6905         end {for j};
- 742  6905       end {stack data}
- 743  6919     end {if ltyp2}
- 744  6919   end {for i}
- 745  6919   level:=succ(level); pc:=pc+size; offset:=pc;
- 746  6955   close(libfil);
- 747  6969   if spnt>spntmax then spntmax:=spnt;
- 748  6981   if stackpnt>stackmax then stackmax:=stackpnt;
- 749  7001 end {getlib};
- 750  7009 
- 751  7010 { ################################ }
- 752  7010 { block (global): handle one block }
- 753  7010 { ################################ }
- 754  7010 
- 755  7010 proc block(bottom: integer);
- 756  7010 
- 757  7010 var l,f9,i,n,stackpn1,forwpn,find,cproc,
- 758  7013     spnt1,dpnt1,parlevel: integer;
- 759  7013     fortab: array[8] of integer;
- 760  7013     ptok: packed char;
- 761  7013     isfunc: boolean;
- 762  7013 
- 763  7013 {#################################}
- 764  7013 { findid: {search in table for id }
- 765  7013 {#################################}
- 766  7013 
- 767  7013 func findid;
- 768  7013 var k,i: integer;
- 769  7016     id1: packed char;
- 770  7016 begin
- 771  7016   packid;
- 772  7022   i := 1;
- 773  7024   k := PIDSIZE * spnt + PIDSIZE + 1;
- 774  7040   id1 :=idpack[1];
- 775  7047 
- 776  7055   repeat
- 777  7055     k:=k-PIDSIZE;
- 778  7061     while (s_id[k]<>id1) and (k>0) do k:=k-PIDSIZE;
- 779  7096     if k>0 then begin
- 780  7111       i:=1;
- 781  7116       repeat i:=succ(i)
- 782  7120         until (i>PIDSIZE) or
- 783  7136           (s_id[k+i-1]<>idpack[i]);
- 784  7161     end
- 785  7165   until (i>PIDSIZE) or (k<=0);
- 786  7179 
- 787  7183   if k<=0 then begin
- 788  7190     findid:=0
- 789  7193   end else
- 790  7199     findid:=(k-1) div PIDSIZE;
- 791  7211 end;
- 792  7216 
- 793  7217 {##################}
- 794  7217 { code2 (of block) }
- 795  7217 {##################}
- 796  7217 
- 797  7217 proc code2(x,y: integer);
- 798  7217 begin
- 799  7217   code1(x); code1(y);
- 800  7242 end;
- 801  7242 
- 802  7243 {##################}
- 803  7243 { code3 (of block) }
- 804  7243 {##################}
- 805  7243 
- 806  7243 proc code3(x: integer; y1: %integer);
- 807  7243 
- 808  7243 var y: integer;
- 809  7246 
- 810  7246 begin {code3}
- 811  7246   y:=y1;
- 812  7248   if (x=34) and (y>=0) and (y<256) then
- 813  7279     code2(32,y)
- 814  7285   else begin
- 815  7298     if (x=35) and (y>-128) and (y<=127) then
- 816  7321       begin
- 817  7322         if (y<0) then y:=y+256;
- 818  7342         code2(33,y);
- 819  7359       end
- 820  7359     else begin
- 821  7362       if (x>=36) and (x<=38) then y:=y-pc-1;
- 822  7391       code1(x); code1(y and 255);
- 823  7419       code1(y shr 8);
- 824  7432     end
- 825  7432   end
- 826  7432 end {code3};
- 827  7432 
- 828  7433 {#####################}
- 829  7433 { testtype (of block) }
- 830  7433 {#####################}
- 831  7433 
- 832  7433 proc testtype(ttype: char);
- 833  7433 
- 834  7433 begin
- 835  7433   if restype<>ttype then
- 836  7442     if (restype<>'u') and (ttype<>'u') then
- 837  7464       merror(14,packed(ttype,restype));
- 838  7485 end;
- 839  7485 
- 840  7486 {###################}
- 841  7486 { putsym (of block) }
- 842  7486 {###################}
- 843  7486 
- 844  7486 proc putsym(ltyp1,ltyp2: char);
- 845  7486 
- 846  7486 var i,addr,oldid: integer;
- 847  7489 
- 848  7489 begin
- 849  7489   oldid:=findid;
- 850  7497   if oldid<>0 then begin
- 851  7508     if not ((ltyp1='f') and
- 852  7518           (oldid=spnt) and
- 853  7527           (high(s_typ[oldid])='f') and
- 854  7540           (level=s_lvl[oldid]+1))
- 855  7557     then begin
- 856  7559       if s_lvl[oldid]=level then
- 857  7570         error(24)
- 858  7580       else if ucheck then
- 859  7589         error(24);
- 860  7604     end;
- 861  7604   end;
- 862  7604 
- 863  7604   if spnt>=SYMBSIZE then error(7)
- 864  7617   else spnt:=succ(spnt);
- 865  7630 
- 866  7635   if spnt>spntmax then spntmax:=spnt;
- 867  7647 
- 868  7655   s_typ[spnt]:=packed(ltyp1,ltyp2);
- 869  7668   s_spz[spnt]:=0;
- 870  7678 
- 871  7682   addr := PIDSIZE * spnt;
- 872  7684   packid;
- 873  7697   for i:=1 to PIDSIZE do s_id[addr+i] := idpack[i];
- 874  7727 
- 875  7749   if ltyp1='v' then begin
- 876  7756     s_vda[spnt]:=dpnt;
- 877  7763     dpnt:=succ(dpnt);
- 878  7775   end;
- 879  7780 
- 880  7780   s_lvl[spnt]:=level
- 881  7784 end {putsym};
- 882  7792 
- 883  7793 {#######################}
- 884  7793 { checkindex (of block) }
- 885  7793 {#######################}
- 886  7793 
- 887  7793 proc checkindex(lowlim,highlim: integer);
- 888  7793 begin
- 889  7793   if rcheck then begin
- 890  7802     code3($40,lowlim-1);
- 891  7820     code2(highlim and 255, highlim shr 8)
- 892  7833   end
- 893  7840 end;
- 894  7840 
- 895  7841 {###################}
- 896  7841 { getcon (of block) }
- 897  7841 {###################}
- 898  7841 
- 899  7841 func getcon;
- 900  7841 
- 901  7841 var idpnt,val,ii: integer;
- 902  7844     rval: real;
- 903  7844     sign: char;
- 904  7844 begin
- 905  7844   restype:='i';
- 906  7848   if token=' -' then begin
- 907  7860     sign:='-'; scan
- 908  7869   end else begin
- 909  7876     sign:='+'; if token=' +' then scan
- 910  7890   end;
- 911  7897   case token of
- 912  7897     'nu': val:=value[0];
- 913  7911     'ru': begin val:=value[0];
- 914  7932             restype:='r' end;
- 915  7946     'st': if value[0]=1 then begin
- 916  7966             restype:='c';
- 917  7971             val:=ord(ident[1])
- 918  7977           end else if value[0]=2 then begin
- 919  7997             val:=(ord(ident[1]) shl 8) +
- 920  8009               ord(ident[2]);
- 921  8015             restype:='p';
- 922  8022           end else if value[0]>2 then begin
- 923  8038             val:=pc;
- 924  8041             for ii:=1 to value[0] do
- 925  8057                         code1(ord(ident[ii]));
- 926  8084             code1(0); value[0]:=0; restype:='s';
- 927  8116           end else error(15);
- 928  8131     'cr': begin parse(' ('); scan; val:=getcon;
- 929  8161             if (val>127) or (val<0) then
- 930  8179               error(12);
- 931  8191             testtype('i');
- 932  8199             restype:='c'; parse(' )');
- 933  8214           end;
- 934  8214     'tr': begin val:=1; restype:='b' end;
- 935  8237     'fa': begin val:=0; restype:='b' end;
- 936  8260     'cp': begin
- 937  8271             scan; val:=getcon;
- 938  8281             testtype('i'); restype:='q';
- 939  8295           end;
- 940  8299     ' @': begin scan; val:=getcon;
- 941  8320             if restype<>'q' then testtype('i');
- 942  8342             restype:='f'
- 943  8342           end
- 944  8344     else begin
- 945  8351       testto('id'); idpnt:=findid;
- 946  8366       if (idpnt>0) and (high(s_typ[idpnt])='c')
- 947  8388       then begin
- 948  8390         val:=s_vda[idpnt];
- 949  8397         restype:=low(s_typ[idpnt]);
- 950  8413         if restype='r' then
- 951  8424           value[1]:=s_spz[idpnt];
- 952  8434       end
- 953  8442       else begin error(4); val:=0;
- 954  8455         restype:='i'
- 955  8459       end
- 956  8461     end
- 957  8465   end {case};
- 958  8467   if sign='-' then
- 959  8473     case restype of
- 960  8477       'i': getcon:=-val;
- 961  8488       'r': begin value[0]:=val;
- 962  8509              splitconv(value,rval);
- 963  8541              splitconv(-rval,value);
- 964  8566              getcon:=value[0]
- 965  8568            end
- 966  8568       else error(12)
- 967  8581     end {case}
- 968  8589   else getcon:=val;
- 969  8592 end {getcon};
- 970  8600 
- 971  8601 {#####################}
- 972  8601 { deccon ( of block ) }
- 973  8601 {#####################}
- 974  8601 
- 975  8601 proc deccon;    { declare constant }
- 976  8601 begin
- 977  8601   if token=' ;' then scan;
- 978  8621   testto('id');
- 979  8630   putsym('c','i');
- 980  8640   parse(' ='); scan;
- 981  8653   s_vda[spnt]:=getcon;
- 982  8663   if (restype='r') then s_spz[spnt]:=value[1];
- 983  8683   if restype<>'i' then
- 984  8697     s_typ[spnt]:=packed('c',restype);
- 985  8712   scan
- 986  8716 end {deccon};
- 987  8720 
- 988  8721 {#####################}
- 989  8721 { decvar ( of block ) }
- 990  8721 {#####################}
- 991  8721 
- 992  8721 proc decvar(typ1,typ2: char);
- 993  8721 begin
- 994  8721   if token=' ,' then scan;
- 995  8741   testto('id');
- 996  8750   putsym(typ1,typ2);
- 997  8764   scan;
- 998  8768 end {decvar};
- 999  8768 
-1000  8769 {######################}
-1001  8769 { gettype ( of block ) }
-1002  8769 {######################}
-1003  8769 
-1004  8769 proc gettype(var typ2: char;
-1005  8769   var aflag,uflag: boolean; var n: integer);
-1006  8769 
-1007  8769 begin
-1008  8769   aflag:=false; n:=0; uflag:=false;
-1009  8788   scan;
-1010  8796   if token='ar' then begin
-1011  8804     parse(' ['); scan;
-1012  8820     n:=getcon; testtype('i');
-1013  8838     if (n<1) then begin error(15); n:=1 end;
-1014  8862     parse(' ]'); parse('of'); scan;
-1015  8884     aflag:=true
-1016  8884   end;
-1017  8890   if token=' %' then begin
-1018  8898     scan; uflag:=true
-1019  8905   end;
-1020  8911   case token of
-1021  8911     'in': typ2:='i';
-1022  8925     'ch': typ2:='c';
-1023  8942     'pa': begin parse ('ch'); typ2:='p' end;
-1024  8972     'bo': typ2:='b';
-1025  8985     'rl': begin typ2:='r'; aflag:=true;
-1026  9008             n:=prec(2*succ(n)) end;
-1027  9025     'cp': typ2:='q';
-1028  9038     'fl': typ2:='f'
-1029  9053     else begin error(11); typ2:='i';end
-1030  9076   end {case}
-1031  9078 end {gettype};
-1032  9078 
-1033  9079 {######################}
-1034  9079 { variable ( of block) }
-1035  9079 {######################}
-1036  9079 
-1037  9079 proc variable;  { variable declarations }
-1038  9079 
-1039  9079 var typ1,typ2: char;
-1040  9082     i,l: integer;
-1041  9082     aflag,uflag: boolean;
-1042  9082 
-1043  9082 begin
-1044  9082   scan;
-1045  9088   repeat {main loop}
-1046  9088     l:=0;
-1047  9090     repeat decvar('v','i'); l:=succ(l);
-1048  9108     until token<> ' ,';
-1049  9120     testto(' :');
-1050  9133     gettype(typ2,aflag,uflag,n);
-1051  9169     if uflag then error(11);
-1052  9184     if aflag then typ1:='a' else typ1:='v';
-1053  9202     if typ1='a' then begin {array}
-1054  9216        dpnt:=dpnt-l; {variable has been assumed}
-1055  9229        for i:=succ(spnt-l) to spnt do begin
-1056  9256          s_vda[i]:=dpnt; s_spz[i]:=n;
-1057  9272          dpnt:=succ(dpnt+n);
-1058  9289       end
-1059  9294     end {array};
-1060  9308     for i:=succ(spnt-l) to spnt do
-1061  9322       s_typ[i]:=packed(typ1,typ2);
-1062  9348     parse(' ;');scan
-1063  9375   until token<>'id' {end main loop}
-1064  9386 end {variable};
-1065  9390 
-1066  9391 {####################}
-1067  9391 { fixup ( of block ) }
-1068  9391 {####################}
-1069  9391 
-1070  9391 proc fixup(x: integer);
-1071  9391 begin
-1072  9391   if ofno<>NO_OUTPUT then begin
-1073  9403     write(@ofno,'F');
-1074  9414     savebyte(succ(x-offset) and 255);
-1075  9433     savebyte(succ(x-offset) shr 8);
-1076  9452     savebyte((pc-x-1) and 255);
-1077  9473     savebyte((pc-x-1) shr 8);
-1078  9494   end;
-1079  9494 end;
-1080  9494 
-1081  9495 {#######################}
-1082  9495 { function ( of block ) }
-1083  9495 {#######################}
-1084  9495 
-1085  9495 proc function;
-1086  9495 
-1087  9495 var n: integer;
-1088  9498     typ1,typ2: char;
-1089  9498     aflag,uflag: boolean;
-1090  9498 begin
-1091  9498   if token<>' :' then begin
-1092  9508     aflag:=false; uflag:=false; typ2:='i' end
-1093  9525   else begin
-1094  9532     gettype(typ2,aflag,uflag,n);
-1095  9568     scan
-1096  9568   end;
-1097  9572   if aflag then begin
-1098  9576     typ1:='s'; s_spz[succ(cproc)]:=n;
-1099  9590     s_vda[succ(cproc)]:=s_vda[succ(cproc)]-n
-1100  9612   end
-1101  9612   else typ1:='r';
-1102  9626   s_typ[succ(cproc)]:=packed(typ1,typ2);
-1103  9644   if uflag then typ2:='u';
-1104  9657   if aflag then typ1:='g'
-1105  9668   else typ1:='f';
-1106  9679   s_typ[cproc]:=packed(typ1,typ2);
-1107  9696 end {function};
-1108  9700 
-1109  9701 {########################}
-1110  9701 { parameter ( of block ) }
-1111  9701 {########################}
-1112  9701 
-1113  9701 proc parameter;
-1114  9701 
-1115  9701 var counter1,counter2,i,n,bs: integer;
-1116  9704     aflag,uflag: boolean;
-1117  9704     vtype1,vtype2: char;
-1118  9704     vtype: packed char;
-1119  9704 
-1120  9704 begin
-1121  9704   push(0); { dummy size, fixed later }
-1122  9714   if find=0 then s_spz[spnt-npara]:=stackpnt
-1123  9733   else bs:=stackpnt;
-1124  9744   counter1:=0
-1125  9752   repeat {main loop}
-1126  9758     counter2:=0;
-1127  9760     vtype1:='d'; vtype2:='i';
-1128  9772     scan;
-1129  9780     if token='co' then scan
-1130  9788     else if token='va' then begin
-1131  9806       scan; vtype1:='w' end; {variable param}
-1132  9819     end;
-1133  9819     repeat {inner loop}
-1134  9819       decvar(vtype1,vtype2);
-1135  9833       s_vda[spnt]:=parlevel;
-1136  9837       parlevel:=succ(parlevel);
-1137  9849       npara:=succ(npara);
-1138  9858       counter2:=succ(counter2);
-1139  9867       until token<>' ,';
-1140  9879     uflag:=false;aflag:=false; n:=0;
-1141  9897     if token<>' :' then
-1142  9908       vtype2:='i' {assume integer }
-1143  9914     else begin
-1144  9921       gettype(vtype2,aflag,uflag,n);
-1145  9957       if n>63 then error(15);
-1146  9975       scan
-1147  9975     end;
-1148  9979     if aflag then begin
-1149  9983       vtype1:=succ(vtype1);
-1150  9990       parlevel:=parlevel-counter2;
+  27  1786 
+  28  1786 const
+  29  1786     IDLENGTH  = 64;   {max. length of ident buffer}
+  30  1789     IDSIZE    = 16;   {chars per identifier in s_id}
+  31  1789     PIDSIZE   = 8;    {packed chars per identifier}
+  32  1789     SYMBSIZE  = 256;  {id table entries}
+  33  1789     IDTABSIZE = 2048; {SYMBSIZE * PIDSIZE}
+  34  1789 
+  35  1789     STACKSIZE = 256;   {stack size}
+  36  1789     PAGELENGHT= 60;    {no of lines per page}
+  37  1789     NO_OUTPUT = @0;
+  38  1789     YES_OUTPUT= @255;
+  39  1789     MAXFI     = 3;     {max nbr  of nested input files
+  40  1789 }
+  41  1789     NRESW     = 63;    {number of res. words, max 64}
+  42  1789 
+  43  1789     SAT_EXPORT = 1;    {Bit mask for s_attr}
+  44  1789 
+  45  1789 var reswtab: array[ 512] of char; {8*(NRESW+1)}
+  46  1789 
+  47  1789     ident:   array[IDLENGTH] of char;
+  48  1789     idpack:  array[PIDSIZE] of packed char;
+  49  1789 
+  50  1789     tpos,pc,level,line,offset,dpnt,spnt,fipnt,
+  51  1789     npara,i,stackpnt,stackmax,spntmax,numerr,
+  52  1789     lineinc: integer;
+  53  1789     scyclus,sdrive,cdrive: integer;
+  54  1789     pname: array[15] of char;
+  55  1789     value: array[1] of integer;
+  56  1789     ch,restype,vartype:char;
+  57  1789     token: packed char;
+  58  1789     libflg,rcheck,ateof: boolean;
+  59  1789     ucheck,lineflg,nlflg: boolean;
+  60  1789     fno,ofno,savefno,lpr: file;
+  61  1789     incname: array[15] of char;
+  62  1789     filstk: array[MAXFI] of file;
+  63  1789 
+  64  1789 { ****. START IF IDENTIFIER TABLE ****}
+  65  1789 
+  66  1789     s_id:   array[IDTABSIZE] of packed char;
+  67  1789     { flat array of symbol names }
+  68  1789 
+  69  1789     s_typ: array[SYMBSIZE] of packed char;
+  70  1789 {  Type of symbol
+  71  1789    High letter:
+  72  1789      a: arrayc:constant
+  73  1789      d: const parameter
+  74  1789      e: constant array parameter
+  75  1789      f: function
+  76  1789      g: array function
+  77  1789      h: 8-bit memory variable
+  78  1789      i: 8-bit array memory variable
+  79  1789      m: 16-bit memory variable
+  80  1789      n: 16-bit array memory variable
+  81  1789      p: procedure
+  82  1789      q: indexed cpnt
+  83  1789      r,t: function result
+  84  1789      s,u: array function result
+  85  1789      v: variable,
+  86  1789      w: variable parameter
+  87  1789      x: variable array parameter
+  88  1789    Low letter:
+  89  1789      b: boolean
+  90  1789      c: char
+  91  1789      f: file
+  92  1789      i: integer
+  93  1789      p: packed char
+  94  1789      q: cpnt (pointer to chars)
+  95  1789      r: real(array of two)
+  96  1789      s: const cpnt
+  97  1789      u: undefined         }
+  98  1789 
+  99  1789     s_lvl: array[SYMBSIZE] of integer;
+ 100  1789     {level}
+ 101  1789 
+ 102  1789     s_vda: array[SYMBSIZE] of integer;
+ 103  1789     {val,dis,addr}
+ 104  1789 
+ 105  1789     s_spz: array[SYMBSIZE] of integer;
+ 106  1789     {stack pointer,size of array}
+ 107  1789 
+ 108  1789 { **** END OF IDENTIFIER TABLE ****}
+ 109  1789 
+ 110  1789     reswcod: array[NRESW] of packed char;
+ 111  1789     stack:   array[STACKSIZE] of integer;
+ 112  1789 
+ 113  1789 {###################}
+ 114  1789 { savebyte (global) }
+ 115  1789 {###################}
+ 116  1789 
+ 117  1789 proc savebyte(x: integer);
+ 118  1789 begin
+ 119  1789     if ofno<>NO_OUTPUT then begin
+ 120  1801       write(@ofno,
+ 121  1804         chr(((x and 255) shr 4)+ord('0')));
+ 122  1825       write(@ofno,chr((x and 15)+ord('0')))
+ 123  1840     end
+ 124  1843 end {savebyte};
+ 125  1843 
+ 126  1844 {###############}
+ 127  1844 { crlf (global) }
+ 128  1844 {###############}
+ 129  1844 
+ 130  1844 proc crlf;
+ 131  1844 begin
+ 132  1844   writeln(@lpr);
+ 133  1861   line:=succ(line); lineinc:=succ(lineinc);
+ 134  1874   tpos := 0;
+ 135  1881 end {crlf};
+ 136  1885 
+ 137  1886 {#################################}
+ 138  1886 { merror and error: error message }
+ 139  1886 {#################################}
+ 140  1886 
+ 141  1886 proc merror(x: integer; code: packed char);
+ 142  1886 var k: integer;
+ 143  1889     answer: char;
+ 144  1889 begin
+ 145  1889   writeln; numerr:=succ(numerr);
+ 146  1901   write(INVVID,'ERROR: ');
+ 147  1917   case x of
+ 148  1917     01: write('Ident');
+ 149  1934     02: write('Ident ',code,' expected');
+ 150  1970     03: write('Var declaration');
+ 151  1996     04: write('Const expected');
+ 152  2021     05: write('Ident unknown');
+ 153  2045     06: write('Cannot be assigned');
+ 154  2074     07: write('Symbol table overflow');
+ 155  2106     08: write('Stack overflow');
+ 156  2131     09: write('Expression');
+ 157  2152     10: write('Statement');
+ 158  2172     11: write('Declaration');
+ 159  2194     12: write('Constant');
+ 160  2213     13: write('Forward reference: ',code);
+ 161  2252     14: write('Type mismatch: ',code);
+ 162  2287     15: write('Array size');
+ 163  2308     16: write('Array (8-bit)');
+ 164  2332     17: write('Real');
+ 165  2347     18: write('File table overflow');
+ 166  2377     19: write('Parameter');
+ 167  2397     20: write('Compiler directive syntax');
+ 168  2433     21: write('Nested include files');
+ 169  2464     22: write('Unexpected EOF');
+ 170  2489     23: write('End mark for comment or string');
+ 171  2530     24: write('Identifier already defined');
+ 172  2567     25: write('Formatted write');
+ 173  2593     26: write('Wrong library version');
+ 174  2625     27: write('Identifier too long')
+ 175  2655   end {case};
+ 176  2657   writeln(' at line ', line, ', pos ', tpos, NORVID);
+ 177  2693   if (ofno<>NO_OUTPUT) and (ofno<>YES_OUTPUT)
+ 178  2706     then close(ofno);
+ 179  2717   ofno:=NO_OUTPUT;
+ 180  2719   _abort;
+ 181  2727 end {merror};
+ 182  2727 
+ 183  2728 proc error(x: integer);
+ 184  2728 begin
+ 185  2728   merror(x,'##')
+ 186  2740 end;
+ 187  2746 
+ 188  2747 {#############################}
+ 189  2747 { pack and unpack identifiers }
+ 190  2747 {#############################}
+ 191  2747 
+ 192  2747 proc packid;
+ 193  2747 var i,j: integer;
+ 194  2750 begin
+ 195  2750   j := 1;
+ 196  2754   for i := 1 to PIDSIZE do begin
+ 197  2775     idpack[i] := packed(ident[j],ident[j+1]);
+ 198  2799     j := j + 2
+ 199  2807   end
+ 200  2809 end;
+ 201  2828 
+ 202  2829 proc unpackid;
+ 203  2829 var i,j: integer;
+ 204  2832 begin
+ 205  2832   j := 1;
+ 206  2836   for i := 1 to PIDSIZE do begin
+ 207  2857     ident[j]   := high(idpack[i]);
+ 208  2869     ident[j+1] := low(idpack[i]);
+ 209  2889     j := j + 2
+ 210  2898   end
+ 211  2900 end;
+ 212  2919 
+ 213  2920 {############}
+ 214  2920 { push & pop }
+ 215  2920 {############}
+ 216  2920 
+ 217  2920 proc push(x: %integer);
+ 218  2920 begin
+ 219  2920   if stackpnt>=STACKSIZE then error(8)
+ 220  2938   else stackpnt:=succ(stackpnt);
+ 221  2951   if stackpnt>stackmax then stackmax:=stackpnt;
+ 222  2968   stack[stackpnt]:=x;
+ 223  2980 end {push};
+ 224  2988 
+ 225  2989 func pop: integer;
+ 226  2989 begin
+ 227  2989   pop:=stack[stackpnt];
+ 228  2998   stackpnt:=prec(stackpnt)
+ 229  3006 end {pop};
+ 230  3015 
+ 231  3016 {################}
+ 232  3016 { code1 (global) }
+ 233  3016 {################}
+ 234  3016 proc code1(x: %integer);  {set one byte p-code}
+ 235  3016 begin
+ 236  3016   savebyte(x); pc:=succ(pc)
+ 237  3031 end;
+ 238  3040 
+ 239  3041 {###################}
+ 240  3041 { nextline (global) }
+ 241  3041 {###################}
+ 242  3041 
+ 243  3041 proc nextline;
+ 244  3041 var i:integer;
+ 245  3044 begin
+ 246  3044   nlflg:=true;
+ 247  3048   if savefno=@0 then write(@lpr,line:4)
+ 248  3073   else begin
+ 249  3083     write(@lpr,'{I:');
+ 250  3093     for i:=0 to 5 do write(@lpr,incname[i]);
+ 251  3125     write(@lpr,'}');
+ 252  3147     line:=line-1; { do not count line }
+ 253  3158     write(@lpr,lineinc:3);
+ 254  3176   end;
+ 255  3176   write(@lpr,' ');
+ 256  3184   write(@lpr,(pc+2):5,' ');
+ 257  3207   tpos := 0;
+ 258  3209 end;
+ 259  3213 
+ 260  3214 {#############################}
+ 261  3214 { getchr and getchr0 (global) }
+ 262  3214 {#############################}
+ 263  3214 
+ 264  3214 proc getchr0;
+ 265  3214 { does not eliminate CR }
+ 266  3214 begin
+ 267  3214   if ateof then begin
+ 268  3223     if savefno<>@0 then begin
+ 269  3233       { end of include file, close it }
+ 270  3236       close(fno);
+ 271  3242       fno:=savefno;
+ 272  3242       { switch back to normal input file }
+ 273  3250       savefno:=@0;
+ 274  3252       ateof:=false;
+ 275  3258       if ch=CR then ch:=' ';
+ 276  3274     end else begin
+ 277  3281       error(22);
+ 278  3289       _abort
+ 279  3289     end
+ 280  3293   end else begin
+ 281  3296     read(@fno,ch);
+ 282  3306     if ch=CR then begin
+ 283  3314       crlf;
+ 284  3321       nextline;
+ 285  3325     end {if}
+ 286  3325     else if ch=EOF then begin
+ 287  3335       ateof:=true;
+ 288  3340       { we need to suppy one more char }
+ 289  3344       { for end. at end of file to work properly }
+ 290  3344       ch:=' ';
+ 291  3346     end
+ 292  3350     else begin
+ 293  3353       write(@lpr,ch);
+ 294  3364       tpos := tpos + 1;
+ 295  3370     end;
+ 296  3375   end;
+ 297  3375 end {getchr};
+ 298  3375 
+ 299  3376 proc getchr;
+ 300  3376 { replaces CR with ' ' to make parsing easier }
+ 301  3376 begin
+ 302  3376   getchr0;
+ 303  3385   if ch=CR then ch:=' ';
+ 304  3397 end;
+ 305  3401 
+ 306  3402 {####################}
+ 307  3402 { splitconv (global) }
+ 308  3402 {####################}
+ 309  3402 
+ 310  3402 proc splitconv(a: array[1] of %integer;
+ 311  3402   var b:array[1] of %integer);
+ 312  3402 begin
+ 313  3402   b:=a;
+ 314  3407 end;
+ 315  3419 
+ 316  3420 {###############}
+ 317  3420 { init (global) }
+ 318  3420 {###############}
+ 319  3420 
+ 320  3420 proc init;
+ 321  3420 const char96=chr(20);
+ 322  3423 var i,j,dummy: integer;
+ 323  3423     dch: char;
+ 324  3423     pch: packed char;
+ 325  3423     request: array[15] of char;
+ 326  3423     default: boolean;
+ 327  3423 begin {init}
+ 328  3423   lpr := PRINTER;
+ 329  3427   ateof:=false; savefno:=@0;
+ 330  3439   cdrive:=FILDRV; { drive of compile program }
+ 331  3450   fipnt:=-1;
+ 332  3452   pc:=2; dpnt:=0; spnt:=0; offset:=2;
+ 333  3477   npara:=0; level:=0;
+ 334  3489   stackpnt:=0; libflg:=false;
+ 335  3501   stackmax:=0;spntmax:=0; numerr:=0;
+ 336  3519   s_typ[0]:='vi'; s_lvl[0]:=0;
+ 337  3536   s_vda[0]:=0; s_spz[0]:=0;
+ 338  3552   { prepare resword table }
+ 339  3556   _asetfile('RESWORDS:W      ',0,0,'W');
+ 340  3586   openr(fno);
+ 341  3592   for i:=0 to NRESW do begin
+ 342  3609     read(@fno,pch,dch);
+ 343  3626     reswcod[i]:=pch;
+ 344  3631     for j:=0 to 7 do reswtab[8*i+j]:=' ';
+ 345  3670     j:=0;
+ 346  3690     while (j<8) and (dch<>CR) do begin
+ 347  3712       read(@fno,dch);
+ 348  3722       if (dch<>CR) then
+ 349  3730         reswtab[8*i+j]:=dch;
+ 350  3745       j:=succ(j)
+ 351  3753     end;
+ 352  3762     while (dch<>CR) and (dch<>EOF) do
+ 353  3779       read(@fno,dch)
+ 354  3788   end;
+ 355  3797   close(fno);
+ 356  3817 
+ 357  3817   sdrive:=1; {default drive for source }
+ 358  3823   scyclus:=0;
+ 359  3825   _agetstring(pname,default,scyclus,sdrive);
+ 360  3869 
+ 361  3869   _agetstring(request,default,dummy,dummy);
+ 362  3909 
+ 363  3909   rcheck:=false;
+ 364  3911   ucheck:=false;
+ 365  3917   ofno:=YES_OUTPUT;
+ 366  3923   lineflg:=false;
+ 367  3929   if not default then begin
+ 368  3938     if request[0]<>'/' then _argerror(103);
+ 369  3961     for i:=1 to 8 do
+ 370  3969       case request[i] of
+ 371  3982         'L': lineflg:=true;
+ 372  3995         'R': rcheck:=true;
+ 373  4011         'N': ofno:=NO_OUTPUT;
+ 374  4027         'F': begin end;
+ 375  4041         ' ': begin end
+ 376  4051         else _argerror(104)
+ 377  4056       end; {case}
+ 378  4078   end;
+ 379  4078 
+ 380  4078   _asetfile(pname,scyclus,sdrive,'P');
+ 381  4100   openr(fno);
+ 382  4106   scyclus:=FILCYC; { may have changed }
+ 383  4114   {save cyclus and drive for compile2}
+ 384  4114   ARGLIST[8]:=scyclus;
+ 385  4116   ARGLIST[9]:=sdrive;
+ 386  4130   NUMARG:=1;
+ 387  4144 
+ 388  4148   RUNERR := _emulator(8);
+ 389  4158 
+ 390  4162   line:=0; lineinc:=0;
+ 391  4170   line:=1;
+ 392  4176   write(@lpr,'   1     4 '); getchr
+ 393  4198 end {init};
+ 394  4202 
+ 395  4203 {################}
+ 396  4203 { clear (global) }
+ 397  4203 {################}
+ 398  4203 
+ 399  4203 proc clear; {clears IDSIZE chars of identifier}
+ 400  4203 var i: integer;
+ 401  4206 begin
+ 402  4206   for i:=1 to IDSIZE do ident[i]:=' '
+ 403  4229 end;
+ 404  4249 
+ 405  4250 {###############}
+ 406  4250 { scan (global) }
+ 407  4250 { ############# }
+ 408  4250 { scan input and make tokens }
+ 409  4250 
+ 410  4250 proc scan;
+ 411  4250 var count,ll,hh,i,i1,co: integer;
+ 412  4253     name: array[7] of char;
+ 413  4253 
+ 414  4253 {####################}
+ 415  4253 { compresw (of scan) }
+ 416  4253 {####################}
+ 417  4253 
+ 418  4253 func compresw(index: integer);
+ 419  4253 var addr,ci,i: integer;
+ 420  4256 begin
+ 421  4256   addr:=8*index; i:=0;
+ 422  4271   repeat
+ 423  4275     ci:=ord(ident[i+1])-ord(reswtab[addr+i]);
+ 424  4299     i:=succ(i)
+ 425  4304   until (ci<>0) or (i>=8);
+ 426  4327   compresw:=ci
+ 427  4331 end {compresw};
+ 428  4339 
+ 429  4340 {################}
+ 430  4340 { pack (of scan) }
+ 431  4340 {################}
+ 432  4340 
+ 433  4340 proc pack;  {packs token and ch to token }
+ 434  4340 begin
+ 435  4340   token:=packed(low(token),ch); getchr
+ 436  4359 end;
+ 437  4363 
+ 438  4364 {##################}
+ 439  4364 { setval (of scan) }
+ 440  4364 {##################}
+ 441  4364 
+ 442  4364 proc setval;
+ 443  4364 var r: real;
+ 444  4367     n,n1: integer;
+ 445  4367     ems: boolean;
+ 446  4367 
+ 447  4367   func times10(r:real):real;
+ 448  4367   {########################}
+ 449  4367   { slightly more accurate than 10.0*r }
+ 450  4367   var r2,r4:real;
+ 451  4370   begin
+ 452  4370     r2:=r+r;
+ 453  4378     r4:=r2+r2;
+ 454  4397     times10:=r2+r4+r4;
+ 455  4423   end;
+ 456  4436 
+ 457  4437 begin
+ 458  4437   r:=0.0;
+ 459  4445   repeat
+ 460  4451     r:=times10(r)+conv(ord(ch)-ord('0'));
+ 461  4472     getchr;
+ 462  4484   until (ch<'0') or (ch>'9');
+ 463  4498   if ch<>'.' then begin {numeric integer}
+ 464  4512     token:='nu';
+ 465  4515     value[0]:=trunc(r+0.5);
+ 466  4534   end
+ 467  4539   else begin {numeric real}
+ 468  4542     n:=0; getchr;
+ 469  4552     while (ch<='9') and (ch>='0') do begin
+ 470  4570       r:=times10(r)+conv(ord(ch)-ord('0'));
+ 471  4591       n:=prec(n); getchr
+ 472  4608     end;
+ 473  4612     if ch='e' then begin
+ 474  4622       ems:=false; getchr;
+ 475  4635       case ch of
+ 476  4635         '+': getchr;
+ 477  4650         '-': begin ems:=true; getchr end
+ 478  4670       end;
+ 479  4672       if (ch>'9') or (ch<'0') then error(17)
+ 480  4692       else begin
+ 481  4701         n1:=ord(ch)-ord('0');
+ 482  4707         getchr;
+ 483  4716         if (ch<='9') and (ch>='0') then begin
+ 484  4731           n1:=10*n1+ord(ch)-ord('0');
+ 485  4748           getchr
+ 486  4753         end;
+ 487  4757         if ems then n:=n-n1 else n:=n+n1
+ 488  4784       end
+ 489  4784     end;
+ 490  4793     while n>0 do begin
+ 491  4803       n:=prec(n);
+ 492  4807       r:=times10(r);
+ 493  4826     end;
+ 494  4832     while n<0 do begin
+ 495  4845       n:=succ(n); r:=0.1*r;
+ 496  4860     end;
+ 497  4873     splitconv(r,value);
+ 498  4900     token:='ru'
+ 499  4900   end
+ 500  4903 end {setval};
+ 501  4907 
+ 502  4908 {#####################}
+ 503  4908 { directive (of scan) }
+ 504  4908 {#####################}
+ 505  4908 
+ 506  4908 proc directive;
+ 507  4908 var i,icyclus:integer;
+ 508  4911 
+ 509  4911   proc onoff(var flag:boolean);
+ 510  4911   begin
+ 511  4911     getchr0; if ch=CR then error(23);
+ 512  4938     case ch of
+ 513  4938       '+': flag:=true;
+ 514  4951       '-': flag:=false
+ 515  4965     else error(20)
+ 516  4976     end;
+ 517  4984     getchr0; if ch=CR then error(23);
+ 518  5006     if ch<>'}' then error(23);
+ 519  5024     getchr; scan;
+ 520  5032   end {onoff};
+ 521  5032 
+ 522  5033 begin
+ 523  5033   getchr;
+ 524  5039   case ch of
+ 525  5039     'I': begin
+ 526  5050            if savefno<>@0 then error(21);
+ 527  5068            getchr0; if ch=CR then error(23);
+ 528  5090            if ch<>' ' then error(20);
+ 529  5108            i:=0;
+ 530  5110            getchr0; if ch=CR then error(23);
+ 531  5136            while (ch<>'}') and (i<16) do begin
+ 532  5154              incname[i]:=ch; i:=i+1;
+ 533  5172              getchr0; if ch=CR then error(23);
+ 534  5199            end;
+ 535  5199            if ch<>'}' then error(23);
+ 536  5220            while (i<16) do begin
+ 537  5230              incname[i]:=' '; i:=i+1;
+ 538  5246            end;
+ 539  5251            icyclus:=0;
+ 540  5256            _asetfile(incname,icyclus,sdrive,'P');
+ 541  5282            savefno:=fno;
+ 542  5282            openr(fno);
+ 543  5296            lineinc:=0;
+ 544  5298            crlf;
+ 545  5306            nextline;
+ 546  5310            getchr; scan;
+ 547  5318          end;
+ 548  5318     'R': onoff(rcheck);
+ 549  5340     'U': onoff(ucheck)
+ 550  5350   else error(20)
+ 551  5367   end {case}
+ 552  5375 end;
+ 553  5375 
+ 554  5376 {#################}
+ 555  5376 { setid (of scan) }
+ 556  5376 {#################}
+ 557  5376 
+ 558  5376 proc setid; {sets one char to ident}
+ 559  5376 begin
+ 560  5376   if count<=IDLENGTH then begin
+ 561  5388     ident[count]:=ch; count:=succ(count)
+ 562  5403   end;
+ 563  5412   getchr0;
+ 564  5416 end {setid};
+ 565  5416 
+ 566  5417 {######################}
+ 567  5417 { isidletter (of scan) }
+ 568  5417 {######################}
+ 569  5417 
+ 570  5417 func isidletter: boolean;
+ 571  5417 {allowed letters in idents}
+ 572  5417 begin
+ 573  5417   isidletter:=
+ 574  5422         ( ((ch>='a') and (ch<='z')) or
+ 575  5437           ((ch>='A') and (ch<='Z')) or
+ 576  5452           (ch='_')
+ 577  5459         );
+ 578  5461 end;
+ 579  5465 
+ 580  5466 {##############}
+ 581  5466 { body of scan }
+ 582  5466 {##############}
+ 583  5466 
+ 584  5466 begin
+ 585  5466   count:=1; while ch=' ' do getchr;
+ 586  5488 
+ 587  5491   { delayed because of token lookahead }
+ 588  5491   if nlflg then begin
+ 589  5495     if lineflg and (pc>2) then begin
+ 590  5510       code1($59);
+ 591  5521       code1((line) and 255);
+ 592  5534       code1((line) shr 8);
+ 593  5547     end;
+ 594  5547     nlflg:=false;
+ 595  5549   end;
+ 596  5553 
+ 597  5553   if not isidletter then begin {main if}
+ 598  5563 
+ 599  5563     if (ch<'0') or (ch>'9') then begin {symb}
+ 600  5581       token:=packed(' ',ch); getchr;
+ 601  5596       case low(token) of
+ 602  5600         '<': if (ch='=') or (ch='>') then pack;
+ 603  5630         '>',':': if (ch='=') then pack;
+ 604  5661         '{': begin
+ 605  5671                if ch='$' then directive
+ 606  5678                else begin
+ 607  5688                  if ch<>'}' then
+ 608  5694                  repeat
+ 609  5695                    getchr0;
+ 610  5702                    { if ch=CR then error(23); }
+ 611  5702                    until ch='}';
+ 612  5708                  getchr; scan
+ 613  5716                end
+ 614  5720              end;
+ 615  5720         '$': begin {hex constant}
+ 616  5730                token:='nu'; value[0]:=0;
+ 617  5741                while ((ch>='0')and(ch<='9'))
+ 618  5759                      or((ch>='a')and(ch<='f'))
+ 619  5774                      do begin
+ 620  5779                  if ch>'9' then
+ 621  5785                    value[0]:=(value[0] shl 4)
+ 622  5799                      +ord(ch)-ord('a')+10
+ 623  5808                  else
+ 624  5810                    value[0]:=(value[0] shl 4)
+ 625  5828                      +ord(ch)-ord('0');
+ 626  5836                  getchr
+ 627  5841                end {do}
+ 628  5845              end; {hex constant}
+ 629  5851         chr(39): begin {string}
+ 630  5858                token:='st';
+ 631  5861                repeat
+ 632  5865                  setid; if ch=CR then error(23);
+ 633  5887                until ch=chr(39);
+ 634  5893                value[0]:=prec(count); getchr
+ 635  5909               end
+ 636  5913       end {case of token}
+ 637  5915     end {special symbols}
+ 638  5915     else setval {numeric value}
+ 639  5922   end {main if}
+ 640  5922   else begin { is_id_letter }
+ 641  5925     clear;
+ 642  5929     repeat
+ 643  5929       setid; if ch=CR then ch:=' ';
+ 644  5945     until not
+ 645  5949       (isidletter or ((ch>='0') and (ch<='9')));
+ 646  5971     ll:=0; hh:=NRESW; {look up in resword table}
+ 647  5987     repeat
+ 648  5987       i:=(ll+hh) shr 1; co:=compresw(i);
+ 649  6015       if (co<0) then hh:=prec(i)
+ 650  6029       else ll:=succ(i);
+ 651  6045       until (co=0) or (ll>hh);
+ 652  6066     if (co=0) then
+ 653  6077       token := reswcod[i] {reserved word}
+ 654  6084     else begin
+ 655  6095       if count>succ(IDSIZE) then error(27);
+ 656  6114       token := 'id' {identifier}
+ 657  6117     end;
+ 658  6121   end {identifier or reserved word}
+ 659  6121 end {scan};
+ 660  6121 
+ 661  6122 {##############}
+ 662  6122 { testto/parse }
+ 663  6122 {##############}
+ 664  6122 
+ 665  6122 { parce source for specific token; else error }
+ 666  6122 
+ 667  6122 proc testto(x: packed char); { current token }
+ 668  6122 begin
+ 669  6122   if token<>x then merror(2,x)
+ 670  6141 end;
+ 671  6151 
+ 672  6152 proc parse(x: packed char); { next token }
+ 673  6152 begin
+ 674  6152   scan; testto(x);
+ 675  6171 end;
+ 676  6171 
+ 677  6172 {########}
+ 678  6172 { getlib }
+ 679  6172 {########}
+ 680  6172 
+ 681  6172 proc getlib;  { read library data }
+ 682  6172 var i,j,nent,addr,size,num,x,base: integer;
+ 683  6175     libfil: file;
+ 684  6175     ch,ltyp2,dummy: char;
+ 685  6175     name: array[7] of char;
+ 686  6175 begin
+ 687  6175   scan; if token=' ,' then scan;
+ 688  6196   testto('id');
+ 689  6205   base:=pc-2;
+ 690  6211   if (ofno<>NO_OUTPUT) then write(@ofno,'L');
+ 691  6234   for i:=0 to 7 do begin
+ 692  6251     name[i]:=ident[succ(i)];
+ 693  6260     if ofno<>NO_OUTPUT then
+ 694  6274       write(@ofno,ident[succ(i)])
+ 695  6288   end;
+ 696  6294   _asetfile(name&'        ',0,cdrive,'L');
+ 697  6338   openr(libfil);  { get table file }
+ 698  6344 
+ 699  6344   { read and check header }
+ 700  6344 
+ 701  6344   read(@libfil,ch); if ch<>'L' then error(26);
+ 702  6373   read(@libfil,ch); if ch<>'I' then error(26);
+ 703  6402   read(@libfil,ch); if ch<>'B' then error(26);
+ 704  6431   read(@libfil,ch); if ch<>'2' then error(26);
+ 705  6460   read(@libfil,ch); if ch<>',' then error(26);
+ 706  6489   read(@libfil,nent,size);
+ 707  6504 
+ 708  6505   { including cr,lf }
+ 709  6505 
+ 710  6505   for i:=succ(spnt) to spnt+nent do begin
+ 711  6532     if spnt>=SYMBSIZE then error(7);
+ 712  6551     spnt:=succ(spnt);
+ 713  6555 
+ 714  6560     clear;
+ 715  6564     j := 1;
+ 716  6566 
+ 717  6570     read(@libfil,ch);
+ 718  6580     while ch<>',' do begin
+ 719  6591       if j<=IDSIZE then begin
+ 720  6598         ident[j] := ch;
+ 721  6605         j := succ(j)
+ 722  6613       end;
+ 723  6622       read(@libfil,ch)
+ 724  6627     end;
+ 725  6633 
+ 726  6636     packid;
+ 727  6640 
+ 728  6640     addr := PIDSIZE * i + 1;
+ 729  6649     for j:=0 to PIDSIZE-1 do
+ 730  6664       s_id[addr+j] := idpack[j+1];
+ 731  6690 
+ 732  6712     read(@libfil,s_typ[i],dummy,s_lvl[i],
+ 733  6737       s_vda[i],s_spz[i]);
+ 734  6760     s_lvl[i]:=s_lvl[i]+level;
+ 735  6773     ltyp2:=high(s_typ[i]);
+ 736  6790     if (ltyp2='p')or(ltyp2='f')
+ 737  6808       or(ltyp2='g') then begin
+ 738  6818       s_vda[i]:=s_vda[i]+base;
+ 739  6833       if s_spz[i]<>0 then begin {stack data}
+ 740  6856         read(@libfil,num);
+ 741  6866         push(num); s_spz[i]:=stackpnt;
+ 742  6881         for j:=1 to num do begin
+ 743  6908           read(@libfil,x);
+ 744  6918           push(x);
+ 745  6929         end {for j};
+ 746  6929       end {stack data}
+ 747  6943     end {if ltyp2}
+ 748  6943   end {for i}
+ 749  6943   level:=succ(level); pc:=pc+size; offset:=pc;
+ 750  6979   close(libfil);
+ 751  6993   if spnt>spntmax then spntmax:=spnt;
+ 752  7005   if stackpnt>stackmax then stackmax:=stackpnt;
+ 753  7025 end {getlib};
+ 754  7033 
+ 755  7034 { ################################ }
+ 756  7034 { block (global): handle one block }
+ 757  7034 { ################################ }
+ 758  7034 
+ 759  7034 proc block(bottom: integer);
+ 760  7034 
+ 761  7034 var l,f9,i,n,stackpn1,forwpn,find,cproc,
+ 762  7037     spnt1,dpnt1,parlevel: integer;
+ 763  7037     fortab: array[8] of integer;
+ 764  7037     ptok: packed char;
+ 765  7037     isfunc: boolean;
+ 766  7037 
+ 767  7037 {#################################}
+ 768  7037 { findid: {search in table for id }
+ 769  7037 {#################################}
+ 770  7037 
+ 771  7037 func findid;
+ 772  7037 var k,i: integer;
+ 773  7040     id1: packed char;
+ 774  7040 begin
+ 775  7040   packid;
+ 776  7046   i := 1;
+ 777  7048   k := PIDSIZE * spnt + PIDSIZE + 1;
+ 778  7064   id1 :=idpack[1];
+ 779  7071 
+ 780  7079   repeat
+ 781  7079     k:=k-PIDSIZE;
+ 782  7085     while (s_id[k]<>id1) and (k>0) do k:=k-PIDSIZE;
+ 783  7120     if k>0 then begin
+ 784  7135       i:=1;
+ 785  7140       repeat i:=succ(i)
+ 786  7144         until (i>PIDSIZE) or
+ 787  7160           (s_id[k+i-1]<>idpack[i]);
+ 788  7185     end
+ 789  7189   until (i>PIDSIZE) or (k<=0);
+ 790  7203 
+ 791  7207   if k<=0 then begin
+ 792  7214     findid:=0
+ 793  7217   end else
+ 794  7223     findid:=(k-1) div PIDSIZE;
+ 795  7235 end;
+ 796  7240 
+ 797  7241 {##################}
+ 798  7241 { code2 (of block) }
+ 799  7241 {##################}
+ 800  7241 
+ 801  7241 proc code2(x,y: integer);
+ 802  7241 begin
+ 803  7241   code1(x); code1(y);
+ 804  7266 end;
+ 805  7266 
+ 806  7267 {##################}
+ 807  7267 { code3 (of block) }
+ 808  7267 {##################}
+ 809  7267 
+ 810  7267 proc code3(x: integer; y1: %integer);
+ 811  7267 
+ 812  7267 var y: integer;
+ 813  7270 
+ 814  7270 begin {code3}
+ 815  7270   y:=y1;
+ 816  7272   if (x=34) and (y>=0) and (y<256) then
+ 817  7303     code2(32,y)
+ 818  7309   else begin
+ 819  7322     if (x=35) and (y>-128) and (y<=127) then
+ 820  7345       begin
+ 821  7346         if (y<0) then y:=y+256;
+ 822  7366         code2(33,y);
+ 823  7383       end
+ 824  7383     else begin
+ 825  7386       if (x>=36) and (x<=38) then y:=y-pc-1;
+ 826  7415       code1(x); code1(y and 255);
+ 827  7443       code1(y shr 8);
+ 828  7456     end
+ 829  7456   end
+ 830  7456 end {code3};
+ 831  7456 
+ 832  7457 {#####################}
+ 833  7457 { testtype (of block) }
+ 834  7457 {#####################}
+ 835  7457 
+ 836  7457 proc testtype(ttype: char);
+ 837  7457 
+ 838  7457 begin
+ 839  7457   if restype<>ttype then
+ 840  7466     if (restype<>'u') and (ttype<>'u') then
+ 841  7488       merror(14,packed(ttype,restype));
+ 842  7509 end;
+ 843  7509 
+ 844  7510 {###################}
+ 845  7510 { putsym (of block) }
+ 846  7510 {###################}
+ 847  7510 
+ 848  7510 proc putsym(ltyp1,ltyp2: char);
+ 849  7510 
+ 850  7510 var i,addr,oldid: integer;
+ 851  7513 
+ 852  7513 begin
+ 853  7513   oldid:=findid;
+ 854  7521   if oldid<>0 then begin
+ 855  7532     if not ((ltyp1='f') and
+ 856  7542           (oldid=spnt) and
+ 857  7551           (high(s_typ[oldid])='f') and
+ 858  7564           (level=s_lvl[oldid]+1))
+ 859  7581     then begin
+ 860  7583       if s_lvl[oldid]=level then
+ 861  7594         error(24)
+ 862  7604       else if ucheck then
+ 863  7613         error(24);
+ 864  7628     end;
+ 865  7628   end;
+ 866  7628 
+ 867  7628   if spnt>=SYMBSIZE then error(7)
+ 868  7641   else spnt:=succ(spnt);
+ 869  7654 
+ 870  7659   if spnt>spntmax then spntmax:=spnt;
+ 871  7671 
+ 872  7679   s_typ[spnt]:=packed(ltyp1,ltyp2);
+ 873  7692   s_spz[spnt]:=0;
+ 874  7702 
+ 875  7706   addr := PIDSIZE * spnt;
+ 876  7708   packid;
+ 877  7721   for i:=1 to PIDSIZE do s_id[addr+i] := idpack[i];
+ 878  7751 
+ 879  7773   if ltyp1='v' then begin
+ 880  7780     s_vda[spnt]:=dpnt;
+ 881  7787     dpnt:=succ(dpnt);
+ 882  7799   end;
+ 883  7804 
+ 884  7804   s_lvl[spnt]:=level
+ 885  7808 end {putsym};
+ 886  7816 
+ 887  7817 {#######################}
+ 888  7817 { checkindex (of block) }
+ 889  7817 {#######################}
+ 890  7817 
+ 891  7817 proc checkindex(lowlim,highlim: integer);
+ 892  7817 begin
+ 893  7817   if rcheck then begin
+ 894  7826     code3($40,lowlim-1);
+ 895  7844     code2(highlim and 255, highlim shr 8)
+ 896  7857   end
+ 897  7864 end;
+ 898  7864 
+ 899  7865 {###################}
+ 900  7865 { getcon (of block) }
+ 901  7865 {###################}
+ 902  7865 
+ 903  7865 func getcon;
+ 904  7865 
+ 905  7865 var idpnt,val,ii: integer;
+ 906  7868     rval: real;
+ 907  7868     sign: char;
+ 908  7868 begin
+ 909  7868   restype:='i';
+ 910  7872   if token=' -' then begin
+ 911  7884     sign:='-'; scan
+ 912  7893   end else begin
+ 913  7900     sign:='+'; if token=' +' then scan
+ 914  7914   end;
+ 915  7921   case token of
+ 916  7921     'nu': val:=value[0];
+ 917  7935     'ru': begin val:=value[0];
+ 918  7956             restype:='r' end;
+ 919  7970     'st': if value[0]=1 then begin
+ 920  7990             restype:='c';
+ 921  7995             val:=ord(ident[1])
+ 922  8001           end else if value[0]=2 then begin
+ 923  8021             val:=(ord(ident[1]) shl 8) +
+ 924  8033               ord(ident[2]);
+ 925  8039             restype:='p';
+ 926  8046           end else if value[0]>2 then begin
+ 927  8062             val:=pc;
+ 928  8065             for ii:=1 to value[0] do
+ 929  8081                         code1(ord(ident[ii]));
+ 930  8108             code1(0); value[0]:=0; restype:='s';
+ 931  8140           end else error(15);
+ 932  8155     'cr': begin parse(' ('); scan; val:=getcon;
+ 933  8185             if (val>127) or (val<0) then
+ 934  8203               error(12);
+ 935  8215             testtype('i');
+ 936  8223             restype:='c'; parse(' )');
+ 937  8238           end;
+ 938  8238     'tr': begin val:=1; restype:='b' end;
+ 939  8261     'fa': begin val:=0; restype:='b' end;
+ 940  8284     'cp': begin
+ 941  8295             scan; val:=getcon;
+ 942  8305             testtype('i'); restype:='q';
+ 943  8319           end;
+ 944  8323     ' @': begin scan; val:=getcon;
+ 945  8344             if restype<>'q' then testtype('i');
+ 946  8366             restype:='f'
+ 947  8366           end
+ 948  8368     else begin
+ 949  8375       testto('id'); idpnt:=findid;
+ 950  8390       if (idpnt>0) and (high(s_typ[idpnt])='c')
+ 951  8412       then begin
+ 952  8414         val:=s_vda[idpnt];
+ 953  8421         restype:=low(s_typ[idpnt]);
+ 954  8437         if restype='r' then
+ 955  8448           value[1]:=s_spz[idpnt];
+ 956  8458       end
+ 957  8466       else begin error(4); val:=0;
+ 958  8479         restype:='i'
+ 959  8483       end
+ 960  8485     end
+ 961  8489   end {case};
+ 962  8491   if sign='-' then
+ 963  8497     case restype of
+ 964  8501       'i': getcon:=-val;
+ 965  8512       'r': begin value[0]:=val;
+ 966  8533              splitconv(value,rval);
+ 967  8565              splitconv(-rval,value);
+ 968  8590              getcon:=value[0]
+ 969  8592            end
+ 970  8592       else error(12)
+ 971  8605     end {case}
+ 972  8613   else getcon:=val;
+ 973  8616 end {getcon};
+ 974  8624 
+ 975  8625 {#####################}
+ 976  8625 { deccon ( of block ) }
+ 977  8625 {#####################}
+ 978  8625 
+ 979  8625 proc deccon;    { declare constant }
+ 980  8625 begin
+ 981  8625   if token=' ;' then scan;
+ 982  8645   testto('id');
+ 983  8654   putsym('c','i');
+ 984  8664   parse(' ='); scan;
+ 985  8677   s_vda[spnt]:=getcon;
+ 986  8687   if (restype='r') then s_spz[spnt]:=value[1];
+ 987  8707   if restype<>'i' then
+ 988  8721     s_typ[spnt]:=packed('c',restype);
+ 989  8736   scan
+ 990  8740 end {deccon};
+ 991  8744 
+ 992  8745 {#####################}
+ 993  8745 { decvar ( of block ) }
+ 994  8745 {#####################}
+ 995  8745 
+ 996  8745 proc decvar(typ1,typ2: char);
+ 997  8745 begin
+ 998  8745   if token=' ,' then scan;
+ 999  8765   testto('id');
+1000  8774   putsym(typ1,typ2);
+1001  8788   scan;
+1002  8792 end {decvar};
+1003  8792 
+1004  8793 {######################}
+1005  8793 { gettype ( of block ) }
+1006  8793 {######################}
+1007  8793 
+1008  8793 proc gettype(var typ2: char;
+1009  8793   var aflag,uflag: boolean; var n: integer);
+1010  8793 
+1011  8793 begin
+1012  8793   aflag:=false; n:=0; uflag:=false;
+1013  8812   scan;
+1014  8820   if token='ar' then begin
+1015  8828     parse(' ['); scan;
+1016  8844     n:=getcon; testtype('i');
+1017  8862     if (n<1) then begin error(15); n:=1 end;
+1018  8886     parse(' ]'); parse('of'); scan;
+1019  8908     aflag:=true
+1020  8908   end;
+1021  8914   if token=' %' then begin
+1022  8922     scan; uflag:=true
+1023  8929   end;
+1024  8935   case token of
+1025  8935     'in': typ2:='i';
+1026  8949     'ch': typ2:='c';
+1027  8966     'pa': begin parse ('ch'); typ2:='p' end;
+1028  8996     'bo': typ2:='b';
+1029  9009     'rl': begin typ2:='r'; aflag:=true;
+1030  9032             n:=prec(2*succ(n)) end;
+1031  9049     'cp': typ2:='q';
+1032  9062     'fl': typ2:='f'
+1033  9077     else begin error(11); typ2:='i';end
+1034  9100   end {case}
+1035  9102 end {gettype};
+1036  9102 
+1037  9103 {######################}
+1038  9103 { variable ( of block) }
+1039  9103 {######################}
+1040  9103 
+1041  9103 proc variable;  { variable declarations }
+1042  9103 
+1043  9103 var typ1,typ2: char;
+1044  9106     i,l: integer;
+1045  9106     aflag,uflag: boolean;
+1046  9106 
+1047  9106 begin
+1048  9106   scan;
+1049  9112   repeat {main loop}
+1050  9112     l:=0;
+1051  9114     repeat decvar('v','i'); l:=succ(l);
+1052  9132     until token<> ' ,';
+1053  9144     testto(' :');
+1054  9157     gettype(typ2,aflag,uflag,n);
+1055  9193     if uflag then error(11);
+1056  9208     if aflag then typ1:='a' else typ1:='v';
+1057  9226     if typ1='a' then begin {array}
+1058  9240        dpnt:=dpnt-l; {variable has been assumed}
+1059  9253        for i:=succ(spnt-l) to spnt do begin
+1060  9280          s_vda[i]:=dpnt; s_spz[i]:=n;
+1061  9296          dpnt:=succ(dpnt+n);
+1062  9313       end
+1063  9318     end {array};
+1064  9332     for i:=succ(spnt-l) to spnt do
+1065  9346       s_typ[i]:=packed(typ1,typ2);
+1066  9372     parse(' ;');scan
+1067  9399   until token<>'id' {end main loop}
+1068  9410 end {variable};
+1069  9414 
+1070  9415 {####################}
+1071  9415 { fixup ( of block ) }
+1072  9415 {####################}
+1073  9415 
+1074  9415 proc fixup(x: integer);
+1075  9415 begin
+1076  9415   if ofno<>NO_OUTPUT then begin
+1077  9427     write(@ofno,'F');
+1078  9438     savebyte(succ(x-offset) and 255);
+1079  9457     savebyte(succ(x-offset) shr 8);
+1080  9476     savebyte((pc-x-1) and 255);
+1081  9497     savebyte((pc-x-1) shr 8);
+1082  9518   end;
+1083  9518 end;
+1084  9518 
+1085  9519 {#######################}
+1086  9519 { function ( of block ) }
+1087  9519 {#######################}
+1088  9519 
+1089  9519 proc function;
+1090  9519 
+1091  9519 var n: integer;
+1092  9522     typ1,typ2: char;
+1093  9522     aflag,uflag: boolean;
+1094  9522 begin
+1095  9522   if token<>' :' then begin
+1096  9532     aflag:=false; uflag:=false; typ2:='i' end
+1097  9549   else begin
+1098  9556     gettype(typ2,aflag,uflag,n);
+1099  9592     scan
+1100  9592   end;
+1101  9596   if aflag then begin
+1102  9600     typ1:='s'; s_spz[succ(cproc)]:=n;
+1103  9614     s_vda[succ(cproc)]:=s_vda[succ(cproc)]-n
+1104  9636   end
+1105  9636   else typ1:='r';
+1106  9650   s_typ[succ(cproc)]:=packed(typ1,typ2);
+1107  9668   if uflag then typ2:='u';
+1108  9681   if aflag then typ1:='g'
+1109  9692   else typ1:='f';
+1110  9703   s_typ[cproc]:=packed(typ1,typ2);
+1111  9720 end {function};
+1112  9724 
+1113  9725 {########################}
+1114  9725 { parameter ( of block ) }
+1115  9725 {########################}
+1116  9725 
+1117  9725 proc parameter;
+1118  9725 
+1119  9725 var counter1,counter2,i,n,bs: integer;
+1120  9728     aflag,uflag: boolean;
+1121  9728     vtype1,vtype2: char;
+1122  9728     vtype: packed char;
+1123  9728 
+1124  9728 begin
+1125  9728   push(0); { dummy size, fixed later }
+1126  9738   if find=0 then s_spz[spnt-npara]:=stackpnt
+1127  9757   else bs:=stackpnt;
+1128  9768   counter1:=0
+1129  9776   repeat {main loop}
+1130  9782     counter2:=0;
+1131  9784     vtype1:='d'; vtype2:='i';
+1132  9796     scan;
+1133  9804     if token='co' then scan
+1134  9812     else if token='va' then begin
+1135  9830       scan; vtype1:='w' end; {variable param}
+1136  9843     end;
+1137  9843     repeat {inner loop}
+1138  9843       decvar(vtype1,vtype2);
+1139  9857       s_vda[spnt]:=parlevel;
+1140  9861       parlevel:=succ(parlevel);
+1141  9873       npara:=succ(npara);
+1142  9882       counter2:=succ(counter2);
+1143  9891       until token<>' ,';
+1144  9903     uflag:=false;aflag:=false; n:=0;
+1145  9921     if token<>' :' then
+1146  9932       vtype2:='i' {assume integer }
+1147  9938     else begin
+1148  9945       gettype(vtype2,aflag,uflag,n);
+1149  9981       if n>63 then error(15);
+1150  9999       scan
 1151  9999     end;
-1152 10008     vtype:=packed(vtype1,vtype2);
-1153 10017     for i:=1 to counter2 do begin
-1154 10040       if uflag then push(packed(vtype1,'u'))
-1155 10054       else push(vtype);
-1156 10073       if aflag then begin
-1157 10077         push(n); s_spz[spnt-counter2+i]:=n;
-1158 10104         s_vda[spnt-counter2+i]:=parlevel;
-1159 10126         parlevel:=succ(parlevel)+n;
-1160 10139       end {then};
-1161 10148       s_typ[spnt-counter2+i]:=vtype;
-1162 10162     end {for};
-1163 10170     if aflag then counter2:=2*counter2;
-1164 10193     counter1:=counter1+counter2;
-1165 10206     until token<>' ;'; {outer loop}
-1166 10226   testto(' )'); scan;
-1167 10239   if find=0 then
-1168 10245     stack[s_spz[spnt-npara]]:=counter1
-1169 10262   else begin {information is allready there}
-1170 10273     stack[bs]:=counter1;
-1171 10277     n:=s_spz[fortab[find]]; {existing stack data}
-1172 10301     for i:=0 to stackpnt-bs do
-1173 10311       if stack[bs+i]<>stack[n+i]
-1174 10342         then merror(13,'pa'); {parameter wrong}
-1175 10380     stackpnt:=prec(bs) {clear the new info}
-1176 10384   end  {else}
-1177 10389 end {parameter};
-1178 10389 
-1179 10390 {####################}
-1180 10390 { memory ( of block) }
-1181 10390 {####################}
-1182 10390 
-1183 10390 proc memory;
-1184 10390 
-1185 10390 var typ1,typ2:char;
-1186 10393     i,l,n: integer;
-1187 10393     aflag,uflag: boolean;
-1188 10393 
-1189 10393 begin
-1190 10393   scan;
-1191 10399   repeat {main loop}
-1192 10399     l:=0;
-1193 10401     repeat
-1194 10405       decvar('m','i');
-1195 10415       l:=succ(l); testto(' ='); scan;
-1196 10437       n:=getcon; testtype('i');
-1197 10455       scan; s_vda[spnt]:=n;
-1198 10463     until token<>' ,';
-1199 10478     testto(' :');
-1200 10491     gettype(typ2,aflag,uflag,n);
-1201 10527     if uflag then error(11);
-1202 10542     scan;
-1203 10546     if token=' &' then begin {8-bit}
-1204 10557       typ1:='h'; scan
-1205 10563     end
-1206 10567     else typ1:='m';
-1207 10572     if aflag then typ1:=succ(typ1);
-1208 10587     for i:=succ(spnt-l) to spnt do begin
-1209 10619       s_typ[i]:=packed(typ1,typ2);
-1210 10632       s_spz[i]:=n;
-1211 10640     end;
-1212 10648     testto(' ;'); scan;
-1213 10675   until token<>'id';
-1214 10682 end {memory};
-1215 10686 
-1216 10687 {######################}
-1217 10687 { statmnt ( of block ) }
-1218 10687 {######################}
-1219 10687 
-1220 10687 proc statmnt;
-1221 10687 var idpnt, relad, k2, savpc,
-1222 10690     wrsize, bottom1: integer;
-1223 10690     device, wln: boolean;
-1224 10690     savtp1, vartyp2, vtype1: char;
-1225 10690     wl: boolean;
-1226 10690 
-1227 10690 {########################}
-1228 10690 { code4 ( of statement ) }
-1229 10690 {########################}
-1230 10690 
-1231 10690 proc code4(x,y1,z1: integer); {set 4-byte code}
-1232 10690 var y,z: integer;
-1233 10693 begin
-1234 10693   y:=y1; z:=z1;
-1235 10703   if y<0 then y:=y+256;
-1236 10728   if x=43 then z:=z-pc-2;
-1237 10754   code1(x);code1(y);code1(z and 255);
-1238 10792   code1(z shr 8)
-1239 10798 end {code4};
-1240 10805 
-1241 10806 {##############################}
-1242 10806 { testferror ( of ,vtype1) ) }
-1243 10806 {##############################}
-1244 10806 
-1245 10806 proc testferror;
-1246 10806 begin
-1247 10806   code1($4f);
-1248 10819 end;
-1249 10819 
-1250 10820 {########################}
-1251 10820 { gpval ( of statement ) }
-1252 10820 {########################}
-1253 10820 
-1254 10820 proc gpval(idpnt: integer;
-1255 10820   dir: boolean; typ: char);
-1256 10820 
-1257 10820 var d: integer;
-1258 10823 
-1259 10823 begin {gpval}
-1260 10823   if dir then d:=1 else d:=0;
-1261 10843   case typ of
-1262 10847   'h':  begin code3($22,s_vda[idpnt]);
-1263 10874           if dir then code1($3f);
-1264 10889           code1($17+d) end;
-1265 10902   'm':  begin code3($22,s_vda[idpnt]);
-1266 10928           code1($3d+d) end;
-1267 10941   'i':  begin
-1268 10951           if dir then code1($3f);
-1269 10966           code3($22,s_vda[idpnt]);
-1270 10982           code1(3);
-1271 10990           if dir then code1($3f);
-1272 11005           code1($17+d) end;
-1273 11018   'n':  begin if dir then code1($3f);
-1274 11043           code3($22,1); code1($12);
-1275 11061           code3($22,s_vda[idpnt]);
-1276 11077           code1(3); code1($3d+d) end
-1277 11098   else begin
-1278 11101     if typ='q' then
-1279 11107       code4($55,level-s_lvl[idpnt],2*s_vda[idpnt])
-1280 11132     else
-1281 11143       code4($27+2*d+relad,level-s_lvl[idpnt],
-1282 11169         2*s_vda[idpnt]);
-1283 11191     end {else}
-1284 11191   end {case}
-1285 11193 end;
-1286 11193 
-1287 11194 {###############################################}
-1288 11194 { FORWARD declaration of mainexp (of statement) }
-1289 11194 {###############################################}
-1290 11194 
-1291 11194 proc mainexp(reqtype: char;
-1292 11194   var arsize: integer); forward;
-1293 11197 
-1294 11197 {##########################}
-1295 11197 { express ( of statement ) }
-1296 11197 {##########################}
-1297 11197 
-1298 11197 proc express; {requests a normal 16-bit result }
-1299 11197 var resultsize: integer;
-1300 11200 begin {express}
-1301 11200   mainexp('n',resultsize);
-1302 11218   if resultsize<>0 then error(15)
-1303 11230 end {express};
-1304 11236 
-1305 11237 {########################}
-1306 11237 { arrayexp ( of mainexp) }
-1307 11237 {########################}
-1308 11237 
-1309 11237 proc arrayexp(size: integer; eltype: char);
-1310 11237 var resultsize: integer;
-1311 11240 begin
-1312 11240   mainexp(eltype,resultsize);
-1313 11260   if resultsize<>size then error(15);
-1314 11280   testtype(eltype);
-1315 11290 end;
-1316 11290 
-1317 11291 {#########################}
-1318 11291 { getvar ( of statement ) }
-1319 11291 {#########################}
-1320 11291 
-1321 11291 proc getvar;
-1322 11291 begin
-1323 11291   vartyp2:=high(s_typ[idpnt]);
-1324 11304   vartype:=low(s_typ[idpnt]);
-1325 11317   scan;
-1326 11326   if (vartype='q') and (token=' [') and
-1327 11341     ((vartyp2='v') or (vartyp2='d')) then begin
-1328 11358     vartyp2:='q'; vartype:='c';
-1329 11369   end;
-1330 11373   case vartyp2 of
-1331 11373   'a','x','s','i','n','q':
-1332 11416       begin
-1333 11419         if token=' [' then begin
-1334 11427           scan; express; relad:=1;
-1335 11440           if vartyp2='r' then begin
-1336 11451             relad:=3;
-1337 11456             code3($22,1); code1($12)
-1338 11472           end;
-1339 11478           if (vartyp2='q') and (s_spz[idpnt]=0) then
-1340 11496             checkindex(0,63)
-1341 11504           else
-1342 11510             checkindex(0,s_spz[idpnt]);
-1343 11529           testtype('i'); testto(' ]'); scan;
-1344 11550         end else relad:=2;
-1345 11555       end;
-1346 11559   'v','w','r','h','m': relad:=0;
-1347 11599   'c','d','e','t','u': error(6)
-1348 11643   else error(1)
-1349 11654   end {case}
-1350 11662 end {getvar};
-1351 11662 
-1352 11663 {#########################}
-1353 11663 { prcall ( of statement ) }
-1354 11663 {#########################}
-1355 11663 
-1356 11663 proc prcall (idpn1: integer);
-1357 11663 
-1358 11663 var bstack,numpar,i,n,n2: integer;
-1359 11666 
-1360 11666 { body of prcall follows later }
-1361 11666 
-1362 11666 {#######################}
-1363 11666 { prcall1 ( of prcall ) }
-1364 11666 {#######################}
-1365 11666 
-1366 11666 proc prcall1;
-1367 11666 var ressize:integer;
-1368 11669 
-1369 11669   proc prcall3;
-1370 11669   {###########}
-1371 11669   begin {prcall3}
-1372 11672     testto('id');
-1373 11683     idpnt:=findid;
-1374 11689     if idpnt=0 then error(5);
-1375 11711     getvar;
-1376 11715     if chr(stack[i] and 255)<>vartype then
-1377 11727       if chr(stack[i] and 255)<>'u' then
-1378 11749         merror(14,'01');
-1379 11764       push(idpnt);
-1380 11774   end {prcall3};
-1381 11774 
-1382 11775 begin {prcall1}
-1383 11775   case chr(stack[i] shr 8) of
-1384 11788     'd':  begin
-1385 11796             if chr(stack[i] and 255) = 'q' then
-1386 11810               mainexp('q',ressize)
-1387 11816             else
-1388 11830               express;
-1389 11837             if chr(stack[i] and 255)<>'u' then
-1390 11851               testtype(chr(stack[i] and 255));
-1391 11873           end;
-1392 11873     'e':  begin
-1393 11883             arrayexp(stack[succ(i)],
-1394 11888               chr(stack[i]));
-1395 11907             i:=succ(i);
-1396 11911           end;
-1397 11916     'w':  begin
-1398 11926             prcall3;
-1399 11930             if relad<>0 then merror(14,'02');
-1400 11951             gpval(idpnt,false,vartyp2);
-1401 11967           end;
-1402 11967     'x':  begin
-1403 11977             prcall3;
-1404 11981             if relad<>2 then merror(14,'03');
-1405 12002             if vartyp2='i' then error(16);
-1406 12020             i:=succ(i);
-1407 12024             if stack[i]<>s_spz[idpnt] then
-1408 12041               error(15);
-1409 12057             if vartyp2='n' then begin
-1410 12064               code3($22,s_vda[idpnt]);
-1411 12083               code1($3d);
-1412 12091             end else code4($27,level-s_lvl[idpnt],
-1413 12104               2*s_vda[idpnt]);
-1414 12126             code2($3b,stack[i]);
-1415 12142           end
-1416 12142     else merror(14,'04')
-1417 12150   end {case}
-1418 12158 end {prcall1};
-1419 12158 
-1420 12159 {#####################}
-1421 12159 { prcall2 (of prcall) }
-1422 12159 {#####################}
-1423 12159 
-1424 12159 proc prcall2;
-1425 12159 begin
-1426 12159   if n>0 then code3(35,-2*n);
-1427 12190   n:=0
-1428 12190 end {prcall2};
-1429 12196 
-1430 12197 {################}
-1431 12197 { body of prcall }
-1432 12197 {################}
-1433 12197 
-1434 12197 begin {body of prcall}
-1435 12197   if s_spz[idpn1]<>0 then begin
-1436 12210     bstack:=s_spz[idpn1];
-1437 12217     numpar:=stack[bstack];
-1438 12229     parse(' ('); scan;
-1439 12250     for i:=succ(bstack) to bstack+numpar do
-1440 12263     begin
-1441 12277       prcall1;
-1442 12281       if i<bstack+numpar then begin
-1443 12295         testto(' ,'); scan
-1444 12307       end
-1445 12311     end;
-1446 12311     testto(' )');
-1447 12334   end {then};
-1448 12334   code4(43,level-s_lvl[idpn1],s_vda[idpn1]);
-1449 12363   if s_spz[idpn1]<>0 then begin
-1450 12374     n:=0; i:=bstack+numpar;
-1451 12387     repeat
-1452 12396       case chr(stack[i] shr 8) of
-1453 12407       'd':  n:=succ(n);
-1454 12419       'w':  begin
-1455 12434               prcall2; idpnt:=pop;
-1456 12444               gpval(idpnt,true,
-1457 12454                   high(s_typ[idpnt]));
-1458 12469             end;
-1459 12469       chr(0): begin
-1460 12479             n2:=stack[i];
-1461 12483             i:=i-1;
-1462 12497             case chr(stack[i] shr 8) of
-1463 12513               'e':  n:=succ(n+n2);
-1464 12530               'x':  begin
-1465 12545                       prcall2;
-1466 12549                       idpnt:=pop;
-1467 12555                       if high(s_typ[idpnt])='n'
-1468 12568                       then begin
-1469 12571                         code3($22,s_vda[idpnt]+
-1470 12580                           2*s_spz[idpnt]);
-1471 12602                         code1($3e)
-1472 12604                       end else
-1473 12610                         code4(41,
-1474 12615                           level-s_lvl[idpnt],
-1475 12623                           2*(s_vda[idpnt]+
-1476 12634                           s_spz[idpnt]));
-1477 12654                       code2($3c,s_spz[idpnt])
-1478 12660                     end
-1479 12670               end {case}
-1480 12672             end
-1481 12672       end; {case}
-1482 12674       i:=prec(i);
-1483 12678     until i=bstack;
-1484 12687     prcall2
-1485 12695   end
-1486 12699 end {prcall};
-1487 12699 
-1488 12700 {########################}
-1489 12700 { mainexp (of statement) }
-1490 12700 {########################}
-1491 12700 {  see forward declaration above    }
-1492 12700 
-1493 12700 proc mainexp(reqtype: char;
-1494 12700   var arsize: integer);
-1495 12700 
-1496 12700 { variables of mainexp}
-1497 12700 var opcode,roff: integer;
-1498 12703     savtype: char;
-1499 12703 
-1500 12703 {########################}
-1501 12703 { argument ( of mainexp ) }
-1502 12703 {#########################}
-1503 12703 
-1504 12703 proc argument(rtype: char);
-1505 12703 begin
-1506 12703   parse(' ('); scan; express;
-1507 12725   testtype(rtype);
-1508 12735   testto(' )'); scan
-1509 12744 end; {argument}
-1510 12749 
-1511 12749 {#######################}
-1512 12749 { simexp ( of mainexp ) }
-1513 12749 {#######################}
-1514 12749 
-1515 12749 proc simexp(var arsize1: integer);
-1516 12749 var opcode: integer;
-1517 12752     sign: char;
-1518 12752 
-1519 12752 {body of simexp  follows later }
-1520 12752 
-1521 12752 {#####################}
-1522 12752 { term ( of simexp )  }
-1523 12752 {#####################}
-1524 12752 
-1525 12752 proc term(var arsize2: integer);
-1526 12752 
-1527 12752 var opcode: integer;
-1528 12755 
-1529 12755 { body of term follows later }
-1530 12755 
-1531 12755 {#######################}
-1532 12755 { factor ( of term )    }
-1533 12755 {#######################}
-1534 12755 
-1535 12755 proc factor(var arsize3: integer);
-1536 12755 
-1537 12755 var i, idpnt: integer;
-1538 12758     h: char;
-1539 12758 
-1540 12758 { body of factor follows later }
-1541 12758 
-1542 12758 {######################}
-1543 12758 { index ( of factor )  }
-1544 12758 {######################}
-1545 12758 
-1546 12758 proc index(chk: boolean);
-1547 12758 var savtype: char;
-1548 12761 begin {index}
-1549 12761   scan; savtype:=restype;
-1550 12767   express; testtype('i'); testto(' ]');
-1551 12796   if savtype='r' then begin
-1552 12803     code3($22,1); code1($12);
-1553 12824   end;
-1554 12824   if chk then begin
-1555 12828     if (savtype='q') and (s_spz[idpnt]=0) then
-1556 12849       { is an arrayed cpnt }
-1557 12850       checkindex(0,63)
-1558 12857     else
-1559 12863       checkindex(0,s_spz[idpnt]);
-1560 12882   end;
-1561 12882   restype:=savtype; scan
-1562 12890 end;
-1563 12894 
-1564 12895 {################}
-1565 12895 { body of factor }
-1566 12895 {################}
-1567 12895 
-1568 12895 begin
-1569 12895   arsize3:=0;
-1570 12899   case token of
-1571 12903     'id': begin {identifier }
-1572 12915             idpnt:=findid;
-1573 12921             if idpnt=0 then error(5);
-1574 12943             restype:=low(s_typ[idpnt]);
-1575 12951             h:=high(s_typ[idpnt]);
-1576 12964             case h of
-1577 12969               'v','w','d':
-1578 12991                     begin
-1579 12994                       scan;
-1580 12998                       if (restype='q') and (token=' ['
-1581 13009 )
-1582 13012                       then begin
-1583 13014                         code4(39,level-s_lvl[idpnt],
-1584 13027                           2*s_vda[idpnt]);
-1585 13049                         index(true);
-1586 13057                         code1($03);
-1587 13065                         code1($54);
-1588 13073                         restype:='c';
-1589 13075                       end else
-1590 13079                         code4(39,level-s_lvl[idpnt],
-1591 13092                           2*s_vda[idpnt]);
-1592 13114                     end;
-1593 13114               'h':  begin code3($22,s_vda[idpnt]);
-1594 13140                       code1($17); scan end;
-1595 13152               'i':  begin code3($22,s_vda[idpnt]);
-1596 13178                       scan;
-1597 13182                       if token=' [' then begin
-1598 13190                         index(true); code1($03);
-1599 13209                         code1($17)
-1600 13211                       end else begin
-1601 13220                         error(16)
-1602 13222                       end
-1603 13228                     end;
-1604 13228               'm':  begin code3($22,s_vda[idpnt]);
-1605 13254                       code1($3d); scan
-1606 13262                     end;
-1607 13266               'n':  begin code3($22,s_vda[idpnt]);
-1608 13292                       scan;
-1609 13296                       if token=' [' then begin
-1610 13304                         index(true);
-1611 13315                         code3($22,1);code1($12);
-1612 13333                         code1($03); code1($3d);
-1613 13349                         if restype='r' then
-1614 13355                         begin
-1615 13356                           code2($3b,1);
-1616 13369                           arsize3:=1
-1617 13369                         end
-1618 13371                       end else begin
-1619 13378                         code1($3d);
-1620 13386                         code2($3b,s_spz[idpnt]);
-1621 13402                         arsize3:=s_spz[idpnt];
-1622 13406                       end
-1623 13414                     end;
-1624 13414               'r','t': begin
-1625 13431                       code3(35,2);
-1626 13441                       idpnt:=prec(idpnt);
-1627 13445                       prcall(idpnt); scan;
-1628 13464                       restype:=low(s_typ[idpnt]);
-1629 13472                     end;
-1630 13477               'c':  if low(s_typ[idpnt])<>'r' then
-1631 13498                     begin
-1632 13499                       code3(34,s_vda[idpnt]);
-1633 13518                       scan;
-1634 13522                       if restype='s' then begin
-1635 13529                         if token=' [' then begin
-1636 13540                           index(true);
-1637 13551                           code1($03);
-1638 13559                           code1($58);
-1639 13567                           code1($54);
-1640 13575                           restype:='c';
-1641 13577                         end else begin
-1642 13584                           code1($58);
-1643 13592                           restype:='q';
-1644 13594                         end;
-1645 13598                       end;
-1646 13598                       {scan;}
-1647 13598                     end else begin
-1648 13601                       code2($3a,2);
-1649 13611                       code2(s_vda[idpnt] and 255,
-1650 13621                         s_vda[idpnt] shr 8);
-1651 13639                       code2(s_spz[idpnt] and 255,
-1652 13649                         s_spz[idpnt] shr 8);
-1653 13667                       arsize3:=1; scan
-1654 13673                     end;
-1655 13677               'a','e','x':
-1656 13698                     begin scan;
-1657 13705                       if token=' [' then begin
-1658 13713                         index(true);
-1659 13724                         code4($28,
-1660 13726                             level-s_lvl[idpnt],
-1661 13734                             2*s_vda[idpnt]);
-1662 13756                         if restype='r' then
-1663 13762                         begin
-1664 13763                           code2($3b,1);
-1665 13776                           arsize3:=1
-1666 13776                         end
-1667 13778                       end else begin
-1668 13785                         code4($27,
-1669 13787                             level-s_lvl[idpnt],
-1670 13795                             2*s_vda[idpnt]);
-1671 13817                         code2($3b,s_spz[idpnt]);
-1672 13833                         arsize3:=s_spz[idpnt];
-1673 13837                       end
-1674 13845                     end;
-1675 13845               's','u':
-1676 13859                     begin
-1677 13862                       code3(35,2*s_spz[idpnt]+2);
-1678 13884                       idpnt:=prec(idpnt);
-1679 13888                       prcall(idpnt); scan;
-1680 13907                       restype:=low(s_typ[idpnt]);
-1681 13915                       idpnt:=succ(idpnt);
-1682 13924                       arsize3:=s_spz[idpnt]
-1683 13929                     end
-1684 13933               else error(1)
-1685 13946             end {case}
-1686 13954           end; {identifier}
-1687 13957     'nu': begin code3(34,value[0]); scan;
-1688 13983             restype:='i'
-1689 13983           end;
-1690 13989     'ru': begin code2($3a,2);
-1691 14010             code2(value[0] and 255,
-1692 14018               value[0] shr 8);
-1693 14034             code2(value[1] and 255,
-1694 14042               value[1] shr 8);
-1695 14058             scan; restype:='r';
-1696 14064             arsize3:=1
-1697 14068           end;
-1698 14074     'st': begin
-1699 14085           if (reqtype='n') and (value[0]<3)
-1700 14100             then begin
-1701 14102               if value[0]<2 then begin
-1702 14114                 code3(34,ord(ident[1]));
-1703 14131                 restype:='c'
-1704 14131               end else begin
-1705 14140                 code3(34,packed(ident[1],ident[2]));
-1706 14161                 restype:='p'
-1707 14161               end
-1708 14163             end else begin
-1709 14170               case reqtype of
-1710 14170                 'c','u','n','q':
-1711 14199                     begin
-1712 14202                       if (vartype='q') or
-1713 14209                          (reqtype='q') then begin
-1714 14217                         arsize3:=0;
-1715 14222                         restype:='q';
-1716 14228                         code2($56,value[0]);
-1717 14246                       end else begin
-1718 14249                         arsize3:=prec(value[0]);
-1719 14255                         restype:='c';
-1720 14262                         code2($39,value[0]);
-1721 14280                       end;
-1722 14280                       for i:=1 to value[0] do
-1723 14288                         code1(ord(ident[i]));
-1724 14315                       if (vartype='q') or
-1725 14336                          (reqtype='q') then code1(0);
-1726 14355                     end;
-1727 14355                 'p': begin
-1728 14365                       if odd(value[0]) then
-1729 14371                         error(15);
-1730 14383                       value[0]:=value[0] shr 1;
-1731 14393                       arsize3:=prec(value[0]);
-1732 14404                       restype:='p';
-1733 14411                       code2($3a,value[0]);
-1734 14429                       for i:=1 to value[0] do
-1735 14437                         begin
-1736 14450                         code1(ident[2*i]);
-1737 14467                         code1(ident[2*i-1]);
-1738 14487                       end
-1739 14487                     end
-1740 14487                 else merror(14,'05')
-1741 14509               end {case}
-1742 14517             end;
-1743 14517             scan
-1744 14517           end;
-1745 14521     'od': begin
-1746 14532             argument('i'); code1(7);
-1747 14548             restype:='b'
-1748 14548           end;
-1749 14554     'me': begin
-1750 14565             parse(' ['); index(false);
-1751 14582             code1(23); restype:='i';
-1752 14592           end;
-1753 14596     ' (': begin
-1754 14607             scan; mainexp(reqtype,arsize3);
-1755 14629             testto(' )'); scan
-1756 14638           end; {no type change}
-1757 14645     'no': begin
-1758 14653             scan; factor(arsize3);
-1759 14669             if (arsize3<>0) then error(15);
-1760 14687             code1($11);
-1761 14695             if restype<>'i' then
-1762 14701               testtype('b')
-1763 14707           end;
-1764 14713     'cr': begin
-1765 14724             argument('i'); code1(52);
-1766 14740             restype:='c'
-1767 14740           end;
-1768 14746     'hi': begin
-1769 14757             argument('p'); code1(51);
-1770 14773             restype:='c'
-1771 14773           end;
-1772 14779     'lo': begin
-1773 14790             argument('p'); code1(52);
-1774 14806             restype:='c'
-1775 14806           end;
-1776 14812     'su': begin
-1777 14823             argument('u'); code1($14);
-1778 14839           end;
-1779 14839     'pc': begin
-1780 14850             argument('u'); code1($15)
-1781 14860           end;
-1782 14866     'cp': begin
-1783 14877             argument('i'); restype:='q';
-1784 14887           end;
-1785 14891     'ni': begin
-1786 14902             code3(34,0); scan; restype:='q';
-1787 14918           end;
-1788 14922     'ox': begin
-1789 14933             argument('u');
-1790 14941             restype:='i'
-1791 14941           end;
-1792 14947     ' @': begin
-1793 14958             scan; factor(arsize3);
-1794 14974             if arsize3<>0 then error(15);
-1795 14992             if restype<>'q' then testtype('i');
-1796 15010             restype:='f'
-1797 15010           end;
-1798 15016     'tr': begin
-1799 15027             code3(34,1); scan;
-1800 15041             restype:='b';
-1801 15043           end;
-1802 15047     'fa': begin
-1803 15058             code3(34,0); scan;
-1804 15072             restype:='b'
-1805 15072           end;
-1806 15078     'tc': begin
-1807 15089             parse(' ('); scan;
-1808 15102             arrayexp(1,'r');
-1809 15112             testto(' )'); scan;
-1810 15125             code1($47); restype:='i';
-1811 15135           end;
-1812 15139     'cv': begin
-1813 15150             argument('i');
-1814 15158             code1($46); arsize3:=1;
-1815 15168             restype:='r'
-1816 15172           end;
-1817 15178     'pa': begin
-1818 15189             parse(' ('); scan; express;
-1819 15206             testtype('c');
-1820 15214             if token=' ,' then begin
-1821 15222               scan; express; testtype('c');
-1822 15241               code1(53)
-1823 15243             end;
-1824 15249             testto(' )'); scan; restype:='p'
-1825 15262           end
-1826 15264     else error(1)
-1827 15273   end {case of token}
-1828 15281 end {factor};
-1829 15281 
-1830 15282 {##############}
-1831 15282 { body of term }
-1832 15282 {##############}
-1833 15282 
-1834 15282 begin
-1835 15282   factor(arsize2);
-1836 15296   repeat
-1837 15296     case token of
-1838 15296       ' *': opcode:=5;
-1839 15310       'di': opcode:=6;
-1840 15327       'an': opcode:=15;
-1841 15344       'sh': opcode:=18;
-1842 15361       'sr': opcode:=19;
-1843 15378       ' /': opcode:=$45
-1844 15393       else opcode:=0
-1845 15402     end {case};
-1846 15410     if opcode>0 then begin
-1847 15417       if (restype='r') and
-1848 15427             (arsize2=1) then begin
-1849 15435         scan; factor(arsize2);
-1850 15454         if (restype<>'r') or (arsize2<>1) then
-1851 15468           merror(14,'06');
-1852 15483         case opcode of
-1853 15483           5: code1($44);
-1854 15502           $45: code1($45)
-1855 15514           else error(17)
-1856 15525         end{case}
-1857 15533       end else begin
-1858 15536         if opcode=$45 then error(9);
-1859 15554         if arsize2<>0 then error(15);
-1860 15572         if (restype='b') and (opcode=15)
-1861 15585           then begin
-1862 15587           scan; factor(arsize2);
-1863 15606           if arsize2<>0 then error(15);
-1864 15624           testtype('b');
-1865 15632           code1(opcode)
-1866 15632         end else begin
-1867 15645           testtype('i'); scan;
-1868 15657           factor(arsize2);
-1869 15669           if arsize2<>0 then error(15);
-1870 15687           testtype('i'); code1(opcode);
-1871 15705         end
-1872 15705       end
-1873 15705     end;
-1874 15705   until opcode=0;
-1875 15711 end;
-1876 15715 
-1877 15716 {################}
-1878 15716 { body of simexp }
-1879 15716 {################}
-1880 15716 
-1881 15716 begin
-1882 15716   sign:=' ';
-1883 15720   if token=' +' then begin
-1884 15732     sign:='+'; scan
-1885 15741   end else if token=' -' then begin
-1886 15756     sign:='-'; scan
-1887 15765   end;
-1888 15769   term(arsize1);
-1889 15781   if sign<>' ' then begin
-1890 15788     if (restype='r')and (arsize1=1) then begin
-1891 15806       if sign='-' then code1($4e)
-1892 15821     end else begin
-1893 15830       testtype('i');
-1894 15838       if arsize1<>0 then error(15);
-1895 15856       if sign='-' then code1(2);
-1896 15874     end
-1897 15874   end;
-1898 15874   repeat
-1899 15874     case token of
-1900 15874       ' &': opcode:=1;
-1901 15888       ' +': opcode:=3;
-1902 15905       ' -': opcode:=4;
-1903 15922       'or': opcode:=14;
-1904 15939       'xo': opcode:=16
-1905 15954       else opcode:=0
-1906 15963     end {case};
-1907 15971     if opcode>1 then begin {if 1}
-1908 15981       if (restype='r') and (arsize1=1)
-1909 15994         then begin {real}
-1910 15999         scan; term(arsize1);
-1911 16015         if (restype<>'r') or (arsize1<>1) then
-1912 16029           error(17);
-1913 16041         case opcode of
-1914 16041           3:  code1($42);
-1915 16060           4:  code1($43)
-1916 16072           else error(17)
-1917 16083         end {case}
-1918 16091       end {real}
-1919 16091       else begin {not real}
-1920 16094         if (arsize1<>0) then error(15);
-1921 16112         if (restype='b') and (opcode>=14)
-1922 16125           then begin {boolean}
-1923 16130           scan; term(arsize1);
-1924 16146           if arsize1<>0 then error(15);
-1925 16164           testtype('b'); code1(opcode)
-1926 16172         end {boolean}
-1927 16182         else begin {not boolean}
-1928 16185           testtype('i'); scan;
-1929 16197           term(arsize1);
-1930 16209           if arsize1<>0 then error(15);
-1931 16227           testtype('i'); code1(opcode);
-1932 16245         end {not boolean}
-1933 16245       end {not real}
-1934 16245     end {if 1}
-1935 16245     else if opcode=1 then begin {else 1}
-1936 16258       sign:=restype;
-1937 16258       scan; term(opcode);
-1938 16282       arsize1:=arsize1+opcode+1;
-1939 16293       testtype(sign)
-1940 16298     end {else 1}
-1941 16308   until opcode=0
-1942 16312 end {simexp};
-1943 16318 
-1944 16319 {#################}
-1945 16319 { body of mainexp }
-1946 16319 {#################}
-1947 16319 
-1948 16319 begin { *** body of mainexp *** }
-1949 16319   roff:=0;
-1950 16323   simexp(arsize);
-1951 16339   if (restype='r') and (arsize=1) then
-1952 16353     roff:=$40;
-1953 16359   case token of
-1954 16363     ' =': opcode:=8;
-1955 16377     ' <': opcode:=10;
-1956 16394     ' >': opcode:=12;
-1957 16411     '<>': opcode:=9;
-1958 16428     '<=': opcode:=13;
-1959 16445     '>=': opcode:=11
-1960 16460     else opcode:=0
-1961 16469   end {case};
-1962 16477   if opcode>0 then begin
-1963 16484     if (arsize<>0) and (roff=0) then
-1964 16501       error(15);
-1965 16513     scan; savtype:=restype; simexp(arsize);
-1966 16537     if ((roff=0) and (arsize<>0))
-1967 16551       or((roff<>0) and (arsize>1)) then
-1968 16567       error(15);
-1969 16579     testtype(savtype); code1(opcode+roff);
-1970 16604     arsize:=0; restype:='b'
-1971 16610   end
-1972 16612 end {mainexp};
-1973 16616 
-1974 16617 {#########################}
-1975 16617 { assign ( of statement ) }
-1976 16617 {#########################}
-1977 16617 
-1978 16617 proc assign;
-1979 16617 var sid: integer;
-1980 16620     styp, sknd: char;
-1981 16620 
-1982 16620   proc assign1;
-1983 16620   begin
-1984 16620     testto(':='); scan; express;
-1985 16642     if (styp='q') and (restype='s') then begin
-1986 16657       code1($58); restype:='q';
-1987 16670     end;
-1988 16674     gpval(sid,true,sknd);
-1989 16690   end {assign1};
-1990 16690 
-1991 16691 begin {assign}
-1992 16691   idpnt:=findid;
-1993 16699   if idpnt=0 then error(5);
-1994 16721   if s_typ[idpnt]='pr' then begin
-1995 16733     prcall(idpnt); scan
-1996 16746   end else begin
-1997 16753     getvar;
-1998 16757     sid:=idpnt;
-1999 16757     styp:=vartype;
-2000 16765     sknd:=vartyp2;
-2001 16773     if relad<2 then begin
-2002 16788       assign1;
-2003 16795       testtype(styp)
-2004 16795     end else begin
-2005 16808       if sknd='i' then error(16); {8-bit mem}
-2006 16826       testto(':='); scan;
-2007 16839       if relad=3 then begin
-2008 16846         arrayexp(1,styp); relad:=1;
-2009 16863         code1($53);
-2010 16875         if sknd='n' then begin
-2011 16882           code1($3f);
-2012 16893           code3($22,1); code1($12);
-2013 16911           code3($22,s_vda[sid]+2);
-2014 16930           code1($3); code1($3e)
-2015 16940         end else
-2016 16946           code4($2a,level-s_lvl[sid],
-2017 16959             2*s_vda[sid]+2);
-2018 16984         code2($3c,1)
-2019 16988       end else begin
-2020 16997         arrayexp(s_spz[sid],styp);
-2021 17015         if sknd='n' then begin
-2022 17022           code3($22,s_vda[sid]+2*s_spz[sid]);
-2023 17053           code1($3e);
-2024 17061         end else
-2025 17061           code4($29,level-s_lvl[sid],
-2026 17074             2*(s_vda[sid]+s_spz[sid]));
-2027 17105         code2($3c,s_spz[sid]);
-2028 17121       end
-2029 17121     end
-2030 17121   end
-2031 17121 end {assign};
-2032 17121 
-2033 17122 {########################}
-2034 17122 { case1 ( of statement ) }
-2035 17122 {########################}
-2036 17122 
-2037 17122 proc case1;
-2038 17122 var i1,i2,casave: integer;
-2039 17125     savetype: char;
-2040 17125 
-2041 17125   proc case2;
-2042 17125   {#########}
-2043 17125 
-2044 17125     proc case3;
-2045 17128     {#########}
-2046 17128     begin
-2047 17128       scan; code1(22); code3(34,getcon);
-2048 17159       testtype(savetype);
-2049 17169       code1(8); scan
-2050 17177     end;
-2051 17181 
-2052 17182   begin {case2}
-2053 17182     i1:=0; case3;
-2054 17194     while token=' ,' do begin
-2055 17205       push(pc); code3(38,0); i1:=succ(i1);
-2056 17229       case3
-2057 17234     end;
-2058 17238     testto(' :'); savpc:=pc; code3(37,0);
-2059 17268     for k2:=1 to i1 do fixup(pop);
-2060 17299     push(savpc);
-2061 17323     scan; statmnt
-2062 17327   end {case2};
-2063 17331 
-2064 17332 begin {case1}
-2065 17332   scan; express; testto('of');
-2066 17351   savetype:=restype; i2:=1; case2;
-2067 17369   while token=' ;' do begin
-2068 17380     casave:=pc; code3(36,0); fixup(pop);
-2069 17410     push(casave); i2:=succ(i2); case2
-2070 17429   end;
-2071 17433   if token='el' then begin
-2072 17444     casave:=pc; code3(36,0); fixup(pop);
-2073 17477     push(casave); scan; statmnt
-2074 17491   end;
-2075 17495   testto('en'); for k2:=1 to i2 do fixup(pop);
-2076 17535   code3(35,-2); scan
-2077 17560 end {case1};
-2078 17564 
-2079 17565 {#########################}
-2080 17565 { openrw ( of statement ) }
-2081 17565 {#########################}
-2082 17565 
-2083 17565 proc openrw(x: integer);
-2084 17565 begin
-2085 17565   parse(' ('); parse('id');
-2086 17588   idpnt:=findid;
-2087 17594   if idpnt=0 then error(5);
-2088 17616   getvar; code1(x);
-2089 17630   testferror;
-2090 17634   if relad=2 then error(15);
-2091 17652   if vartype<>'f' then merror(14,'07');
-2092 17673   gpval(idpnt,true,vartyp2);
-2093 17689   testto(' )'); scan
-2094 17698 end {openrw};
-2095 17702 
-2096 17703 {########################}
-2097 17703 { gpsec ( of statement ) }
-2098 17703 {########################}
-2099 17703 
-2100 17703 proc gpsec(code);   { get/put sector }
-2101 17703 
-2102 17703   proc gpsec1;
-2103 17706   {##########}
-2104 17706   begin
-2105 17706     scan; express; testtype('i');
-2106 17727     testto(' ,');
-2107 17736   end;
-2108 17736 
-2109 17737 begin {gpsec}
-2110 17737   parse(' ('); gpsec1; gpsec1; gpsec1;
-2111 17760   code1(code);
-2112 17770   parse('id'); idpnt:=findid;
-2113 17785   if idpnt=0 then error(5);
-2114 17807   getvar; code3(34,$db); { get file error code }
-2115 17821   if relad=2 then error(15);
-2116 17839   code1(23); if vartype<>'i' then merror(14,'08');
-2117 17868   gpval(idpnt,true,vartyp2);
-2118 17884   testto(' )');
-2119 17893 end {gpsec};
-2120 17893 
-2121 17894 {#############}
-2122 17894 proc writebool;
-2123 17894 {#############}
-2124 17894 var savpc, k2: integer;
-2125 17897 begin
-2126 17897   { boolean value is already on stack }
-2127 17897 
-2128 17897   savpc := pc;
-2129 17899   code3(37,0);   { jump if false }
-2130 17917 
-2131 17917   { TRUE }
-2132 17917   code1(50);
-2133 17925   code1(ord('T') and 127);
-2134 17936   code1(ord('R') and 127);
-2135 17947   code1(ord('U') and 127);
-2136 17958   code1(ord('E') or 128);
-2137 17969 
-2138 17969   k2 := pc;
-2139 17969   code3(36,0);   { unconditional jump }
-2140 17987 
-2141 17987   fixup(savpc);
-2142 17997 
-2143 17997   { FALSE }
-2144 17997   code1(50);
-2145 18005   code1(ord('F') and 127);
-2146 18016   code1(ord('A') and 127);
-2147 18027   code1(ord('L') and 127);
-2148 18038   code1(ord('S') and 127);
-2149 18049   code1(ord('E') or 128);
-2150 18060 
-2151 18060   fixup(k2);
-2152 18070 end;
-2153 18070 
-2154 18071 {########################}
-2155 18071 { findwproc of statement }
-2156 18071 {########################}
-2157 18071 
-2158 18071 proc findwproc(nm: array[7] of char);
-2159 18071 var i: integer;
-2160 18074 begin
-2161 18074   for i := 1 to 8 do ident[i] := nm[i-1];
-2162 18104   for i := 9 to 16 do ident[i] := ' ';
-2163 18149 
-2164 18167   idpnt := findid;
-2165 18173   if (idpnt=0) or (s_typ[idpnt]<>'pr') then
-2166 18196     error(25);
-2167 18208 end;
-2168 18208 
-2169 18209 {###################}
-2170 18209 { body of statement }
-2171 18209 {###################}
-2172 18209 
-2173 18209 begin {body of statement }
-2174 18209   if token=' ;' then scan;
-2175 18226   case token of
-2176 18226     'id': assign;
-2177 18242 
-2178 18245     'if': begin {if}
-2179 18253             scan; express; testtype('b');
-2180 18269             testto('th'); scan;  savpc:=pc;
-2181 18282             code3(37,0); statmnt;
-2182 18304             if token='el' then begin {else}
-2183 18315               k2:=pc; code3(36,0);
-2184 18333               fixup(savpc); scan; statmnt;
-2185 18351               fixup(k2)
-2186 18351             end else fixup(savpc)
-2187 18364           end; {if}
-2188 18377 
-2189 18377     'be':  begin {begin}
-2190 18385             repeat
-2191 18385               scan; statmnt
-2192 18389             until token<>(' ;');
-2193 18400             testto('en'); scan
-2194 18413           end; {begin}
-2195 18420 
-2196 18420     'rp': begin {repeat}
-2197 18428             savpc:=pc;
-2198 18428             repeat
-2199 18436               scan; statmnt
-2200 18440             until token='un';
-2201 18451             scan; express; testtype('b');
-2202 18471             code3(37,savpc)
-2203 18473           end {repeat};
-2204 18483 
-2205 18486     're': begin {read}
-2206 18494             parse(' ('); scan;
-2207 18507             if token=' @' then begin
-2208 18515               scan; express; testtype('f');
-2209 18534               device:=true;
-2210 18536               code1(44); testto(' ,')
-2211 18551             end
-2212 18557             else begin
-2213 18560               device:=false; code1(26)
-2214 18568             end;
-2215 18574             repeat
-2216 18574               begin {main loop of read}
-2217 18574                 if token=' ,' then scan;
-2218 18589                 testto('id'); idpnt:=findid;
-2219 18604                 if idpnt=0 then error(5);
-2220 18626                 getvar;
-2221 18630                 if relad=2 then error(15);
-2222 18648                 case vartype of
-2223 18648                   'i':  code1(28);
-2224 18667                   'c':  code1(27);
-2225 18685                   'p':  begin
-2226 18695                         code1(27); code1(27);
-2227 18711                         code1(53)
-2228 18713                         end
-2229 18719                   else error(114)
-2230 18724                 end {case};
-2231 18732                 gpval(idpnt,true,vartyp2)
-2232 18738               end {mainloop of read}
-2233 18748             until token<>' ,';
-2234 18755             testto(' )'); scan;
-2235 18772             if device then code1(45);
-2236 18787           end {read};
-2237 18787 
-2238 18790     'wr','wl':
-2239 18803           begin {write,writeln}
-2240 18806             if token='wl' then wln:=true
-2241 18817             else wln:=false;
-2242 18828             scan;
-2243 18836             if token=' (' then begin
-2244 18844               scan;
-2245 18851               if token=' @' then begin
-2246 18859                 scan; express;
-2247 18870                 if restype='q' then restype:='f';
-2248 18882                 testtype('f');
-2249 18894                 device:=true; code1(44);
-2250 18908                 if not ((token = ' ,') or
-2251 18916                   (token = ' )')) then merror(2,' ,');
-2252 18940               end else device:=false;
-2253 18945               repeat
-2254 18949                 if token=' ,' then scan;
-2255 18964                 if (token=' )') and device
-2256 18972                        and wln then
-2257 18977                    {empty writeln except device}
-2258 18982                    k2:=k2 {do nothing}
-2259 18985                 else if token='st' then begin
-2260 19004                   {string}
-2261 19007                   code1(50);
-2262 19015                   for k2:=1 to value[0]-1 do
-2263 19029                     code1(ord(ident[k2])
-2264 19043                         and 127);
-2265 19056                   code1(ord(ident[value[0]])
-2266 19076                       or 128);
-2267 19089                   scan
-2268 19089                 end else begin
-2269 19096 
-2270 19096                   {start of expression }
-2271 19096                   mainexp('n',wrsize);
-2272 19112                   vtype1 := restype;
-2273 19112 
-2274 19120                   if (vtype1<>'r') and
-2275 19127                     (wrsize<>0) then error(15);
-2276 19146                   if (vtype1='r') and
-2277 19153                     (wrsize<>1) then error(15);
-2278 19172 
-2279 19172                   if token=' :' then begin
-2280 19180                     scan;
-2281 19187                     express;
-2282 19191                     testtype('i');
-2283 19199 
-2284 19199                     if vtype1='i' then begin
-2285 19206                       findwproc('__wrintf');
-2286 19225                       code4(43, level-s_lvl[idpnt],
-2287 19235                         s_vda[idpnt]);
-2288 19254                       code2(33,252)
-2289 19258                     end
-2290 19264                     else if vtype1='r' then begin
-2291 19274                       if token=' :' then begin
-2292 19285                         scan;
-2293 19292                         express;
-2294 19296                         testtype('i')
-2295 19298                       end
-2296 19304                       else
-2297 19304                         code2(32,3);
-2298 19317 
-2299 19317                       findwproc('__wrfix ');
-2300 19333                       code4(43, level-s_lvl[idpnt],
-2301 19343                         s_vda[idpnt]);
-2302 19362                       code2(33,248)
-2303 19366                     end
-2304 19372                     else
-2305 19372                       merror(14,'09')
-2306 19380                   end
-2307 19386                   else begin
-2308 19389                     if vtype1='r' then begin
-2309 19396                       code2(32,11);
-2310 19409                       code2(32,3);
-2311 19419                       findwproc('__wrfix ');
-2312 19435                       code4(43, level-s_lvl[idpnt],
-2313 19445                         s_vda[idpnt]);
-2314 19464                       code2(33,248)
-2315 19468                     end
-2316 19474                     else begin
-2317 19477                       case vtype1 of
-2318 19477                         'i':  code1(30);
-2319 19496                         'c':  code1(29);
-2320 19514                         'q':  code1($57);
-2321 19532                         's':  begin
-2322 19542                                 code1($58);
-2323 19550                                 code1($57);
-2324 19558                               end;
-2325 19558                         'b':  writebool;
-2326 19572                         'p':  begin
-2327 19582                                 code1(22);
-2328 19590                                 code1(51);
-2329 19598                                 code1(29);
-2330 19606                                 code1(52);
-2331 19614                                 code1(29);
-2332 19622                               end
-2333 19622                         else merror(14,'09')
-2334 19630                       end
-2335 19636                     end
-2336 19638                   end
-2337 19638                 end
-2338 19638                 {end of expression}
-2339 19638 
-2340 19638               until token<>' ,';
-2341 19645               if wln then begin {writeln(..)}
-2342 19656                 code2(32,13); code1(29);
-2343 19674                 code2(32,10); code1(29);
-2344 19692               end;
-2345 19692               if device then code1(45);
-2346 19707               testto(' )'); scan
-2347 19716             end {if}
-2348 19720             else if wln then begin {writeln}
-2349 19730               code2(32,13); code1(29);
-2350 19748               code2(32,10); code1(29);
-2351 19766             end
-2352 19766           end {write, writeln};
-2353 19766 
-2354 19769     'cs': case1; {case statement}
-2355 19784 
-2356 19784     'wh': begin {while}
-2357 19792             scan; savpc:=pc; express;
-2358 19808             testtype('b');
-2359 19816             k2:=pc; code3(37,0);
-2360 19834             testto('do'); scan; statmnt;
-2361 19851             code3(36,savpc); fixup(k2)
-2362 19863           end {while};
-2363 19873 
-2364 19876     'fo': begin {for}
-2365 19884             parse('id'); assign;
-2366 19897             if s_typ[idpnt]='pr' then error(1);
-2367 19920             savtp1:=low(s_typ[idpnt]);
-2368 19928             case token of
-2369 19933               'to': k2:=1;
-2370 19947               'dw': k2:=0
-2371 19962               else merror(2,'to')
-2372 19976             end {case of token};
-2373 19984             scan; express; testtype(savtp1);
-2374 20002             bottom1:=pc; code1(22);
-2375 20018             gpval(idpnt,false,vartyp2);
-2376 20034             code1(13-k2-k2);
-2377 20052             savpc:=pc; code3(37,0);
-2378 20070             testto('do'); scan; statmnt;
-2379 20087             gpval(idpnt,false,vartyp2);
-2380 20103             code1(21-k2);
-2381 20116             gpval(idpnt,true,vartyp2);
-2382 20132             code3(36,bottom1); fixup(savpc);
-2383 20154             code3(35,-2);
-2384 20165           end {for};
-2385 20165 
-2386 20168     'me': begin {mem}
-2387 20176             parse(' ['); scan; express;
-2388 20193             testtype('i');
-2389 20201             testto(' ]'); parse(':=');
-2390 20219             scan; express; code1(24);
-2391 20235             testtype('i');
-2392 20243           end {mem};
-2393 20243 
-2394 20246     'ca': begin {call}
-2395 20254             parse(' ('); scan; express;
-2396 20271             testtype('i');
-2397 20279             testto(' )'); code1(25); scan
-2398 20296           end {call};
-2399 20300 
-2400 20303     'op': openrw(47);
-2401 20319 
-2402 20322     'ow': openrw(48);
-2403 20338 
-2404 20341     'ob': openrw(80);
-2405 20357 
-2406 20360     'gb': begin
-2407 20368             parse(' ('); scan; express;
-2408 20385             testtype('f'); testto(' ,');
-2409 20402             scan; express; testtype('i');
-2410 20418             testto(' ,'); scan; testto('id');
-2411 20440             idpnt:=findid;
-2412 20446             if idpnt=0 then error(5);
-2413 20468             getvar;
-2414 20472             if relad<>0 then error(15);
-2415 20490             code1($51); testferror;
-2416 20502             gpval(idpnt,true,vartyp2);
-2417 20518             testto(' )'); scan
-2418 20527           end;
-2419 20531 
-2420 20534     'pb': begin
-2421 20542             parse(' ('); scan; express;
-2422 20559             testtype('f'); testto(' ,');
-2423 20576             scan; express; testtype('i');
-2424 20592             testto(' ,'); scan; express;
-2425 20609             code1($52);testferror;
-2426 20621             testto(' )');
-2427 20630             scan
-2428 20630           end;
-2429 20634 
-2430 20637     'ru': begin
-2431 20645             code1($41); scan;
-2432 20657           end;
-2433 20657 
-2434 20660     'fi': begin
-2435 20668             code1(46); scan
-2436 20676           end;
-2437 20680 
-2438 20683     'ge': gpsec(55);
-2439 20699 
-2440 20702     'pu': gpsec(56);
-2441 20718 
-2442 20721     'ex': begin {exit}
-2443 20729             if level>0 then code1(1) else code1(0);
-2444 20758             scan;
-2445 20762           end;
-2446 20762 
-2447 20765     'cl': begin {close}
-2448 20773             parse(' (');
-2449 20782             repeat
-2450 20782               scan; express; code1(49);
-2451 20798               testtype('f');
-2452 20806               testferror
-2453 20806             until token<>' ,';
-2454 20817             testto(' )'); scan;
-2455 20834           end {close}
-2456 20834 
-2457 20834     else if (token<>'en') and (token<>' ;')
-2458 20852       and (token<>'un') then begin
-2459 20863       error(10); scan
-2460 20874     end
-2461 20878   end {case of statements}
-2462 20880 end;
-2463 20880 
-2464 20881 {#######################}
-2465 20881 { findforw ( of block ) }
-2466 20881 {#######################}
-2467 20881 
-2468 20881 func findforw;
-2469 20881 
-2470 20881 var i,j,sav1: integer;
-2471 20884     done: boolean;
-2472 20884 
-2473 20884   func found(start: integer):boolean;
-2474 20884   var ii: integer;
-2475 20887   begin {compare}
-2476 20887     ii:=0;
-2477 20891     repeat
-2478 20895       ii:=succ(ii);
-2479 20899     until (ii >= PIDSIZE) or
-2480 20911       (idpack[ii] <> s_id[start+ii-1]);
-2481 20936     found:=(ii >= PIDSIZE);
-2482 20947   end {compare};
-2483 20951 
-2484 20952 begin {findforw}
-2485 20952   packid;
-2486 20958   i:=succ(forwpn);
-2487 20962   repeat
-2488 20967     i:=prec(i);
-2489 20971     done := (i = 0);
-2490 20983     if not done then
-2491 20987       done := found(PIDSIZE * fortab[i] + 1);
-2492 21017   until done;
-2493 21021   findforw:=i;
-2494 21028   if i>0 then
-2495 21042     if i=forwpn then forwpn:=forwpn-1
-2496 21062     else begin
-2497 21072       sav1:=fortab[i];
-2498 21076       for j:=i to forwpn-1 do
-2499 21098         fortab[j]:=fortab[succ(j)];
-2500 21117       fortab[forwpn]:=sav1;
-2501 21143       findforw:=forwpn;
-2502 21151       forwpn:=forwpn-1
-2503 21163     end
-2504 21165 end {findforw};
-2505 21170 
-2506 21171 {###############}
-2507 21171 { body of block }
-2508 21171 {###############}
-2509 21171 
-2510 21171 begin
-2511 21171   dpnt:=3; s_vda[bottom]:=pc;
-2512 21183   code3(36,0);
-2513 21201   stackpn1:=stackpnt; forwpn:=0;
-2514 21211 
-2515 21215   if token='co' then begin    { * const * }
-2516 21226     scan;
-2517 21230     repeat
-2518 21230       deccon; testto(' ;'); scan
-2519 21243     until token <> 'id';
-2520 21254   end {const};
-2521 21258 
-2522 21258   if token='me' then memory;  { * mem * }
-2523 21273 
-2524 21273   if token='va' then variable;{ * var * }
-2525 21288 
-2526 21288     while (token='pr')or (token='fu') do begin
-2527 21308     parlevel:=0;
-2528 21310     isfunc:=token='fu';
-2529 21321     case token of
-2530 21326     'pr': begin               { * proc * }
-2531 21338             parse('id'); npara:=0;
-2532 21349             if forwpn=0 then find:=0
-2533 21363             else find:=findforw;
-2534 21378             if find=0 then begin
-2535 21389               putsym('p','r');
-2536 21402               cproc:=spnt;
-2537 21402             end else begin
-2538 21413               cproc:=fortab[find];
-2539 21417               fixup(s_vda[cproc]);
-2540 21439             end;
-2541 21439             level:=succ(level);
-2542 21443           end;
-2543 21448     'fu': begin               { * func * }
-2544 21459             parse('id'); npara:=1;
-2545 21470             if forwpn=0 then find:=0
-2546 21484             else find:=findforw;
-2547 21499             if find=0 then begin
-2548 21510               putsym('f','i');
-2549 21523               cproc:=spnt; level:=succ(level);
-2550 21535               putsym('f','i');
-2551 21550               s_vda[spnt]:=parlevel;
-2552 21554               parlevel:=succ(parlevel);
-2553 21566             end else begin
-2554 21574               cproc:=fortab[find];
-2555 21578               level:=succ(level);
-2556 21590               parlevel:=1;
-2557 21597               fixup(s_vda[cproc]);
-2558 21615             end;
-2559 21615           end
-2560 21615     end; {case of token}
-2561 21617     scan; spnt1:=spnt;
-2562 21621     dpnt1:=dpnt;
-2563 21629     if token=' (' then parameter;
-2564 21652     if isfunc then function;
-2565 21663     testto(' ;');
-2566 21672     for i:=1 to npara do
-2567 21678     s_vda[succ(spnt-i)]:=s_vda[succ(spnt-i)]
-2568 21710           -parlevel;
-2569 21715     scan;
-2570 21742     if token='fw' then begin
-2571 21750       if forwpn=8 then merror(13,'ov');
-2572 21774       forwpn:=succ(forwpn);
-2573 21778       fortab[forwpn]:=cproc;
-2574 21787       s_vda[cproc]:=pc;
-2575 21799       code3(36,0);
-2576 21817       scan
-2577 21817     end else block(cproc);
-2578 21834     level:=prec(level);
-2579 21838     dpnt:=dpnt1; spnt:=spnt1;
-2580 21851     case high(s_typ[spnt]) of
-2581 21867       'r':  s_typ[spnt]:=packed('t',low(s_typ[spnt]));
-2582 21891       's':  s_typ[spnt]:=packed('u',low(s_typ[spnt]))
-2583 21919     end {case};
-2584 21927     testto(' ;'); scan
-2585 21936   end {procedure of function};
-2586 21940 
-2587 21943   testto('be');     { * begin * }
-2588 21952   if forwpn<>0 then merror(13,'ur');
-2589 21973   fixup(s_vda[bottom]);
-2590 21987   s_vda[bottom]:=pc;
-2591 21991   scan;
-2592 22003   code3(35,2*dpnt);
-2593 22018   repeat
-2594 22018     statmnt
-2595 22018   until token='en';
-2596 22029   scan;
-2597 22037   if level>0 then code1(1) else code1(0);
-2598 22066   stackpnt:=stackpn1;
-2599 22066 end {block};
-2600 22074 
-2601 22075 {####################}
-2602 22075 { savtable ( global) }
-2603 22075 {####################}
-2604 22075 
-2605 22075 proc savtable; { save lib table in @ofno }
-2606 22075 
-2607 22075 var i, j, k, num, addr: integer;
-2608 22078     vtype1: char;
-2609 22078 
-2610 22078 begin
-2611 22078   writeln(@ofno,'LIB2,',spnt,',',pc+2);
-2612 22113   for i:=1 to spnt do begin {for every entry }
-2613 22132     addr := PIDSIZE * i;
-2614 22134     for j:=1 to PIDSIZE do
-2615 22151       idpack[j] := s_id[addr+j];
-2616 22173     unpackid;
-2617 22199     j := IDSIZE;
-2618 22201     while (j>1) and (ident[j]=' ') do j := j-1;
-2619 22233     for k:=1 to j do
-2620 22247       write(@ofno,ident[k]);
-2621 22275       writeln(@ofno,',',s_typ[i],',',s_lvl[i],',',
-2622 22322         s_vda[i],',',s_spz[i]);
-2623 22349     vtype1:=high(s_typ[i]);
-2624 22357     if ((vtype1='p') or (vtype1='f') or
-2625 22376       (vtype1='g')) and (s_spz[i]<>0) then begin
-2626 22397       num:=stack[s_spz[i]];
-2627 22408       write(@ofno,num);
-2628 22427       for j:=1 to num do
-2629 22433         write(@ofno,',',stack[s_spz[i]+j]);
-2630 22472       write(@ofno,CR,LF);
-2631 22498     end {then};
-2632 22498   end {for}
-2633 22498 end {savtable};
-2634 22512 
-2635 22513 {##############}
-2636 22513 { main program }
-2637 22513 {##############}
-2638 22513 
-2639 22513 begin {main}
-2640 22513   RUNERR := 0;
-2641 22518   nlflg:=false;
-2642 22524   init;scan;
-2643 22536   case token of
-2644 22536     'pg': begin
-2645 22548             libflg:=false;
-2646 22550             _asetfile(pname,scyclus,sdrive,'Q');
-2647 22576           end;
-2648 22576     'li': begin
-2649 22587             libflg:=true;
-2650 22589             _asetfile(pname,scyclus,sdrive,'T');
-2651 22615           end
-2652 22615     else
-2653 22615       merror(2,'pg')
-2654 22623   end {case}
-2655 22631   parse('id');
-2656 22640   i:=0;
-2657 22642   repeat
-2658 22646     i:=succ(i);
-2659 22650   until (i>7) or (pname[i] = ':') or
-2660 22673       (pname[i]<>_uppercase(ident[i+1]));
-2661 22702   if i<8 then
-2662 22712     merror(2,packed(pname[0],pname[1]));
-2663 22737     { name differs from filename }
-2664 22737   parse(' ;');
-2665 22746   if ofno<>NO_OUTPUT then openw(ofno);
-2666 22762   scan;
-2667 22766   if (token='us') and (libflg=false) then begin
-2668 22782     repeat
-2669 22785       getlib; scan
-2670 22789     until token<>' ,';
-2671 22800     testto(' ;'); scan
-2672 22813   end;
-2673 22817   block(0); testto(' .');
-2674 22834   if ofno<>NO_OUTPUT then begin
-2675 22841     write(@ofno,'E');
-2676 22852     savebyte(pc and 255);
-2677 22865     savebyte(pc shr 8);
-2678 22878     close(ofno);
-2679 22884     if libflg then begin
-2680 22888       _asetfile(pname,scyclus,sdrive,'L');
-2681 22913       openw(ofno);
-2682 22919       savtable;
-2683 22923       close(ofno)
-2684 22923     end
-2685 22929   end else
-2686 22929     RUNERR:=$87; {no loader file}
-2687 22938   writeln(@lpr);
-2688 22950 
-2689 22950   write(PRTON);
-2690 22953   writeln('Code lenght:           ',pc);
-2691 22988   writeln('Compiler stack size:   ',stackmax);
-2692 23023   writeln('Ident stack size:      ',spntmax, PRTOFF);
-2693 23061 
-2694 23061   RUNERR := _emulator(9);
-2695 23071   close(fno);
-2696 23081   { check whether second pass is not required }
-2697 23081   if (RUNERR=0) and libflg then RUNERR:=-1;
-2698 23097 end {main}.
-2699 23102 
-Code lenght:         23101
-Compiler stack size: 142
-Ident stack size:    226
+1152 10003     if aflag then begin
+1153 10007       vtype1:=succ(vtype1);
+1154 10014       parlevel:=parlevel-counter2;
+1155 10023     end;
+1156 10032     vtype:=packed(vtype1,vtype2);
+1157 10041     for i:=1 to counter2 do begin
+1158 10064       if uflag then push(packed(vtype1,'u'))
+1159 10078       else push(vtype);
+1160 10097       if aflag then begin
+1161 10101         push(n); s_spz[spnt-counter2+i]:=n;
+1162 10128         s_vda[spnt-counter2+i]:=parlevel;
+1163 10150         parlevel:=succ(parlevel)+n;
+1164 10163       end {then};
+1165 10172       s_typ[spnt-counter2+i]:=vtype;
+1166 10186     end {for};
+1167 10194     if aflag then counter2:=2*counter2;
+1168 10217     counter1:=counter1+counter2;
+1169 10230     until token<>' ;'; {outer loop}
+1170 10250   testto(' )'); scan;
+1171 10263   if find=0 then
+1172 10269     stack[s_spz[spnt-npara]]:=counter1
+1173 10286   else begin {information is allready there}
+1174 10297     stack[bs]:=counter1;
+1175 10301     n:=s_spz[fortab[find]]; {existing stack data}
+1176 10325     for i:=0 to stackpnt-bs do
+1177 10335       if stack[bs+i]<>stack[n+i]
+1178 10366         then merror(13,'pa'); {parameter wrong}
+1179 10404     stackpnt:=prec(bs) {clear the new info}
+1180 10408   end  {else}
+1181 10413 end {parameter};
+1182 10413 
+1183 10414 {####################}
+1184 10414 { memory ( of block) }
+1185 10414 {####################}
+1186 10414 
+1187 10414 proc memory;
+1188 10414 
+1189 10414 var typ1,typ2:char;
+1190 10417     i,l,n: integer;
+1191 10417     aflag,uflag: boolean;
+1192 10417 
+1193 10417 begin
+1194 10417   scan;
+1195 10423   repeat {main loop}
+1196 10423     l:=0;
+1197 10425     repeat
+1198 10429       decvar('m','i');
+1199 10439       l:=succ(l); testto(' ='); scan;
+1200 10461       n:=getcon; testtype('i');
+1201 10479       scan; s_vda[spnt]:=n;
+1202 10487     until token<>' ,';
+1203 10502     testto(' :');
+1204 10515     gettype(typ2,aflag,uflag,n);
+1205 10551     if uflag then error(11);
+1206 10566     scan;
+1207 10570     if token=' &' then begin {8-bit}
+1208 10581       typ1:='h'; scan
+1209 10587     end
+1210 10591     else typ1:='m';
+1211 10596     if aflag then typ1:=succ(typ1);
+1212 10611     for i:=succ(spnt-l) to spnt do begin
+1213 10643       s_typ[i]:=packed(typ1,typ2);
+1214 10656       s_spz[i]:=n;
+1215 10664     end;
+1216 10672     testto(' ;'); scan;
+1217 10699   until token<>'id';
+1218 10706 end {memory};
+1219 10710 
+1220 10711 {######################}
+1221 10711 { statmnt ( of block ) }
+1222 10711 {######################}
+1223 10711 
+1224 10711 proc statmnt;
+1225 10711 var idpnt, relad, k2, savpc,
+1226 10714     wrsize, bottom1: integer;
+1227 10714     device, wln: boolean;
+1228 10714     savtp1, vartyp2, vtype1: char;
+1229 10714     wl: boolean;
+1230 10714 
+1231 10714 {########################}
+1232 10714 { code4 ( of statement ) }
+1233 10714 {########################}
+1234 10714 
+1235 10714 proc code4(x,y1,z1: integer); {set 4-byte code}
+1236 10714 var y,z: integer;
+1237 10717 begin
+1238 10717   y:=y1; z:=z1;
+1239 10727   if y<0 then y:=y+256;
+1240 10752   if x=43 then z:=z-pc-2;
+1241 10778   code1(x);code1(y);code1(z and 255);
+1242 10816   code1(z shr 8)
+1243 10822 end {code4};
+1244 10829 
+1245 10830 {##############################}
+1246 10830 { testferror ( of ,vtype1) ) }
+1247 10830 {##############################}
+1248 10830 
+1249 10830 proc testferror;
+1250 10830 begin
+1251 10830   code1($4f);
+1252 10843 end;
+1253 10843 
+1254 10844 {########################}
+1255 10844 { gpval ( of statement ) }
+1256 10844 {########################}
+1257 10844 
+1258 10844 proc gpval(idpnt: integer;
+1259 10844   dir: boolean; typ: char);
+1260 10844 
+1261 10844 var d: integer;
+1262 10847 
+1263 10847 begin {gpval}
+1264 10847   if dir then d:=1 else d:=0;
+1265 10867   case typ of
+1266 10871   'h':  begin code3($22,s_vda[idpnt]);
+1267 10898           if dir then code1($3f);
+1268 10913           code1($17+d) end;
+1269 10926   'm':  begin code3($22,s_vda[idpnt]);
+1270 10952           code1($3d+d) end;
+1271 10965   'i':  begin
+1272 10975           if dir then code1($3f);
+1273 10990           code3($22,s_vda[idpnt]);
+1274 11006           code1(3);
+1275 11014           if dir then code1($3f);
+1276 11029           code1($17+d) end;
+1277 11042   'n':  begin if dir then code1($3f);
+1278 11067           code3($22,1); code1($12);
+1279 11085           code3($22,s_vda[idpnt]);
+1280 11101           code1(3); code1($3d+d) end
+1281 11122   else begin
+1282 11125     if typ='q' then
+1283 11131       code4($55,level-s_lvl[idpnt],2*s_vda[idpnt])
+1284 11156     else
+1285 11167       code4($27+2*d+relad,level-s_lvl[idpnt],
+1286 11193         2*s_vda[idpnt]);
+1287 11215     end {else}
+1288 11215   end {case}
+1289 11217 end;
+1290 11217 
+1291 11218 {###############################################}
+1292 11218 { FORWARD declaration of mainexp (of statement) }
+1293 11218 {###############################################}
+1294 11218 
+1295 11218 proc mainexp(reqtype: char;
+1296 11218   var arsize: integer); forward;
+1297 11221 
+1298 11221 {##########################}
+1299 11221 { express ( of statement ) }
+1300 11221 {##########################}
+1301 11221 
+1302 11221 proc express; {requests a normal 16-bit result }
+1303 11221 var resultsize: integer;
+1304 11224 begin {express}
+1305 11224   mainexp('n',resultsize);
+1306 11242   if resultsize<>0 then error(15)
+1307 11254 end {express};
+1308 11260 
+1309 11261 {########################}
+1310 11261 { arrayexp ( of mainexp) }
+1311 11261 {########################}
+1312 11261 
+1313 11261 proc arrayexp(size: integer; eltype: char);
+1314 11261 var resultsize: integer;
+1315 11264 begin
+1316 11264   mainexp(eltype,resultsize);
+1317 11284   if resultsize<>size then error(15);
+1318 11304   testtype(eltype);
+1319 11314 end;
+1320 11314 
+1321 11315 {#########################}
+1322 11315 { getvar ( of statement ) }
+1323 11315 {#########################}
+1324 11315 
+1325 11315 proc getvar;
+1326 11315 begin
+1327 11315   vartyp2:=high(s_typ[idpnt]);
+1328 11328   vartype:=low(s_typ[idpnt]);
+1329 11341   scan;
+1330 11350   if (vartype='q') and (token=' [') and
+1331 11365     ((vartyp2='v') or (vartyp2='d')) then begin
+1332 11382     vartyp2:='q'; vartype:='c';
+1333 11393   end;
+1334 11397   case vartyp2 of
+1335 11397   'a','x','s','i','n','q':
+1336 11440       begin
+1337 11443         if token=' [' then begin
+1338 11451           scan; express; relad:=1;
+1339 11464           if vartyp2='r' then begin
+1340 11475             relad:=3;
+1341 11480             code3($22,1); code1($12)
+1342 11496           end;
+1343 11502           if (vartyp2='q') and (s_spz[idpnt]=0) then
+1344 11520             checkindex(0,63)
+1345 11528           else
+1346 11534             checkindex(0,s_spz[idpnt]);
+1347 11553           testtype('i'); testto(' ]'); scan;
+1348 11574         end else relad:=2;
+1349 11579       end;
+1350 11583   'v','w','r','h','m': relad:=0;
+1351 11623   'c','d','e','t','u': error(6)
+1352 11667   else error(1)
+1353 11678   end {case}
+1354 11686 end {getvar};
+1355 11686 
+1356 11687 {#########################}
+1357 11687 { prcall ( of statement ) }
+1358 11687 {#########################}
+1359 11687 
+1360 11687 proc prcall (idpn1: integer);
+1361 11687 
+1362 11687 var bstack,numpar,i,n,n2: integer;
+1363 11690 
+1364 11690 { body of prcall follows later }
+1365 11690 
+1366 11690 {#######################}
+1367 11690 { prcall1 ( of prcall ) }
+1368 11690 {#######################}
+1369 11690 
+1370 11690 proc prcall1;
+1371 11690 var ressize:integer;
+1372 11693 
+1373 11693   proc prcall3;
+1374 11693   {###########}
+1375 11693   begin {prcall3}
+1376 11696     testto('id');
+1377 11707     idpnt:=findid;
+1378 11713     if idpnt=0 then error(5);
+1379 11735     getvar;
+1380 11739     if chr(stack[i] and 255)<>vartype then
+1381 11751       if chr(stack[i] and 255)<>'u' then
+1382 11773         merror(14,'01');
+1383 11788       push(idpnt);
+1384 11798   end {prcall3};
+1385 11798 
+1386 11799 begin {prcall1}
+1387 11799   case chr(stack[i] shr 8) of
+1388 11812     'd':  begin
+1389 11820             if chr(stack[i] and 255) = 'q' then
+1390 11834               mainexp('q',ressize)
+1391 11840             else
+1392 11854               express;
+1393 11861             if chr(stack[i] and 255)<>'u' then
+1394 11875               testtype(chr(stack[i] and 255));
+1395 11897           end;
+1396 11897     'e':  begin
+1397 11907             arrayexp(stack[succ(i)],
+1398 11912               chr(stack[i]));
+1399 11931             i:=succ(i);
+1400 11935           end;
+1401 11940     'w':  begin
+1402 11950             prcall3;
+1403 11954             if relad<>0 then merror(14,'02');
+1404 11975             gpval(idpnt,false,vartyp2);
+1405 11991           end;
+1406 11991     'x':  begin
+1407 12001             prcall3;
+1408 12005             if relad<>2 then merror(14,'03');
+1409 12026             if vartyp2='i' then error(16);
+1410 12044             i:=succ(i);
+1411 12048             if stack[i]<>s_spz[idpnt] then
+1412 12065               error(15);
+1413 12081             if vartyp2='n' then begin
+1414 12088               code3($22,s_vda[idpnt]);
+1415 12107               code1($3d);
+1416 12115             end else code4($27,level-s_lvl[idpnt],
+1417 12128               2*s_vda[idpnt]);
+1418 12150             code2($3b,stack[i]);
+1419 12166           end
+1420 12166     else merror(14,'04')
+1421 12174   end {case}
+1422 12182 end {prcall1};
+1423 12182 
+1424 12183 {#####################}
+1425 12183 { prcall2 (of prcall) }
+1426 12183 {#####################}
+1427 12183 
+1428 12183 proc prcall2;
+1429 12183 begin
+1430 12183   if n>0 then code3(35,-2*n);
+1431 12214   n:=0
+1432 12214 end {prcall2};
+1433 12220 
+1434 12221 {################}
+1435 12221 { body of prcall }
+1436 12221 {################}
+1437 12221 
+1438 12221 begin {body of prcall}
+1439 12221   if s_spz[idpn1]<>0 then begin
+1440 12234     bstack:=s_spz[idpn1];
+1441 12241     numpar:=stack[bstack];
+1442 12253     parse(' ('); scan;
+1443 12274     for i:=succ(bstack) to bstack+numpar do
+1444 12287     begin
+1445 12301       prcall1;
+1446 12305       if i<bstack+numpar then begin
+1447 12319         testto(' ,'); scan
+1448 12331       end
+1449 12335     end;
+1450 12335     testto(' )');
+1451 12358   end {then};
+1452 12358   code4(43,level-s_lvl[idpn1],s_vda[idpn1]);
+1453 12387   if s_spz[idpn1]<>0 then begin
+1454 12398     n:=0; i:=bstack+numpar;
+1455 12411     repeat
+1456 12420       case chr(stack[i] shr 8) of
+1457 12431       'd':  n:=succ(n);
+1458 12443       'w':  begin
+1459 12458               prcall2; idpnt:=pop;
+1460 12468               gpval(idpnt,true,
+1461 12478                   high(s_typ[idpnt]));
+1462 12493             end;
+1463 12493       chr(0): begin
+1464 12503             n2:=stack[i];
+1465 12507             i:=i-1;
+1466 12521             case chr(stack[i] shr 8) of
+1467 12537               'e':  n:=succ(n+n2);
+1468 12554               'x':  begin
+1469 12569                       prcall2;
+1470 12573                       idpnt:=pop;
+1471 12579                       if high(s_typ[idpnt])='n'
+1472 12592                       then begin
+1473 12595                         code3($22,s_vda[idpnt]+
+1474 12604                           2*s_spz[idpnt]);
+1475 12626                         code1($3e)
+1476 12628                       end else
+1477 12634                         code4(41,
+1478 12639                           level-s_lvl[idpnt],
+1479 12647                           2*(s_vda[idpnt]+
+1480 12658                           s_spz[idpnt]));
+1481 12678                       code2($3c,s_spz[idpnt])
+1482 12684                     end
+1483 12694               end {case}
+1484 12696             end
+1485 12696       end; {case}
+1486 12698       i:=prec(i);
+1487 12702     until i=bstack;
+1488 12711     prcall2
+1489 12719   end
+1490 12723 end {prcall};
+1491 12723 
+1492 12724 {########################}
+1493 12724 { mainexp (of statement) }
+1494 12724 {########################}
+1495 12724 {  see forward declaration above    }
+1496 12724 
+1497 12724 proc mainexp(reqtype: char;
+1498 12724   var arsize: integer);
+1499 12724 
+1500 12724 { variables of mainexp}
+1501 12724 var opcode,roff: integer;
+1502 12727     savtype: char;
+1503 12727 
+1504 12727 {########################}
+1505 12727 { argument ( of mainexp ) }
+1506 12727 {#########################}
+1507 12727 
+1508 12727 proc argument(rtype: char);
+1509 12727 begin
+1510 12727   parse(' ('); scan; express;
+1511 12749   testtype(rtype);
+1512 12759   testto(' )'); scan
+1513 12768 end; {argument}
+1514 12773 
+1515 12773 {#######################}
+1516 12773 { simexp ( of mainexp ) }
+1517 12773 {#######################}
+1518 12773 
+1519 12773 proc simexp(var arsize1: integer);
+1520 12773 var opcode: integer;
+1521 12776     sign: char;
+1522 12776 
+1523 12776 {body of simexp  follows later }
+1524 12776 
+1525 12776 {#####################}
+1526 12776 { term ( of simexp )  }
+1527 12776 {#####################}
+1528 12776 
+1529 12776 proc term(var arsize2: integer);
+1530 12776 
+1531 12776 var opcode: integer;
+1532 12779 
+1533 12779 { body of term follows later }
+1534 12779 
+1535 12779 {#######################}
+1536 12779 { factor ( of term )    }
+1537 12779 {#######################}
+1538 12779 
+1539 12779 proc factor(var arsize3: integer);
+1540 12779 
+1541 12779 var i, idpnt: integer;
+1542 12782     h: char;
+1543 12782 
+1544 12782 { body of factor follows later }
+1545 12782 
+1546 12782 {######################}
+1547 12782 { index ( of factor )  }
+1548 12782 {######################}
+1549 12782 
+1550 12782 proc index(chk: boolean);
+1551 12782 var savtype: char;
+1552 12785 begin {index}
+1553 12785   scan; savtype:=restype;
+1554 12791   express; testtype('i'); testto(' ]');
+1555 12820   if savtype='r' then begin
+1556 12827     code3($22,1); code1($12);
+1557 12848   end;
+1558 12848   if chk then begin
+1559 12852     if (savtype='q') and (s_spz[idpnt]=0) then
+1560 12873       { is an arrayed cpnt }
+1561 12874       checkindex(0,63)
+1562 12881     else
+1563 12887       checkindex(0,s_spz[idpnt]);
+1564 12906   end;
+1565 12906   restype:=savtype; scan
+1566 12914 end;
+1567 12918 
+1568 12919 {################}
+1569 12919 { body of factor }
+1570 12919 {################}
+1571 12919 
+1572 12919 begin
+1573 12919   arsize3:=0;
+1574 12923   case token of
+1575 12927     'id': begin {identifier }
+1576 12939             idpnt:=findid;
+1577 12945             if idpnt=0 then error(5);
+1578 12967             restype:=low(s_typ[idpnt]);
+1579 12975             h:=high(s_typ[idpnt]);
+1580 12988             case h of
+1581 12993               'v','w','d':
+1582 13015                     begin
+1583 13018                       scan;
+1584 13022                       if (restype='q') and (token=' ['
+1585 13033 )
+1586 13036                       then begin
+1587 13038                         code4(39,level-s_lvl[idpnt],
+1588 13051                           2*s_vda[idpnt]);
+1589 13073                         index(true);
+1590 13081                         code1($03);
+1591 13089                         code1($54);
+1592 13097                         restype:='c';
+1593 13099                       end else
+1594 13103                         code4(39,level-s_lvl[idpnt],
+1595 13116                           2*s_vda[idpnt]);
+1596 13138                     end;
+1597 13138               'h':  begin code3($22,s_vda[idpnt]);
+1598 13164                       code1($17); scan end;
+1599 13176               'i':  begin code3($22,s_vda[idpnt]);
+1600 13202                       scan;
+1601 13206                       if token=' [' then begin
+1602 13214                         index(true); code1($03);
+1603 13233                         code1($17)
+1604 13235                       end else begin
+1605 13244                         error(16)
+1606 13246                       end
+1607 13252                     end;
+1608 13252               'm':  begin code3($22,s_vda[idpnt]);
+1609 13278                       code1($3d); scan
+1610 13286                     end;
+1611 13290               'n':  begin code3($22,s_vda[idpnt]);
+1612 13316                       scan;
+1613 13320                       if token=' [' then begin
+1614 13328                         index(true);
+1615 13339                         code3($22,1);code1($12);
+1616 13357                         code1($03); code1($3d);
+1617 13373                         if restype='r' then
+1618 13379                         begin
+1619 13380                           code2($3b,1);
+1620 13393                           arsize3:=1
+1621 13393                         end
+1622 13395                       end else begin
+1623 13402                         code1($3d);
+1624 13410                         code2($3b,s_spz[idpnt]);
+1625 13426                         arsize3:=s_spz[idpnt];
+1626 13430                       end
+1627 13438                     end;
+1628 13438               'r','t': begin
+1629 13455                       code3(35,2);
+1630 13465                       idpnt:=prec(idpnt);
+1631 13469                       prcall(idpnt); scan;
+1632 13488                       restype:=low(s_typ[idpnt]);
+1633 13496                     end;
+1634 13501               'c':  if low(s_typ[idpnt])<>'r' then
+1635 13522                     begin
+1636 13523                       code3(34,s_vda[idpnt]);
+1637 13542                       scan;
+1638 13546                       if restype='s' then begin
+1639 13553                         if token=' [' then begin
+1640 13564                           index(true);
+1641 13575                           code1($03);
+1642 13583                           code1($58);
+1643 13591                           code1($54);
+1644 13599                           restype:='c';
+1645 13601                         end else begin
+1646 13608                           code1($58);
+1647 13616                           restype:='q';
+1648 13618                         end;
+1649 13622                       end;
+1650 13622                       {scan;}
+1651 13622                     end else begin
+1652 13625                       code2($3a,2);
+1653 13635                       code2(s_vda[idpnt] and 255,
+1654 13645                         s_vda[idpnt] shr 8);
+1655 13663                       code2(s_spz[idpnt] and 255,
+1656 13673                         s_spz[idpnt] shr 8);
+1657 13691                       arsize3:=1; scan
+1658 13697                     end;
+1659 13701               'a','e','x':
+1660 13722                     begin scan;
+1661 13729                       if token=' [' then begin
+1662 13737                         index(true);
+1663 13748                         code4($28,
+1664 13750                             level-s_lvl[idpnt],
+1665 13758                             2*s_vda[idpnt]);
+1666 13780                         if restype='r' then
+1667 13786                         begin
+1668 13787                           code2($3b,1);
+1669 13800                           arsize3:=1
+1670 13800                         end
+1671 13802                       end else begin
+1672 13809                         code4($27,
+1673 13811                             level-s_lvl[idpnt],
+1674 13819                             2*s_vda[idpnt]);
+1675 13841                         code2($3b,s_spz[idpnt]);
+1676 13857                         arsize3:=s_spz[idpnt];
+1677 13861                       end
+1678 13869                     end;
+1679 13869               's','u':
+1680 13883                     begin
+1681 13886                       code3(35,2*s_spz[idpnt]+2);
+1682 13908                       idpnt:=prec(idpnt);
+1683 13912                       prcall(idpnt); scan;
+1684 13931                       restype:=low(s_typ[idpnt]);
+1685 13939                       idpnt:=succ(idpnt);
+1686 13948                       arsize3:=s_spz[idpnt]
+1687 13953                     end
+1688 13957               else error(1)
+1689 13970             end {case}
+1690 13978           end; {identifier}
+1691 13981     'nu': begin code3(34,value[0]); scan;
+1692 14007             restype:='i'
+1693 14007           end;
+1694 14013     'ru': begin code2($3a,2);
+1695 14034             code2(value[0] and 255,
+1696 14042               value[0] shr 8);
+1697 14058             code2(value[1] and 255,
+1698 14066               value[1] shr 8);
+1699 14082             scan; restype:='r';
+1700 14088             arsize3:=1
+1701 14092           end;
+1702 14098     'st': begin
+1703 14109           if (reqtype='n') and (value[0]<3)
+1704 14124             then begin
+1705 14126               if value[0]<2 then begin
+1706 14138                 code3(34,ord(ident[1]));
+1707 14155                 restype:='c'
+1708 14155               end else begin
+1709 14164                 code3(34,packed(ident[1],ident[2]));
+1710 14185                 restype:='p'
+1711 14185               end
+1712 14187             end else begin
+1713 14194               case reqtype of
+1714 14194                 'c','u','n','q':
+1715 14223                     begin
+1716 14226                       if (vartype='q') or
+1717 14233                          (reqtype='q') then begin
+1718 14241                         arsize3:=0;
+1719 14246                         restype:='q';
+1720 14252                         code2($56,value[0]);
+1721 14270                       end else begin
+1722 14273                         arsize3:=prec(value[0]);
+1723 14279                         restype:='c';
+1724 14286                         code2($39,value[0]);
+1725 14304                       end;
+1726 14304                       for i:=1 to value[0] do
+1727 14312                         code1(ord(ident[i]));
+1728 14339                       if (vartype='q') or
+1729 14360                          (reqtype='q') then code1(0);
+1730 14379                     end;
+1731 14379                 'p': begin
+1732 14389                       if odd(value[0]) then
+1733 14395                         error(15);
+1734 14407                       value[0]:=value[0] shr 1;
+1735 14417                       arsize3:=prec(value[0]);
+1736 14428                       restype:='p';
+1737 14435                       code2($3a,value[0]);
+1738 14453                       for i:=1 to value[0] do
+1739 14461                         begin
+1740 14474                         code1(ident[2*i]);
+1741 14491                         code1(ident[2*i-1]);
+1742 14511                       end
+1743 14511                     end
+1744 14511                 else merror(14,'05')
+1745 14533               end {case}
+1746 14541             end;
+1747 14541             scan
+1748 14541           end;
+1749 14545     'od': begin
+1750 14556             argument('i'); code1(7);
+1751 14572             restype:='b'
+1752 14572           end;
+1753 14578     'me': begin
+1754 14589             parse(' ['); index(false);
+1755 14606             code1(23); restype:='i';
+1756 14616           end;
+1757 14620     ' (': begin
+1758 14631             scan; mainexp(reqtype,arsize3);
+1759 14653             testto(' )'); scan
+1760 14662           end; {no type change}
+1761 14669     'no': begin
+1762 14677             scan; factor(arsize3);
+1763 14693             if (arsize3<>0) then error(15);
+1764 14711             code1($11);
+1765 14719             if restype<>'i' then
+1766 14725               testtype('b')
+1767 14731           end;
+1768 14737     'cr': begin
+1769 14748             argument('i'); code1(52);
+1770 14764             restype:='c'
+1771 14764           end;
+1772 14770     'hi': begin
+1773 14781             argument('p'); code1(51);
+1774 14797             restype:='c'
+1775 14797           end;
+1776 14803     'lo': begin
+1777 14814             argument('p'); code1(52);
+1778 14830             restype:='c'
+1779 14830           end;
+1780 14836     'su': begin
+1781 14847             argument('u'); code1($14);
+1782 14863           end;
+1783 14863     'pc': begin
+1784 14874             argument('u'); code1($15)
+1785 14884           end;
+1786 14890     'cp': begin
+1787 14901             argument('i'); restype:='q';
+1788 14911           end;
+1789 14915     'ni': begin
+1790 14926             code3(34,0); scan; restype:='q';
+1791 14942           end;
+1792 14946     'ox': begin
+1793 14957             argument('u');
+1794 14965             restype:='i'
+1795 14965           end;
+1796 14971     ' @': begin
+1797 14982             scan; factor(arsize3);
+1798 14998             if arsize3<>0 then error(15);
+1799 15016             if restype<>'q' then testtype('i');
+1800 15034             restype:='f'
+1801 15034           end;
+1802 15040     'tr': begin
+1803 15051             code3(34,1); scan;
+1804 15065             restype:='b';
+1805 15067           end;
+1806 15071     'fa': begin
+1807 15082             code3(34,0); scan;
+1808 15096             restype:='b'
+1809 15096           end;
+1810 15102     'tc': begin
+1811 15113             parse(' ('); scan;
+1812 15126             arrayexp(1,'r');
+1813 15136             testto(' )'); scan;
+1814 15149             code1($47); restype:='i';
+1815 15159           end;
+1816 15163     'cv': begin
+1817 15174             argument('i');
+1818 15182             code1($46); arsize3:=1;
+1819 15192             restype:='r'
+1820 15196           end;
+1821 15202     'pa': begin
+1822 15213             parse(' ('); scan; express;
+1823 15230             testtype('c');
+1824 15238             if token=' ,' then begin
+1825 15246               scan; express; testtype('c');
+1826 15265               code1(53)
+1827 15267             end;
+1828 15273             testto(' )'); scan; restype:='p'
+1829 15286           end
+1830 15288     else error(1)
+1831 15297   end {case of token}
+1832 15305 end {factor};
+1833 15305 
+1834 15306 {##############}
+1835 15306 { body of term }
+1836 15306 {##############}
+1837 15306 
+1838 15306 begin
+1839 15306   factor(arsize2);
+1840 15320   repeat
+1841 15320     case token of
+1842 15320       ' *': opcode:=5;
+1843 15334       'di': opcode:=6;
+1844 15351       'an': opcode:=15;
+1845 15368       'sh': opcode:=18;
+1846 15385       'sr': opcode:=19;
+1847 15402       ' /': opcode:=$45
+1848 15417       else opcode:=0
+1849 15426     end {case};
+1850 15434     if opcode>0 then begin
+1851 15441       if (restype='r') and
+1852 15451             (arsize2=1) then begin
+1853 15459         scan; factor(arsize2);
+1854 15478         if (restype<>'r') or (arsize2<>1) then
+1855 15492           merror(14,'06');
+1856 15507         case opcode of
+1857 15507           5: code1($44);
+1858 15526           $45: code1($45)
+1859 15538           else error(17)
+1860 15549         end{case}
+1861 15557       end else begin
+1862 15560         if opcode=$45 then error(9);
+1863 15578         if arsize2<>0 then error(15);
+1864 15596         if (restype='b') and (opcode=15)
+1865 15609           then begin
+1866 15611           scan; factor(arsize2);
+1867 15630           if arsize2<>0 then error(15);
+1868 15648           testtype('b');
+1869 15656           code1(opcode)
+1870 15656         end else begin
+1871 15669           testtype('i'); scan;
+1872 15681           factor(arsize2);
+1873 15693           if arsize2<>0 then error(15);
+1874 15711           testtype('i'); code1(opcode);
+1875 15729         end
+1876 15729       end
+1877 15729     end;
+1878 15729   until opcode=0;
+1879 15735 end;
+1880 15739 
+1881 15740 {################}
+1882 15740 { body of simexp }
+1883 15740 {################}
+1884 15740 
+1885 15740 begin
+1886 15740   sign:=' ';
+1887 15744   if token=' +' then begin
+1888 15756     sign:='+'; scan
+1889 15765   end else if token=' -' then begin
+1890 15780     sign:='-'; scan
+1891 15789   end;
+1892 15793   term(arsize1);
+1893 15805   if sign<>' ' then begin
+1894 15812     if (restype='r')and (arsize1=1) then begin
+1895 15830       if sign='-' then code1($4e)
+1896 15845     end else begin
+1897 15854       testtype('i');
+1898 15862       if arsize1<>0 then error(15);
+1899 15880       if sign='-' then code1(2);
+1900 15898     end
+1901 15898   end;
+1902 15898   repeat
+1903 15898     case token of
+1904 15898       ' &': opcode:=1;
+1905 15912       ' +': opcode:=3;
+1906 15929       ' -': opcode:=4;
+1907 15946       'or': opcode:=14;
+1908 15963       'xo': opcode:=16
+1909 15978       else opcode:=0
+1910 15987     end {case};
+1911 15995     if opcode>1 then begin {if 1}
+1912 16005       if (restype='r') and (arsize1=1)
+1913 16018         then begin {real}
+1914 16023         scan; term(arsize1);
+1915 16039         if (restype<>'r') or (arsize1<>1) then
+1916 16053           error(17);
+1917 16065         case opcode of
+1918 16065           3:  code1($42);
+1919 16084           4:  code1($43)
+1920 16096           else error(17)
+1921 16107         end {case}
+1922 16115       end {real}
+1923 16115       else begin {not real}
+1924 16118         if (arsize1<>0) then error(15);
+1925 16136         if (restype='b') and (opcode>=14)
+1926 16149           then begin {boolean}
+1927 16154           scan; term(arsize1);
+1928 16170           if arsize1<>0 then error(15);
+1929 16188           testtype('b'); code1(opcode)
+1930 16196         end {boolean}
+1931 16206         else begin {not boolean}
+1932 16209           testtype('i'); scan;
+1933 16221           term(arsize1);
+1934 16233           if arsize1<>0 then error(15);
+1935 16251           testtype('i'); code1(opcode);
+1936 16269         end {not boolean}
+1937 16269       end {not real}
+1938 16269     end {if 1}
+1939 16269     else if opcode=1 then begin {else 1}
+1940 16282       sign:=restype;
+1941 16282       scan; term(opcode);
+1942 16306       arsize1:=arsize1+opcode+1;
+1943 16317       testtype(sign)
+1944 16322     end {else 1}
+1945 16332   until opcode=0
+1946 16336 end {simexp};
+1947 16342 
+1948 16343 {#################}
+1949 16343 { body of mainexp }
+1950 16343 {#################}
+1951 16343 
+1952 16343 begin { *** body of mainexp *** }
+1953 16343   roff:=0;
+1954 16347   simexp(arsize);
+1955 16363   if (restype='r') and (arsize=1) then
+1956 16377     roff:=$40;
+1957 16383   case token of
+1958 16387     ' =': opcode:=8;
+1959 16401     ' <': opcode:=10;
+1960 16418     ' >': opcode:=12;
+1961 16435     '<>': opcode:=9;
+1962 16452     '<=': opcode:=13;
+1963 16469     '>=': opcode:=11
+1964 16484     else opcode:=0
+1965 16493   end {case};
+1966 16501   if opcode>0 then begin
+1967 16508     if (arsize<>0) and (roff=0) then
+1968 16525       error(15);
+1969 16537     scan; savtype:=restype; simexp(arsize);
+1970 16561     if ((roff=0) and (arsize<>0))
+1971 16575       or((roff<>0) and (arsize>1)) then
+1972 16591       error(15);
+1973 16603     testtype(savtype); code1(opcode+roff);
+1974 16628     arsize:=0; restype:='b'
+1975 16634   end
+1976 16636 end {mainexp};
+1977 16640 
+1978 16641 {#########################}
+1979 16641 { assign ( of statement ) }
+1980 16641 {#########################}
+1981 16641 
+1982 16641 proc assign;
+1983 16641 var sid: integer;
+1984 16644     styp, sknd: char;
+1985 16644 
+1986 16644   proc assign1;
+1987 16644   begin
+1988 16644     testto(':='); scan; express;
+1989 16666     if (styp='q') and (restype='s') then begin
+1990 16681       code1($58); restype:='q';
+1991 16694     end;
+1992 16698     gpval(sid,true,sknd);
+1993 16714   end {assign1};
+1994 16714 
+1995 16715 begin {assign}
+1996 16715   idpnt:=findid;
+1997 16723   if idpnt=0 then error(5);
+1998 16745   if s_typ[idpnt]='pr' then begin
+1999 16757     prcall(idpnt); scan
+2000 16770   end else begin
+2001 16777     getvar;
+2002 16781     sid:=idpnt;
+2003 16781     styp:=vartype;
+2004 16789     sknd:=vartyp2;
+2005 16797     if relad<2 then begin
+2006 16812       assign1;
+2007 16819       testtype(styp)
+2008 16819     end else begin
+2009 16832       if sknd='i' then error(16); {8-bit mem}
+2010 16850       testto(':='); scan;
+2011 16863       if relad=3 then begin
+2012 16870         arrayexp(1,styp); relad:=1;
+2013 16887         code1($53);
+2014 16899         if sknd='n' then begin
+2015 16906           code1($3f);
+2016 16917           code3($22,1); code1($12);
+2017 16935           code3($22,s_vda[sid]+2);
+2018 16954           code1($3); code1($3e)
+2019 16964         end else
+2020 16970           code4($2a,level-s_lvl[sid],
+2021 16983             2*s_vda[sid]+2);
+2022 17008         code2($3c,1)
+2023 17012       end else begin
+2024 17021         arrayexp(s_spz[sid],styp);
+2025 17039         if sknd='n' then begin
+2026 17046           code3($22,s_vda[sid]+2*s_spz[sid]);
+2027 17077           code1($3e);
+2028 17085         end else
+2029 17085           code4($29,level-s_lvl[sid],
+2030 17098             2*(s_vda[sid]+s_spz[sid]));
+2031 17129         code2($3c,s_spz[sid]);
+2032 17145       end
+2033 17145     end
+2034 17145   end
+2035 17145 end {assign};
+2036 17145 
+2037 17146 {########################}
+2038 17146 { case1 ( of statement ) }
+2039 17146 {########################}
+2040 17146 
+2041 17146 proc case1;
+2042 17146 var i1,i2,casave: integer;
+2043 17149     savetype: char;
+2044 17149 
+2045 17149   proc case2;
+2046 17149   {#########}
+2047 17149 
+2048 17149     proc case3;
+2049 17152     {#########}
+2050 17152     begin
+2051 17152       scan; code1(22); code3(34,getcon);
+2052 17183       testtype(savetype);
+2053 17193       code1(8); scan
+2054 17201     end;
+2055 17205 
+2056 17206   begin {case2}
+2057 17206     i1:=0; case3;
+2058 17218     while token=' ,' do begin
+2059 17229       push(pc); code3(38,0); i1:=succ(i1);
+2060 17253       case3
+2061 17258     end;
+2062 17262     testto(' :'); savpc:=pc; code3(37,0);
+2063 17292     for k2:=1 to i1 do fixup(pop);
+2064 17323     push(savpc);
+2065 17347     scan; statmnt
+2066 17351   end {case2};
+2067 17355 
+2068 17356 begin {case1}
+2069 17356   scan; express; testto('of');
+2070 17375   savetype:=restype; i2:=1; case2;
+2071 17393   while token=' ;' do begin
+2072 17404     casave:=pc; code3(36,0); fixup(pop);
+2073 17434     push(casave); i2:=succ(i2); case2
+2074 17453   end;
+2075 17457   if token='el' then begin
+2076 17468     casave:=pc; code3(36,0); fixup(pop);
+2077 17501     push(casave); scan; statmnt
+2078 17515   end;
+2079 17519   testto('en'); for k2:=1 to i2 do fixup(pop);
+2080 17559   code3(35,-2); scan
+2081 17584 end {case1};
+2082 17588 
+2083 17589 {#########################}
+2084 17589 { openrw ( of statement ) }
+2085 17589 {#########################}
+2086 17589 
+2087 17589 proc openrw(x: integer);
+2088 17589 begin
+2089 17589   parse(' ('); parse('id');
+2090 17612   idpnt:=findid;
+2091 17618   if idpnt=0 then error(5);
+2092 17640   getvar; code1(x);
+2093 17654   testferror;
+2094 17658   if relad=2 then error(15);
+2095 17676   if vartype<>'f' then merror(14,'07');
+2096 17697   gpval(idpnt,true,vartyp2);
+2097 17713   testto(' )'); scan
+2098 17722 end {openrw};
+2099 17726 
+2100 17727 {########################}
+2101 17727 { gpsec ( of statement ) }
+2102 17727 {########################}
+2103 17727 
+2104 17727 proc gpsec(code);   { get/put sector }
+2105 17727 
+2106 17727   proc gpsec1;
+2107 17730   {##########}
+2108 17730   begin
+2109 17730     scan; express; testtype('i');
+2110 17751     testto(' ,');
+2111 17760   end;
+2112 17760 
+2113 17761 begin {gpsec}
+2114 17761   parse(' ('); gpsec1; gpsec1; gpsec1;
+2115 17784   code1(code);
+2116 17794   parse('id'); idpnt:=findid;
+2117 17809   if idpnt=0 then error(5);
+2118 17831   getvar; code3(34,$db); { get file error code }
+2119 17845   if relad=2 then error(15);
+2120 17863   code1(23); if vartype<>'i' then merror(14,'08');
+2121 17892   gpval(idpnt,true,vartyp2);
+2122 17908   testto(' )');
+2123 17917 end {gpsec};
+2124 17917 
+2125 17918 {#############}
+2126 17918 proc writebool;
+2127 17918 {#############}
+2128 17918 var savpc, k2: integer;
+2129 17921 begin
+2130 17921   { boolean value is already on stack }
+2131 17921 
+2132 17921   savpc := pc;
+2133 17923   code3(37,0);   { jump if false }
+2134 17941 
+2135 17941   { TRUE }
+2136 17941   code1(50);
+2137 17949   code1(ord('T') and 127);
+2138 17960   code1(ord('R') and 127);
+2139 17971   code1(ord('U') and 127);
+2140 17982   code1(ord('E') or 128);
+2141 17993 
+2142 17993   k2 := pc;
+2143 17993   code3(36,0);   { unconditional jump }
+2144 18011 
+2145 18011   fixup(savpc);
+2146 18021 
+2147 18021   { FALSE }
+2148 18021   code1(50);
+2149 18029   code1(ord('F') and 127);
+2150 18040   code1(ord('A') and 127);
+2151 18051   code1(ord('L') and 127);
+2152 18062   code1(ord('S') and 127);
+2153 18073   code1(ord('E') or 128);
+2154 18084 
+2155 18084   fixup(k2);
+2156 18094 end;
+2157 18094 
+2158 18095 {########################}
+2159 18095 { findwproc of statement }
+2160 18095 {########################}
+2161 18095 
+2162 18095 proc findwproc(nm: array[7] of char);
+2163 18095 var i: integer;
+2164 18098 begin
+2165 18098   for i := 1 to 8 do ident[i] := nm[i-1];
+2166 18128   for i := 9 to 16 do ident[i] := ' ';
+2167 18173 
+2168 18191   idpnt := findid;
+2169 18197   if (idpnt=0) or (s_typ[idpnt]<>'pr') then
+2170 18220     error(25);
+2171 18232 end;
+2172 18232 
+2173 18233 {###################}
+2174 18233 { body of statement }
+2175 18233 {###################}
+2176 18233 
+2177 18233 begin {body of statement }
+2178 18233   if token=' ;' then scan;
+2179 18250   case token of
+2180 18250     'id': assign;
+2181 18266 
+2182 18269     'if': begin {if}
+2183 18277             scan; express; testtype('b');
+2184 18293             testto('th'); scan;  savpc:=pc;
+2185 18306             code3(37,0); statmnt;
+2186 18328             if token='el' then begin {else}
+2187 18339               k2:=pc; code3(36,0);
+2188 18357               fixup(savpc); scan; statmnt;
+2189 18375               fixup(k2)
+2190 18375             end else fixup(savpc)
+2191 18388           end; {if}
+2192 18401 
+2193 18401     'be':  begin {begin}
+2194 18409             repeat
+2195 18409               scan; statmnt
+2196 18413             until token<>(' ;');
+2197 18424             testto('en'); scan
+2198 18437           end; {begin}
+2199 18444 
+2200 18444     'rp': begin {repeat}
+2201 18452             savpc:=pc;
+2202 18452             repeat
+2203 18460               scan; statmnt
+2204 18464             until token='un';
+2205 18475             scan; express; testtype('b');
+2206 18495             code3(37,savpc)
+2207 18497           end {repeat};
+2208 18507 
+2209 18510     're': begin {read}
+2210 18518             parse(' ('); scan;
+2211 18531             if token=' @' then begin
+2212 18539               scan; express; testtype('f');
+2213 18558               device:=true;
+2214 18560               code1(44); testto(' ,')
+2215 18575             end
+2216 18581             else begin
+2217 18584               device:=false; code1(26)
+2218 18592             end;
+2219 18598             repeat
+2220 18598               begin {main loop of read}
+2221 18598                 if token=' ,' then scan;
+2222 18613                 testto('id'); idpnt:=findid;
+2223 18628                 if idpnt=0 then error(5);
+2224 18650                 getvar;
+2225 18654                 if relad=2 then error(15);
+2226 18672                 case vartype of
+2227 18672                   'i':  code1(28);
+2228 18691                   'c':  code1(27);
+2229 18709                   'p':  begin
+2230 18719                         code1(27); code1(27);
+2231 18735                         code1(53)
+2232 18737                         end
+2233 18743                   else error(114)
+2234 18748                 end {case};
+2235 18756                 gpval(idpnt,true,vartyp2)
+2236 18762               end {mainloop of read}
+2237 18772             until token<>' ,';
+2238 18779             testto(' )'); scan;
+2239 18796             if device then code1(45);
+2240 18811           end {read};
+2241 18811 
+2242 18814     'wr','wl':
+2243 18827           begin {write,writeln}
+2244 18830             if token='wl' then wln:=true
+2245 18841             else wln:=false;
+2246 18852             scan;
+2247 18860             if token=' (' then begin
+2248 18868               scan;
+2249 18875               if token=' @' then begin
+2250 18883                 scan; express;
+2251 18894                 if restype='q' then restype:='f';
+2252 18906                 testtype('f');
+2253 18918                 device:=true; code1(44);
+2254 18932                 if not ((token = ' ,') or
+2255 18940                   (token = ' )')) then merror(2,' ,');
+2256 18964               end else device:=false;
+2257 18969               repeat
+2258 18973                 if token=' ,' then scan;
+2259 18988                 if (token=' )') and device
+2260 18996                        and wln then
+2261 19001                    {empty writeln except device}
+2262 19006                    k2:=k2 {do nothing}
+2263 19009                 else if token='st' then begin
+2264 19028                   {string}
+2265 19031                   code1(50);
+2266 19039                   for k2:=1 to value[0]-1 do
+2267 19053                     code1(ord(ident[k2])
+2268 19067                         and 127);
+2269 19080                   code1(ord(ident[value[0]])
+2270 19100                       or 128);
+2271 19113                   scan
+2272 19113                 end else begin
+2273 19120 
+2274 19120                   {start of expression }
+2275 19120                   mainexp('n',wrsize);
+2276 19136                   vtype1 := restype;
+2277 19136 
+2278 19144                   if (vtype1<>'r') and
+2279 19151                     (wrsize<>0) then error(15);
+2280 19170                   if (vtype1='r') and
+2281 19177                     (wrsize<>1) then error(15);
+2282 19196 
+2283 19196                   if token=' :' then begin
+2284 19204                     scan;
+2285 19211                     express;
+2286 19215                     testtype('i');
+2287 19223 
+2288 19223                     if vtype1='i' then begin
+2289 19230                       findwproc('__wrintf');
+2290 19249                       code4(43, level-s_lvl[idpnt],
+2291 19259                         s_vda[idpnt]);
+2292 19278                       code2(33,252)
+2293 19282                     end
+2294 19288                     else if vtype1='r' then begin
+2295 19298                       if token=' :' then begin
+2296 19309                         scan;
+2297 19316                         express;
+2298 19320                         testtype('i')
+2299 19322                       end
+2300 19328                       else
+2301 19328                         code2(32,3);
+2302 19341 
+2303 19341                       findwproc('__wrfix ');
+2304 19357                       code4(43, level-s_lvl[idpnt],
+2305 19367                         s_vda[idpnt]);
+2306 19386                       code2(33,248)
+2307 19390                     end
+2308 19396                     else
+2309 19396                       merror(14,'09')
+2310 19404                   end
+2311 19410                   else begin
+2312 19413                     if vtype1='r' then begin
+2313 19420                       code2(32,11);
+2314 19433                       code2(32,3);
+2315 19443                       findwproc('__wrfix ');
+2316 19459                       code4(43, level-s_lvl[idpnt],
+2317 19469                         s_vda[idpnt]);
+2318 19488                       code2(33,248)
+2319 19492                     end
+2320 19498                     else begin
+2321 19501                       case vtype1 of
+2322 19501                         'i':  code1(30);
+2323 19520                         'c':  code1(29);
+2324 19538                         'q':  code1($57);
+2325 19556                         's':  begin
+2326 19566                                 code1($58);
+2327 19574                                 code1($57);
+2328 19582                               end;
+2329 19582                         'b':  writebool;
+2330 19596                         'p':  begin
+2331 19606                                 code1(22);
+2332 19614                                 code1(51);
+2333 19622                                 code1(29);
+2334 19630                                 code1(52);
+2335 19638                                 code1(29);
+2336 19646                               end
+2337 19646                         else merror(14,'09')
+2338 19654                       end
+2339 19660                     end
+2340 19662                   end
+2341 19662                 end
+2342 19662                 {end of expression}
+2343 19662 
+2344 19662               until token<>' ,';
+2345 19669               if wln then begin {writeln(..)}
+2346 19680                 code2(32,13); code1(29);
+2347 19698                 code2(32,10); code1(29);
+2348 19716               end;
+2349 19716               if device then code1(45);
+2350 19731               testto(' )'); scan
+2351 19740             end {if}
+2352 19744             else if wln then begin {writeln}
+2353 19754               code2(32,13); code1(29);
+2354 19772               code2(32,10); code1(29);
+2355 19790             end
+2356 19790           end {write, writeln};
+2357 19790 
+2358 19793     'cs': case1; {case statement}
+2359 19808 
+2360 19808     'wh': begin {while}
+2361 19816             scan; savpc:=pc; express;
+2362 19832             testtype('b');
+2363 19840             k2:=pc; code3(37,0);
+2364 19858             testto('do'); scan; statmnt;
+2365 19875             code3(36,savpc); fixup(k2)
+2366 19887           end {while};
+2367 19897 
+2368 19900     'fo': begin {for}
+2369 19908             parse('id'); assign;
+2370 19921             if s_typ[idpnt]='pr' then error(1);
+2371 19944             savtp1:=low(s_typ[idpnt]);
+2372 19952             case token of
+2373 19957               'to': k2:=1;
+2374 19971               'dw': k2:=0
+2375 19986               else merror(2,'to')
+2376 20000             end {case of token};
+2377 20008             scan; express; testtype(savtp1);
+2378 20026             bottom1:=pc; code1(22);
+2379 20042             gpval(idpnt,false,vartyp2);
+2380 20058             code1(13-k2-k2);
+2381 20076             savpc:=pc; code3(37,0);
+2382 20094             testto('do'); scan; statmnt;
+2383 20111             gpval(idpnt,false,vartyp2);
+2384 20127             code1(21-k2);
+2385 20140             gpval(idpnt,true,vartyp2);
+2386 20156             code3(36,bottom1); fixup(savpc);
+2387 20178             code3(35,-2);
+2388 20189           end {for};
+2389 20189 
+2390 20192     'me': begin {mem}
+2391 20200             parse(' ['); scan; express;
+2392 20217             testtype('i');
+2393 20225             testto(' ]'); parse(':=');
+2394 20243             scan; express; code1(24);
+2395 20259             testtype('i');
+2396 20267           end {mem};
+2397 20267 
+2398 20270     'ca': begin {call}
+2399 20278             parse(' ('); scan; express;
+2400 20295             testtype('i');
+2401 20303             testto(' )'); code1(25); scan
+2402 20320           end {call};
+2403 20324 
+2404 20327     'op': openrw(47);
+2405 20343 
+2406 20346     'ow': openrw(48);
+2407 20362 
+2408 20365     'ob': openrw(80);
+2409 20381 
+2410 20384     'gb': begin
+2411 20392             parse(' ('); scan; express;
+2412 20409             testtype('f'); testto(' ,');
+2413 20426             scan; express; testtype('i');
+2414 20442             testto(' ,'); scan; testto('id');
+2415 20464             idpnt:=findid;
+2416 20470             if idpnt=0 then error(5);
+2417 20492             getvar;
+2418 20496             if relad<>0 then error(15);
+2419 20514             code1($51); testferror;
+2420 20526             gpval(idpnt,true,vartyp2);
+2421 20542             testto(' )'); scan
+2422 20551           end;
+2423 20555 
+2424 20558     'pb': begin
+2425 20566             parse(' ('); scan; express;
+2426 20583             testtype('f'); testto(' ,');
+2427 20600             scan; express; testtype('i');
+2428 20616             testto(' ,'); scan; express;
+2429 20633             code1($52);testferror;
+2430 20645             testto(' )');
+2431 20654             scan
+2432 20654           end;
+2433 20658 
+2434 20661     'ru': begin
+2435 20669             code1($41); scan;
+2436 20681           end;
+2437 20681 
+2438 20684     'fi': begin
+2439 20692             code1(46); scan
+2440 20700           end;
+2441 20704 
+2442 20707     'ge': gpsec(55);
+2443 20723 
+2444 20726     'pu': gpsec(56);
+2445 20742 
+2446 20745     'ex': begin {exit}
+2447 20753             if level>0 then code1(1) else code1(0);
+2448 20782             scan;
+2449 20786           end;
+2450 20786 
+2451 20789     'cl': begin {close}
+2452 20797             parse(' (');
+2453 20806             repeat
+2454 20806               scan; express; code1(49);
+2455 20822               testtype('f');
+2456 20830               testferror
+2457 20830             until token<>' ,';
+2458 20841             testto(' )'); scan;
+2459 20858           end {close}
+2460 20858 
+2461 20858     else if (token<>'en') and (token<>' ;')
+2462 20876       and (token<>'un') then begin
+2463 20887       error(10); scan
+2464 20898     end
+2465 20902   end {case of statements}
+2466 20904 end;
+2467 20904 
+2468 20905 {#######################}
+2469 20905 { findforw ( of block ) }
+2470 20905 {#######################}
+2471 20905 
+2472 20905 func findforw;
+2473 20905 
+2474 20905 var i,j,sav1: integer;
+2475 20908     done: boolean;
+2476 20908 
+2477 20908   func found(start: integer):boolean;
+2478 20908   var ii: integer;
+2479 20911   begin {compare}
+2480 20911     ii:=0;
+2481 20915     repeat
+2482 20919       ii:=succ(ii);
+2483 20923     until (ii >= PIDSIZE) or
+2484 20935       (idpack[ii] <> s_id[start+ii-1]);
+2485 20960     found:=(ii >= PIDSIZE);
+2486 20971   end {compare};
+2487 20975 
+2488 20976 begin {findforw}
+2489 20976   packid;
+2490 20982   i:=succ(forwpn);
+2491 20986   repeat
+2492 20991     i:=prec(i);
+2493 20995     done := (i = 0);
+2494 21007     if not done then
+2495 21011       done := found(PIDSIZE * fortab[i] + 1);
+2496 21041   until done;
+2497 21045   findforw:=i;
+2498 21052   if i>0 then
+2499 21066     if i=forwpn then forwpn:=forwpn-1
+2500 21086     else begin
+2501 21096       sav1:=fortab[i];
+2502 21100       for j:=i to forwpn-1 do
+2503 21122         fortab[j]:=fortab[succ(j)];
+2504 21141       fortab[forwpn]:=sav1;
+2505 21167       findforw:=forwpn;
+2506 21175       forwpn:=forwpn-1
+2507 21187     end
+2508 21189 end {findforw};
+2509 21194 
+2510 21195 {###############}
+2511 21195 { body of block }
+2512 21195 {###############}
+2513 21195 
+2514 21195 begin
+2515 21195   dpnt:=3; s_vda[bottom]:=pc;
+2516 21207   code3(36,0);
+2517 21225   stackpn1:=stackpnt; forwpn:=0;
+2518 21235 
+2519 21239   if token='co' then begin    { * const * }
+2520 21250     scan;
+2521 21254     repeat
+2522 21254       deccon; testto(' ;'); scan
+2523 21267     until token <> 'id';
+2524 21278   end {const};
+2525 21282 
+2526 21282   if token='me' then memory;  { * mem * }
+2527 21297 
+2528 21297   if token='va' then variable;{ * var * }
+2529 21312 
+2530 21312     while (token='pr')or (token='fu') do begin
+2531 21332     parlevel:=0;
+2532 21334     isfunc:=token='fu';
+2533 21345     case token of
+2534 21350     'pr': begin               { * proc * }
+2535 21362             parse('id'); npara:=0;
+2536 21373             if forwpn=0 then find:=0
+2537 21387             else find:=findforw;
+2538 21402             if find=0 then begin
+2539 21413               putsym('p','r');
+2540 21426               cproc:=spnt;
+2541 21426             end else begin
+2542 21437               cproc:=fortab[find];
+2543 21441               fixup(s_vda[cproc]);
+2544 21463             end;
+2545 21463             level:=succ(level);
+2546 21467           end;
+2547 21472     'fu': begin               { * func * }
+2548 21483             parse('id'); npara:=1;
+2549 21494             if forwpn=0 then find:=0
+2550 21508             else find:=findforw;
+2551 21523             if find=0 then begin
+2552 21534               putsym('f','i');
+2553 21547               cproc:=spnt; level:=succ(level);
+2554 21559               putsym('f','i');
+2555 21574               s_vda[spnt]:=parlevel;
+2556 21578               parlevel:=succ(parlevel);
+2557 21590             end else begin
+2558 21598               cproc:=fortab[find];
+2559 21602               level:=succ(level);
+2560 21614               parlevel:=1;
+2561 21621               fixup(s_vda[cproc]);
+2562 21639             end;
+2563 21639           end
+2564 21639     end; {case of token}
+2565 21641     scan; spnt1:=spnt;
+2566 21645     dpnt1:=dpnt;
+2567 21653     if token=' (' then parameter;
+2568 21676     if isfunc then function;
+2569 21687     testto(' ;');
+2570 21696     for i:=1 to npara do
+2571 21702     s_vda[succ(spnt-i)]:=s_vda[succ(spnt-i)]
+2572 21734           -parlevel;
+2573 21739     scan;
+2574 21766     if token='fw' then begin
+2575 21774       if forwpn=8 then merror(13,'ov');
+2576 21798       forwpn:=succ(forwpn);
+2577 21802       fortab[forwpn]:=cproc;
+2578 21811       s_vda[cproc]:=pc;
+2579 21823       code3(36,0);
+2580 21841       scan
+2581 21841     end else block(cproc);
+2582 21858     level:=prec(level);
+2583 21862     dpnt:=dpnt1; spnt:=spnt1;
+2584 21875     case high(s_typ[spnt]) of
+2585 21891       'r':  s_typ[spnt]:=packed('t',low(s_typ[spnt]));
+2586 21915       's':  s_typ[spnt]:=packed('u',low(s_typ[spnt]))
+2587 21943     end {case};
+2588 21951     testto(' ;'); scan
+2589 21960   end {procedure of function};
+2590 21964 
+2591 21967   testto('be');     { * begin * }
+2592 21976   if forwpn<>0 then merror(13,'ur');
+2593 21997   fixup(s_vda[bottom]);
+2594 22011   s_vda[bottom]:=pc;
+2595 22015   scan;
+2596 22027   code3(35,2*dpnt);
+2597 22042   repeat
+2598 22042     statmnt
+2599 22042   until token='en';
+2600 22053   scan;
+2601 22061   if level>0 then code1(1) else code1(0);
+2602 22090   stackpnt:=stackpn1;
+2603 22090 end {block};
+2604 22098 
+2605 22099 {####################}
+2606 22099 { savtable ( global) }
+2607 22099 {####################}
+2608 22099 
+2609 22099 proc savtable; { save lib table in @ofno }
+2610 22099 
+2611 22099 var i, j, k, num, addr: integer;
+2612 22102     vtype1: char;
+2613 22102 
+2614 22102 begin
+2615 22102   writeln(@ofno,'LIB2,',spnt,',',pc+2);
+2616 22137   for i:=1 to spnt do begin {for every entry }
+2617 22156     addr := PIDSIZE * i;
+2618 22158     for j:=1 to PIDSIZE do
+2619 22175       idpack[j] := s_id[addr+j];
+2620 22197     unpackid;
+2621 22223     j := IDSIZE;
+2622 22225     while (j>1) and (ident[j]=' ') do j := j-1;
+2623 22257     for k:=1 to j do
+2624 22271       write(@ofno,ident[k]);
+2625 22299       writeln(@ofno,',',s_typ[i],',',s_lvl[i],',',
+2626 22346         s_vda[i],',',s_spz[i]);
+2627 22373     vtype1:=high(s_typ[i]);
+2628 22381     if ((vtype1='p') or (vtype1='f') or
+2629 22400       (vtype1='g')) and (s_spz[i]<>0) then begin
+2630 22421       num:=stack[s_spz[i]];
+2631 22432       write(@ofno,num);
+2632 22451       for j:=1 to num do
+2633 22457         write(@ofno,',',stack[s_spz[i]+j]);
+2634 22496       write(@ofno,CR,LF);
+2635 22522     end {then};
+2636 22522   end {for}
+2637 22522 end {savtable};
+2638 22536 
+2639 22537 {##############}
+2640 22537 { main program }
+2641 22537 {##############}
+2642 22537 
+2643 22537 begin {main}
+2644 22537   RUNERR := 0;
+2645 22542   nlflg:=false;
+2646 22548   init;scan;
+2647 22560   case token of
+2648 22560     'pg': begin
+2649 22572             libflg:=false;
+2650 22574             _asetfile(pname,scyclus,sdrive,'Q');
+2651 22600           end;
+2652 22600     'li': begin
+2653 22611             libflg:=true;
+2654 22613             _asetfile(pname,scyclus,sdrive,'T');
+2655 22639           end
+2656 22639     else
+2657 22639       merror(2,'pg')
+2658 22647   end {case}
+2659 22655   parse('id');
+2660 22664   i:=0;
+2661 22666   repeat
+2662 22670     i:=succ(i);
+2663 22674   until (i>7) or (pname[i] = ':') or
+2664 22697       (pname[i]<>_uppercase(ident[i+1]));
+2665 22726   if i<8 then
+2666 22736     merror(2,packed(pname[0],pname[1]));
+2667 22761     { name differs from filename }
+2668 22761   parse(' ;');
+2669 22770   if ofno<>NO_OUTPUT then openw(ofno);
+2670 22786   scan;
+2671 22790   if (token='us') and (libflg=false) then begin
+2672 22806     repeat
+2673 22809       getlib; scan
+2674 22813     until token<>' ,';
+2675 22824     testto(' ;'); scan
+2676 22837   end;
+2677 22841   block(0); testto(' .');
+2678 22858   if ofno<>NO_OUTPUT then begin
+2679 22865     write(@ofno,'E');
+2680 22876     savebyte(pc and 255);
+2681 22889     savebyte(pc shr 8);
+2682 22902     close(ofno);
+2683 22908     if libflg then begin
+2684 22912       _asetfile(pname,scyclus,sdrive,'L');
+2685 22937       openw(ofno);
+2686 22943       savtable;
+2687 22947       close(ofno)
+2688 22947     end
+2689 22953   end else
+2690 22953     RUNERR:=$87; {no loader file}
+2691 22962   writeln(@lpr);
+2692 22974 
+2693 22974   write(PRTON);
+2694 22977   writeln('Code lenght:           ',pc);
+2695 23012   writeln('Compiler stack size:   ',stackmax);
+2696 23047   writeln('Ident stack size:      ',spntmax, PRTOFF);
+2697 23085 
+2698 23085   RUNERR := _emulator(9);
+2699 23095   close(fno);
+2700 23105   { check whether second pass is not required }
+2701 23105   if (RUNERR=0) and libflg then RUNERR:=-1;
+2702 23121 end {main}.
+2703 23126 
+Code lenght:           23125
+Compiler stack size:   142
+Ident stack size:      226

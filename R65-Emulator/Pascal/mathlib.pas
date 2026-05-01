@@ -141,7 +141,7 @@ begin
   if m>0. then
     while m<1. do begin e:=e-1; m:=10.*m; end;
 
-  m:=m+0.00005; { round to 4 decimals }
+  m := m + 0.0000501; { round to 4 decimals }
   if m>=10. then begin e:=e+1; m:=m/10.; end;
 
   width:=12; { sign, digit, dot, 4 decimals, e+xx }
