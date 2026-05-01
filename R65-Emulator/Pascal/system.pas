@@ -21,19 +21,19 @@ Examples:
   COMPILE TEST1
   COPY TEST3,0,1
   FIND TEST*
+  GREP "abcd" TEST:P
 
 First tries to run program from drive 1,
 unless a drive is specified in the call.
 If not found there and not specified,
 tries to run it from drive 0.
-Default for arguments is drive 1.
-}
+Default for arguments is drive 1.       }
 
 program system;
 {does not use libraries to save memory}
 
 const
-  title='R65 PASCAL VERSION 5.8';
+  title='R65 PASCAL VERSION 5.9';
   STOPCODE = $2010;
   INPUT    = @0;
   CR       = chr(13);
@@ -47,6 +47,8 @@ mem
   IOCHECK  = $0023: boolean&;
   ENDSTK   = $000e: integer;
   BUFFPN   = $0015: integer&;
+  FILERR   = $00db: integer&;
+  FILNAM   = $0301: array[15] of char&;
   FILCY1   = $0330: integer&;
   FIDRTB   = $0339: array[8] of integer&;
   FILNM1   = $0320: array[15] of char&;
@@ -315,6 +317,11 @@ begin {main}
           writeln(INVVID,'Program not found',NORVID);
           RUNERR:=0;
         end;
+      end;
+      if (RUNERR>0) and (RUNERR<=8) then begin
+        write(INVVID,'in file ');
+        for i:=0 to 15 do write(FILNM1[i]);
+        writeln(NORVID);
       end;
       ENDSTK:=TOPMEM-144;
       IOCHECK:=true;

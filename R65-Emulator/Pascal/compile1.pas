@@ -26,7 +26,6 @@ program compile1;
 uses syslib, arglib, filelib;
 
 const
-
     IDLENGTH  = 64;   {max. length of ident buffer}
     IDSIZE    = 16;   {chars per identifier in s_id}
     PIDSIZE   = 8;    {packed chars per identifier}
@@ -37,7 +36,8 @@ const
     PAGELENGHT= 60;    {no of lines per page}
     NO_OUTPUT = @0;
     YES_OUTPUT= @255;
-    MAXFI     = 3;     {max nbr of nested input files}
+    MAXFI     = 3;     {max nbr  of nested input files
+}
     NRESW     = 63;    {number of res. words, max 64}
 
     SAT_EXPORT = 1;    {Bit mask for s_attr}
@@ -55,12 +55,11 @@ var reswtab: array[ 512] of char; {8*(NRESW+1)}
     value: array[1] of integer;
     ch,restype,vartype:char;
     token: packed char;
-    prt,libflg,rcheck,ateof: boolean;
+    libflg,rcheck,ateof: boolean;
     ucheck,lineflg,nlflg: boolean;
-    fno,ofno,savefno: file;
+    fno,ofno,savefno,lpr: file;
     incname: array[15] of char;
     filstk: array[MAXFI] of file;
-    lpr: file;
 
 { ****. START IF IDENTIFIER TABLE ****}
 
@@ -130,7 +129,7 @@ end {savebyte};
 
 proc crlf;
 begin
-  writeln;
+  writeln(@lpr);
   line:=succ(line); lineinc:=succ(lineinc);
 end {crlf};
 
@@ -143,8 +142,6 @@ var k: integer;
     answer: char;
 begin
   crlf; numerr:=succ(numerr);
-  for k:=2 to tpos do write(' ');
-  write('^'); crlf;
   write(INVVID,'ERROR: ');
   case x of
     01: write('Ident');
@@ -175,7 +172,7 @@ begin
     26: write('Wrong library version');
     27: write('Identifier too long')
   end {case};
-  writeln(NORVID);
+  writeln(' at line ', line, ', pos ', tpos, NORVID);
   if (ofno<>NO_OUTPUT) and (ofno<>YES_OUTPUT)
     then close(ofno);
   ofno:=NO_OUTPUT;
@@ -254,7 +251,7 @@ begin
     line:=line-1; { do not count line }
     write(@lpr,lineinc:3);
   end;
-  write(' ');
+  write(@lpr,' ');
   write(@lpr,(pc+2):5,' ');
 end;
 
@@ -323,7 +320,6 @@ var i,j,dummy: integer;
     request: array[15] of char;
     default: boolean;
 begin {init}
-  writeln('R65 PASCAL COMPILER, Pass  1');
   lpr := PRINTER;
   ateof:=false; savefno:=@0;
   cdrive:=FILDRV; { drive of compile program }
@@ -335,7 +331,6 @@ begin {init}
   s_typ[0]:='vi'; s_lvl[0]:=0;
   s_vda[0]:=0; s_spz[0]:=0;
   { prepare resword table }
-  writeln('Reading reserved words');
   _asetfile('RESWORDS:W      ',0,0,'W');
   openr(fno);
   for i:=0 to NRESW do begin
@@ -354,8 +349,6 @@ begin {init}
   end;
   close(fno);
 
-  writeln;
-
   sdrive:=1; {default drive for source }
   scyclus:=0;
   _agetstring(pname,default,scyclus,sdrive);
@@ -364,14 +357,12 @@ begin {init}
 
   rcheck:=false;
   ucheck:=false;
-  prt:=true;
   ofno:=YES_OUTPUT;
   lineflg:=false;
   if not default then begin
     if request[0]<>'/' then _argerror(103);
     for i:=1 to 8 do
       case request[i] of
-        'P': prt:=false;
         'L': lineflg:=true;
         'R': rcheck:=true;
         'N': ofno:=NO_OUTPUT;
@@ -389,14 +380,11 @@ begin {init}
   ARGLIST[9]:=sdrive;
   NUMARG:=1;
 
-  if prt then begin
-    write(PRTON);
-    RUNERR := _emulator(8);
-  end
+  RUNERR := _emulator(8);
 
   line:=0; lineinc:=0;
-  crlf; line:=1;
-  write('   1     4) '); getchr
+  line:=1;
+  write(@lpr,'   1     4 '); getchr
 end {init};
 
 {################}
@@ -701,7 +689,6 @@ begin
     if ofno<>NO_OUTPUT then
       write(@ofno,ident[succ(i)])
   end;
-  write(PRTOFF);
   _asetfile(name&'        ',0,cdrive,'L');
   openr(libfil);  { get table file }
 
@@ -759,7 +746,6 @@ begin
   close(libfil);
   if spnt>spntmax then spntmax:=spnt;
   if stackpnt>stackmax then stackmax:=stackpnt;
-  if prt then write(PRTON);
 end {getlib};
 
 { ################################ }
@@ -2698,20 +2684,14 @@ begin {main}
     end
   end else
     RUNERR:=$87; {no loader file}
-  writeln;
-  writeln;
-  writeln('End compile');
-  writeln;
-  writeln('Code lenght:          ',pc);
-  writeln('Compiler stack size:  ',stackmax);
-  writeln('Ident stack size:     ',spntmax);
-  write('Pascal errors:        ');
-  if numerr>0 then write(INVVID);
-  writeln(numerr,NORVID);
-  if prt then begin
-    write(PRTOFF);
-    RUNERR := _emulator(9);
-  end;
+  writeln(@lpr);
+
+  write(PRTON);
+  writeln('Code lenght:           ',pc);
+  writeln('Compiler stack size:   ',stackmax);
+  writeln('Ident stack size:      ',spntmax, PRTOFF);
+
+  RUNERR := _emulator(9);
   close(fno);
   { check whether second pass is not required }
   if (RUNERR=0) and libflg then RUNERR:=-1;

@@ -18,7 +18,7 @@
 #define SETPASCALCOLOR       Stroke(0,210,210)
 #define SETHIDETEXTCOLOR     Stroke(0,0,0) 
 #define SETINVERSETEXTCOLOR  Stroke(160,160,160); Fill(160,160,160,0)
-#define SETINVERSEPTEXTCOLOR Stroke(0,160,160); Fill(0,160,160,0)
+#define SETINVERSEPASCALCOLOR Stroke(210,210,0); Fill(210,210,0,0)
 #define SETDISKNAMECOLOR     Stroke(255, 20, 20)
 #define SETBACKGROUNDCOLOR   Fill(0,0,0,0)
 #define SETBUTTONCOLOR       Stroke(210,210,210); Fill(100,0,0,1)
@@ -338,13 +338,15 @@ void crtUpdate()
                     s[0] = read6502(global_videoBaseAddress + (NUMCHAR * yy) + xx);
                     if (s[0] & 0x80) {
                         if (memory[M8_SFLAG] & 1) {
-                            SETINVERSEPTEXTCOLOR; }
-                    	else {
-                            SETINVERSETEXTCOLOR; }
-                        Rect(hcell*xx + crtOffset, vcell*(yy+1) + 8 * panelScale + crtOffset - 8,
-                            hcell, vcell);
-                        Stroke(0,0,0);
+							SETINVERSEPASCALCOLOR;
                         }
+                    	else {
+                            SETINVERSETEXTCOLOR;
+                            Rect(hcell*xx + crtOffset, vcell*(yy+1) + 8 * panelScale + crtOffset - 8,
+                                hcell, vcell);
+                            Stroke(0,0,0);
+                        }
+                    }
                     else if (memory[M8_SFLAG] & 1)
                         SETPASCALCOLOR;
                     else

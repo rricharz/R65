@@ -12,7 +12,6 @@ program compile2;
 uses syslib,arglib,filelib;
 
 const
-    title='R65 PASCAL COMPILER Version 4.2, Pass 2';
     wrfile = $e81b;
     sblock = $6000;
     eblock = TOPMEM;
@@ -37,8 +36,7 @@ var pointer,address,maxsize,dummy,
 
 proc error(x:integer);
 begin
-  writeln;
-  write('*** ');
+  writeln(INVVID);
   if x<100 then {file error, bcd}
     writeln('File error ',(x shr 4),(x and 15))
   else
@@ -50,6 +48,7 @@ begin
       107: writeln('Pointer not matching')
       else writeln('Unknown error ',x)
     end {case}
+  write(NORVID);
   close(source);
   RUNERR:=x;
   _abort;
@@ -77,8 +76,8 @@ begin
   FILTYP:='B';
   call(wrfile);
   FILTYP := 'B';
-  _write_label;
-  write('+');
+  {_write_label;
+  write('+');}
   testerr
 end {blocksave};
 
@@ -93,14 +92,10 @@ var i: integer;
 begin
   cdrive:=FILDRV; { drive of compile program }
   ENDSTK:=sblock-144;   {reserve memory }
-  writeln;
-  writeln;
-  write(title);
   scyclus:=0; sdrive:=1;
   _agetstring(name,default,scyclus,sdrive);
   _asetfile(name,scyclus,sdrive,'Q');
   openr(source);
-  { writeln; }
   scyclus:=FILCYC;
 end {init};
 
@@ -118,8 +113,6 @@ begin
   if (ch<'0') or (ch>'@') then error(102);
   byte:=byte + ((ord(ch) and 15));
   getbyte1:=byte;
-  { heartbeat: }
-  { if (pointer and 255)=0 then write('.'); }
 end {getbyte1};
 
 
@@ -167,8 +160,6 @@ proc getbl(base:integer);  {get block }
     mem[pointer+3]:=0;
     pointer:=pointer+4;
     offset:=pointer-sblock;
-    { writeln; }
-    { writeln('Library loaded') }
   end {getlib};
 
 
@@ -183,7 +174,7 @@ begin { * body of getbl * }
                   (getbyte2 shl 8)+offset;
               if (address<offset) or
                   (address>maxsize) then begin
-                writeln;
+                writeln(INVVID);
                 write(address,' ',offset);
                 error(105);
               end;
@@ -210,8 +201,8 @@ begin { * body of getbl * }
   mem[sblock+1]:=(pointer-sblock) shr 8;
   address:=getbyte2+(getbyte2 shl 8)+base;
   if address<>(pointer-sblock) then begin
-    writeln(address,' ',pointer-sblock);
-    error(107)
+    writeln(INVVID, address,' ', pointer - sblock);
+    error(107);
   end
 end {getbl};
 
@@ -221,16 +212,13 @@ proc showused;
 var usedbytes, maxbytes,
     usedpages, maxpages: integer;
 begin
-  writeln;
   usedbytes := pointer - sblock;
   maxbytes  := maxsize + 2;
-
   usedpages := (usedbytes + 255) div 256;
   maxpages  := (maxbytes  + 255) div 256;
 
-  writeln('Load area used: ', usedpages, '/',
-    maxpages, ' pages (',
-    usedbytes, '/', maxbytes, ' bytes)');
+  writeln('Load area used:        ', usedpages, '/',
+    maxpages, ' pages');
 end;
 
 { * main * }
@@ -239,13 +227,11 @@ begin {main}
   init; maxsize:=eblock-sblock-2;
   pointer:=sblock+2; offset:=2;
   getbl(0);
-  writeln;
   mem[pointer-1]:=0;
   mem[pointer]:=255;
   mem[pointer+1]:=255;
   pointer:=pointer+1;
   close(source);
-  { writeln; }
   blocksave(sblock,pointer);
   showused;
   ENDSTK:=TOPMEM-144;

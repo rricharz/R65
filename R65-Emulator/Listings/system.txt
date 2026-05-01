@@ -1,353 +1,342 @@
 
-R65 COMPILE 4.8: program SYSTEM           28/4/26 page 1
-
-
-   1 (    4) {
-   2 (    4)          **************************
-   3 (    4)          *                        *
-   4 (    4)          * R65 Pascal Main System *
-   5 (    4)          *                        *
-   6 (    4)          **************************
-   7 (    4) 
-   8 (    4)      Based on version 01/08/82 rricharz
-   9 (    4)      1979-1982  rricharz (r77@bluewin.ch)
-  10 (    4)      2018       recovered
-  11 (    4)      2023       last change version 5.4
-  12 (    4) 
-  13 (    4) R65 Pascal System Program. This program is
-  14 (    4) called, when Pascal is executed. It allows to
-  15 (    4) call other programs by names and with
-  16 (    4) arguments.
-  17 (    4) 
-  18 (    4) Examples:
-  19 (    4)   COMPILE TEST1:P
-  20 (    4)   COMPILE TEST1:P.1F,1
-  21 (    4)   COMPILE TEST1
-  22 (    4)   COPY TEST3,0,1
-  23 (    4)   FIND TEST*
-  24 (    4) 
-  25 (    4) First tries to run program from drive 1,
-  26 (    4) unless a drive is specified in the call.
-  27 (    4) If not found there and not specified,
-  28 (    4) tries to run it from drive 0.
-  29 (    4) Default for arguments is drive 1.
-  30 (    4) }
-  31 (    4) 
-  32 (    4) program system;
-  33 (    4) {does not use libraries to save memory}
-  34 (    4) 
-  35 (    4) const
-  36 (    4)   title='R65 PASCAL VERSION 5.8';
-  37 (   30)   STOPCODE = $2010;
-  38 (   30)   INPUT    = @0;
-  39 (   30)   CR       = chr(13);
-  40 (   30)   NORVID   = chr($0b);  {normal video}
-  41 (   30)   INVVID   = chr($0e);  {inverse video}
-  42 (   30)   MMAXSEQ  = 8;         {max no of seq. files}
-  43 (   30)   TOPMEM   = $c780;
-  44 (   30) 
-  45 (   30) mem
-  46 (   30)   RUNERR   = $000c: integer&;
-  47 (   30)   IOCHECK  = $0023: boolean&;
-  48 (   30)   ENDSTK   = $000e: integer;
-  49 (   30)   BUFFPN   = $0015: integer&;
-  50 (   30)   FILCY1   = $0330: integer&;
-  51 (   30)   FIDRTB   = $0339: array[8] of integer&;
-  52 (   30)   FILNM1   = $0320: array[15] of char&;
-  53 (   30)   NUMARG   = $005f: integer&;
-  54 (   30)   FILDRV   = $00dc: integer&;
-  55 (   30)   FILFLG   = $00da: integer&;
-  56 (   30)   MAXSEQ   = $0336: integer&;
-  57 (   30)   ARGLIST  = $0060: array[10] of integer;
-  58 (   30)   ARGLISTS = $0060: array[63] of char&;
-  59 (   30)   ARGTYPE  = $00a0: array[31] of char&;
-
-R65 COMPILE 4.8: program SYSTEM           28/4/26 page 2
-
-  60 (   30) 
-  61 (   30) 
-  62 (   30) var
-  63 (   30)   i, m, n: integer;
-  64 (   30)   ch: char;
-  65 (   30)   ok: boolean;
-  66 (   30)   argerr: integer;
-  67 (   30)   runname,aname: array[15] of char;
-  68 (   30)   drive1,drive2: integer;
-  69 (   30)   cyclus1,cyclus2: integer;
-  70 (   30) 
-  71 (   30) { * runprog * }
-  72 (   30) 
-  73 (   30) proc runprog
-  74 (   30)   (name: array[15] of char;
-  75 (   30)    drv: integer; cyc: integer);
-  76 (   30) 
-  77 (   30) var i: integer;
-  78 (   33) 
-  79 (   33) begin
-  80 (   33)   for i:=0 to 15 do FILNM1[i]:=name[i];
-  81 (   60)   FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
-  82 (  104)   run
-  83 (  108) end;
-  84 (  109) 
-  85 (  110) { * _uppercase * }
-  86 (  110) 
-  87 (  110) func _uppercase(ch1: char): char;
-  88 (  110) 
-  89 (  110) begin
-  90 (  110)   if (ch1 >= 'a') and (ch1 <= 'z') then
-  91 (  129)     _uppercase := chr(ord(ch1) - 32)
-  92 (  139)   else
-  93 (  140)     _uppercase := ch1;
-  94 (  148) end;
-  95 (  156) 
-  96 (  157) { * next * }
-  97 (  157) 
-  98 (  157) proc next;
-  99 (  157) 
- 100 (  157) begin
- 101 (  157)   read(@INPUT,ch);
- 102 (  170)   ch:=_uppercase(ch);
- 103 (  183) end;
- 104 (  187) 
- 105 (  188) { * nextraw * }
- 106 (  188) 
- 107 (  188) proc nextraw;
- 108 (  188) 
- 109 (  188) begin
- 110 (  188)   read(@INPUT,ch);
- 111 (  201) end;
- 112 (  202) 
- 113 (  203) { * getnum * }
- 114 (  203) 
- 115 (  203) proc getnum
- 116 (  203)   (var num: integer);
- 117 (  203) 
- 118 (  203) var sign: integer;
- 119 (  206) 
-
-R65 COMPILE 4.8: program SYSTEM           28/4/26 page 3
-
- 120 (  206) begin
- 121 (  206)   sign:=1; num:=0;
- 122 (  216)   case ch of
- 123 (  220)     '+': next;
- 124 (  235)     '-':  begin sign:=-1; next end
- 125 (  256)   end; {case}
- 126 (  258)   ok:=ok and ((ch>='0') and (ch<='9'));
- 127 (  277)   while (ch>='0') and (ch<='9') do begin
- 128 (  300)     num:=10*num+ord(ch)-ord('0');
- 129 (  314)     next
- 130 (  319)   end;
- 131 (  323)   num:=sign*num
- 132 (  330) end;
- 133 (  339) 
- 134 (  340) { * getfname * }
- 135 (  340) 
- 136 (  340) proc getfname
- 137 (  340)   (var name: array[15] of char;
- 138 (  340)    ptype: char; var ok: boolean;
- 139 (  340)    var drv: integer; var cyc: integer);
- 140 (  340) 
- 141 (  340) var i, j: integer;
- 142 (  343) 
- 143 (  343)   func nexthexdigit: integer;
- 144 (  343) 
- 145 (  343)   var d: integer;
- 146 (  346) 
- 147 (  346)   begin
- 148 (  346)     next;
- 149 (  352)     if (ch>='0') and (ch<='9') then
- 150 (  366)       nexthexdigit:= ord(ch)-ord('0')
- 151 (  376)     else if (ch>='A') and (ch<='Z') then
- 152 (  398)       nexthexdigit:= ord(ch)-ord('A')+10
- 153 (  409)     else begin
- 154 (  419)       ok:=false;
- 155 (  421)     nexthexdigit:=0;
- 156 (  427)     end;
- 157 (  431)   end;
- 158 (  431) 
- 159 (  432) begin
- 160 (  432)   ok:=((ch>='A') and (ch<='Z'))
- 161 (  448)     or (ch='*') or (ch='?') or (ch='/');
- 162 (  472)   i:=0;
- 163 (  479)   repeat
- 164 (  483)     name[i]:=ch; i:=succ(i);
- 165 (  499)     next
- 166 (  504)     until (i>12) or (ch=' ') or (ch=CR) or
- 167 (  530)       (ch=',') or (ch=':') or (ch='.');
- 168 (  554)   for j:=i to 15 do name[j]:=' ';
- 169 (  583)   if ch=':' then begin
- 170 (  608)     next;
- 171 (  615)     name[i]:=':';
- 172 (  621)     name[i+1]:=ch;
- 173 (  632)     next
- 174 (  640)   end
- 175 (  644)   else if ptype <> ' ' then begin
- 176 (  654)     name[i]:=':';
- 177 (  663)     name[i+1]:=ptype
- 178 (  674)   end;
- 179 (  682)   if (ch='.') then begin
-
-R65 COMPILE 4.8: program SYSTEM           28/4/26 page 4
-
- 180 (  689)     cyc:=nexthexdigit*16+nexthexdigit;
- 181 (  707)     next;
- 182 (  716)   end
- 183 (  716)   if (ch=',') then begin
- 184 (  723)     next;
- 185 (  730)     getnum(drv);
- 186 (  742)     if (drv<0) or (drv>1) then
- 187 (  756)       argerr:=105;
- 188 (  762)   end
- 189 (  766) end;
- 190 (  766) 
- 191 (  767) { * clearinput * }
- 192 (  767) 
- 193 (  767) proc clearinput;
- 194 (  767) 
- 195 (  767) begin
- 196 (  767)   BUFFPN:=-1;
- 197 (  774) end;
- 198 (  779) 
- 199 (  780) { * main * }
- 200 (  780) 
- 201 (  780) begin {main}
- 202 (  780)   MAXSEQ := MMAXSEQ - 1;
- 203 (  786)   for i:=0 to MMAXSEQ-1 do FIDRTB[i]:=0;
- 204 (  818)   clearinput; writeln;
- 205 (  843)   writeln(title);
- 206 (  859)   ok:=true;
- 207 (  861) 
- 208 (  865)   repeat {main loop (endless)}
- 209 (  865)     write('P*');
- 210 (  868)     next;
- 211 (  872)     if ch=CR then call(STOPCODE);
- 212 (  886)     while (ch=' ') or (ch=chr(13)) do next;
- 213 (  909)     { default for program to run is drive 1,
- 214 (  912)       if not found, run from drive 0,
- 215 (  912)       user INPUT is ignored }
- 216 (  912)     drive1:=0; cyclus1:=0;
- 217 (  920)     getfname(runname,'R',ok,drive1,cyclus1);
- 218 (  968)     for i:=0 to 31 do ARGTYPE[i]:=chr(0);
- 219 (  991)     if ok then begin
- 220 ( 1016)       NUMARG:=0; n:=0; argerr:=0;
- 221 ( 1033)       if ch=' ' then begin  {arguments}
- 222 ( 1047)         repeat
- 223 ( 1047)           next;
- 224 ( 1051)           if ch='"' then
- 225 ( 1057)           begin {quoted argument}
- 226 ( 1061)             ARGTYPE[n]:='q';
- 227 ( 1067)             if n>23 then argerr:=107
- 228 ( 1083)             else begin
- 229 ( 1092)               for i:=0 to 15 do aname[i]:=' ';
- 230 ( 1115)               i:=0;
- 231 ( 1135)               nextraw;
- 232 ( 1143)               while (ch<>'"') and (ch<>CR) do begin
- 233 ( 1161)                 if i<=15 then begin
- 234 ( 1168)                   aname[i]:=ch;
- 235 ( 1175)                   i:=succ(i);
- 236 ( 1187)                 end
- 237 ( 1192)                 else
- 238 ( 1192)                   argerr:=106;
- 239 ( 1197)                 nextraw;
-
-R65 COMPILE 4.8: program SYSTEM           28/4/26 page 5
-
- 240 ( 1205)               end;
- 241 ( 1205)               if ch<>'"' then
- 242 ( 1214)                 argerr:=106
- 243 ( 1218)               else
- 244 ( 1220)                 next;
- 245 ( 1231)               for i:=0 to 7 do
- 246 ( 1239)                 ARGLIST[n+i]:=
- 247 ( 1257)                   ord(packed(aname[2*i+1],
- 248 ( 1267)                   aname[2*i]));
- 249 ( 1283)               n:=n+7;
- 250 ( 1311)             end
- 251 ( 1316)           end {quoted argument}
- 252 ( 1316)           else if (ch>='0') and (ch<='9') then
- 253 ( 1333)           begin {number}
- 254 ( 1337)             getnum(m);
- 255 ( 1349)             ARGLIST[n]:=m;
- 256 ( 1353)             ARGTYPE[n]:='i';
- 257 ( 1371)           end {number}
- 258 ( 1377)           else if ((ch>='A') and (ch<='Z'))
- 259 ( 1394)             or (ch='*') or (ch='?') or (ch='/')
- 260 ( 1417)               then begin {letter}
- 261 ( 1422)               { default for arg is drive 1 }
- 262 ( 1422)               drive2:=255; cyclus2:=0;
- 263 ( 1430)               getfname(aname,' ',ok,
- 264 ( 1442)                 drive2,cyclus2);
- 265 ( 1478)               if not ok then argerr:=106;
- 266 ( 1488)               ARGTYPE[n]:='s';
- 267 ( 1498)               if n>22 then argerr:=107
- 268 ( 1514)               else begin
- 269 ( 1523)                 for i:=0 to 7 do
- 270 ( 1531)                   ARGLIST[n+i]:=
- 271 ( 1549)                     ord(packed(aname[2*i+1],
- 272 ( 1559)                     aname[2*i]));
- 273 ( 1575)                 n:=n+7;
- 274 ( 1603)               end;
- 275 ( 1608)             ARGLIST[n+1]:=cyclus2;
- 276 ( 1615)             ARGTYPE[n+1]:='i';
- 277 ( 1636)             if drive2=255 then begin {default}
- 278 ( 1652)               ARGLIST[n+2]:=1;
- 279 ( 1661)               ARGTYPE[n+2]:='d';
- 280 ( 1678)             end else begin
- 281 ( 1687)               ARGLIST[n+2]:=drive2;
- 282 ( 1694)               ARGTYPE[n+2]:='i';
- 283 ( 1715)             end;
- 284 ( 1721)             n:=n+2;
- 285 ( 1727)           end {letter}
- 286 ( 1732)           else begin
- 287 ( 1735)             ARGLIST[n]:=0;
- 288 ( 1741)             ARGTYPE[n]:='d';
- 289 ( 1755)           end;
- 290 ( 1761)           n:=n+1; NUMARG:=NUMARG+1;
- 291 ( 1777)         until (argerr<>0) or (n>31)
- 292 ( 1795)             or ((ch<>' ') and (ch<>','));
- 293 ( 1812)         if ch<>CR then argerr:=106;
- 294 ( 1828)       end; {arguments}
- 295 ( 1832)       if ch<>CR then argerr:=106;
- 296 ( 1844)     end {ok}
- 297 ( 1848)     else argerr:=106;
- 298 ( 1853) 
- 299 ( 1857)     if argerr<>0 then begin
-
-R65 COMPILE 4.8: program SYSTEM           28/4/26 page 6
-
- 300 ( 1864)       writeln;
- 301 ( 1867)       writeln(INVVID,'Argument error ', argerr,NORVID)
- 302 ( 1899) ;
- 303 ( 1906)       clearinput;
- 304 ( 1910)     end
- 305 ( 1910)     else begin
- 306 ( 1913)       clearinput;
- 307 ( 1917)       ENDSTK:=TOPMEM-144;
- 308 ( 1922)       { try to run program from drive 1 }
- 309 ( 1926)       runprog(runname,1,cyclus1);
- 310 ( 1944)       if RUNERR=$84 then begin
- 311 ( 1950)         { if failed, run from drive 0 }
- 312 ( 1953)         RUNERR:=0;
- 313 ( 1955)         runprog(runname,0,cyclus1);
- 314 ( 1977)         if RUNERR=$84 then begin
- 315 ( 1983)           writeln(INVVID,'Program not found',NORVID);
- 316 ( 2016)           RUNERR:=0;
- 317 ( 2018)         end;
- 318 ( 2022)       end;
- 319 ( 2022)       ENDSTK:=TOPMEM-144;
- 320 ( 2027)       IOCHECK:=true;
- 321 ( 2033) {     if RUNERR<>0 then begin
- 322 ( 2037)         writeln;
- 323 ( 2037)         writeln(INVVID,'Program aborted',NORVID);
- 324 ( 2037)       end                                          }
- 325 ( 2037)     end
- 326 ( 2037)   until false;
- 327 ( 2039) end.
+   1     4) {
+   2     4          **************************
+   3     4          *                        *
+   4     4          * R65 Pascal Main System *
+   5     4          *                        *
+   6     4          **************************
+   7     4 
+   8     4      Based on version 01/08/82 rricharz
+   9     4      1979-1982  rricharz (r77@bluewin.ch)
+  10     4      2018       recovered
+  11     4      2023       last change version 5.4
+  12     4 
+  13     4 R65 Pascal System Program. This program is
+  14     4 called, when Pascal is executed. It allows to
+  15     4 call other programs by names and with
+  16     4 arguments.
+  17     4 
+  18     4 Examples:
+  19     4   COMPILE TEST1:P
+  20     4   COMPILE TEST1:P.1F,1
+  21     4   COMPILE TEST1
+  22     4   COPY TEST3,0,1
+  23     4   FIND TEST*
+  24     4   GREP "abcd" TEST:P
+  25     4 
+  26     4 First tries to run program from drive 1,
+  27     4 unless a drive is specified in the call.
+  28     4 If not found there and not specified,
+  29     4 tries to run it from drive 0.
+  30     4 Default for arguments is drive 1.       }
+  31     4 
+  32     4 program system;
+  33     4 {does not use libraries to save memory}
+  34     4 
+  35     4 const
+  36     4   title='R65 PASCAL VERSION 5.9';
+  37    30   STOPCODE = $2010;
+  38    30   INPUT    = @0;
+  39    30   CR       = chr(13);
+  40    30   NORVID   = chr($0b);  {normal video}
+  41    30   INVVID   = chr($0e);  {inverse video}
+  42    30   MMAXSEQ  = 8;         {max no of seq. files}
+  43    30   TOPMEM   = $c780;
+  44    30 
+  45    30 mem
+  46    30   RUNERR   = $000c: integer&;
+  47    30   IOCHECK  = $0023: boolean&;
+  48    30   ENDSTK   = $000e: integer;
+  49    30   BUFFPN   = $0015: integer&;
+  50    30   FILERR   = $00db: integer&;
+  51    30   FILNAM   = $0301: array[15] of char&;
+  52    30   FILCY1   = $0330: integer&;
+  53    30   FIDRTB   = $0339: array[8] of integer&;
+  54    30   FILNM1   = $0320: array[15] of char&;
+  55    30   NUMARG   = $005f: integer&;
+  56    30   FILDRV   = $00dc: integer&;
+  57    30   FILFLG   = $00da: integer&;
+  58    30   MAXSEQ   = $0336: integer&;
+  59    30   ARGLIST  = $0060: array[10] of integer;
+  60    30   ARGLISTS = $0060: array[63] of char&;
+  61    30   ARGTYPE  = $00a0: array[31] of char&;
+  62    30 
+  63    30 
+  64    30 var
+  65    30   i, m, n: integer;
+  66    30   ch: char;
+  67    30   ok: boolean;
+  68    30   argerr: integer;
+  69    30   runname,aname: array[15] of char;
+  70    30   drive1,drive2: integer;
+  71    30   cyclus1,cyclus2: integer;
+  72    30 
+  73    30 { * runprog * }
+  74    30 
+  75    30 proc runprog
+  76    30   (name: array[15] of char;
+  77    30    drv: integer; cyc: integer);
+  78    30 
+  79    30 var i: integer;
+  80    33 
+  81    33 begin
+  82    33   for i:=0 to 15 do FILNM1[i]:=name[i];
+  83    60   FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
+  84   104   run
+  85   108 end;
+  86   109 
+  87   110 { * _uppercase * }
+  88   110 
+  89   110 func _uppercase(ch1: char): char;
+  90   110 
+  91   110 begin
+  92   110   if (ch1 >= 'a') and (ch1 <= 'z') then
+  93   129     _uppercase := chr(ord(ch1) - 32)
+  94   139   else
+  95   140     _uppercase := ch1;
+  96   148 end;
+  97   156 
+  98   157 { * next * }
+  99   157 
+ 100   157 proc next;
+ 101   157 
+ 102   157 begin
+ 103   157   read(@INPUT,ch);
+ 104   170   ch:=_uppercase(ch);
+ 105   183 end;
+ 106   187 
+ 107   188 { * nextraw * }
+ 108   188 
+ 109   188 proc nextraw;
+ 110   188 
+ 111   188 begin
+ 112   188   read(@INPUT,ch);
+ 113   201 end;
+ 114   202 
+ 115   203 { * getnum * }
+ 116   203 
+ 117   203 proc getnum
+ 118   203   (var num: integer);
+ 119   203 
+ 120   203 var sign: integer;
+ 121   206 
+ 122   206 begin
+ 123   206   sign:=1; num:=0;
+ 124   216   case ch of
+ 125   220     '+': next;
+ 126   235     '-':  begin sign:=-1; next end
+ 127   256   end; {case}
+ 128   258   ok:=ok and ((ch>='0') and (ch<='9'));
+ 129   277   while (ch>='0') and (ch<='9') do begin
+ 130   300     num:=10*num+ord(ch)-ord('0');
+ 131   314     next
+ 132   319   end;
+ 133   323   num:=sign*num
+ 134   330 end;
+ 135   339 
+ 136   340 { * getfname * }
+ 137   340 
+ 138   340 proc getfname
+ 139   340   (var name: array[15] of char;
+ 140   340    ptype: char; var ok: boolean;
+ 141   340    var drv: integer; var cyc: integer);
+ 142   340 
+ 143   340 var i, j: integer;
+ 144   343 
+ 145   343   func nexthexdigit: integer;
+ 146   343 
+ 147   343   var d: integer;
+ 148   346 
+ 149   346   begin
+ 150   346     next;
+ 151   352     if (ch>='0') and (ch<='9') then
+ 152   366       nexthexdigit:= ord(ch)-ord('0')
+ 153   376     else if (ch>='A') and (ch<='Z') then
+ 154   398       nexthexdigit:= ord(ch)-ord('A')+10
+ 155   409     else begin
+ 156   419       ok:=false;
+ 157   421     nexthexdigit:=0;
+ 158   427     end;
+ 159   431   end;
+ 160   431 
+ 161   432 begin
+ 162   432   ok:=((ch>='A') and (ch<='Z'))
+ 163   448     or (ch='*') or (ch='?') or (ch='/');
+ 164   472   i:=0;
+ 165   479   repeat
+ 166   483     name[i]:=ch; i:=succ(i);
+ 167   499     next
+ 168   504     until (i>12) or (ch=' ') or (ch=CR) or
+ 169   530       (ch=',') or (ch=':') or (ch='.');
+ 170   554   for j:=i to 15 do name[j]:=' ';
+ 171   583   if ch=':' then begin
+ 172   608     next;
+ 173   615     name[i]:=':';
+ 174   621     name[i+1]:=ch;
+ 175   632     next
+ 176   640   end
+ 177   644   else if ptype <> ' ' then begin
+ 178   654     name[i]:=':';
+ 179   663     name[i+1]:=ptype
+ 180   674   end;
+ 181   682   if (ch='.') then begin
+ 182   689     cyc:=nexthexdigit*16+nexthexdigit;
+ 183   707     next;
+ 184   716   end
+ 185   716   if (ch=',') then begin
+ 186   723     next;
+ 187   730     getnum(drv);
+ 188   742     if (drv<0) or (drv>1) then
+ 189   756       argerr:=105;
+ 190   762   end
+ 191   766 end;
+ 192   766 
+ 193   767 { * clearinput * }
+ 194   767 
+ 195   767 proc clearinput;
+ 196   767 
+ 197   767 begin
+ 198   767   BUFFPN:=-1;
+ 199   774 end;
+ 200   779 
+ 201   780 { * main * }
+ 202   780 
+ 203   780 begin {main}
+ 204   780   MAXSEQ := MMAXSEQ - 1;
+ 205   786   for i:=0 to MMAXSEQ-1 do FIDRTB[i]:=0;
+ 206   818   clearinput; writeln;
+ 207   843   writeln(title);
+ 208   859   ok:=true;
+ 209   861 
+ 210   865   repeat {main loop (endless)}
+ 211   865     write('P*');
+ 212   868     next;
+ 213   872     if ch=CR then call(STOPCODE);
+ 214   886     while (ch=' ') or (ch=chr(13)) do next;
+ 215   909     { default for program to run is drive 1,
+ 216   912       if not found, run from drive 0,
+ 217   912       user INPUT is ignored }
+ 218   912     drive1:=0; cyclus1:=0;
+ 219   920     getfname(runname,'R',ok,drive1,cyclus1);
+ 220   968     for i:=0 to 31 do ARGTYPE[i]:=chr(0);
+ 221   991     if ok then begin
+ 222  1016       NUMARG:=0; n:=0; argerr:=0;
+ 223  1033       if ch=' ' then begin  {arguments}
+ 224  1047         repeat
+ 225  1047           next;
+ 226  1051           if ch='"' then
+ 227  1057           begin {quoted argument}
+ 228  1061             ARGTYPE[n]:='q';
+ 229  1067             if n>23 then argerr:=107
+ 230  1083             else begin
+ 231  1092               for i:=0 to 15 do aname[i]:=' ';
+ 232  1115               i:=0;
+ 233  1135               nextraw;
+ 234  1143               while (ch<>'"') and (ch<>CR) do begin
+ 235  1161                 if i<=15 then begin
+ 236  1168                   aname[i]:=ch;
+ 237  1175                   i:=succ(i);
+ 238  1187                 end
+ 239  1192                 else
+ 240  1192                   argerr:=106;
+ 241  1197                 nextraw;
+ 242  1205               end;
+ 243  1205               if ch<>'"' then
+ 244  1214                 argerr:=106
+ 245  1218               else
+ 246  1220                 next;
+ 247  1231               for i:=0 to 7 do
+ 248  1239                 ARGLIST[n+i]:=
+ 249  1257                   ord(packed(aname[2*i+1],
+ 250  1267                   aname[2*i]));
+ 251  1283               n:=n+7;
+ 252  1311             end
+ 253  1316           end {quoted argument}
+ 254  1316           else if (ch>='0') and (ch<='9') then
+ 255  1333           begin {number}
+ 256  1337             getnum(m);
+ 257  1349             ARGLIST[n]:=m;
+ 258  1353             ARGTYPE[n]:='i';
+ 259  1371           end {number}
+ 260  1377           else if ((ch>='A') and (ch<='Z'))
+ 261  1394             or (ch='*') or (ch='?') or (ch='/')
+ 262  1417               then begin {letter}
+ 263  1422               { default for arg is drive 1 }
+ 264  1422               drive2:=255; cyclus2:=0;
+ 265  1430               getfname(aname,' ',ok,
+ 266  1442                 drive2,cyclus2);
+ 267  1478               if not ok then argerr:=106;
+ 268  1488               ARGTYPE[n]:='s';
+ 269  1498               if n>22 then argerr:=107
+ 270  1514               else begin
+ 271  1523                 for i:=0 to 7 do
+ 272  1531                   ARGLIST[n+i]:=
+ 273  1549                     ord(packed(aname[2*i+1],
+ 274  1559                     aname[2*i]));
+ 275  1575                 n:=n+7;
+ 276  1603               end;
+ 277  1608             ARGLIST[n+1]:=cyclus2;
+ 278  1615             ARGTYPE[n+1]:='i';
+ 279  1636             if drive2=255 then begin {default}
+ 280  1652               ARGLIST[n+2]:=1;
+ 281  1661               ARGTYPE[n+2]:='d';
+ 282  1678             end else begin
+ 283  1687               ARGLIST[n+2]:=drive2;
+ 284  1694               ARGTYPE[n+2]:='i';
+ 285  1715             end;
+ 286  1721             n:=n+2;
+ 287  1727           end {letter}
+ 288  1732           else begin
+ 289  1735             ARGLIST[n]:=0;
+ 290  1741             ARGTYPE[n]:='d';
+ 291  1755           end;
+ 292  1761           n:=n+1; NUMARG:=NUMARG+1;
+ 293  1777         until (argerr<>0) or (n>31)
+ 294  1795             or ((ch<>' ') and (ch<>','));
+ 295  1812         if ch<>CR then argerr:=106;
+ 296  1828       end; {arguments}
+ 297  1832       if ch<>CR then argerr:=106;
+ 298  1844     end {ok}
+ 299  1848     else argerr:=106;
+ 300  1853 
+ 301  1857     if argerr<>0 then begin
+ 302  1864       writeln;
+ 303  1867       writeln(INVVID,'Argument error ', argerr,NORVID)
+ 304  1899 ;
+ 305  1906       clearinput;
+ 306  1910     end
+ 307  1910     else begin
+ 308  1913       clearinput;
+ 309  1917       ENDSTK:=TOPMEM-144;
+ 310  1922       { try to run program from drive 1 }
+ 311  1926       runprog(runname,1,cyclus1);
+ 312  1944       if RUNERR=$84 then begin
+ 313  1950         { if failed, run from drive 0 }
+ 314  1953         RUNERR:=0;
+ 315  1955         runprog(runname,0,cyclus1);
+ 316  1977         if RUNERR=$84 then begin
+ 317  1983           writeln(INVVID,'Program not found',NORVID);
+ 318  2016           RUNERR:=0;
+ 319  2018         end;
+ 320  2022       end;
+ 321  2022       if (RUNERR>0) and (RUNERR<=8) then begin
+ 322  2035         write(INVVID,'in file ');
+ 323  2050         for i:=0 to 15 do write(FILNM1[i]);
+ 324  2077         writeln(NORVID);
+ 325  2100       end;
+ 326  2100       ENDSTK:=TOPMEM-144;
+ 327  2105       IOCHECK:=true;
+ 328  2111 {     if RUNERR<>0 then begin
+ 329  2115         writeln;
+ 330  2115         writeln(INVVID,'Program aborted',NORVID);
+ 331  2115       end                                          }
+ 332  2115     end
+ 333  2115   until false;
+ 334  2117 end.
 
 End compile
 
-Code lenght:          2041
+Code lenght:          2119
 Compiler stack size:  20
-Ident stack size:     51
+Ident stack size:     53
 Pascal errors:        0
