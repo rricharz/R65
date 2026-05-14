@@ -46,7 +46,7 @@ begin
   end;
   _move(XSIZE-3,ypaddle);
   _draw(XSIZE-3, ypaddle+paddlesize, WHITE);
-  lastypadde:=ypaddle;
+  lastypaddle:=ypaddle;
 end;
 
 proc showcount(x,y,count:integer);

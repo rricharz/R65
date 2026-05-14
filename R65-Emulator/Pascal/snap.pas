@@ -5,7 +5,7 @@
   the graphics canvas must be enabled      }
 
 program snap;
-uses syslib,arglib;
+uses syslib,arglib,filelib;
 
 const startcanvas = $700;
       sizecanvas  = 3304; { 224x118/8 }

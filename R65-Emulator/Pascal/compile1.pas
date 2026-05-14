@@ -540,7 +540,7 @@ begin
              incname[i]:=' '; i:=i+1;
            end;
            icyclus:=0;
-           _asetfile(incname,icyclus,sdrive,'P');
+           _asetfile(incname,icyclus,0,'P');
            savefno:=fno;
            openr(fno);
            lineinc:=0;

@@ -15,7 +15,6 @@ const DEBUG    = @1; { debug output }
 
       { control characters }
       CLRSCR   = chr($11);
-      CLRLIN   = chr($17);
       ENDMARK  = chr($00);
 
       { key codes }

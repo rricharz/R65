@@ -2,7 +2,7 @@ program tail;
 { displays text file and ascii codes of last 4 chars }
 { stops at non printable character of text file }
 
-uses syslib, arglib, wildlib;
+uses syslib, arglib, filelib, wildlib;
 
 const cup=chr($1a);
       clrlin=chr($17);

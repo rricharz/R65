@@ -16,7 +16,7 @@
 {$U+}
 
 program chkdsk;
-uses syslib,arglib;
+uses syslib,arglib,filelib;
 
 const aprepdo  = $f4a7;
       aenddo   = $f625;

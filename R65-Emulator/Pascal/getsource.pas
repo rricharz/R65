@@ -17,7 +17,7 @@
 {$U+}
 
 program getsource;
-uses syslib,arglib,filelib;
+uses syslib,arglib,filelib,wildlib;
 
 const afloppy=$c827; { exdos vector }
   VERBOSE = false;
@@ -50,7 +50,8 @@ begin
     if (filerr<>0) then ok:=false;
     { make sure that dname is on drive 0 }
     if VERBOSE then begin
-      write('Putting disk ');  _writename(dname);
+      write('Putting disk ');
+      _writename(dname);
       writeln(' in drive 0');
     end;
     cyclus:=0; drive:=0;

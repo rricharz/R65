@@ -5,7 +5,7 @@
 
 program show;
 
-uses syslib,arglib,plotlib;
+uses syslib,arglib,filelib,plotlib;
 
 const startcanvas = $700;
       sizecanvas  = 3304; { 224x118/8 }
