@@ -1137,7 +1137,7 @@ FNAM    JSR PRTINF
 * NO AUTOMATIC ERROR TESTING
 *
 OPNR    LDA =$40      silent read open
-OPNR2   STA FILFLG    
+OPNR2   STA FILFLG
         JSR COPY
         JSR OPEN
         INY
@@ -1930,8 +1930,8 @@ PERROR  LDA =47         CHECK CHARS/LINE
         STA NUMCHR      SET TO 48 CHARS/LINE
         JSR PRTINF      AND CLEAR SCREEN
         BYT $01,$91     HOME,CLRSCR
-PERROR0 JSR PRTINF
-        BYT $D,$A,7,'Pascal error '+128
+PERROR0 JSR PRTINF      INVVID,MESSAGE
+        BYT $0D,$A,$0E,'Pascal error '+128
         LDA =0
         STA DEVICE
         STA DEVPNT
@@ -1971,7 +1971,7 @@ PERROR2 LDA LSTLIN
         JSR PRTN        WRITE LINE NUMBER
 *
 PERROR3 JSR PRTINF
-        BYT $D,$8A
+        BYT $0B,$0D,$8A NORVID, CRLF
 *
 PERROR1 JMP STOP
 *

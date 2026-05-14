@@ -462,7 +462,7 @@ int mousepad()
                name,
                NULL
         };
-        printf("Running bbedit on %s, waiting for completion\n", name);
+        printf("Running TextMate on %s, waiting for completion\n", name);
 #else
         char *argv[] = {
             "/usr/bin/mousepad",

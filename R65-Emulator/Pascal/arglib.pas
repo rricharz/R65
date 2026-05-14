@@ -26,12 +26,14 @@ var _carg: integer;
 
 proc _argerror(e: integer);
 {*************************}
-{ display argument error e and stops app }
+{ display argument error e and stop app }
 const STOP=$2010;
+      NORVID   = chr($0b);  {normal video}
+      INVVID   = chr($0e);  {inverse video}
 mem RUNERR=$000c: integer&;
 begin
     writeln;
-    writeln('Argument error ',e);
+    writeln(INVVID,'Argument error ',e,NORVID);
     RUNERR:=255;
     call(STOP)
 end;

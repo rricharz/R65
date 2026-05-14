@@ -80,14 +80,17 @@ var   i: integer;
 
   proc checkfilerr;
 
-  const stopcode=$2010;
-  mem filerr = $db: integer&;
-      runerr = $0c: integer&;
+  const
+      STOPCODE=$2010;
+      NORVID   = chr($0b);  {normal video}
+      INVVID   = chr($0e);  {inverse video}
+  mem FILERR   = $db: integer&;
+      RUNERR   = $0c: integer&;
   begin
-    if filerr<>0 then begin
-      writeln('Directory error');
-      runerr:=$36;
-      call(stopcode);
+    if FILERR<>0 then begin
+      writeln(INVVID,'Directory error',NORVID);
+      RUNERR:=$36;
+      call(STOPCODE);
     end;
   end;
 

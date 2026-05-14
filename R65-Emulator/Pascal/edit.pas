@@ -73,7 +73,7 @@ begin { main }
   filerr := _emulator(ECEDIT);
   if filerr<>0 then begin
     if filerr=$69 then
-      writeln('File not stored')
+      writeln(INVVID,'File not stored',NORVID)
     else begin
       bcderror(filerr);
       writeln;

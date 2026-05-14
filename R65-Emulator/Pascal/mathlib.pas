@@ -40,7 +40,8 @@ var   lower,upper,guess:real;
 begin
   if n=0.0 then begin sqrt:=0.0; exit end;
   if n<0.0 then begin
-    writeln(INVVID,'sqrt(x) for x<0 called',NORVID);
+    writeln(INVVID,'sqrt: non-positive argument'
+      ,NORVID);
     RUNERR := 54;
     call(STOPCODE);
     end;
@@ -141,7 +142,7 @@ begin
   if m>0. then
     while m<1. do begin e:=e-1; m:=10.*m; end;
 
-  m := m + 0.0000501; { round to 4 decimals }
+  m := m + 0.000051; { round to 4 decimals }
   if m>=10. then begin e:=e+1; m:=m/10.; end;
 
   width:=12; { sign, digit, dot, 4 decimals, e+xx }
@@ -255,7 +256,7 @@ end;
 proc __wrfix(r:real; fl, d:integer);
 {**********************************}
 { write real in fixed point format
-  right justified in field of 11 chars
+  right justified in field of fl chars,
   d digits after decimal point.
   Real output is reliable to about 6 digits.
   This function is used by write(real). }
@@ -336,7 +337,7 @@ var r0,rm1,rp1,a,b,res,d,q: real;
 begin
   if fabs(r-1.0)<0.0001 then begin ln:=0.0; exit end;
   if r<=0.0 then begin
-  writeln('ln: non-positive argument');
+  writeln(INVVID,'ln: non-positive argument',NORVID);
     ln:=-1.0e-38
   end else begin
     r0:=r;

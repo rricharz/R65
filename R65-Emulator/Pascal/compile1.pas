@@ -131,6 +131,7 @@ proc crlf;
 begin
   writeln(@lpr);
   line:=succ(line); lineinc:=succ(lineinc);
+  tpos := 0;
 end {crlf};
 
 {#################################}
@@ -141,7 +142,7 @@ proc merror(x: integer; code: packed char);
 var k: integer;
     answer: char;
 begin
-  crlf; numerr:=succ(numerr);
+  writeln; numerr:=succ(numerr);
   write(INVVID,'ERROR: ');
   case x of
     01: write('Ident');
@@ -253,6 +254,7 @@ begin
   end;
   write(@lpr,' ');
   write(@lpr,(pc+2):5,' ');
+  tpos := 0;
 end;
 
 {#############################}
@@ -287,7 +289,10 @@ begin
       { for end. at end of file to work properly }
       ch:=' ';
     end
-    else write(@lpr,ch);
+    else begin
+      write(@lpr,ch);
+      tpos := tpos + 1;
+    end;
   end;
 end {getchr};
 
@@ -578,7 +583,6 @@ end;
 
 begin
   count:=1; while ch=' ' do getchr;
-  tpos:=CURPOS;
 
   { delayed because of token lookahead }
   if nlflg then begin

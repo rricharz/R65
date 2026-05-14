@@ -20,12 +20,20 @@ proc _checkfilerr;
 {****************}
 { display file error code and stop }
 const
+    NORVID   = chr($0b);  {normal video}
+    INVVID   = chr($0e);  {inverse video}
     STOP=$2010;
 mem
     RUNERR=$000c: integer&;
+    FILNM1  = $0320: array[NAMESIZE] of char&;
+var i: integer;
 begin
   if filerr<>0 then begin
-    writeln('File Error ', filerr);
+    write(INVVID,'File Error ', filerr,
+    ' in file ');
+    for i := 0 to 15 do
+      write(FILNM1[i]);
+    writeln(NORVID);
     RUNERR := 255;
     call(STOP);
   end;
@@ -48,11 +56,13 @@ dummy: boolean;
   proc _argerror(e: integer);
   const
     STOP=$2010;
+    NORVID   = chr($0b);  {normal video}
+    INVVID   = chr($0e);  {inverse video}
   mem
     RUNERR=$000c: integer&;
   begin
     writeln;
-    writeln('Argument error ',e);
+    writeln(INVVID,'Argument error ',e, NORVID);
     RUNERR:=255;
     call(STOP)
   end;
