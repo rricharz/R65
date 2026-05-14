@@ -1,1032 +1,973 @@
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 1
-
-
-   1 (    4) program extract;
-   2 (    4) uses syslib, arglib, filelib, strlib;
-   3 ( 3084) 
-   4 ( 3084) {$U+}
-   5 ( 3084) 
-   6 ( 3084) const TOK_OTHER = 0;
-   7 ( 3087)       TOK_CONST = 1;
-   8 ( 3087)       TOK_MEM   = 2;
-   9 ( 3087)       TOK_VAR   = 3;
-  10 ( 3087)       TOK_PROC  = 4;
-  11 ( 3087)       TOK_FUNC  = 5;
-  12 ( 3087)       TOK_BEGIN = 6;
-  13 ( 3087)       TOK_CASE  = 7;
-  14 ( 3087)       TOK_END   = 8;
-  15 ( 3087) 
-  16 ( 3087)       SSTART   = 0;
-  17 ( 3087)       SCONST   = 1;
-  18 ( 3087)       SMEM     = 2;
-  19 ( 3087)       SVAR     = 3;
-  20 ( 3087)       SROUT    = 4;
-  21 ( 3087)       SSKIP    = 5;
-  22 ( 3087)       SBODY    = 6;
-  23 ( 3087)       SDONE    = 7;
-  24 ( 3087)       SHEAD    = 8;
-  25 ( 3087) 
-  26 ( 3087)       DEBUG1   = false;
-  27 ( 3087)       DEBUG2   = false;
-  28 ( 3087)       INDENT   = '      ';
-  29 ( 3094)       IPINDENT = ' 10';
-  30 ( 3098) 
-  31 ( 3098)       QUOTE    = chr($27);
-  32 ( 3098) 
-  33 ( 3098) var
-  34 ( 3098)   f_in, f_out: file;
-  35 ( 3098)   line, libname, cname,
-  36 ( 3098)     cval, cval2, cval3, addrpad, body: cpnt;
-  37 ( 3098)   name: array[15] of char;
-  38 ( 3098)   lineno, llen: integer;
-  39 ( 3098)   ateof: boolean;
-  40 ( 3098)   state, tok, pass: integer;
-  41 ( 3098)   seenbegin, ininner: boolean;
-  42 ( 3098)   routheader: boolean;
-  43 ( 3098)   blocklevel, routlevel, dlevel: integer;
-  44 ( 3098)   parlevel: integer;
-  45 ( 3098) 
-  46 ( 3098) proc isidchar(ch:char; var yes:boolean);
-  47 ( 3098) {************************************}
-  48 ( 3098) begin
-  49 ( 3098)   yes:=(((ch>='A') and (ch<='Z')) or
-  50 ( 3118)         ((ch>='a') and (ch<='z')) or
-  51 ( 3133)         ((ch>='0') and (ch<='9')) or
-  52 ( 3149)         (ch='_'));
-  53 ( 3158) end;
-  54 ( 3162) 
-  55 ( 3163) proc wordat(pos:integer; w:cpnt;
-  56 ( 3163)             var yes:boolean);
-  57 ( 3163) {******************************}
-  58 ( 3163) var i,n: integer;
-  59 ( 3166)     b1,b2: boolean;
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 2
-
-  60 ( 3166) begin
-  61 ( 3166)   yes:=false;
-  62 ( 3170)   n:=_strlen(w);
-  63 ( 3186) 
-  64 ( 3190)   i:=0;
-  65 ( 3192)   while i<n do
-  66 ( 3200)   begin
-  67 ( 3208)     if line[pos+i]=ENDMARK then exit;
-  68 ( 3230)     if line[pos+i]<>w[i] then exit;
-  69 ( 3260)     i:=i+1;
-  70 ( 3266)   end;
-  71 ( 3271) 
-  72 ( 3274)   if pos=0 then
-  73 ( 3280)     b1:=false
-  74 ( 3284)   else
-  75 ( 3286)     isidchar(line[pos-1],b1);
-  76 ( 3320) 
-  77 ( 3320)   isidchar(line[pos+n],b2);
-  78 ( 3349)   yes:=not b1 and not b2;
-  79 ( 3354) end;
-  80 ( 3364) 
-  81 ( 3365) proc updblockline(var delta:integer);
-  82 ( 3365) {***********************************}
-  83 ( 3365) var i: integer;
-  84 ( 3368)     inquote,yes: boolean;
-  85 ( 3368) begin
-  86 ( 3368)   delta:=0;
-  87 ( 3372)   i:=0;
-  88 ( 3378)   inquote:=false;
-  89 ( 3384) 
-  90 ( 3388)   while line[i]<>ENDMARK do
-  91 ( 3400)   begin
-  92 ( 3404)     if line[i]=QUOTE then
-  93 ( 3416)     begin
-  94 ( 3417)       inquote:=not inquote;
-  95 ( 3420)       i:=i+1;
-  96 ( 3435)     end
-  97 ( 3440)     else if (not inquote) and (line[i]='{') then
-  98 ( 3461)       exit
-  99 ( 3462)     else if not inquote then
- 100 ( 3469)     begin
- 101 ( 3474)       wordat(i,'begin',yes);
- 102 ( 3503)       if yes then
- 103 ( 3503)       begin
- 104 ( 3507)         delta:=delta+1;
- 105 ( 3516)         i:=i+5;
- 106 ( 3527)       end
- 107 ( 3532)       else
- 108 ( 3532)       begin
- 109 ( 3535)         wordat(i,'case',yes);
- 110 ( 3560)         if yes then
- 111 ( 3560)         begin
- 112 ( 3564)           delta:=delta+1;
- 113 ( 3573)           i:=i+4;
- 114 ( 3584)         end
- 115 ( 3589)         else
- 116 ( 3589)         begin
- 117 ( 3592)           wordat(i,'end',yes);
- 118 ( 3616)           if yes then
- 119 ( 3616)           begin
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 3
-
- 120 ( 3620)             delta:=delta-1;
- 121 ( 3629)             i:=i+3;
- 122 ( 3640)           end
- 123 ( 3645)           else
- 124 ( 3645)             i:=i+1;
- 125 ( 3654)         end;
- 126 ( 3659)       end;
- 127 ( 3659)     end
- 128 ( 3659)     else
- 129 ( 3659)       i:=i+1;
- 130 ( 3668)   end;
- 131 ( 3673) end;
- 132 ( 3676) 
- 133 ( 3677) proc splitstr(src: cpnt; sep: char; dstl,dstr: cpnt);
- 134 ( 3677) {***************************************************}
- 135 ( 3677) var i,j: integer;
- 136 ( 3680) begin
- 137 ( 3680)   dstl[0] := ENDMARK;
- 138 ( 3686)   dstr[0] := ENDMARK;
- 139 ( 3694) 
- 140 ( 3698)   i := _strpos(sep,src,0);
- 141 ( 3716)   if i < 0 then begin
- 142 ( 3727)     _strcpy(src, dstl);
- 143 ( 3744)     exit;
- 144 ( 3745)   end;
- 145 ( 3745) 
- 146 ( 3745)   j := 0;
- 147 ( 3747)   while j < i do begin
- 148 ( 3763)     dstl[j] := src[j];
- 149 ( 3775)     j := j+1;
- 150 ( 3787)   end;
- 151 ( 3792)   dstl[j] := ENDMARK;
- 152 ( 3801) 
- 153 ( 3805)   i := i+1;
- 154 ( 3811)   while src[i] = ' ' do
- 155 ( 3828)     i := i+1;
- 156 ( 3838) 
- 157 ( 3846)   j := 0;
- 158 ( 3848)   while src[i] <> ENDMARK do begin
- 159 ( 3868)     dstr[j] := src[i];
- 160 ( 3880)     j := j+1;
- 161 ( 3892)     i := i+1;
- 162 ( 3903)   end;
- 163 ( 3908)   dstr[j] := ENDMARK;
- 164 ( 3917) end;
- 165 ( 3921) 
- 166 ( 3922) proc padright(src,dst: cpnt; w: integer);
- 167 ( 3922) {***************************************}
- 168 ( 3922) var i: integer;
- 169 ( 3925) begin
- 170 ( 3925)   dst[0] := ENDMARK;
- 171 ( 3931)   write(@dst, src);
- 172 ( 3946)   i := _strlen(src);
- 173 ( 3958)   while i < w do begin
- 174 ( 3974)     write(@dst, ' ');
- 175 ( 3982)     i := i+1;
- 176 ( 3988)   end;
- 177 ( 3993) end;
- 178 ( 3996) 
- 179 ( 3997) proc buildbody(addr,typ,dst: cpnt);
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 4
-
- 180 ( 3997) {********************************}
- 181 ( 3997) begin
- 182 ( 3997)   dst[0] := ENDMARK;
- 183 ( 4006)   write(@dst, addr, '  ',typ);
- 184 ( 4029) end;
- 185 ( 4029) 
- 186 ( 4030) 
- 187 ( 4030) 
- 188 ( 4030) proc updpar(s:cpnt);
- 189 ( 4030) {******************}
- 190 ( 4030) var i: integer;
- 191 ( 4033) begin
- 192 ( 4033)   i:=0;
- 193 ( 4037)   while s[i]<>ENDMARK do
- 194 ( 4053)   begin
- 195 ( 4057)     if s[i]='(' then
- 196 ( 4069)       parlevel:=parlevel+1;
- 197 ( 4079)     if s[i]=')' then
- 198 ( 4096)       parlevel:=parlevel-1;
- 199 ( 4106)     i:=i+1;
- 200 ( 4117)   end;
- 201 ( 4122) end;
- 202 ( 4125) 
- 203 ( 4126) func hassemi(s:cpnt): boolean;
- 204 ( 4126) {************************}
- 205 ( 4126) var i: integer;
- 206 ( 4129) begin
- 207 ( 4129)   i:=0;
- 208 ( 4133)   while s[i]<>ENDMARK do
- 209 ( 4149)   begin
- 210 ( 4153)     if s[i]=';' then
- 211 ( 4165)     begin
- 212 ( 4166)       hassemi:=true;
- 213 ( 4171)       exit;
- 214 ( 4176)     end;
- 215 ( 4176)     i:=i+1;
- 216 ( 4182)   end;
- 217 ( 4187)   hassemi:=false;
- 218 ( 4192) end;
- 219 ( 4196) 
- 220 ( 4197) proc rtrim(s:cpnt);
- 221 ( 4197) {*****************}
- 222 ( 4197) var i: integer;
- 223 ( 4200) begin
- 224 ( 4200)   i:=_strlen(s);
- 225 ( 4214)   while i>0 do
- 226 ( 4224)   begin
- 227 ( 4228)     if s[i-1]<>' ' then
- 228 ( 4243)     begin
- 229 ( 4244)       s[i]:=ENDMARK;
- 230 ( 4253)       exit;
- 231 ( 4258)     end;
- 232 ( 4258)     i:=i-1;
- 233 ( 4264)   end;
- 234 ( 4269)   s[0]:=ENDMARK;
- 235 ( 4276) end;
- 236 ( 4280) 
- 237 ( 4281) proc isalnum(ch:char; var yes:boolean);
- 238 ( 4281) {*************************************}
- 239 ( 4281) begin
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 5
-
- 240 ( 4281)   yes:=(((ch>='A') and (ch<='Z')) or
- 241 ( 4301)         ((ch>='a') and (ch<='z')) or
- 242 ( 4316)         ((ch>='0') and (ch<='9')));
- 243 ( 4333) end;
- 244 ( 4337) 
- 245 ( 4338) proc matchtok(t:cpnt; s:cpnt; var yes:boolean);
- 246 ( 4338) {*********************************************}
- 247 ( 4338) var i,j,lt,ls: integer;
- 248 ( 4341)     ok: boolean;
- 249 ( 4341) begin
- 250 ( 4341)   yes:=false;
- 251 ( 4345)   lt:=_strlen(t);
- 252 ( 4361)   ls:=_strlen(s);
- 253 ( 4377) 
- 254 ( 4381)   i:=0;
- 255 ( 4383)   while (i<ls) and (s[i]=' ') do
- 256 ( 4409)     i:=i+1;
- 257 ( 4419) 
- 258 ( 4427)   if i+lt>ls then
- 259 ( 4436)     exit;
- 260 ( 4445) 
- 261 ( 4445)   j:=0;
- 262 ( 4447)   while j<lt do
- 263 ( 4455)   begin
- 264 ( 4463)     if t[j]<>s[i+j] then
- 265 ( 4486)       exit;
- 266 ( 4493)     j:=j+1;
- 267 ( 4499)   end;
- 268 ( 4504) 
- 269 ( 4507)   if i+lt<ls then
- 270 ( 4516)   begin
- 271 ( 4521)     isalnum(s[i+lt], ok);
- 272 ( 4553)     if ok then
- 273 ( 4553)       exit;
- 274 ( 4561)   end;
- 275 ( 4561) 
- 276 ( 4561)   yes:=true;
- 277 ( 4563) end;
- 278 ( 4567) 
- 279 ( 4568) proc gettok(var tok0:integer);
- 280 ( 4568) {****************************}
- 281 ( 4568) var yes: boolean;
- 282 ( 4571) begin
- 283 ( 4571)   tok0:=TOK_OTHER;
- 284 ( 4575) 
- 285 ( 4579)   matchtok('const', line, yes);
- 286 ( 4605)   if yes then
- 287 ( 4605)   begin
- 288 ( 4609)     tok0:=TOK_CONST;
- 289 ( 4614)     exit;
- 290 ( 4619)   end;
- 291 ( 4619) 
- 292 ( 4619)   matchtok('mem', line, yes);
- 293 ( 4643)   if yes then
- 294 ( 4643)   begin
- 295 ( 4647)     tok0:=TOK_MEM;
- 296 ( 4652)     exit;
- 297 ( 4657)   end;
- 298 ( 4657) 
- 299 ( 4657)   matchtok('var', line, yes);
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 6
-
- 300 ( 4681)   if yes then
- 301 ( 4681)   begin
- 302 ( 4685)     tok0:=TOK_VAR;
- 303 ( 4690)     exit;
- 304 ( 4695)   end;
- 305 ( 4695) 
- 306 ( 4695)   matchtok('proc', line, yes);
- 307 ( 4720)   if yes then
- 308 ( 4720)   begin
- 309 ( 4724)     tok0:=TOK_PROC;
- 310 ( 4729)     exit;
- 311 ( 4734)   end;
- 312 ( 4734) 
- 313 ( 4734)   matchtok('func', line, yes);
- 314 ( 4759)   if yes then
- 315 ( 4759)   begin
- 316 ( 4763)     tok0:=TOK_FUNC;
- 317 ( 4768)     exit;
- 318 ( 4773)   end;
- 319 ( 4773) 
- 320 ( 4773)   matchtok('begin', line, yes);
- 321 ( 4799)   if yes then
- 322 ( 4799)   begin
- 323 ( 4803)     tok0:=TOK_BEGIN;
- 324 ( 4808)     exit;
- 325 ( 4813)   end;
- 326 ( 4813) 
- 327 ( 4813)   matchtok('case', line, yes);
- 328 ( 4838)   if yes then
- 329 ( 4838)   begin
- 330 ( 4842)     tok0:=TOK_CASE;
- 331 ( 4847)     exit;
- 332 ( 4852)   end;
- 333 ( 4852) 
- 334 ( 4852)   matchtok('end', line, yes);
- 335 ( 4876)   if yes then
- 336 ( 4876)   begin
- 337 ( 4880)     tok0:=TOK_END;
- 338 ( 4885)     exit;
- 339 ( 4890)   end;
- 340 ( 4890) end;
- 341 ( 4890) 
- 342 ( 4891) proc printtok(tok0:integer);
- 343 ( 4891) {**************************}
- 344 ( 4891) begin
- 345 ( 4891)   case tok0 of
- 346 ( 4896)     TOK_CONST: write('CONST');
- 347 ( 4913)     TOK_MEM  : write('MEM');
- 348 ( 4927)     TOK_VAR  : write('VAR');
- 349 ( 4941)     TOK_PROC : write('PROC');
- 350 ( 4956)     TOK_FUNC : write('FUNC');
- 351 ( 4971)     TOK_BEGIN: write('BEGIN');
- 352 ( 4987)     TOK_CASE : write('CASE');
- 353 ( 5002)     TOK_END  : write('END')
- 354 ( 5016)   else
- 355 ( 5016)     write('OTHER')
- 356 ( 5025)   end;
- 357 ( 5027) end;
- 358 ( 5027) 
- 359 ( 5028) proc printstate(st:integer);
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 7
-
- 360 ( 5028) {**************************}
- 361 ( 5028) begin
- 362 ( 5028)   case st of
- 363 ( 5033)     SSTART: write('SSTART');
- 364 ( 5051)     SCONST: write('SCONST');
- 365 ( 5068)     SMEM  : write('SMEM');
- 366 ( 5083)     SVAR  : write('SVAR');
- 367 ( 5098)     SROUT : write('SROUT');
- 368 ( 5114)     SSKIP : write('SSKIP');
- 369 ( 5130)     SBODY : write('SBODY');
- 370 ( 5146)     SDONE : write('SDONE');
- 371 ( 5162)     SHEAD : write('SHEAD')
- 372 ( 5178)   else
- 373 ( 5178)     write('???')
- 374 ( 5185)   end;
- 375 ( 5187) end;
- 376 ( 5187) 
- 377 ( 5188) proc writehex(f:file; a:integer);
- 378 ( 5188) {*******************************}
- 379 ( 5188) var h:integer;
- 380 ( 5191)   func hexdigit(c:char):char;
- 381 ( 5191)   var d:integer;
- 382 ( 5194)   begin
- 383 ( 5194)     d:=ord(c) and 15;
- 384 ( 5202)     if d>9 then
- 385 ( 5213)       hexdigit:=chr(d-10+ord('A'))
- 386 ( 5226)     else
- 387 ( 5227)       hexdigit:=chr(d+ord('0'));
- 388 ( 5242)   end;
- 389 ( 5247) begin
- 390 ( 5248)   h:=a and 255;
- 391 ( 5256)   write(@f,hexdigit(chr(h shr 4)));
- 392 ( 5284)   write(@f,hexdigit(chr(h and 15)));
- 393 ( 5307) end;
- 394 ( 5307) 
- 395 ( 5308) proc setsubtype(subtype:char);
- 396 ( 5308) {****************************}
- 397 ( 5308) var i:integer;
- 398 ( 5311) begin
- 399 ( 5311)   i:=0;
- 400 ( 5315)   repeat
- 401 ( 5319)     i:=i+1;
- 402 ( 5325)   until (name[i]=':') or
- 403 ( 5341)         (name[i]=' ') or
- 404 ( 5352)         (i>=14);
- 405 ( 5360)   name[i]:=':';
- 406 ( 5370)   name[i+1]:=subtype;
- 407 ( 5381) end;
- 408 ( 5389) 
- 409 ( 5390) proc initname;
- 410 ( 5390) {*************}
- 411 ( 5390) var default: boolean;
- 412 ( 5393)     cyclus, drive: integer;
- 413 ( 5393) begin
- 414 ( 5393)   cyclus:=0;
- 415 ( 5397)   drive:=1;
- 416 ( 5403)   default:=true;
- 417 ( 5409)   _agetstring(name, default, cyclus, drive);
- 418 ( 5453) end;
- 419 ( 5453) 
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 8
-
- 420 ( 5454) proc open_files(outsubtype:char);
- 421 ( 5454) {******************************}
- 422 ( 5454) var cyclus, drive, vcyclus: integer;
- 423 ( 5457) begin
- 424 ( 5457)   drive:=1;
- 425 ( 5461)   cyclus:=0;
- 426 ( 5467)   vcyclus:=FILCYC;
- 427 ( 5475) 
- 428 ( 5479)   setsubtype('P');
- 429 ( 5487)   _asetfile(name, cyclus, drive, ' ');
- 430 ( 5509)   openr(f_in);
- 431 ( 5515)   writeln;
- 432 ( 5515) 
- 433 ( 5521)   cyclus:=0;
- 434 ( 5523)   setsubtype(outsubtype);
- 435 ( 5537)   _asetfile(name, cyclus, drive, ' ');
- 436 ( 5559)   openw(f_out);
- 437 ( 5565) 
- 438 ( 5565)   if DEBUG1 then
- 439 ( 5567)   begin
- 440 ( 5567)     write(@f_out,'program EXTRACT version ');
- 441 ( 5601)     writehex(f_out,vcyclus);
- 442 ( 5615)     writeln(@f_out);
- 443 ( 5627)   end;
- 444 ( 5627) end;
- 445 ( 5627) 
- 446 ( 5628) proc close_files;
- 447 ( 5628) {***************}
- 448 ( 5628) begin
- 449 ( 5628)   close(f_in);
- 450 ( 5639)   close(f_out);
- 451 ( 5645) end;
- 452 ( 5645) 
- 453 ( 5646) proc print_rem(kwlen:integer);
- 454 ( 5646) {************************}
- 455 ( 5646) var i:integer;
- 456 ( 5649) begin
- 457 ( 5649)   i:=0;
- 458 ( 5653)   while line[i]=' ' do
- 459 ( 5669)     i:=i+1;
- 460 ( 5679) 
- 461 ( 5687)   i:=i+kwlen;
- 462 ( 5691)   if line[i]=ENDMARK then exit;
- 463 ( 5717)   while line[i]=' ' do
- 464 ( 5729)     i:=i+1;
- 465 ( 5739) 
- 466 ( 5747)   if line[i]<>ENDMARK then
- 467 ( 5759)   begin
- 468 ( 5760)     write(@f_out,INDENT);
- 469 ( 5774)     while line[i]<>ENDMARK do
- 470 ( 5786)     begin
- 471 ( 5790)       write(@f_out,line[i]);
- 472 ( 5807)       i:=i+1;
- 473 ( 5813)     end;
- 474 ( 5818)     writeln(@f_out);
- 475 ( 5833)   end;
- 476 ( 5833) end;
- 477 ( 5833) 
- 478 ( 5834) proc getlibname;
- 479 ( 5834) {***************}
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 9
-
- 480 ( 5834) var i,j: integer;
- 481 ( 5837) begin
- 482 ( 5837)   i:=0;
- 483 ( 5841)   while line[i]=' ' do
- 484 ( 5857)     i:=i+1;
- 485 ( 5867) 
- 486 ( 5875)   i:=i+7;
- 487 ( 5881)   while line[i]=' ' do
- 488 ( 5898)     i:=i+1;
- 489 ( 5908) 
- 490 ( 5916)   j:=0;
- 491 ( 5918)   while (line[i]<>ENDMARK) and
- 492 ( 5935)         (line[i]<>';') and
- 493 ( 5948)         (line[i]<>' ') do
- 494 ( 5962)   begin
- 495 ( 5966)     libname[j]:=_uppercase(line[i]);
- 496 ( 5988)     i:=i+1;
- 497 ( 5998)     j:=j+1;
- 498 ( 6009)   end;
- 499 ( 6014)   libname[j]:=ENDMARK;
- 500 ( 6023) end;
- 501 ( 6027) 
- 502 ( 6028) proc stripcomment;
- 503 ( 6028) {****************}
- 504 ( 6028) var  i: integer;
- 505 ( 6031) begin
- 506 ( 6031)   i := _strpos('{',line,0);
- 507 ( 6049)   if i >= 0 then
- 508 ( 6059)     line[i] := ENDMARK;
- 509 ( 6069) end;
- 510 ( 6073) 
- 511 ( 6074) func isemptyline: boolean;
- 512 ( 6074) {************************}
- 513 ( 6074) var i: integer;
- 514 ( 6077) begin
- 515 ( 6077)   i := 0;
- 516 ( 6081)   while line[i] <> ENDMARK do begin
- 517 ( 6101)     if (line[i] <> ' ') and (line[i] <> TAB8) then
- 518 ( 6127)     begin
- 519 ( 6128)       isemptyline := false;
- 520 ( 6133)       exit;
- 521 ( 6138)     end;
- 522 ( 6138)     i := i + 1;
- 523 ( 6144)   end;
- 524 ( 6149)   isemptyline := true;
- 525 ( 6154) end;
- 526 ( 6158) 
- 527 ( 6159) proc dostart;
- 528 ( 6159) {*************}
- 529 ( 6159) var i: integer;
- 530 ( 6162) begin
- 531 ( 6162)   getlibname;
- 532 ( 6168)   if isemptyline then exit;
- 533 ( 6178) 
- 534 ( 6178)   if pass=2 then
- 535 ( 6184)   begin
- 536 ( 6185)     writeln(@f_out,'.TH ',libname,' 1');
- 537 ( 6213)     writeln(@f_out);
- 538 ( 6225)     writeln(@f_out,'.SH NAME');
- 539 ( 6246)     writeln(@f_out,libname,' - library');
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 10
-
- 540 ( 6274)     writeln(@f_out);
- 541 ( 6286)     writeln(@f_out,'.NF');
- 542 ( 6302)     writeln(@f_out);
- 543 ( 6314)     exit;
- 544 ( 6315)   end;
- 545 ( 6315) 
- 546 ( 6315)     i:=0;
- 547 ( 6317)     while line[i]<>ENDMARK do
- 548 ( 6333)     begin
- 549 ( 6337)       if line[i]=';' then
- 550 ( 6349)       begin
- 551 ( 6350)         write(@f_out,';');
- 552 ( 6361)         writeln(@f_out);
- 553 ( 6373)         exit;
- 554 ( 6374)       end;
- 555 ( 6374)       write(@f_out,_uppercase(line[i]));
- 556 ( 6399)       i:=i+1;
- 557 ( 6405)     end;
- 558 ( 6410) end;
- 559 ( 6413) 
- 560 ( 6414) proc doconst(entering:boolean);
- 561 ( 6414) {****************************}
- 562 ( 6414) begin
- 563 ( 6414)   stripcomment;
- 564 ( 6423)   if isemptyline then exit;
- 565 ( 6433)   if entering then
- 566 ( 6433)     begin
- 567 ( 6437)       writeln(@f_out);
- 568 ( 6452)       if pass=2 then
- 569 ( 6458)         write(@f_out, '.SH ');
- 570 ( 6473)       writeln(@f_out, 'CONSTANTS');
- 571 ( 6495)       print_rem(5);
- 572 ( 6503)     end
- 573 ( 6503)   else
- 574 ( 6503)     writeln(@f_out, line);
- 575 ( 6523) end;
- 576 ( 6523) 
- 577 ( 6524) proc domem(entering:boolean);
- 578 ( 6524) {**************************}
- 579 ( 6524) begin
- 580 ( 6524)   stripcomment;
- 581 ( 6533)   if isemptyline then exit;
- 582 ( 6543)   if entering then
- 583 ( 6543)     begin
- 584 ( 6547)       writeln(@f_out);
- 585 ( 6562) 
- 586 ( 6562) if pass=2 then
- 587 ( 6568)         write(@f_out, '.SH ');
- 588 ( 6583)       writeln(@f_out,'MEMORY');
- 589 ( 6602)       if tok=TOK_MEM then
- 590 ( 6608)         print_rem(3);
- 591 ( 6620)     end
- 592 ( 6620)   else
- 593 ( 6620)     writeln(@f_out,line);
- 594 ( 6640) end;
- 595 ( 6640) 
- 596 ( 6641) proc dovar(entering:boolean);
- 597 ( 6641) {**************************}
- 598 ( 6641) begin
- 599 ( 6641)   stripcomment;
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 11
-
- 600 ( 6650)   if isemptyline then exit;
- 601 ( 6660)   if entering then
- 602 ( 6660)     begin
- 603 ( 6664)       writeln(@f_out);
- 604 ( 6679)       if pass=2 then
- 605 ( 6685)         write(@f_out, '.SH ');
- 606 ( 6700)       writeln(@f_out, 'VARIABLES');
- 607 ( 6722)       print_rem(3);
- 608 ( 6730)     end
- 609 ( 6730)   else
- 610 ( 6730)     writeln(@f_out, line);
- 611 ( 6750) end;
- 612 ( 6750) 
- 613 ( 6751) proc dorout(entering:boolean);
- 614 ( 6751) {***************************}
- 615 ( 6751) begin
- 616 ( 6751)      if entering and not routheader then
- 617 ( 6760)     begin
- 618 ( 6766)       writeln(@f_out);
- 619 ( 6781)       if pass=2 then
- 620 ( 6787)         write(@f_out, '.SH ');
- 621 ( 6802)       writeln(@f_out, 'ROUTINES');
- 622 ( 6823)       routheader:=true;
- 623 ( 6825)     end;
- 624 ( 6829)     writeln(@f_out, line);
- 625 ( 6846) end;
- 626 ( 6846) 
- 627 ( 6847) proc debugline;
- 628 ( 6847) {**************}
- 629 ( 6847) begin
- 630 ( 6847)   if DEBUG1 then
- 631 ( 6854)   begin
- 632 ( 6854)     write('line ');
- 633 ( 6863)     write(lineno);
- 634 ( 6868)     write(': state=');
- 635 ( 6877)     printstate(state);
- 636 ( 6887)     write(' tok=');
- 637 ( 6893)     printtok(tok);
- 638 ( 6903)     write(' text="');
- 639 ( 6911)     write(line);
- 640 ( 6916)     writeln('"');
- 641 ( 6924)     write(' blocklevel=',blocklevel);
- 642 ( 6942)     writeln;
- 643 ( 6942)   end;
- 644 ( 6948) end;
- 645 ( 6948) 
- 646 ( 6949) proc debugstate;
- 647 ( 6949) {***************}
- 648 ( 6949) begin
- 649 ( 6949)   if DEBUG1 then
- 650 ( 6956)   begin
- 651 ( 6956)     write('     newstate=');
- 652 ( 6974)     printstate(state);
- 653 ( 6984)     writeln;
- 654 ( 6984)   end;
- 655 ( 6990) end;
- 656 ( 6990) 
- 657 ( 6991) proc runpass(passno: integer);
- 658 ( 6991) {***************************}
- 659 ( 6991) var islib: boolean;
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 12
-
- 660 ( 6994) begin
- 661 ( 6994)   pass := passno;
- 662 ( 6996)   if pass = 1 then
- 663 ( 7010)     open_files('H')
- 664 ( 7016)   else
- 665 ( 7022)     open_files('N');
- 666 ( 7033)   lineno:=0;
- 667 ( 7035)   state:=SSTART;
- 668 ( 7041)   seenbegin:=false;
- 669 ( 7047)   ininner:=false;
- 670 ( 7053)   blocklevel:=0;
- 671 ( 7059)   routlevel:=0;
- 672 ( 7065)   parlevel:=0;
- 673 ( 7071)   routheader:=false;
- 674 ( 7077) 
- 675 ( 7081)   repeat
- 676 ( 7081)     llen:=_strread(f_in, line, ateof);
- 677 ( 7105)     rtrim(line);
- 678 ( 7119)     lineno:=lineno+1;
- 679 ( 7125) 
- 680 ( 7130)     if llen>0 then
- 681 ( 7136)     begin
- 682 ( 7137)       write('.');
- 683 ( 7142)       gettok(tok);
- 684 ( 7154)       debugline;
- 685 ( 7158)       matchtok('library', line, islib);
- 686 ( 7186) 
- 687 ( 7186)       case state of
- 688 ( 7186) 
- 689 ( 7190)         SSTART:
- 690 ( 7194)           begin
- 691 ( 7197)             if islib then
- 692 ( 7197)               dostart
- 693 ( 7201)             else if tok=TOK_CONST then
- 694 ( 7217)             begin
- 695 ( 7218)               doconst(true);
- 696 ( 7229)               state:=SCONST;
- 697 ( 7231)             end
- 698 ( 7235)             else if tok=TOK_MEM then
- 699 ( 7244)             begin
- 700 ( 7245)               domem(true);
- 701 ( 7256)               state:=SMEM;
- 702 ( 7258)             end
- 703 ( 7262)             else if tok=TOK_VAR then
- 704 ( 7271)             begin
- 705 ( 7272)               dovar(true);
- 706 ( 7283)               state:=SVAR;
- 707 ( 7285)             end
- 708 ( 7289)             else if (tok=TOK_PROC) or
- 709 ( 7299)                     (tok=TOK_FUNC) then
- 710 ( 7306)             begin
- 711 ( 7307)               dorout(true);
- 712 ( 7318)               parlevel:=0;
- 713 ( 7320)               updpar(line);
- 714 ( 7334)               if (parlevel=0) and hassemi(line) then
- 715 ( 7353)               begin
- 716 ( 7354)                 state:=SSKIP;
- 717 ( 7359)                 seenbegin:=false;
- 718 ( 7365)                 blocklevel:=0;
- 719 ( 7371)                 routlevel:=0;
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 13
-
- 720 ( 7377)                 ininner:=false;
- 721 ( 7383)               end
- 722 ( 7387)               else
- 723 ( 7387)                 state:=SHEAD;
- 724 ( 7392)             end
- 725 ( 7396)             else if tok=TOK_BEGIN then
- 726 ( 7405)             begin
- 727 ( 7406)               state:=SBODY;
- 728 ( 7411)               blocklevel:=1;
- 729 ( 7417)             end;
- 730 ( 7421)           end;
- 731 ( 7421) 
- 732 ( 7424)         SCONST:
- 733 ( 7428)           begin
- 734 ( 7431)             if tok=TOK_MEM then
- 735 ( 7437)             begin
- 736 ( 7438)               domem(true);
- 737 ( 7449)               state:=SMEM;
- 738 ( 7451)             end
- 739 ( 7455)             else if tok=TOK_VAR then
- 740 ( 7464)             begin
- 741 ( 7465)               dovar(true);
- 742 ( 7476)               state:=SVAR;
- 743 ( 7478)             end
- 744 ( 7482)             else if (tok=TOK_PROC) or
- 745 ( 7492)                     (tok=TOK_FUNC) then
- 746 ( 7499)             begin
- 747 ( 7500)               dorout(true);
- 748 ( 7511)               parlevel:=0;
- 749 ( 7513)               updpar(line);
- 750 ( 7527)               if (parlevel=0) and hassemi(line) then
- 751 ( 7546)               begin
- 752 ( 7547)                 state:=SSKIP;
- 753 ( 7552)                 seenbegin:=false;
- 754 ( 7558)                 blocklevel:=0;
- 755 ( 7564)                 routlevel:=0;
- 756 ( 7570)                 ininner:=false;
- 757 ( 7576)               end
- 758 ( 7580)               else
- 759 ( 7580)                 state:=SHEAD;
- 760 ( 7585)             end
- 761 ( 7589)             else if tok=TOK_BEGIN then
- 762 ( 7598)             begin
- 763 ( 7599)               state:=SBODY;
- 764 ( 7604)               blocklevel:=1;
- 765 ( 7610)             end
- 766 ( 7614)             else
- 767 ( 7614)               doconst(false);
- 768 ( 7625)           end;
- 769 ( 7625) 
- 770 ( 7628)         SMEM:
- 771 ( 7632)           begin
- 772 ( 7635)             if tok=TOK_VAR then
- 773 ( 7641)             begin
- 774 ( 7642)               dovar(true);
- 775 ( 7653)               state:=SVAR;
- 776 ( 7655)             end
- 777 ( 7659)             else if (tok=TOK_PROC) or
- 778 ( 7669)                     (tok=TOK_FUNC) then
- 779 ( 7676)             begin
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 14
-
- 780 ( 7677)               dorout(true);
- 781 ( 7688)               parlevel:=0;
- 782 ( 7690)               updpar(line);
- 783 ( 7704)               if (parlevel=0) and hassemi(line) then
- 784 ( 7723)               begin
- 785 ( 7724)                 state:=SSKIP;
- 786 ( 7729)                 seenbegin:=false;
- 787 ( 7735)                 blocklevel:=0;
- 788 ( 7741)                 routlevel:=0;
- 789 ( 7747)                 ininner:=false;
- 790 ( 7753)               end
- 791 ( 7757)               else
- 792 ( 7757)                 state:=SHEAD;
- 793 ( 7762)             end
- 794 ( 7766)             else if tok=TOK_BEGIN then
- 795 ( 7775)             begin
- 796 ( 7776)               state:=SBODY;
- 797 ( 7781)               blocklevel:=1;
- 798 ( 7787)             end
- 799 ( 7791)             else
- 800 ( 7791)               domem(false);
- 801 ( 7802)           end;
- 802 ( 7802) 
- 803 ( 7805)         SVAR:
- 804 ( 7809)           begin
- 805 ( 7812)             if tok=TOK_OTHER then
- 806 ( 7818)               dovar(false)
- 807 ( 7824)             else if (tok=TOK_PROC) or
- 808 ( 7840)                     (tok=TOK_FUNC) then
- 809 ( 7847)             begin
- 810 ( 7848)               dorout(true);
- 811 ( 7859)               parlevel:=0;
- 812 ( 7861)               updpar(line);
- 813 ( 7875)               if (parlevel=0) and hassemi(line) then
- 814 ( 7894)               begin
- 815 ( 7895)                 state:=SSKIP;
- 816 ( 7900)                 seenbegin:=false;
- 817 ( 7906)                 blocklevel:=0;
- 818 ( 7912)                 routlevel:=0;
- 819 ( 7918)                 ininner:=false;
- 820 ( 7924)               end
- 821 ( 7928)               else
- 822 ( 7928)                 state:=SHEAD;
- 823 ( 7933)             end
- 824 ( 7937)             else if tok=TOK_BEGIN then
- 825 ( 7946)             begin
- 826 ( 7947)               state:=SBODY;
- 827 ( 7952)               blocklevel:=1;
- 828 ( 7958)             end;
- 829 ( 7962)           end;
- 830 ( 7962) 
- 831 ( 7965)         SROUT:
- 832 ( 7969)           begin
- 833 ( 7972)             if (tok=TOK_PROC) or
- 834 ( 7979)                (tok=TOK_FUNC) then
- 835 ( 7986)             begin
- 836 ( 7987)               dorout(true);
- 837 ( 7998)               parlevel:=0;
- 838 ( 8000)               updpar(line);
- 839 ( 8014)               if (parlevel=0) and hassemi(line) then
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 15
-
- 840 ( 8033)               begin
- 841 ( 8034)                 state:=SSKIP;
- 842 ( 8039)                 seenbegin:=false;
- 843 ( 8045)                 blocklevel:=0;
- 844 ( 8051)                 routlevel:=0;
- 845 ( 8057)                 ininner:=false;
- 846 ( 8063)               end
- 847 ( 8067)               else
- 848 ( 8067)                 state:=SHEAD;
- 849 ( 8072)             end
- 850 ( 8076)             else if tok=TOK_BEGIN then
- 851 ( 8085)             begin
- 852 ( 8086)               state:=SBODY;
- 853 ( 8091)               blocklevel:=1;
- 854 ( 8097)             end;
- 855 ( 8101)           end;
- 856 ( 8101) 
- 857 ( 8104)         SHEAD:
- 858 ( 8108)           begin
- 859 ( 8111)             dorout(false);
- 860 ( 8119)             updpar(line);
- 861 ( 8129)             if (parlevel=0) and hassemi(line) then
- 862 ( 8148)             begin
- 863 ( 8149)               state:=SSKIP;
- 864 ( 8154)               seenbegin:=false;
- 865 ( 8160)               blocklevel:=0;
- 866 ( 8166)               routlevel:=0;
- 867 ( 8172)               ininner:=false;
- 868 ( 8178)             end;
- 869 ( 8182)           end;
- 870 ( 8182) 
- 871 ( 8185)         SSKIP:
- 872 ( 8189)           begin
- 873 ( 8192)             if not seenbegin then
- 874 ( 8192)             begin
- 875 ( 8197)               if ininner then
- 876 ( 8200)               begin
- 877 ( 8204)                 updblockline(dlevel);
- 878 ( 8219)                 if (dlevel<>0) and DEBUG1 then
- 879 ( 8228)                   writeln(' dlevel=',dlevel);
- 880 ( 8252) 
- 881 ( 8252)                 blocklevel:=blocklevel+dlevel;
- 882 ( 8256)                 if blocklevel=0 then
- 883 ( 8271)                 begin
- 884 ( 8272)                   ininner:=false;
- 885 ( 8277)                   routlevel:=routlevel-1;
- 886 ( 8287)                 end;
- 887 ( 8292)               end
- 888 ( 8292)               else
- 889 ( 8292)               begin
- 890 ( 8295)                 if (tok=TOK_PROC) or
- 891 ( 8302)                    (tok=TOK_FUNC) then
- 892 ( 8309)                   routlevel:=routlevel+1
- 893 ( 8317)                 else if tok=TOK_BEGIN then
- 894 ( 8333)                 begin
- 895 ( 8334)                   if routlevel>0 then
- 896 ( 8343)                   begin
- 897 ( 8344)                     ininner:=true;
- 898 ( 8349)                     blocklevel:=1;
- 899 ( 8355)                   end
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 16
-
- 900 ( 8359)                   else
- 901 ( 8359)                   begin
- 902 ( 8362)                     seenbegin:=true;
- 903 ( 8364)                     blocklevel:=1;
- 904 ( 8370)                   end;
- 905 ( 8374)                 end;
- 906 ( 8374)               end;
- 907 ( 8374)             end
- 908 ( 8374)             else
- 909 ( 8374)             begin
- 910 ( 8377)               updblockline(dlevel);
- 911 ( 8389)                 if (dlevel<>0) and DEBUG1 then
- 912 ( 8398)                   writeln(' dlevel=',dlevel);
- 913 ( 8422) 
- 914 ( 8422)               blocklevel:=blocklevel+dlevel;
- 915 ( 8426)               if blocklevel=0 then
- 916 ( 8441)                 state:=SROUT;
- 917 ( 8447)             end;
- 918 ( 8451)           end;
- 919 ( 8451) 
- 920 ( 8454)         SBODY:
- 921 ( 8458)           begin
- 922 ( 8461)             updblockline(dlevel);
- 923 ( 8473)                 if (dlevel<>0) and DEBUG1 then
- 924 ( 8482)                   writeln(' dlevel=',dlevel);
- 925 ( 8506) 
- 926 ( 8506)             blocklevel:=blocklevel+dlevel;
- 927 ( 8510)             if blocklevel=0 then
- 928 ( 8525)               state:=SDONE;
- 929 ( 8531)           end
- 930 ( 8535)       end;
- 931 ( 8537) 
- 932 ( 8537)       debugstate;
- 933 ( 8541)     end;
- 934 ( 8541) 
- 935 ( 8541)   until ateof or (state=SDONE);
- 936 ( 8552) 
- 937 ( 8556)   close_files;
- 938 ( 8560) end;
- 939 ( 8560) 
- 940 ( 8561) { main program }
- 941 ( 8561) {**************}
- 942 ( 8561) begin
- 943 ( 8561)   write(PRTON);
- 944 ( 8566) 
- 945 ( 8566)   line    := _new;
- 946 ( 8572)   libname := _new;
- 947 ( 8582)   cname   := _new;
- 948 ( 8592)   cval    := _new;
- 949 ( 8602)   cval2   := _new;
- 950 ( 8612)   cval3   := _new;
- 951 ( 8622)   addrpad := _new;
- 952 ( 8632)   body    := _new;
- 953 ( 8642) 
- 954 ( 8646)   initname;
- 955 ( 8650) 
- 956 ( 8650)   runpass(1);
- 957 ( 8658) 
- 958 ( 8658)   { do not make a nroff source file }
- 959 ( 8658)   { runpass(2); }
-
-R65 COMPILE 4.7: program EXTRACT          26/4/26 page 17
-
- 960 ( 8658) 
- 961 ( 8658)   _release(body);
- 962 ( 8668)   _release(addrpad);
- 963 ( 8678)   _release(cval3);
- 964 ( 8688)   _release(cval2);
- 965 ( 8698)   _release(cval);
- 966 ( 8708)   _release(cname);
- 967 ( 8718)   _release(libname);
- 968 ( 8728)   _release(line);
- 969 ( 8738) 
- 970 ( 8738)   writeln;
- 971 ( 8738)   write(PRTOFF);
- 972 ( 8747) end.
- 973 ( 8747) 
-
-End compile
-
-Code lenght:          8746
-Compiler stack size:  154
-Ident stack size:     179
-Pascal errors:        0
+   1     4 program extract;
+   2     4 uses syslib, arglib, filelib, strlib;
+   3  3095 
+   4  3095 {$U+}
+   5  3095 
+   6  3095 const TOK_OTHER = 0;
+   7  3098       TOK_CONST = 1;
+   8  3098       TOK_MEM   = 2;
+   9  3098       TOK_VAR   = 3;
+  10  3098       TOK_PROC  = 4;
+  11  3098       TOK_FUNC  = 5;
+  12  3098       TOK_BEGIN = 6;
+  13  3098       TOK_CASE  = 7;
+  14  3098       TOK_END   = 8;
+  15  3098 
+  16  3098       SSTART   = 0;
+  17  3098       SCONST   = 1;
+  18  3098       SMEM     = 2;
+  19  3098       SVAR     = 3;
+  20  3098       SROUT    = 4;
+  21  3098       SSKIP    = 5;
+  22  3098       SBODY    = 6;
+  23  3098       SDONE    = 7;
+  24  3098       SHEAD    = 8;
+  25  3098 
+  26  3098       DEBUG1   = false;
+  27  3098       DEBUG2   = false;
+  28  3098       INDENT   = '      ';
+  29  3105       IPINDENT = ' 10';
+  30  3109 
+  31  3109       QUOTE    = chr($27);
+  32  3109 
+  33  3109 var
+  34  3109   f_in, f_out: file;
+  35  3109   line, libname, cname,
+  36  3109     cval, cval2, cval3, addrpad, body: cpnt;
+  37  3109   name: array[15] of char;
+  38  3109   lineno, llen: integer;
+  39  3109   ateof: boolean;
+  40  3109   state, tok, pass: integer;
+  41  3109   seenbegin, ininner: boolean;
+  42  3109   routheader: boolean;
+  43  3109   blocklevel, routlevel, dlevel: integer;
+  44  3109   parlevel: integer;
+  45  3109 
+  46  3109 proc isidchar(ch:char; var yes:boolean);
+  47  3109 {************************************}
+  48  3109 begin
+  49  3109   yes:=(((ch>='A') and (ch<='Z')) or
+  50  3129         ((ch>='a') and (ch<='z')) or
+  51  3144         ((ch>='0') and (ch<='9')) or
+  52  3160         (ch='_'));
+  53  3169 end;
+  54  3173 
+  55  3174 proc wordat(pos:integer; w:cpnt;
+  56  3174             var yes:boolean);
+  57  3174 {******************************}
+  58  3174 var i,n: integer;
+  59  3177     b1,b2: boolean;
+  60  3177 begin
+  61  3177   yes:=false;
+  62  3181   n:=_strlen(w);
+  63  3197 
+  64  3201   i:=0;
+  65  3203   while i<n do
+  66  3211   begin
+  67  3219     if line[pos+i]=ENDMARK then exit;
+  68  3241     if line[pos+i]<>w[i] then exit;
+  69  3271     i:=i+1;
+  70  3277   end;
+  71  3282 
+  72  3285   if pos=0 then
+  73  3291     b1:=false
+  74  3295   else
+  75  3297     isidchar(line[pos-1],b1);
+  76  3331 
+  77  3331   isidchar(line[pos+n],b2);
+  78  3360   yes:=not b1 and not b2;
+  79  3365 end;
+  80  3375 
+  81  3376 proc updblockline(var delta:integer);
+  82  3376 {***********************************}
+  83  3376 var i: integer;
+  84  3379     inquote,yes: boolean;
+  85  3379 begin
+  86  3379   delta:=0;
+  87  3383   i:=0;
+  88  3389   inquote:=false;
+  89  3395 
+  90  3399   while line[i]<>ENDMARK do
+  91  3411   begin
+  92  3415     if line[i]=QUOTE then
+  93  3427     begin
+  94  3428       inquote:=not inquote;
+  95  3431       i:=i+1;
+  96  3446     end
+  97  3451     else if (not inquote) and (line[i]='{') then
+  98  3472       exit
+  99  3473     else if not inquote then
+ 100  3480     begin
+ 101  3485       wordat(i,'begin',yes);
+ 102  3514       if yes then
+ 103  3514       begin
+ 104  3518         delta:=delta+1;
+ 105  3527         i:=i+5;
+ 106  3538       end
+ 107  3543       else
+ 108  3543       begin
+ 109  3546         wordat(i,'case',yes);
+ 110  3571         if yes then
+ 111  3571         begin
+ 112  3575           delta:=delta+1;
+ 113  3584           i:=i+4;
+ 114  3595         end
+ 115  3600         else
+ 116  3600         begin
+ 117  3603           wordat(i,'end',yes);
+ 118  3627           if yes then
+ 119  3627           begin
+ 120  3631             delta:=delta-1;
+ 121  3640             i:=i+3;
+ 122  3651           end
+ 123  3656           else
+ 124  3656             i:=i+1;
+ 125  3665         end;
+ 126  3670       end;
+ 127  3670     end
+ 128  3670     else
+ 129  3670       i:=i+1;
+ 130  3679   end;
+ 131  3684 end;
+ 132  3687 
+ 133  3688 proc splitstr(src: cpnt; sep: char; dstl,dstr: cpnt);
+ 134  3688 {***************************************************}
+ 135  3688 var i,j: integer;
+ 136  3691 begin
+ 137  3691   dstl[0] := ENDMARK;
+ 138  3697   dstr[0] := ENDMARK;
+ 139  3705 
+ 140  3709   i := _strpos(sep,src,0);
+ 141  3727   if i < 0 then begin
+ 142  3738     _strcpy(src, dstl);
+ 143  3755     exit;
+ 144  3756   end;
+ 145  3756 
+ 146  3756   j := 0;
+ 147  3758   while j < i do begin
+ 148  3774     dstl[j] := src[j];
+ 149  3786     j := j+1;
+ 150  3798   end;
+ 151  3803   dstl[j] := ENDMARK;
+ 152  3812 
+ 153  3816   i := i+1;
+ 154  3822   while src[i] = ' ' do
+ 155  3839     i := i+1;
+ 156  3849 
+ 157  3857   j := 0;
+ 158  3859   while src[i] <> ENDMARK do begin
+ 159  3879     dstr[j] := src[i];
+ 160  3891     j := j+1;
+ 161  3903     i := i+1;
+ 162  3914   end;
+ 163  3919   dstr[j] := ENDMARK;
+ 164  3928 end;
+ 165  3932 
+ 166  3933 proc padright(src,dst: cpnt; w: integer);
+ 167  3933 {***************************************}
+ 168  3933 var i: integer;
+ 169  3936 begin
+ 170  3936   dst[0] := ENDMARK;
+ 171  3942   write(@dst, src);
+ 172  3957   i := _strlen(src);
+ 173  3969   while i < w do begin
+ 174  3985     write(@dst, ' ');
+ 175  3993     i := i+1;
+ 176  3999   end;
+ 177  4004 end;
+ 178  4007 
+ 179  4008 proc buildbody(addr,typ,dst: cpnt);
+ 180  4008 {********************************}
+ 181  4008 begin
+ 182  4008   dst[0] := ENDMARK;
+ 183  4017   write(@dst, addr, '  ',typ);
+ 184  4040 end;
+ 185  4040 
+ 186  4041 
+ 187  4041 
+ 188  4041 proc updpar(s:cpnt);
+ 189  4041 {******************}
+ 190  4041 var i: integer;
+ 191  4044 begin
+ 192  4044   i:=0;
+ 193  4048   while s[i]<>ENDMARK do
+ 194  4064   begin
+ 195  4068     if s[i]='(' then
+ 196  4080       parlevel:=parlevel+1;
+ 197  4090     if s[i]=')' then
+ 198  4107       parlevel:=parlevel-1;
+ 199  4117     i:=i+1;
+ 200  4128   end;
+ 201  4133 end;
+ 202  4136 
+ 203  4137 func hassemi(s:cpnt): boolean;
+ 204  4137 {************************}
+ 205  4137 var i: integer;
+ 206  4140 begin
+ 207  4140   i:=0;
+ 208  4144   while s[i]<>ENDMARK do
+ 209  4160   begin
+ 210  4164     if s[i]=';' then
+ 211  4176     begin
+ 212  4177       hassemi:=true;
+ 213  4182       exit;
+ 214  4187     end;
+ 215  4187     i:=i+1;
+ 216  4193   end;
+ 217  4198   hassemi:=false;
+ 218  4203 end;
+ 219  4207 
+ 220  4208 proc rtrim(s:cpnt);
+ 221  4208 {*****************}
+ 222  4208 var i: integer;
+ 223  4211 begin
+ 224  4211   i:=_strlen(s);
+ 225  4225   while i>0 do
+ 226  4235   begin
+ 227  4239     if s[i-1]<>' ' then
+ 228  4254     begin
+ 229  4255       s[i]:=ENDMARK;
+ 230  4264       exit;
+ 231  4269     end;
+ 232  4269     i:=i-1;
+ 233  4275   end;
+ 234  4280   s[0]:=ENDMARK;
+ 235  4287 end;
+ 236  4291 
+ 237  4292 proc isalnum(ch:char; var yes:boolean);
+ 238  4292 {*************************************}
+ 239  4292 begin
+ 240  4292   yes:=(((ch>='A') and (ch<='Z')) or
+ 241  4312         ((ch>='a') and (ch<='z')) or
+ 242  4327         ((ch>='0') and (ch<='9')));
+ 243  4344 end;
+ 244  4348 
+ 245  4349 proc matchtok(t:cpnt; s:cpnt; var yes:boolean);
+ 246  4349 {*********************************************}
+ 247  4349 var i,j,lt,ls: integer;
+ 248  4352     ok: boolean;
+ 249  4352 begin
+ 250  4352   yes:=false;
+ 251  4356   lt:=_strlen(t);
+ 252  4372   ls:=_strlen(s);
+ 253  4388 
+ 254  4392   i:=0;
+ 255  4394   while (i<ls) and (s[i]=' ') do
+ 256  4420     i:=i+1;
+ 257  4430 
+ 258  4438   if i+lt>ls then
+ 259  4447     exit;
+ 260  4456 
+ 261  4456   j:=0;
+ 262  4458   while j<lt do
+ 263  4466   begin
+ 264  4474     if t[j]<>s[i+j] then
+ 265  4497       exit;
+ 266  4504     j:=j+1;
+ 267  4510   end;
+ 268  4515 
+ 269  4518   if i+lt<ls then
+ 270  4527   begin
+ 271  4532     isalnum(s[i+lt], ok);
+ 272  4564     if ok then
+ 273  4564       exit;
+ 274  4572   end;
+ 275  4572 
+ 276  4572   yes:=true;
+ 277  4574 end;
+ 278  4578 
+ 279  4579 proc gettok(var tok0:integer);
+ 280  4579 {****************************}
+ 281  4579 var yes: boolean;
+ 282  4582 begin
+ 283  4582   tok0:=TOK_OTHER;
+ 284  4586 
+ 285  4590   matchtok('const', line, yes);
+ 286  4616   if yes then
+ 287  4616   begin
+ 288  4620     tok0:=TOK_CONST;
+ 289  4625     exit;
+ 290  4630   end;
+ 291  4630 
+ 292  4630   matchtok('mem', line, yes);
+ 293  4654   if yes then
+ 294  4654   begin
+ 295  4658     tok0:=TOK_MEM;
+ 296  4663     exit;
+ 297  4668   end;
+ 298  4668 
+ 299  4668   matchtok('var', line, yes);
+ 300  4692   if yes then
+ 301  4692   begin
+ 302  4696     tok0:=TOK_VAR;
+ 303  4701     exit;
+ 304  4706   end;
+ 305  4706 
+ 306  4706   matchtok('proc', line, yes);
+ 307  4731   if yes then
+ 308  4731   begin
+ 309  4735     tok0:=TOK_PROC;
+ 310  4740     exit;
+ 311  4745   end;
+ 312  4745 
+ 313  4745   matchtok('func', line, yes);
+ 314  4770   if yes then
+ 315  4770   begin
+ 316  4774     tok0:=TOK_FUNC;
+ 317  4779     exit;
+ 318  4784   end;
+ 319  4784 
+ 320  4784   matchtok('begin', line, yes);
+ 321  4810   if yes then
+ 322  4810   begin
+ 323  4814     tok0:=TOK_BEGIN;
+ 324  4819     exit;
+ 325  4824   end;
+ 326  4824 
+ 327  4824   matchtok('case', line, yes);
+ 328  4849   if yes then
+ 329  4849   begin
+ 330  4853     tok0:=TOK_CASE;
+ 331  4858     exit;
+ 332  4863   end;
+ 333  4863 
+ 334  4863   matchtok('end', line, yes);
+ 335  4887   if yes then
+ 336  4887   begin
+ 337  4891     tok0:=TOK_END;
+ 338  4896     exit;
+ 339  4901   end;
+ 340  4901 end;
+ 341  4901 
+ 342  4902 proc printtok(tok0:integer);
+ 343  4902 {**************************}
+ 344  4902 begin
+ 345  4902   case tok0 of
+ 346  4907     TOK_CONST: write('CONST');
+ 347  4924     TOK_MEM  : write('MEM');
+ 348  4938     TOK_VAR  : write('VAR');
+ 349  4952     TOK_PROC : write('PROC');
+ 350  4967     TOK_FUNC : write('FUNC');
+ 351  4982     TOK_BEGIN: write('BEGIN');
+ 352  4998     TOK_CASE : write('CASE');
+ 353  5013     TOK_END  : write('END')
+ 354  5027   else
+ 355  5027     write('OTHER')
+ 356  5036   end;
+ 357  5038 end;
+ 358  5038 
+ 359  5039 proc printstate(st:integer);
+ 360  5039 {**************************}
+ 361  5039 begin
+ 362  5039   case st of
+ 363  5044     SSTART: write('SSTART');
+ 364  5062     SCONST: write('SCONST');
+ 365  5079     SMEM  : write('SMEM');
+ 366  5094     SVAR  : write('SVAR');
+ 367  5109     SROUT : write('SROUT');
+ 368  5125     SSKIP : write('SSKIP');
+ 369  5141     SBODY : write('SBODY');
+ 370  5157     SDONE : write('SDONE');
+ 371  5173     SHEAD : write('SHEAD')
+ 372  5189   else
+ 373  5189     write('???')
+ 374  5196   end;
+ 375  5198 end;
+ 376  5198 
+ 377  5199 proc writehex(f:file; a:integer);
+ 378  5199 {*******************************}
+ 379  5199 var h:integer;
+ 380  5202   func hexdigit(c:char):char;
+ 381  5202   var d:integer;
+ 382  5205   begin
+ 383  5205     d:=ord(c) and 15;
+ 384  5213     if d>9 then
+ 385  5224       hexdigit:=chr(d-10+ord('A'))
+ 386  5237     else
+ 387  5238       hexdigit:=chr(d+ord('0'));
+ 388  5253   end;
+ 389  5258 begin
+ 390  5259   h:=a and 255;
+ 391  5267   write(@f,hexdigit(chr(h shr 4)));
+ 392  5295   write(@f,hexdigit(chr(h and 15)));
+ 393  5318 end;
+ 394  5318 
+ 395  5319 proc setsubtype(subtype:char);
+ 396  5319 {****************************}
+ 397  5319 var i:integer;
+ 398  5322 begin
+ 399  5322   i:=0;
+ 400  5326   repeat
+ 401  5330     i:=i+1;
+ 402  5336   until (name[i]=':') or
+ 403  5352         (name[i]=' ') or
+ 404  5363         (i>=14);
+ 405  5371   name[i]:=':';
+ 406  5381   name[i+1]:=subtype;
+ 407  5392 end;
+ 408  5400 
+ 409  5401 proc initname;
+ 410  5401 {*************}
+ 411  5401 var default: boolean;
+ 412  5404     cyclus, drive: integer;
+ 413  5404 begin
+ 414  5404   cyclus:=0;
+ 415  5408   drive:=1;
+ 416  5414   default:=true;
+ 417  5420   _agetstring(name, default, cyclus, drive);
+ 418  5464 end;
+ 419  5464 
+ 420  5465 proc open_files(outsubtype:char);
+ 421  5465 {******************************}
+ 422  5465 var cyclus, drive, vcyclus: integer;
+ 423  5468 begin
+ 424  5468   drive:=1;
+ 425  5472   cyclus:=0;
+ 426  5478   vcyclus:=FILCYC;
+ 427  5486 
+ 428  5490   setsubtype('P');
+ 429  5498   _asetfile(name, cyclus, drive, ' ');
+ 430  5520   openr(f_in);
+ 431  5526 
+ 432  5526   cyclus:=0;
+ 433  5528   setsubtype(outsubtype);
+ 434  5542   _asetfile(name, cyclus, drive, ' ');
+ 435  5564   openw(f_out);
+ 436  5570 
+ 437  5570   if DEBUG1 then
+ 438  5572   begin
+ 439  5572     write(@f_out,'program EXTRACT version ');
+ 440  5606     writehex(f_out,vcyclus);
+ 441  5620     writeln(@f_out);
+ 442  5632   end;
+ 443  5632 end;
+ 444  5632 
+ 445  5633 proc close_files;
+ 446  5633 {***************}
+ 447  5633 begin
+ 448  5633   close(f_in);
+ 449  5644   close(f_out);
+ 450  5650 end;
+ 451  5650 
+ 452  5651 proc print_rem(kwlen:integer);
+ 453  5651 {************************}
+ 454  5651 var i:integer;
+ 455  5654 begin
+ 456  5654   i:=0;
+ 457  5658   while line[i]=' ' do
+ 458  5674     i:=i+1;
+ 459  5684 
+ 460  5692   i:=i+kwlen;
+ 461  5696   if line[i]=ENDMARK then exit;
+ 462  5722   while line[i]=' ' do
+ 463  5734     i:=i+1;
+ 464  5744 
+ 465  5752   if line[i]<>ENDMARK then
+ 466  5764   begin
+ 467  5765     write(@f_out,INDENT);
+ 468  5779     while line[i]<>ENDMARK do
+ 469  5791     begin
+ 470  5795       write(@f_out,line[i]);
+ 471  5812       i:=i+1;
+ 472  5818     end;
+ 473  5823     writeln(@f_out);
+ 474  5838   end;
+ 475  5838 end;
+ 476  5838 
+ 477  5839 proc getlibname;
+ 478  5839 {***************}
+ 479  5839 var i,j: integer;
+ 480  5842 begin
+ 481  5842   i:=0;
+ 482  5846   while line[i]=' ' do
+ 483  5862     i:=i+1;
+ 484  5872 
+ 485  5880   i:=i+7;
+ 486  5886   while line[i]=' ' do
+ 487  5903     i:=i+1;
+ 488  5913 
+ 489  5921   j:=0;
+ 490  5923   while (line[i]<>ENDMARK) and
+ 491  5940         (line[i]<>';') and
+ 492  5953         (line[i]<>' ') do
+ 493  5967   begin
+ 494  5971     libname[j]:=_uppercase(line[i]);
+ 495  5993     i:=i+1;
+ 496  6003     j:=j+1;
+ 497  6014   end;
+ 498  6019   libname[j]:=ENDMARK;
+ 499  6028 end;
+ 500  6032 
+ 501  6033 proc stripcomment;
+ 502  6033 {****************}
+ 503  6033 var  i: integer;
+ 504  6036 begin
+ 505  6036   i := _strpos('{',line,0);
+ 506  6054   if i >= 0 then
+ 507  6064     line[i] := ENDMARK;
+ 508  6074 end;
+ 509  6078 
+ 510  6079 func isemptyline: boolean;
+ 511  6079 {************************}
+ 512  6079 var i: integer;
+ 513  6082 begin
+ 514  6082   i := 0;
+ 515  6086   while line[i] <> ENDMARK do begin
+ 516  6106     if (line[i] <> ' ') and (line[i] <> TAB8) then
+ 517  6132     begin
+ 518  6133       isemptyline := false;
+ 519  6138       exit;
+ 520  6143     end;
+ 521  6143     i := i + 1;
+ 522  6149   end;
+ 523  6154   isemptyline := true;
+ 524  6159 end;
+ 525  6163 
+ 526  6164 proc dostart;
+ 527  6164 {*************}
+ 528  6164 var i: integer;
+ 529  6167 begin
+ 530  6167   getlibname;
+ 531  6173   if isemptyline then exit;
+ 532  6183 
+ 533  6183   if pass=2 then
+ 534  6189   begin
+ 535  6190     writeln(@f_out,'.TH ',libname,' 1');
+ 536  6218     writeln(@f_out);
+ 537  6230     writeln(@f_out,'.SH NAME');
+ 538  6251     writeln(@f_out,libname,' - library');
+ 539  6279     writeln(@f_out);
+ 540  6291     writeln(@f_out,'.NF');
+ 541  6307     writeln(@f_out);
+ 542  6319     exit;
+ 543  6320   end;
+ 544  6320 
+ 545  6320     i:=0;
+ 546  6322     while line[i]<>ENDMARK do
+ 547  6338     begin
+ 548  6342       if line[i]=';' then
+ 549  6354       begin
+ 550  6355         write(@f_out,';');
+ 551  6366         writeln(@f_out);
+ 552  6378         exit;
+ 553  6379       end;
+ 554  6379       write(@f_out,_uppercase(line[i]));
+ 555  6404       i:=i+1;
+ 556  6410     end;
+ 557  6415 end;
+ 558  6418 
+ 559  6419 proc doconst(entering:boolean);
+ 560  6419 {****************************}
+ 561  6419 begin
+ 562  6419   stripcomment;
+ 563  6428   if isemptyline then exit;
+ 564  6438   if entering then
+ 565  6438     begin
+ 566  6442       writeln(@f_out);
+ 567  6457       if pass=2 then
+ 568  6463         write(@f_out, '.SH ');
+ 569  6478       writeln(@f_out, 'CONSTANTS');
+ 570  6500       print_rem(5);
+ 571  6508     end
+ 572  6508   else
+ 573  6508     writeln(@f_out, line);
+ 574  6528 end;
+ 575  6528 
+ 576  6529 proc domem(entering:boolean);
+ 577  6529 {**************************}
+ 578  6529 begin
+ 579  6529   stripcomment;
+ 580  6538   if isemptyline then exit;
+ 581  6548   if entering then
+ 582  6548     begin
+ 583  6552       writeln(@f_out);
+ 584  6567 
+ 585  6567 if pass=2 then
+ 586  6573         write(@f_out, '.SH ');
+ 587  6588       writeln(@f_out,'MEMORY');
+ 588  6607       if tok=TOK_MEM then
+ 589  6613         print_rem(3);
+ 590  6625     end
+ 591  6625   else
+ 592  6625     writeln(@f_out,line);
+ 593  6645 end;
+ 594  6645 
+ 595  6646 proc dovar(entering:boolean);
+ 596  6646 {**************************}
+ 597  6646 begin
+ 598  6646   stripcomment;
+ 599  6655   if isemptyline then exit;
+ 600  6665   if entering then
+ 601  6665     begin
+ 602  6669       writeln(@f_out);
+ 603  6684       if pass=2 then
+ 604  6690         write(@f_out, '.SH ');
+ 605  6705       writeln(@f_out, 'VARIABLES');
+ 606  6727       print_rem(3);
+ 607  6735     end
+ 608  6735   else
+ 609  6735     writeln(@f_out, line);
+ 610  6755 end;
+ 611  6755 
+ 612  6756 proc dorout(entering:boolean);
+ 613  6756 {***************************}
+ 614  6756 begin
+ 615  6756      if entering and not routheader then
+ 616  6765     begin
+ 617  6771       writeln(@f_out);
+ 618  6786       if pass=2 then
+ 619  6792         write(@f_out, '.SH ');
+ 620  6807       writeln(@f_out, 'ROUTINES');
+ 621  6828       routheader:=true;
+ 622  6830     end;
+ 623  6834     writeln(@f_out, line);
+ 624  6851 end;
+ 625  6851 
+ 626  6852 proc debugline;
+ 627  6852 {**************}
+ 628  6852 begin
+ 629  6852   if DEBUG1 then
+ 630  6859   begin
+ 631  6859     write('line ');
+ 632  6868     write(lineno);
+ 633  6873     write(': state=');
+ 634  6882     printstate(state);
+ 635  6892     write(' tok=');
+ 636  6898     printtok(tok);
+ 637  6908     write(' text="');
+ 638  6916     write(line);
+ 639  6921     writeln('"');
+ 640  6929     write(' blocklevel=',blocklevel);
+ 641  6947     writeln;
+ 642  6947   end;
+ 643  6953 end;
+ 644  6953 
+ 645  6954 proc debugstate;
+ 646  6954 {***************}
+ 647  6954 begin
+ 648  6954   if DEBUG1 then
+ 649  6961   begin
+ 650  6961     write('     newstate=');
+ 651  6979     printstate(state);
+ 652  6989     writeln;
+ 653  6989   end;
+ 654  6995 end;
+ 655  6995 
+ 656  6996 proc runpass(passno: integer);
+ 657  6996 {***************************}
+ 658  6996 var islib: boolean;
+ 659  6999 begin
+ 660  6999   pass := passno;
+ 661  7001   if pass = 1 then
+ 662  7015     open_files('H')
+ 663  7021   else
+ 664  7027     open_files('N');
+ 665  7038   lineno:=0;
+ 666  7040   state:=SSTART;
+ 667  7046   seenbegin:=false;
+ 668  7052   ininner:=false;
+ 669  7058   blocklevel:=0;
+ 670  7064   routlevel:=0;
+ 671  7070   parlevel:=0;
+ 672  7076   routheader:=false;
+ 673  7082 
+ 674  7086   repeat
+ 675  7086     llen:=_strread(f_in, line, ateof);
+ 676  7110     rtrim(line);
+ 677  7124     lineno:=lineno+1;
+ 678  7130 
+ 679  7135     if llen>0 then
+ 680  7141     begin
+ 681  7142       gettok(tok);
+ 682  7157       debugline;
+ 683  7161       matchtok('library', line, islib);
+ 684  7189 
+ 685  7189       case state of
+ 686  7189 
+ 687  7193         SSTART:
+ 688  7197           begin
+ 689  7200             if islib then
+ 690  7200               dostart
+ 691  7204             else if tok=TOK_CONST then
+ 692  7220             begin
+ 693  7221               doconst(true);
+ 694  7232               state:=SCONST;
+ 695  7234             end
+ 696  7238             else if tok=TOK_MEM then
+ 697  7247             begin
+ 698  7248               domem(true);
+ 699  7259               state:=SMEM;
+ 700  7261             end
+ 701  7265             else if tok=TOK_VAR then
+ 702  7274             begin
+ 703  7275               dovar(true);
+ 704  7286               state:=SVAR;
+ 705  7288             end
+ 706  7292             else if (tok=TOK_PROC) or
+ 707  7302                     (tok=TOK_FUNC) then
+ 708  7309             begin
+ 709  7310               dorout(true);
+ 710  7321               parlevel:=0;
+ 711  7323               updpar(line);
+ 712  7337               if (parlevel=0) and hassemi(line) then
+ 713  7356               begin
+ 714  7357                 state:=SSKIP;
+ 715  7362                 seenbegin:=false;
+ 716  7368                 blocklevel:=0;
+ 717  7374                 routlevel:=0;
+ 718  7380                 ininner:=false;
+ 719  7386               end
+ 720  7390               else
+ 721  7390                 state:=SHEAD;
+ 722  7395             end
+ 723  7399             else if tok=TOK_BEGIN then
+ 724  7408             begin
+ 725  7409               state:=SBODY;
+ 726  7414               blocklevel:=1;
+ 727  7420             end;
+ 728  7424           end;
+ 729  7424 
+ 730  7427         SCONST:
+ 731  7431           begin
+ 732  7434             if tok=TOK_MEM then
+ 733  7440             begin
+ 734  7441               domem(true);
+ 735  7452               state:=SMEM;
+ 736  7454             end
+ 737  7458             else if tok=TOK_VAR then
+ 738  7467             begin
+ 739  7468               dovar(true);
+ 740  7479               state:=SVAR;
+ 741  7481             end
+ 742  7485             else if (tok=TOK_PROC) or
+ 743  7495                     (tok=TOK_FUNC) then
+ 744  7502             begin
+ 745  7503               dorout(true);
+ 746  7514               parlevel:=0;
+ 747  7516               updpar(line);
+ 748  7530               if (parlevel=0) and hassemi(line) then
+ 749  7549               begin
+ 750  7550                 state:=SSKIP;
+ 751  7555                 seenbegin:=false;
+ 752  7561                 blocklevel:=0;
+ 753  7567                 routlevel:=0;
+ 754  7573                 ininner:=false;
+ 755  7579               end
+ 756  7583               else
+ 757  7583                 state:=SHEAD;
+ 758  7588             end
+ 759  7592             else if tok=TOK_BEGIN then
+ 760  7601             begin
+ 761  7602               state:=SBODY;
+ 762  7607               blocklevel:=1;
+ 763  7613             end
+ 764  7617             else
+ 765  7617               doconst(false);
+ 766  7628           end;
+ 767  7628 
+ 768  7631         SMEM:
+ 769  7635           begin
+ 770  7638             if tok=TOK_VAR then
+ 771  7644             begin
+ 772  7645               dovar(true);
+ 773  7656               state:=SVAR;
+ 774  7658             end
+ 775  7662             else if (tok=TOK_PROC) or
+ 776  7672                     (tok=TOK_FUNC) then
+ 777  7679             begin
+ 778  7680               dorout(true);
+ 779  7691               parlevel:=0;
+ 780  7693               updpar(line);
+ 781  7707               if (parlevel=0) and hassemi(line) then
+ 782  7726               begin
+ 783  7727                 state:=SSKIP;
+ 784  7732                 seenbegin:=false;
+ 785  7738                 blocklevel:=0;
+ 786  7744                 routlevel:=0;
+ 787  7750                 ininner:=false;
+ 788  7756               end
+ 789  7760               else
+ 790  7760                 state:=SHEAD;
+ 791  7765             end
+ 792  7769             else if tok=TOK_BEGIN then
+ 793  7778             begin
+ 794  7779               state:=SBODY;
+ 795  7784               blocklevel:=1;
+ 796  7790             end
+ 797  7794             else
+ 798  7794               domem(false);
+ 799  7805           end;
+ 800  7805 
+ 801  7808         SVAR:
+ 802  7812           begin
+ 803  7815             if tok=TOK_OTHER then
+ 804  7821               dovar(false)
+ 805  7827             else if (tok=TOK_PROC) or
+ 806  7843                     (tok=TOK_FUNC) then
+ 807  7850             begin
+ 808  7851               dorout(true);
+ 809  7862               parlevel:=0;
+ 810  7864               updpar(line);
+ 811  7878               if (parlevel=0) and hassemi(line) then
+ 812  7897               begin
+ 813  7898                 state:=SSKIP;
+ 814  7903                 seenbegin:=false;
+ 815  7909                 blocklevel:=0;
+ 816  7915                 routlevel:=0;
+ 817  7921                 ininner:=false;
+ 818  7927               end
+ 819  7931               else
+ 820  7931                 state:=SHEAD;
+ 821  7936             end
+ 822  7940             else if tok=TOK_BEGIN then
+ 823  7949             begin
+ 824  7950               state:=SBODY;
+ 825  7955               blocklevel:=1;
+ 826  7961             end;
+ 827  7965           end;
+ 828  7965 
+ 829  7968         SROUT:
+ 830  7972           begin
+ 831  7975             if (tok=TOK_PROC) or
+ 832  7982                (tok=TOK_FUNC) then
+ 833  7989             begin
+ 834  7990               dorout(true);
+ 835  8001               parlevel:=0;
+ 836  8003               updpar(line);
+ 837  8017               if (parlevel=0) and hassemi(line) then
+ 838  8036               begin
+ 839  8037                 state:=SSKIP;
+ 840  8042                 seenbegin:=false;
+ 841  8048                 blocklevel:=0;
+ 842  8054                 routlevel:=0;
+ 843  8060                 ininner:=false;
+ 844  8066               end
+ 845  8070               else
+ 846  8070                 state:=SHEAD;
+ 847  8075             end
+ 848  8079             else if tok=TOK_BEGIN then
+ 849  8088             begin
+ 850  8089               state:=SBODY;
+ 851  8094               blocklevel:=1;
+ 852  8100             end;
+ 853  8104           end;
+ 854  8104 
+ 855  8107         SHEAD:
+ 856  8111           begin
+ 857  8114             dorout(false);
+ 858  8122             updpar(line);
+ 859  8132             if (parlevel=0) and hassemi(line) then
+ 860  8151             begin
+ 861  8152               state:=SSKIP;
+ 862  8157               seenbegin:=false;
+ 863  8163               blocklevel:=0;
+ 864  8169               routlevel:=0;
+ 865  8175               ininner:=false;
+ 866  8181             end;
+ 867  8185           end;
+ 868  8185 
+ 869  8188         SSKIP:
+ 870  8192           begin
+ 871  8195             if not seenbegin then
+ 872  8195             begin
+ 873  8200               if ininner then
+ 874  8203               begin
+ 875  8207                 updblockline(dlevel);
+ 876  8222                 if (dlevel<>0) and DEBUG1 then
+ 877  8231                   writeln(' dlevel=',dlevel);
+ 878  8255 
+ 879  8255                 blocklevel:=blocklevel+dlevel;
+ 880  8259                 if blocklevel=0 then
+ 881  8274                 begin
+ 882  8275                   ininner:=false;
+ 883  8280                   routlevel:=routlevel-1;
+ 884  8290                 end;
+ 885  8295               end
+ 886  8295               else
+ 887  8295               begin
+ 888  8298                 if (tok=TOK_PROC) or
+ 889  8305                    (tok=TOK_FUNC) then
+ 890  8312                   routlevel:=routlevel+1
+ 891  8320                 else if tok=TOK_BEGIN then
+ 892  8336                 begin
+ 893  8337                   if routlevel>0 then
+ 894  8346                   begin
+ 895  8347                     ininner:=true;
+ 896  8352                     blocklevel:=1;
+ 897  8358                   end
+ 898  8362                   else
+ 899  8362                   begin
+ 900  8365                     seenbegin:=true;
+ 901  8367                     blocklevel:=1;
+ 902  8373                   end;
+ 903  8377                 end;
+ 904  8377               end;
+ 905  8377             end
+ 906  8377             else
+ 907  8377             begin
+ 908  8380               updblockline(dlevel);
+ 909  8392                 if (dlevel<>0) and DEBUG1 then
+ 910  8401                   writeln(' dlevel=',dlevel);
+ 911  8425 
+ 912  8425               blocklevel:=blocklevel+dlevel;
+ 913  8429               if blocklevel=0 then
+ 914  8444                 state:=SROUT;
+ 915  8450             end;
+ 916  8454           end;
+ 917  8454 
+ 918  8457         SBODY:
+ 919  8461           begin
+ 920  8464             updblockline(dlevel);
+ 921  8476                 if (dlevel<>0) and DEBUG1 then
+ 922  8485                   writeln(' dlevel=',dlevel);
+ 923  8509 
+ 924  8509             blocklevel:=blocklevel+dlevel;
+ 925  8513             if blocklevel=0 then
+ 926  8528               state:=SDONE;
+ 927  8534           end
+ 928  8538       end;
+ 929  8540 
+ 930  8540       debugstate;
+ 931  8544     end;
+ 932  8544 
+ 933  8544   until ateof or (state=SDONE);
+ 934  8555 
+ 935  8559   close_files;
+ 936  8563 end;
+ 937  8563 
+ 938  8564 { main program }
+ 939  8564 {**************}
+ 940  8564 begin
+ 941  8564   write(PRTON);
+ 942  8569 
+ 943  8569   line    := _new;
+ 944  8575   libname := _new;
+ 945  8585   cname   := _new;
+ 946  8595   cval    := _new;
+ 947  8605   cval2   := _new;
+ 948  8615   cval3   := _new;
+ 949  8625   addrpad := _new;
+ 950  8635   body    := _new;
+ 951  8645 
+ 952  8649   initname;
+ 953  8653 
+ 954  8653   runpass(1);
+ 955  8661 
+ 956  8661   { do not make a nroff source file }
+ 957  8661   { runpass(2); }
+ 958  8661 
+ 959  8661   _release(body);
+ 960  8671   _release(addrpad);
+ 961  8681   _release(cval3);
+ 962  8691   _release(cval2);
+ 963  8701   _release(cval);
+ 964  8711   _release(cname);
+ 965  8721   _release(libname);
+ 966  8731   _release(line);
+ 967  8741 
+ 968  8741   write(PRTOFF);
+ 969  8744 end.
+ 970  8744 
+Code length:            8743
+Compiler stack size:     154
+Ident stack size:        175

@@ -190,8 +190,8 @@ begin
   call(afloppy);
 end;
 
-proc srunprog(name: cpnt; cyc: integer; drv: integer);
-{****************************************************}
+proc _srunprog(name: cpnt; cyc, drv: integer);
+{********************************************}
 const
     ENDMARK = chr(0);
 mem

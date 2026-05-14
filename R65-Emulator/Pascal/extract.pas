@@ -428,7 +428,6 @@ begin
   setsubtype('P');
   _asetfile(name, cyclus, drive, ' ');
   openr(f_in);
-  writeln;
 
   cyclus:=0;
   setsubtype(outsubtype);
@@ -679,7 +678,6 @@ begin
 
     if llen>0 then
     begin
-      write('.');
       gettok(tok);
       debugline;
       matchtok('library', line, islib);
@@ -967,6 +965,5 @@ begin
   _release(libname);
   _release(line);
 
-  writeln;
   write(PRTOFF);
 end.

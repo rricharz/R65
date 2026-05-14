@@ -36,7 +36,6 @@ begin
                 ' FC=', FILCYC,
                 ' v=', version);
     end;
-    entry := entry + 1;
   end;
   getlastvers := version;
 end;
@@ -94,12 +93,19 @@ begin
   { check object file versions }
   _strcpy(sname, tname);
   _stradd(':R',tname);
-    drive := 1;
+
+  drive := 1;
   rversion := getlastvers;
+
+  if DEBUG then
+    writeln('pversion=', pversion,
+           ' rversion=', rversion);
+
   if rversion < pversion then begin
     drive := 0;
     rversion := getlastvers;
   end;
+
   if (rversion >= pversion) then begin
     _hexstr(pversion, h);
     write(INVVID, 'Error: Object file exists: ');

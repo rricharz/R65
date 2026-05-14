@@ -34,8 +34,6 @@ const
 
     STACKSIZE = 256;   {stack size}
     PAGELENGHT= 60;    {no of lines per page}
-    NO_OUTPUT = @0;
-    YES_OUTPUT= @255;
     MAXFI     = 3;     {max nbr  of nested input files
 }
     NRESW     = 63;    {number of res. words, max 64}
@@ -48,7 +46,7 @@ var reswtab: array[ 512] of char; {8*(NRESW+1)}
     idpack:  array[PIDSIZE] of packed char;
 
     tpos,pc,level,line,offset,dpnt,spnt,fipnt,
-    npara,i,stackpnt,stackmax,spntmax,numerr,
+    npara,i,stackpnt,stackmax,spntmax,
     lineinc: integer;
     scyclus,sdrive,cdrive: integer;
     pname: array[15] of char;
@@ -57,6 +55,7 @@ var reswtab: array[ 512] of char; {8*(NRESW+1)}
     token: packed char;
     libflg,rcheck,ateof: boolean;
     ucheck,lineflg,nlflg: boolean;
+    makeoutput: boolean;
     fno,ofno,savefno,lpr: file;
     incname: array[15] of char;
     filstk: array[MAXFI] of file;
@@ -116,7 +115,7 @@ var reswtab: array[ 512] of char; {8*(NRESW+1)}
 
 proc savebyte(x: integer);
 begin
-    if ofno<>NO_OUTPUT then begin
+    if makeoutput then begin
       write(@ofno,
         chr(((x and 255) shr 4)+ord('0')));
       write(@ofno,chr((x and 15)+ord('0')))
@@ -129,7 +128,8 @@ end {savebyte};
 
 proc crlf;
 begin
-  writeln(@lpr);
+  if makeoutput then
+    writeln(@lpr);
   line:=succ(line); lineinc:=succ(lineinc);
   tpos := 0;
 end {crlf};
@@ -142,7 +142,6 @@ proc merror(x: integer; code: packed char);
 var k: integer;
     answer: char;
 begin
-  writeln; numerr:=succ(numerr);
   write(INVVID,'ERROR: ');
   case x of
     01: write('Ident');
@@ -174,9 +173,7 @@ begin
     27: write('Identifier too long')
   end {case};
   writeln(' at line ', line, ', pos ', tpos, NORVID);
-  if (ofno<>NO_OUTPUT) and (ofno<>YES_OUTPUT)
-    then close(ofno);
-  ofno:=NO_OUTPUT;
+  if makeoutput then close(ofno);
   _abort;
 end {merror};
 
@@ -244,17 +241,20 @@ proc nextline;
 var i:integer;
 begin
   nlflg:=true;
-  if savefno=@0 then write(@lpr,line:4)
-  else begin
-    write(@lpr,'{I:');
-    for i:=0 to 5 do write(@lpr,incname[i]);
-    write(@lpr,'}');
-    line:=line-1; { do not count line }
-    write(@lpr,lineinc:3);
+  if makeoutput then begin
+    if savefno=@0 then write(@lpr,line:4)
+    else begin
+      write(@lpr,'{I:');
+      for i:=0 to 5 do write(@lpr,incname[i]);
+      write(@lpr,'}');
+      write(@lpr,lineinc:3);
+    end;
+    write(@lpr,' ');
+    write(@lpr,(pc+2):5,' ');
   end;
-  write(@lpr,' ');
-  write(@lpr,(pc+2):5,' ');
-  tpos := 0;
+  if savefno<>@0 then
+    line:=line-1; { do not count library line }
+  tpos:=0;
 end;
 
 {#############################}
@@ -290,7 +290,7 @@ begin
       ch:=' ';
     end
     else begin
-      write(@lpr,ch);
+      if makeoutput then write(@lpr,ch);
       tpos := tpos + 1;
     end;
   end;
@@ -332,7 +332,7 @@ begin {init}
   pc:=2; dpnt:=0; spnt:=0; offset:=2;
   npara:=0; level:=0;
   stackpnt:=0; libflg:=false;
-  stackmax:=0;spntmax:=0; numerr:=0;
+  stackmax:=0;spntmax:=0;
   s_typ[0]:='vi'; s_lvl[0]:=0;
   s_vda[0]:=0; s_spz[0]:=0;
   { prepare resword table }
@@ -362,7 +362,7 @@ begin {init}
 
   rcheck:=false;
   ucheck:=false;
-  ofno:=YES_OUTPUT;
+  makeoutput:=true;
   lineflg:=false;
   if not default then begin
     if request[0]<>'/' then _argerror(103);
@@ -370,7 +370,7 @@ begin {init}
       case request[i] of
         'L': lineflg:=true;
         'R': rcheck:=true;
-        'N': ofno:=NO_OUTPUT;
+        'N': makeoutput:=false;
         'F': begin end;
         ' ': begin end
         else _argerror(104)
@@ -385,11 +385,14 @@ begin {init}
   ARGLIST[9]:=sdrive;
   NUMARG:=1;
 
-  RUNERR := _emulator(8);
+  if makeoutput then begin
+    RUNERR := _emulator(8);
+    write(@lpr,'   1     4 ');
+  end;
 
   line:=0; lineinc:=0;
   line:=1;
-  write(@lpr,'   1     4 '); getchr
+  getchr;
 end {init};
 
 {################}
@@ -687,10 +690,10 @@ begin
   scan; if token=' ,' then scan;
   testto('id');
   base:=pc-2;
-  if (ofno<>NO_OUTPUT) then write(@ofno,'L');
+  if makeoutput then write(@ofno,'L');
   for i:=0 to 7 do begin
     name[i]:=ident[succ(i)];
-    if ofno<>NO_OUTPUT then
+    if makeoutput then
       write(@ofno,ident[succ(i)])
   end;
   _asetfile(name&'        ',0,cdrive,'L');
@@ -1073,7 +1076,7 @@ end {variable};
 
 proc fixup(x: integer);
 begin
-  if ofno<>NO_OUTPUT then begin
+  if makeoutput then begin
     write(@ofno,'F');
     savebyte(succ(x-offset) and 255);
     savebyte(succ(x-offset) shr 8);
@@ -2644,6 +2647,8 @@ begin {main}
   RUNERR := 0;
   nlflg:=false;
   init;scan;
+
+  { read program/library statement }
   case token of
     'pg': begin
             libflg:=false;
@@ -2660,22 +2665,28 @@ begin {main}
   i:=0;
   repeat
     i:=succ(i);
-  until (i>7) or (pname[i] = ':') or
+  until (i>11) or (pname[i] = ':') or
       (pname[i]<>_uppercase(ident[i+1]));
-  if i<8 then
+  if i<12 then
     merror(2,packed(pname[0],pname[1]));
     { name differs from filename }
   parse(' ;');
-  if ofno<>NO_OUTPUT then openw(ofno);
+  if makeoutput then openw(ofno);
   scan;
+
+  { read used statement }
   if (token='us') and (libflg=false) then begin
     repeat
       getlib; scan
     until token<>' ,';
     testto(' ;'); scan
   end;
+
+  { read block, finish with end. }
   block(0); testto(' .');
-  if ofno<>NO_OUTPUT then begin
+
+  { finish output file and make library file }
+  if makeoutput then begin
     write(@ofno,'E');
     savebyte(pc and 255);
     savebyte(pc shr 8);
@@ -2688,15 +2699,22 @@ begin {main}
     end
   end else
     RUNERR:=$87; {no loader file}
+
+  { write statistics }
   writeln(@lpr);
+  if makeoutput then write(PRTON);
+  writeln('Code length:           ',pc:5);
+  writeln('Compiler stack size:   ',stackmax:5);
+  writeln('Ident stack size:      ',spntmax:5);
+  write(PRTOFF);
 
-  write(PRTON);
-  writeln('Code lenght:           ',pc);
-  writeln('Compiler stack size:   ',stackmax);
-  writeln('Ident stack size:      ',spntmax, PRTOFF);
-
-  RUNERR := _emulator(9);
+  { clean up }
+  if makeoutput then
+    RUNERR := _emulator(9);
   close(fno);
+
   { check whether second pass is not required }
-  if (RUNERR=0) and libflg then RUNERR:=-1;
+  if (RUNERR=0) then
+    if libflg or not makeoutput then
+      RUNERR:=-1;
 end {main}.
