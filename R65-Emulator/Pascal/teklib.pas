@@ -39,8 +39,47 @@ end;
 
 proc _starttek;
 { switch R65 PRINTER device to raw mode }
+{ and start tek4010 in half window.     }
+{ all R65 system functions are hidden   }
+
+const C_SHELL  = 10;
+      STOPCODE = $2010;
+      NORVID   = chr($0b);
+      INVVID   = chr($0e);
+mem   str    = $0004: cpnt;
+      RUNERR = $000c: integer&;
+{$I IHIDDENMEM:P}
+var res: integer;
+
+  proc delay10msec;
+  begin
+    emucom:=6;
+  end;
+
+  func sh(s: cpnt): integer;
+  { use flp scratch register to transfer pointer }
+  var result:   integer;
+  begin
+    str := s;
+    emucom := (C_SHELL);
+    sh  := emures;
+  end;
+
 begin
-  write(@PLOTTER,chr(17));
+  res := sh('pkill tek4010');
+  delay10msec;
+  res := sh('truncate -s 0 printout.txt');
+  delay10msec;
+  res := sh(
+    'tek4010 -half -fast tail -f printout.txt &');
+  delay10msec;
+  res := sh('pgrep -x tek4010 >/dev/null');
+  if res <> 0 then begin
+    writeln(INVVID, 'tek4010 did not start', NORVID);
+    RUNERR := 54;
+    call(STOPCODE);
+    end;
+  write(@PLOTTER,chr(17)); { switch to raw mode }
   _clearscreen;
 end;
 

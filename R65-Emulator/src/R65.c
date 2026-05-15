@@ -592,16 +592,16 @@ void write6502(uint16_t address, uint8_t value)
     
     if (address == R8_EMUCOM) {
         if (value == 1) {
-            memory[R8_EMURES] = export_file();  // export and set result
+            memory[R8_EMURES] = export_file(); // export and set result
             memory[R8_EMUCOM] = 0;          // and clear command
         }
         else if (value == 2) {
-            memory[R8_EMURES] = import_file();  // import and set result
+            memory[R8_EMURES] = import_file(); // import and set result
             // printf("EMURES=%d\n",memory[R8_EMURES]);
             memory[R8_EMUCOM] = 0;          // and clear command
         }
         else if (value == 3) {
-            memory[R8_EMURES] = mousepad();  // execute mousepad
+            memory[R8_EMURES] = mousepad(); // execute mousepad
             memory[R8_EMUCOM] = 0;          // and clear command
         }
         else if (value == 4) {
@@ -615,14 +615,14 @@ void write6502(uint16_t address, uint8_t value)
             if (global_pendingCrtUpdate)
                crtUpdate();                 // update screen if necessary
             checkPendingEvents();
-            usleep(10000);              // avoid 100% cpu usage during wait
+            usleep(10000);              	// avoid 100% cpu usage during wait
             checkMotorTurnoff(2);
             checkMinTimeout();
             memory[R8_EMURES] = 0;
             memory[R8_EMUCOM] = 0;
         }
-        else if (value == 7) {              // sync screen and wait 30 msec
-                                            // since last call
+        else if (value == 7) {              			// sync screen and wait 30 msec
+														// since last call
             int sleepmicros = lastCrtSync - clock() + 30000;
             if ((sleepmicros > 0) && (sleepmicros < 30000))
                 usleep(sleepmicros);
@@ -634,34 +634,34 @@ void write6502(uint16_t address, uint8_t value)
             memory[R8_EMURES] = sleepmicros / 1000;
             memory[R8_EMUCOM] = 0;
         }
-        else if (value == 8) {              // start listing
+        else if (value == 8) {              			// start listing
             int i,end;
             char s[32],name[32];
             if (printFile)
                 fclose(printFile);                
             i = 15;
-            while ((memory[M8_FILNAM+i] == ' ') && (i > 0) )    // find end of file name
-                i--;
+            while ((memory[M8_FILNAM+i] == ' ') && (i > 0) )
+				i--;									// find end of file
             end = i + 1;    
             for (i = 0; i < end; i++) {        
-                if (memory[M8_FILNAM+i] == ':') {               // remove :
+                if (memory[M8_FILNAM+i] == ':') {      	// remove :
                 s[i]=' ';
                 end = i;               
                 }
                 else
                     s[i] = memory[M8_FILNAM+i];
             
-            if ((s[i] >= 'A') && (s[i] <= 'Z'))             // convert to small letters
+            if ((s[i] >= 'A') && (s[i] <= 'Z'))         // convert to small letters
                 s[i] = s[i] + 0x20;
             }    
-            s[end] = 0;                                         // add end of string mark
+            s[end] = 0;                              	// add end of string mark
             sprintf(name, "Listings/%s.txt", s);
             printf("Writing listing to %s\n", name);
             printFile = fopen(name,"w");
             if (printFile == NULL)
                 printf("Cannot open %s\n",s);
         }
-        else if (value == 9) {              // end listing
+        else if (value == 9) {             				// end listing
             printf("Closing listing\n");
             if (printFile)
                 fclose(printFile);
@@ -670,6 +670,16 @@ void write6502(uint16_t address, uint8_t value)
             if (printFile == NULL)
                 printf("Cannot open %s\n",s);            
         }
+        else if (value == 10) {							// execute Linux shell command line
+			int pnt = memory[4] + 256 * memory[5];
+			char *s = (char *) memory + pnt;
+			printf("SHELL: %s\n", s);
+			fflush(stdout);
+			int result = system(s);
+			memory[R8_EMURES] = (result != 0);			
+			printf("result=%d\n", result);
+			fflush(stdout);
+		}
         else {
             printf("Unknown emulator command %02X, pc=%04X\n", value, pc-3);
         memory[R8_EMURES] = 0X67;           // set result to 0
