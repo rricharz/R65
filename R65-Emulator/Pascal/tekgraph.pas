@@ -22,11 +22,12 @@ var f:file;
 
 begin
 
+  write('Displaying values stored in TABLE:X');
   f:=_attach('TABLE:X         ',0,1,FREAD,
     0,0,'X');
   _getword(f,0,size);
   writeln;
-  writeln('Elements: ', size);
+  writeln('Points: ', size);
   _getreal(f,1,xmin);
   _getreal(f,2,xmax);
 
@@ -41,7 +42,6 @@ begin
   writeln('Ymax:   ',max);
   writeln('Xmin:   ',xmin);
   writeln('Xmax:   ',xmax);
-  writeln;
 
   daxis0:=(max-min)/2.;
   daxis:=1.;
@@ -77,7 +77,7 @@ begin
     xsaxis:=xmin;
   if xsaxis<xmin then xsaxis:=xsaxis+xaxis;
 
-  _starttek;
+  _starttek(T_HALF);
   xs:=leftborder;
   xw:=MAXX-leftborder-border;
   ys:=border;

@@ -106,9 +106,8 @@ begin
   sy:=conv(MAXY)/8.0;
   dx:=6.0;
   dy:=3.0;
-  writeln('Tektronix terminal required');
 
-  _starttek;
+  _starttek(T_HALF);
   _startdraw(1,1);
 
 {*******************************************}

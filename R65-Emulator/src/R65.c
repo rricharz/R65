@@ -456,6 +456,7 @@ int mousepad()
 
     {
 #ifdef __APPLE__
+
         char *argv[] = {
                "/usr/local/bin/mate",
                "--wait",
@@ -463,7 +464,19 @@ int mousepad()
                NULL
         };
         printf("Running TextMate on %s, waiting for completion\n", name);
+
+#elif defined(_WIN32)
+
+        char *argv[] = {
+               "code",
+               "--wait",
+               name,
+               NULL
+        };
+        printf("Running VS Code on %s, waiting for completion\n", name);
+
 #else
+
         char *argv[] = {
             "/usr/bin/mousepad",
             "--disable-server",
@@ -471,6 +484,7 @@ int mousepad()
             NULL
         };
         printf("Running mousepad on %s, waiting for completion\n", name);
+
 #endif
 
         if (!g_spawn_async(NULL, argv, NULL,

@@ -25,6 +25,11 @@ const MAXX = 1023; { Tektronix 4010 graphic mode }
 
       PLOTTER    = @1;
 
+      { tek4010 window modes }
+      T_HALF     = 0;   { default }
+      T_FULLV    = 1;
+      T_GAMING   = 2;
+
 var   _xs,_ys: integer;
 
 proc _clearscreen;
@@ -38,9 +43,9 @@ proc _starttek(mode: integer);
   are hidden. tek4010 is called with the following
   arguments
 
-  mode 0: -half        (default)
-  mode 1: -fullv       (for large window)
-  mode 2: -half -fast  (for games)            }
+  mode T_HALF:    -half        (default)
+  mode T_FULLV:   -fullv       (for large window)
+  mode T_GAMING:  -half -fast  (for games)       }
 
 const C_SHELL  = 10;
       STOPCODE = $2010;
@@ -79,9 +84,9 @@ begin {starttek}
   delay10msec(5);
 
   case mode of
-    1: dummy := sh(
+    T_FULLV: dummy := sh(
         'tek4010 -fullv tail -f printout.txt &');
-    2: dummy := sh(
+    T_GAMING: dummy := sh(
         'tek4010 -half -fast tail -f printout.txt &')
     else dummy := sh(
         'tek4010 -half tail -f printout.txt &')

@@ -319,7 +319,7 @@ begin {main}
         end;
       end;
       if (RUNERR>0) and (RUNERR<=8) then begin
-        write(INVVID,'in file ');
+        write(INVVID,'File: ');
         for i:=0 to 15 do write(FILNM1[i]);
         writeln(NORVID);
       end;

@@ -20,12 +20,11 @@ begin
 end;
 
 begin
-  writeln('Tektronix terminal required');
   xcenter:=MAXX div 2;
   ycenter:=MAXY div 2;
   radius:=9*MAXY div 20;
 
-  _starttek;
+  _starttek(T_HALF);
   _moveto(450,760);
   write(@PLOTTER,'tektest');
 
