@@ -549,9 +549,9 @@ int export_file()
     s[end] = 0;                                         // add end of string mark
     
     filtyp = memory[M8_FILTYP];
-    printf("Filtyp = %c   ", filtyp);
+    // printf("Filtyp = %c   ", filtyp);
     memory[M8_FILSTP] = filstp;
-    printf("Filstp = %c\n", filstp);
+    // printf("Filstp = %c\n", filstp);
     
     if (filtyp=='S') {      // sequential file
         if (filstp == 'A')
@@ -579,7 +579,7 @@ int export_file()
     }
     
     sprintf(name, "Files/%s%s", s, extension);
-    printf("Exporting to %s\n", name);
+    // printf("Exporting to %s\n", name);
     
     foutput = fopen(name, "w");         // open output file
     if (foutput == NULL) {
@@ -631,12 +631,12 @@ int export_file()
                 }
                 if ((buffer[i] & 0x7F) == 0x7F) { // stop if 7F found
                     fclose(foutput);
-                    printf("Export complete, bytes written: %d\n",count);
+                    // printf("Export complete, bytes written: %d\n",count);
                     return 0;
                 }
                 if ((buffer[i] & 0x7F) == 0x1F) { // stop if 1F found
                     fclose(foutput);
-                    printf("Export complete, bytes written: %d\n",count);
+                    // printf("Export complete, bytes written: %d\n",count);
                     return 0;
                 }
             }
@@ -656,7 +656,7 @@ int export_file()
     while (size >= 0);
     
     fclose(foutput);
-    printf("Export complete\n");
+    // printf("Export complete\n");
     return 0;
 }
 

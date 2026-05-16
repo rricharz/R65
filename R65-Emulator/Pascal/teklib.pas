@@ -1,25 +1,20 @@
-{ plot routines for Tektronix 4010 graphics      }
-{  on the R65 PRINTER port. On the original      }
-{  R65 computer, a PRINTER or PLOTTER could      }
-{  be hooked up using RS-232. On the R65         }
-{  emulator, the OUTPUT is stored in the Linux   }
-{  file printout.txt. The tek4010 tektronix      }
-{  emulator (github.com/rricharz/tek4010) can    }
-{  be hooked up to the R65 emulator by           }
-{  calling tek4010 as follows, if a copy of      }
-
-{  tek4010 is put in the R65-emulator folder.    }
-
-{    ./tek4010 tail -f printout.txt              }
+{  Plot routines for Tektronix 4010 graphics
+   on the R65 PRINTER port. On the original
+   R65 computer, a PRINTER or PLOTTER could
+   be hooked up using RS-232. On the R65
+   emulator, the OUTPUT is stored in the Linux
+   file printout.txt. The tek4010 tektronix
+   emulator (github.com/rricharz/tek4010) must
+   be installed. starttek opens a tek4010 window }
 
 {$U+}
 
 library teklib;
 
-const MAXX = 1023; { Tektronix 4010 graphics     }
+const MAXX = 1023; { Tektronix 4010 graphic mode }
       MAXY = 780;
 
-      MAXCOLUMNS = 74; { Tektronix 4010 }
+      MAXCOLUMNS = 74;
       MAXLINES   = 35;
 
       SOLID      = 1;
@@ -37,27 +32,37 @@ begin
   write(@PLOTTER,chr(27),chr(12));
 end;
 
-proc _starttek;
-{ switch R65 PRINTER device to raw mode }
-{ and start tek4010 in half window.     }
-{ all R65 system functions are hidden   }
+proc _starttek(mode: integer);
+{ Switch R65 PRINTER device to raw mode
+  and start tek4010. All R65 system functions
+  are hidden. tek4010 is called with the following
+  arguments
+
+  mode 0: -half        (default)
+  mode 1: -fullv       (for large window)
+  mode 2: -half -fast  (for games)            }
 
 const C_SHELL  = 10;
       STOPCODE = $2010;
       NORVID   = chr($0b);
       INVVID   = chr($0e);
+
 mem   str    = $0004: cpnt;
       RUNERR = $000c: integer&;
-{$I IHIDDENMEM:P}
-var res: integer;
 
-  proc delay10msec;
+{$I IHIDDENMEM:P}
+
+var dummy, res: integer;
+
+  proc delay10msec(times: integer);
+  var icount: integer;
   begin
-    emucom:=6;
+    for icount := 1 to times do
+      emucom:=6;
   end;
 
   func sh(s: cpnt): integer;
-  { use flp scratch register to transfer pointer }
+  { uses flp scratch register to transfer pointer }
   var result:   integer;
   begin
     str := s;
@@ -65,26 +70,39 @@ var res: integer;
     sh  := emures;
   end;
 
-begin
-  res := sh('pkill tek4010');
-  delay10msec;
-  res := sh('truncate -s 0 printout.txt');
-  delay10msec;
-  res := sh(
-    'tek4010 -half -fast tail -f printout.txt &');
-  delay10msec;
+begin {starttek}
+
+  dummy := sh('pkill tek4010');
+  delay10msec(5);
+
+  dummy := sh('truncate -s 0 printout.txt');
+  delay10msec(5);
+
+  case mode of
+    1: dummy := sh(
+        'tek4010 -fullv tail -f printout.txt &');
+    2: dummy := sh(
+        'tek4010 -half -fast tail -f printout.txt &')
+    else dummy := sh(
+        'tek4010 -half tail -f printout.txt &')
+    end {case}
+  delay10msec(50);
+
   res := sh('pgrep -x tek4010 >/dev/null');
   if res <> 0 then begin
     writeln(INVVID, 'tek4010 did not start', NORVID);
     RUNERR := 54;
     call(STOPCODE);
-    end;
+  end;
+
   write(@PLOTTER,chr(17)); { switch to raw mode }
   _clearscreen;
-end;
+
+end {starttek};
 
 proc _endtek;
-{ switch R65 PRINTER device to normal mode }
+{ switch R65 PRINTER device to normal mode
+  tek4010 window is not closed }
 begin
   write(@PLOTTER,chr(18));
 end;

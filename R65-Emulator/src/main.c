@@ -648,7 +648,7 @@ int main (int argc, char *argv[])
     double target = 1920.0 / 1080.0;
     if (aspect > target) screenWidth =  (int)((screenHeight  * target) + 0.5 );
     if (aspect < target) screenHeight = (int)((screenWidth / target) + 0.5);
-    printf("Aspect ratio adjusted: %d x %d\n", screenWidth, screenHeight);
+    // printf("Aspect ratio adjusted: %d x %d\n", screenWidth, screenHeight);
     
     g_set_prgname("r65-emulator");
     g_set_application_name("R65 Emulator");
@@ -703,7 +703,7 @@ int main (int argc, char *argv[])
     r65Setup();
 
     gtk_main();
-    
+
     release_single_instance_lock();
 
 	return 0;

@@ -264,7 +264,7 @@ int main(int argc, char *argv[])
     column = 0;
     line = 1;
     
-    printf("pushr65 version 1.4\n");
+    if (debug) printf("pushr65 version 1.5\n");
     
     if ((argc < 2) || (argc > 3)) {
         printf("Usage: pushr65 filename diskfile\n");
@@ -451,12 +451,13 @@ int main(int argc, char *argv[])
     while ((!feof(finput))&&((chr != 0xff)));
     pushByte(foutput, 0x7f);        // R65 system EOF character
     numSectors = (byteOutCounter / 256) + 1;
-    printf("Bytes read %d\n", (int)byteInCounter);
-    printf("Bytes written %d\n", (int)byteOutCounter);
-    printf("Compression %d%%\n", (int)((100 * byteOutCounter) / byteInCounter));
-    if (debug) printf("Lines written %d\n", line);
-    if (debug) printf("Sectors written %d\n", numSectors);
-
+    if (debug) {
+      printf("Bytes read %d\n", (int)byteInCounter);
+      printf("Bytes written %d\n", (int)byteOutCounter);
+      printf("Compression %d%%\n", (int)((100 * byteOutCounter) / byteInCounter));
+      printf("Lines written %d\n", line);
+      printf("Sectors written %d\n", numSectors);
+    }
     
     // Prepare and save the new file entry
     

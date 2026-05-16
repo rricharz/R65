@@ -677,7 +677,6 @@ void write6502(uint16_t address, uint8_t value)
 			fflush(stdout);
 			int result = system(s);
 			memory[R8_EMURES] = (result != 0);			
-			printf("result=%d\n", result);
 			fflush(stdout);
 		}
         else {
@@ -1059,5 +1058,6 @@ void r65Quit()
             fprintf(confFile, "disk=%s\n", floppy[drive].name);
         fclose(confFile);
     }
+    system("pkill tek4010");  // kill any test4010 opened by emulator    
     fdc_quit();
 }
