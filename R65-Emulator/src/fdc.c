@@ -599,65 +599,83 @@ int export_file()
         return (0x65);
     }
     
-    do {
-        if ((fread(&buffer, sizeof(buffer), 1, floppy[drive].file) != 1)) { 
-            printf("Export: write error\n");
-            return(0x65);
-        }
-        else {
-            // print buffer
-            int i = 0;
-            
-            if (filtyp=='S') {  // sequential file
-				
-                while ((i < 256) && ((unsigned char)buffer[i] != 0x7F)
-                    && ((buffer[i] & 0x7F) != 0x1F)) {
-                    if (((unsigned char)buffer[i] >= 0x80) && ((unsigned char)buffer[i] <= 0xFe)) {
-                        for (int ii = 0; ii < (buffer[i] & 0x7F); ii++) {
-                            fprintf(foutput, "%c", ' ');
-                            // printf("<BL>");
-						}
-                    }
-                    else if ((unsigned char)buffer[i] == 0x0D) {
-                        fprintf(foutput, "\n");
-                        // printf("<RT>\n");
-                    }
-                    else {
-                        fprintf(foutput, "%c",buffer[i]);
-                        // printf("%c", buffer[i]);
-                        count++;
-                    }
-                    i++;
-                }
-                if ((unsigned char)buffer[i] == 0x7F) { // stop if 7F found
-                    fclose(foutput);
-                    // printf("Export complete, bytes written: %d\n",count);
-                    return 0;
-                }
-                if ((unsigned char)buffer[i] == 0x1F) { // stop if 1F found
-                    fclose(foutput);
-                    // printf("Export complete, bytes written: %d\n",count);
-                    return 0;
-                }
-            }
-            else {
-                for (i = 0; i<256; i++) {
-                    if ((i & 15) == 0) {
-                       fprintf(foutput,"\n(%04x) ",pnt);
-                    }
-                    fprintf(foutput,"%02x ", buffer[i]);
-                    pnt++;                    
-                }
-            }
-        }
-        size -= 256;
-        
+ do {
+    if ((fread(&buffer, sizeof(buffer), 1,
+        floppy[drive].file) != 1)) {
+
+        printf("Export: read error\n");
+        fclose(foutput);
+        return(0x65);
     }
-    while (size >= 0);
-    
-    fclose(foutput);
-    // printf("Export complete\n");
-    return 0;
+
+    int i = 0;
+
+    if (filtyp == 'S') {          // sequential file
+
+        while (i < 256) {
+
+            unsigned char ch =
+                (unsigned char)buffer[i];
+
+            // end of file
+
+            if ((ch == 0x7F) || (ch == 0x1F)) {
+                fclose(foutput);
+                return 0;
+            }
+
+            // compressed blanks
+
+            if ((ch >= 0x80) && (ch <= 0xFE)) {
+
+                for (int ii = 0;
+                     ii < (ch & 0x7F); ii++) {
+
+                    fprintf(foutput, "%c", ' ');
+                }
+            }
+
+            // carriage return
+
+            else if (ch == 0x0D) {
+
+                fprintf(foutput, "\n");
+            }
+
+            // normal character
+
+            else {
+
+                fprintf(foutput, "%c", ch);
+                count++;
+            }
+
+            i++;
+        }
+    }
+
+    else {
+
+        for (i = 0; i < 256; i++) {
+
+            if ((i & 15) == 0) {
+                fprintf(foutput,
+                        "\n(%04x) ", pnt);
+            }
+
+            fprintf(foutput,
+                    "%02x ", buffer[i]);
+
+            pnt++;
+        }
+    }
+
+    size -= 256;
+
+} while (size >= 0);
+
+fclose(foutput);
+return 0;
 }
 
 /***************/
