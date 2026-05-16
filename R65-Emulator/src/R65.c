@@ -650,7 +650,7 @@ void write6502(uint16_t address, uint8_t value)
         }
         else if (value == 8) {              			// start listing
             int i,end;
-            char s[32],name[32];
+            char s[32],name[64];
             if (printFile)
                 fclose(printFile);                
             i = 15;

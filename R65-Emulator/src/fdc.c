@@ -502,7 +502,7 @@ int export_file()
     long int dataPnt;
     FILE *foutput;
     char s[32];
-    char name[32];
+    char name[64];
     int pnt = 0;
     
     // printf("Export called\n")
