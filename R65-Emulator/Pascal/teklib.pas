@@ -32,6 +32,17 @@ const MAXX = 1023; { Tektronix 4010 graphic mode }
 
 var   _xs,_ys: integer;
 
+proc _delay10msec(time:integer);
+{ _delay10msec: delay 10 msec }
+{ process is suspended during delay }
+mem
+{$I IHIDDENMEM}
+var i:integer;
+begin
+  for i:=1 to time do
+    emucom:=6;
+end;
+
 proc _clearscreen;
 begin
   write(@PLOTTER,chr(27),chr(12));
@@ -59,13 +70,6 @@ mem   str    = $0004: cpnt;
 
 var dummy, res: integer;
 
-  proc delay10msec(times: integer);
-  var icount: integer;
-  begin
-    for icount := 1 to times do
-      emucom:=6;
-  end;
-
   func sh(s: cpnt): integer;
   { uses flp scratch register to transfer pointer }
   var result:   integer;
@@ -78,20 +82,21 @@ var dummy, res: integer;
 begin {starttek}
 
   dummy := sh('pkill tek4010');
-  delay10msec(5);
+  _delay10msec(5);
 
   dummy := sh('truncate -s 0 printout.txt');
-  delay10msec(5);
+  _delay10msec(5);
 
   case mode of
     T_FULLV: dummy := sh(
-        'tek4010 -fullv tail -f printout.txt &');
+'$HOME/bin/tek4010 -fullv tail -f printout.txt &');
     T_GAMING: dummy := sh(
-        'tek4010 -half -fast tail -f printout.txt &')
+'$HOME/bin/tek4010 -half -fast tail -f printout.txt &'
+)
     else dummy := sh(
-        'tek4010 -half tail -f printout.txt &')
+'$HOME/bin/tek4010 -half tail -f printout.txt &')
     end {case}
-  delay10msec(50);
+  _delay10msec(50);
 
   res := sh('pgrep -x tek4010 >/dev/null');
   if res <> 0 then begin
@@ -180,17 +185,6 @@ proc _moveto(x1,y1: integer);
 begin
   _startdraw(x1,y1);
   _enddraw;
-end;
-
-proc _delay10msec(time:integer);
-{ _delay10msec: delay 10 msec }
-{ process is suspended during delay }
-mem
-{$I IHIDDENMEM}
-var i:integer;
-begin
-  for i:=1 to time do
-    emucom:=6;
 end;
 
 proc _setchsize(size:integer);
