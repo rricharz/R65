@@ -610,7 +610,7 @@ int export_file()
             
             if (filtyp=='S') {  // sequential file
 				
-                while ((i < 256) && ((buffer[i] & 0x7F) != 0x7F)
+                while ((i < 256) && ((unsigned char)buffer[i] != 0x7F)
                     && ((buffer[i] & 0x7F) != 0x1F)) {
                     if (((unsigned char)buffer[i] >= 0x80) && ((unsigned char)buffer[i] <= 0xFe)) {
                         for (int ii = 0; ii < (buffer[i] & 0x7F); ii++) {
@@ -618,7 +618,7 @@ int export_file()
                             // printf("<BL>");
 						}
                     }
-                    else if (buffer[i] == 0x0D) {
+                    else if ((unsigned char)buffer[i] == 0x0D) {
                         fprintf(foutput, "\n");
                         // printf("<RT>\n");
                     }
@@ -629,12 +629,12 @@ int export_file()
                     }
                     i++;
                 }
-                if ((buffer[i] & 0x7F) == 0x7F) { // stop if 7F found
+                if ((unsigned char)buffer[i] == 0x7F) { // stop if 7F found
                     fclose(foutput);
                     // printf("Export complete, bytes written: %d\n",count);
                     return 0;
                 }
-                if ((buffer[i] & 0x7F) == 0x1F) { // stop if 1F found
+                if ((unsigned char)buffer[i] == 0x1F) { // stop if 1F found
                     fclose(foutput);
                     // printf("Export complete, bytes written: %d\n",count);
                     return 0;
