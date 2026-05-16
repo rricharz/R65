@@ -578,7 +578,7 @@ int export_file()
         }
     }
     
-    sprintf(name, "Files/%s%s", s, extension);
+    snprintf(name, sizeof(name), "Files/%s%s", s, extension);
     // printf("Exporting to %s\n", name);
     
     foutput = fopen(name, "w");         // open output file

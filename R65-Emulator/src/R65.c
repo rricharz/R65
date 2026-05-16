@@ -669,7 +669,7 @@ void write6502(uint16_t address, uint8_t value)
                 s[i] = s[i] + 0x20;
             }    
             s[end] = 0;                              	// add end of string mark
-            sprintf(name, "Listings/%s.txt", s);
+            snprintf(name, sizeof(name), "Listings/%s.txt", s);
             printf("Writing listing to %s\n", name);
             printFile = fopen(name,"w");
             if (printFile == NULL)
