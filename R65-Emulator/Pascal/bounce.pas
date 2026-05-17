@@ -28,7 +28,6 @@ var x,y,xspeed,yspeed: real;
     xc,yc,rc: real;
 
 {$I IRANDOM:P}
-{$I ICIRCLE:P }
 
 proc initmode;
 begin
@@ -58,7 +57,7 @@ begin
          xc:=conv(XSIZE) * 0.5;
          yc:=conv(YSIZE-14) * 0.5;
          rc:=conv(YSIZE-14) * 0.25;
-         circle(trunc(xc),trunc(yc),trunc(rc),WHITE);
+         _circle(trunc(xc),trunc(yc),trunc(rc),WHITE);
        end;
     3: begin
          x:=conv(XSIZE)/2.0; y:=conv(YSIZE)/2.0;
@@ -66,7 +65,7 @@ begin
          xc:=conv(XSIZE) * 0.5;
          yc:=conv(YSIZE-14) * 0.5;
          rc:=conv(YSIZE-14) * 0.5 - 1.0;
-         circle(trunc(xc),trunc(yc),trunc(rc),WHITE);
+         _circle(trunc(xc),trunc(yc),trunc(rc),WHITE);
        end
     end {case};
 end;

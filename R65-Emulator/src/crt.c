@@ -385,21 +385,29 @@ void crtUpdate()
         }   
         if (global_videoMemorySplitted) {
             SETDOTBACKGROUNDCOLOR;
-            if (global_graphicsFlag) {
-                xdot2 = (double)crtWidth / (double)NUMXDOTS;
-                ydot2 = xdot2; // preserve aspect ratio
-                int reducedHeight = (double)crtWidth * (double)NUMYDOTS / (double)NUMXDOTS;
-                gcrtxoff = crtOffset;
-                gcrtyoff =  crtOffset + 1 + reducedHeight;
-                Rect(gcrtxoff,gcrtyoff,crtWidth - 1,reducedHeight);         
-            }
+			if (global_graphicsFlag) {
+				xdot2 = (double)crtWidth / (double)NUMXDOTS;
+				ydot2 = xdot2;
+				int dotWidth =
+					(int)(xdot2 * (NUMXDOTS - 1)) + (int)xdot2;
+				int dotHeight =
+					(int)(ydot2 * (NUMYDOTS - 1)) + (int)ydot2;
+				gcrtxoff = crtOffset;
+				gcrtyoff = crtOffset + 1 + dotHeight;
+				Rect(gcrtxoff - 1,
+					gcrtyoff + 1,
+					(int)(xdot2 * NUMXDOTS + 0.999) + 2,
+					(int)(ydot2 * NUMYDOTS + 0.999) + 2);
+			}
             else {
                 xdot2=2;
                 ydot2=2;
                 gcrtxoff = crtOffset + crtWidth - NUMXDOTS * xdot2 - 1;
                 gcrtyoff = crtOffset + 1 + ydot2 * NUMYDOTS;
-                Rect(gcrtxoff,gcrtyoff,
-                    xdot2 * NUMXDOTS - 1,ydot2 * NUMYDOTS);
+				Rect(gcrtxoff - 1,
+					gcrtyoff + 1,
+					(int)(xdot2 * NUMXDOTS + 0.999) + 2,
+					(int)(ydot2 * NUMYDOTS + 0.999) + 2);
             }
 
             SETDOTCOLOR;

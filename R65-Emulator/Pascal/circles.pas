@@ -2,13 +2,10 @@
 program circles;
 uses syslib,plotlib,mathlib;
 
-{$U+}
-
 const autorepeat=false;
 
 var   x9,y9,r9:integer;
 
-{$I ICIRCLE:P}
 {$I IRANDOM:P}
 
 func expaint:boolean;
@@ -17,7 +14,7 @@ begin
   r9 := 3 + _random div 5;
   x9 := irandom(r9 div 2, XSIZE - r9 div 2);
   y9 := irandom(r9 div 2, YSIZE - r9 div 2);
-  circle(x9,y9,r9,WHITE);
+  _circle(x9,y9,r9,WHITE);
 end;
 
 func exkey(ch:char):boolean;

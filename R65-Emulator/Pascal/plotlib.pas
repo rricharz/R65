@@ -10,8 +10,6 @@
 
 }
 
-{$U+}
-
 library plotlib;
 
 const XSIZE=223;
@@ -246,6 +244,50 @@ begin
     read(@KEY,ch);
     if ch=toggle then write(ch);
   until ch<>toggle;
+end;
+
+{ plotif(x,y,mode)         }
+{ pot within canvas limits }
+
+proc _plotif(x,y,mode: integer);
+begin
+  if (x >= 0) and (x <= XSIZE) and
+     (y >= 0) and (y <= YSIZE) then
+    _plot(x, y, mode);
+end;
+
+{ circle(cx,cy,r,mode)     }
+{ draw a circle            }
+
+proc _circle(cx,cy,r,mode: integer);
+var x, y, d: integer;
+
+  proc put8(x,y: integer);
+  begin
+    _plotif(cx + x, cy + y, mode);
+    _plotif(cx - x, cy + y, mode);
+    _plotif(cx + x, cy - y, mode);
+    _plotif(cx - x, cy - y, mode);
+    _plotif(cx + y, cy + x, mode);
+    _plotif(cx - y, cy + x, mode);
+    _plotif(cx + y, cy - x, mode);
+    _plotif(cx - y, cy - x, mode);
+  end;
+
+begin
+  x := 0;
+  y := r;
+  d := 3 - 2 * r;
+  while x <= y do begin
+    put8(x, y);
+    if d < 0 then
+      d := d + 4 * x + 6
+    else begin
+      d := d + 4 * (x - y) + 10;
+      y := y - 1;
+    end;
+    x := x + 1;
+  end;
 end;
 
 begin {initialization}
