@@ -120,6 +120,22 @@ func expaint: boolean;
 { paint picture and apply motion }
 var f:integer;
     s:cpnt;
+
+  proc nextround;
+  begin
+      if count >= 10 then begin
+        if demomode then begin
+          score := 0;
+          count := 0;
+          init;
+        end
+        else expaint := true;
+      end
+      else init;
+    fx:=1.0; fy:=1; fxspeed:=0.0; ffloor:=0;
+    showresult;
+  end;
+
 begin
   if demomode then begin
     if ffloor=nfloors then fxspeed:=2.0
@@ -140,16 +156,7 @@ begin
   if (ffloor=nfloors) and (trunc(fx)>XSIZE-10) then
   begin
     score:=score+1; count:=count+1;
-    if count>=10 then begin
-      if demomode then begin
-        score:=0; count:=0; init;
-      end else begin
-        expaint:=true; exit;
-      end;
-    end;
-    init;
-    fx:=1.0; fy:=1; fxspeed:=0.0; ffloor:=0;
-    showresult;
+    nextround;
     exit;
   end;
   { check for next floor on ladder }
@@ -226,12 +233,7 @@ begin
      (trunc(by)>=fy-4) and (trunc(by)<=fy+8)
     then begin
       count:=count+1;
-      showresult;
-      if count>=10 then
-        if demomode then begin
-          count:=0; init;
-        end else expaint:=true;
-      init;
+      nextround;
     end;
 end;
 

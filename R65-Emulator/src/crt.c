@@ -13,7 +13,7 @@
 
 
 #define SETNORMALTEXTCOLOR   Stroke(210,210,210)
-#define SETDOTCOLOR          Stroke(128,90,0); Fill(255,180,0,0)
+#define SETDOTCOLOR          Fill(255,180,0,0)
 #define SETDOTBACKGROUNDCOLOR Stroke(255,180,0); Fill(36,26,0,0)
 #define SETPASCALCOLOR       Stroke(0,210,210)
 #define SETHIDETEXTCOLOR     Stroke(0,0,0) 
@@ -384,33 +384,72 @@ void crtUpdate()
             }
         }   
         if (global_videoMemorySplitted) {
-            SETDOTBACKGROUNDCOLOR;
-			if (global_graphicsFlag) {
-				xdot2 = (double)crtWidth / (double)NUMXDOTS;
-				ydot2 = xdot2;
-				int dotWidth =
-					(int)(xdot2 * (NUMXDOTS - 1)) + (int)xdot2;
-				int dotHeight =
-					(int)(ydot2 * (NUMYDOTS - 1)) + (int)ydot2;
-				gcrtxoff = crtOffset;
-				gcrtyoff = crtOffset + 1 + dotHeight;
-				Rect(gcrtxoff - 1,
-					gcrtyoff + 1,
-					(int)(xdot2 * NUMXDOTS + 0.999) + 2,
-					(int)(ydot2 * NUMYDOTS + 0.999) + 2);
-			}
-            else {
-                xdot2=2;
-                ydot2=2;
-                gcrtxoff = crtOffset + crtWidth - NUMXDOTS * xdot2 - 1;
-                gcrtyoff = crtOffset + 1 + ydot2 * NUMYDOTS;
-				Rect(gcrtxoff - 1,
-					gcrtyoff + 1,
-					(int)(xdot2 * NUMXDOTS + 0.999) + 2,
-					(int)(ydot2 * NUMYDOTS + 0.999) + 2);
-            }
 
-            SETDOTCOLOR;
+			SETDOTBACKGROUNDCOLOR;
+
+			if (global_graphicsFlag) {
+
+				/* full view:
+				use largest possible scale,
+				centered horizontally */
+
+				xdot2 = crtWidth / NUMXDOTS;
+
+				if (xdot2 < 1) {
+
+					/* use fractional scaling only if necessary */
+
+					xdot2 = (double)crtWidth / (double)NUMXDOTS;
+
+                if (xdot2 > 1.0)
+                        xdot2 = 1.0;
+				}
+
+				ydot2 = xdot2;
+
+				int dotWidth  = (int)(NUMXDOTS * xdot2 + 0.999);
+				int dotHeight = (int)(NUMYDOTS * ydot2 + 0.999);
+
+				gcrtxoff = crtOffset + (crtWidth - dotWidth) / 2;
+				gcrtyoff = crtOffset + 1 + dotHeight;
+
+				Rect(gcrtxoff - 1,
+						gcrtyoff + 1,
+						dotWidth + 2,
+						dotHeight + 2);
+				}
+			else {
+
+				/* split view:
+				use half of full-view scale,
+				right justified */
+
+				xdot2 = (crtWidth / NUMXDOTS) / 2;
+
+				if (xdot2 < 1) {
+
+					xdot2 = (double)crtWidth /
+							(2.0 * (double)NUMXDOTS);
+
+					if (xdot2 > 1.0)
+							xdot2 = 1.0;
+				}
+
+				ydot2 = xdot2;
+
+				int dotWidth  = (int)(NUMXDOTS * xdot2 + 0.999);
+				int dotHeight = (int)(NUMYDOTS * ydot2 + 0.999);
+
+				gcrtxoff = crtOffset + crtWidth - dotWidth - 1;
+				gcrtyoff = crtOffset + 1 + dotHeight;
+
+				Rect(gcrtxoff - 1,
+						gcrtyoff + 1,
+						dotWidth + 2,
+						dotHeight + 2);
+			}
+
+			SETDOTCOLOR;
             int pnt = 0x0700;
             for (double yy = 0.0; yy < ((double)NUMYDOTS * ydot2); yy += ydot2) {
                 for (int xx = 0; xx < NUMXDOTS; xx += 8) {
@@ -419,7 +458,7 @@ void crtUpdate()
                     pnt++;
                     for (double bit = xdot2 * xx; bit < xdot2 * (xx + 8); bit+= xdot2) {
                         if (val & mask) {
-                            Rect(gcrtxoff + bit,  gcrtyoff - yy,
+                            FillRect(gcrtxoff + bit,  gcrtyoff - yy,
                                     (int)xdot2, (int)ydot2);
                         }
                         mask = mask >> 1;                         

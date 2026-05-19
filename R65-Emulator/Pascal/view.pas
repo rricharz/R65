@@ -5,7 +5,7 @@ uses syslib, arglib, filelib;
 
 {$U+} { do not allow shadowing or duplicates }
 
-const DEBUG    = @1; { debug output }
+const
       MAXLINES = 1024;
       MINFREE  = 512;
       PAGELEN  = 15;
@@ -71,8 +71,6 @@ begin
   end;
 
   if start<1 then begin
-    writeln(@DEBUG,
-      'findat: start<1, start=',start);
     _abort;
   end;
 
@@ -222,8 +220,6 @@ begin
   findsav  := allocate(FINDMAX);
   line     := allocate(LINEMAX);
 
-  writeln(@DEBUG,
-    'Start of VIEW, free memory=', freemem);
 end;
 
 { ***** hex ***** }
@@ -277,7 +273,6 @@ begin
   filename[16] := ENDMARK;
 
   write(@filename,'.',hex(FILCYC));
-  writeln(@DEBUG,'File ', filename, ' is open');
 end;
 
 { ***** readinput ***** }
@@ -304,9 +299,6 @@ begin
     nlines := nlines + 1;
   end;
   close(f_in);
-
-  writeln(@DEBUG, 'nlines=',nlines,
-     '; ', freemem, ' bytes free');
 end;
 
 { ***** setnumlin ***** }
@@ -386,7 +378,6 @@ end;
 proc drawpage;
 var i, lastline, scrline: integer;
 begin
-  writeln(@DEBUG, 'drawpage, topline=', topline);
   lastline := topline + (PAGELEN - 1);
   if lastline > nlines then
     lastline := nlines;
@@ -425,11 +416,9 @@ end;
 
 proc startview;
 begin
-  writeln(@DEBUG,'begin startview');
   enter56mode;
   hidecursor;
   updatescreen;
-  writeln(@DEBUG,'end startview');
 end;
 
 { ***** stopview ***** }
@@ -509,7 +498,6 @@ var key0: char;
     len,pos: integer;
     accept, done: boolean;
 begin
-  writeln(@DEBUG, 'Start of editfindfield');
   copy(findstr,findsav);
 
   len := strlen(findstr);
@@ -557,9 +545,6 @@ begin
 
   drawstatus;
   editfindfield := accept;
-  writeln(@DEBUG,
-    'End of editfindfield, result=', accept);
-  writeln(@DEBUG, 'findstr=,<', findstr,'<');
 end;
 
 { ***** searchfirst ***** }
@@ -726,9 +711,6 @@ end;
 
 proc handlekey;
 begin
-  writeln(@DEBUG,'handlekey: code of key = ',
-      ord(key));
-
   case key of
   KESC,'q':  stop:=true;
   KUP:       moveline(-1);

@@ -8,6 +8,7 @@ void Stroke(int r, int g, int b);
 void Fill(int r, int g, int b, int alpha);
 void StrokeWidth(int w);
 void Rect(int x, int y, int w, int h);
+void FillRect(int x, int y, int w, int h);
 void Line(int x1, int y1, int x2, int y2);
 void Circle(int x, int y, int r);
 void Text(int x, int y, char *s, char *fn, int fontSize, int erase, int bold);

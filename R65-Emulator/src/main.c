@@ -136,6 +136,19 @@ void Rect(int x, int y, int w, int h)
 }
 
 /////////////////////////////////////////
+void FillRect(int x, int y, int w, int h)
+/////////////////////////////////////////
+{
+        cairo_set_antialias(global_surface_cr, CAIRO_ANTIALIAS_NONE);
+        cairo_set_source_rgb(global_surface_cr,
+                             fillColor.r, fillColor.g, fillColor.b);
+        cairo_rectangle(global_surface_cr, x, y - h, w, h);
+        cairo_fill(global_surface_cr);
+        global_surface_has_been_updated = TRUE;
+        cairo_set_antialias(global_surface_cr, CAIRO_ANTIALIAS_DEFAULT);
+}
+
+/////////////////////////////////////////
 void Line(int x1, int y1, int x2, int y2)
 /////////////////////////////////////////
 {
