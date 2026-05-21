@@ -4,6 +4,7 @@ library sprtlib;
 
 const NSPRITES    = 44;
       FRAMES      = 3;
+      S_CLEAR     = 0;
       S_STANDING  = 1;
       S_RIGHT     = 9;
       S_LEFT      = 32;
@@ -94,4 +95,4 @@ end;
 
 begin
   readsprites;
-end. 
+end.

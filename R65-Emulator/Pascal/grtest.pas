@@ -1,15 +1,47 @@
 { grtest.pas - test graphics }
 
 program grtest;
-uses syslib,plotlib;
+uses syslib,plotlib,sprtlib;
 
-var ch: char;
-    i,j: integer;
+const
+    autorepeat = false;
+    STEP       = 4;
+
+var ch:                char;
+    i,j, frame:        integer;
+    ax, lastax, stepx: integer;
+
+func expaint: boolean;
+begin
+  expaint := false;
+  if lastax > 0 then
+    showsprite(lastax, 51, S_CLEAR);
+  if stepx > 0 then
+    showsprite(ax, 51, S_RIGHT + frame)
+  else
+    showsprite(ax, 51, S_LEFT + frame);
+  frame := frame + 1;
+  if frame >= 3 then frame := 0;
+  lastax := ax;
+  ax := ax + stepx;
+  if ((stepx > 0) and (ax > 195)) or
+     ((stepx < 0) and (ax < 24)) then
+    stepx := -stepx;
+  _delay10msec(5);
+end;
+
+func exkey(ch:char):boolean;
+begin
+ exkey := (ch = chr(0));  { stop on escape }
+end;
+
+{$I IANIMATE:P}
 
 begin
   _grinit;
-  _splitview;
+  _fullview;
   _cleargr;
+
   _plot(0,0,WHITE);
   _plot(223,0,WHITE);
   _plot(0,117,WHITE);
@@ -26,14 +58,16 @@ begin
   _move(38,100);
   for i:=0 to 15 do
     write(@PLOTDEV,chr(i+80));
+  { rectangle }
   _move(20,20);
   _draw(203,20,WHITE);
-  _draw(203,65,WHITE);
-  _draw(20,65,WHITE);
+  _draw(203,50,WHITE);
+  _draw(20,50,WHITE);
   _draw(20,20,WHITE);
-  _draw(203,65,WHITE);
+  { diagonals }
+  _draw(203,50,WHITE);
   _move(203,20);
-  _draw(20,65,WHITE);
+  _draw(20,50,WHITE);
   j:=$8000;
   for i:=0 to 15 do begin
     _plot(45+4*i,110,WHITE);
@@ -44,5 +78,11 @@ begin
     j:=j shr 1;
   end;
   _move(25,5);
-  write(@PLOTDEV,'Testing string display')
+  write(@PLOTDEV,'Testing string display');
+
+  frame := 0;
+  ax := 20;
+  stepx := STEP;
+  lastax := -1;
+  animate(autorepeat);
 end.
