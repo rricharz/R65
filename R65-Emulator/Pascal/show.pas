@@ -42,14 +42,13 @@ proc loadcanvas;
 { load the canvas from disk }
 begin
   _asetfile(name,cyclus,drive,'I');
-  FILFLG:=chr(0);
+  FILFLG:=chr($40); { silent read }
   filsa:=startcanvas;
   filea:=startcanvas+sizecanvas;
   filsa1:=startcanvas;
   filtyp:='I';
   filerr:=0;
   call(rdfile);
-  writeln;
   if filerr<>0 then
     writeln(INVVID,'File error ',filerr shr 4,
       filerr and 15,NORVID);
@@ -59,7 +58,7 @@ begin
   cyclus:=0; drive:=1;
   _agetstring(name,default,cyclus,drive);
   if default then begin
-    writeln(INVVID,'Usage: showsnap FILNAM',NORVID);
+    writeln(INVVID,'Usage: SHOW filename',NORVID);
     exit;
   end;
   if haswildcard(name) then begin
@@ -67,7 +66,7 @@ begin
     exit;
   end;
 
-  _grinit; _splitview; _cleargr;
+  _grinit; _fullview; _cleargr;
   loadcanvas;
 
 end.

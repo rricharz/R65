@@ -67,7 +67,7 @@ begin
   if default then begin
     _grend;
     writeln(INVVID,'No file specified',NORVID);
-    write('Usage: paint filename[.cyclus][,drive]');
+    writeln('Usage: PAINT filename');
     _abort;
   end;
   { check whether file exists, wildcards allowed }
@@ -76,7 +76,7 @@ begin
   _findentry(name,drive,entry,found,last);
   if (not found) or last then exit;
   _asetfile(name,cyclus,drive,'I');
-  FILFLG:=chr(0);
+  FILFLG:=chr($40); { silent load }
   filsa:=startcanvas;
   filea:=startcanvas+sizecanvas;
   filsa1:=startcanvas;
@@ -93,6 +93,7 @@ proc savecanvas;
 { save the canvas on disk }
 begin
   _asetfile(name,cyclus,drive,'I');
+  FILFLG:=chr($40); { silent store }
   filsa:=startcanvas;
   filea:=startcanvas+sizecanvas;
   filsa1:=startcanvas;
@@ -112,8 +113,8 @@ begin
               _plot(ax,ay,INVERSE);
             end;
     dline:  begin
-              _move(startx,starty); _draw(x,y,INVERSE)
-;
+              _move(startx,starty);
+              _draw(x,y,INVERSE);
             end;
     drect:  begin
               _move(startx,starty);
@@ -163,8 +164,10 @@ end;
 
 proc drawrect;
 begin
-   _move(startx,starty); _draw(x,starty,cmode);
-   _draw(x,y,cmode); _draw(startx,y,cmode);
+   _move(startx,starty);
+   _draw(x,starty,cmode);
+   _draw(x,y,cmode);
+   _draw(startx,y,cmode);
    _draw(startx,starty,cmode);
 end;
 
