@@ -101,8 +101,10 @@ int curLocLow               = 0;
 
 int dotrace = 0;        // pascal user program tracer
 
-int checkEventCounter = 0;
-clock_t lastCrtSync = 0;
+int  checkEventCounter = 0;
+long lastCrtSync = 0;
+long lastAnimationTime = 0;
+int  isAnimation = 0;
 
 
 /********************/
@@ -344,7 +346,9 @@ uint8_t read6502(uint16_t address)
                 return(0);
             crtUpdate();                    // update screen bevore waiting for events
             checkPendingEvents();
-            usleep(10000);                  // avoid 100% cpu usage during waiting for key
+            
+            if (!isAnimation)
+                usleep(10000);              // avoid 100% cpu usage during waiting for key
             checkMotorTurnoff(1);
             checkMinTimeout();
         }
@@ -527,6 +531,18 @@ int mousepad()
     return 0;                      // changed, write new version
 }
 
+/********************************/
+static long long wall_micros(void)
+/********************************/
+{
+        struct timespec ts;
+
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+
+        return (long long)ts.tv_sec * 1000000LL
+             + (long long)ts.tv_nsec / 1000LL;
+}
+
 /*********************************************/
 void write6502(uint16_t address, uint8_t value)
 /*********************************************/
@@ -635,19 +651,50 @@ void write6502(uint16_t address, uint8_t value)
             memory[R8_EMURES] = 0;
             memory[R8_EMUCOM] = 0;
         }
-        else if (value == 7) {              			// sync screen and wait 30 msec
-														// since last call
-            int sleepmicros = lastCrtSync - clock() + 30000;
-            if ((sleepmicros > 0) && (sleepmicros < 30000))
+		else if (value == 7) {              // sync screen and wait 30 msec
+											// since last call
+			static long long lastPrint = 0;
+			static int frameCount = 0;
+
+			long long now;
+			int sleepmicros;
+			
+			isAnimation = 1;
+			lastAnimationTime = wall_micros();			
+			
+			now = wall_micros();
+
+			if (lastCrtSync == 0)
+                lastCrtSync = now;
+
+			sleepmicros = (int)(lastCrtSync + 30000 - now);
+
+			if ((sleepmicros > 0) && (sleepmicros < 30000))
                 usleep(sleepmicros);
-            else
+			else
                 sleepmicros = 0;
-            lastCrtSync = clock();
-            checkEventCounter = -20000;
-            crtUpdate();
-            memory[R8_EMURES] = sleepmicros / 1000;
-            memory[R8_EMUCOM] = 0;
-        }
+
+			lastCrtSync = wall_micros();
+
+			frameCount++;
+
+			if (lastPrint == 0)
+                lastPrint = lastCrtSync;
+
+			if (lastCrtSync - lastPrint >= 1000000) {
+                printf("syncscreen frame rate: %.1f fps\n",
+                       1000000.0 * frameCount /
+                       (double)(lastCrtSync - lastPrint));
+                fflush(stdout);
+                frameCount = 0;
+                lastPrint = lastCrtSync;
+			}
+
+			checkEventCounter = -20000;
+			crtUpdate();
+			memory[R8_EMURES] = sleepmicros / 1000;
+			memory[R8_EMUCOM] = 0;
+		}
         else if (value == 8) {              			// start listing
             int i,end;
             char s[32],name[64];
@@ -1041,6 +1088,8 @@ int r65Loop()
             global_pendingCrtUpdate = 1;
         }
         if (checkEventCounter++ > 200000) {
+			if (isAnimation && (wall_micros() - lastAnimationTime > 500000))
+				isAnimation = 0;
             checkPendingEvents();
             checkMotorTurnoff(1);
             crtUpdate();
