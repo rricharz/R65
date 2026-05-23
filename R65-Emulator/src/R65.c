@@ -106,6 +106,8 @@ long lastCrtSync = 0;
 long lastAnimationTime = 0;
 int  isAnimation = 0;
 int  global_forceCrtUpdate = 0;
+int  pcSample = 0;
+int  spSample = 0;
 
 
 /********************/
@@ -692,7 +694,6 @@ void write6502(uint16_t address, uint8_t value)
                 lastPrint = lastCrtSync;
 			}
 
-			checkEventCounter = -20000;
 			crtUpdate();
 			memory[R8_EMURES] = sleepmicros / 1000;
 			memory[R8_EMUCOM] = 0;
@@ -1092,6 +1093,10 @@ int r65Loop()
         if (checkEventCounter++ > 100000) {
 			if (isAnimation && (wall_micros() - lastAnimationTime > 500000))
 				isAnimation = 0;
+			// sample pc and sp for info display in animation loop
+			fflush(stdout);
+			pcSample = pc;
+			spSample = memory[0x08] + (memory[0x0b] << 9);
             checkPendingEvents();
             checkMotorTurnoff(1);
             crtUpdate();

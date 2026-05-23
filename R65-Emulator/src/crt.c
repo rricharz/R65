@@ -277,9 +277,18 @@ void infoPanel()
     
     if (!usedByUser)
 		s1[0] = 0;
-    sprintf(s2,"%04X  %02X",pc, spMin);
-    int pascalSp = memory[0x08] + (memory[0x0b] << 9);
-    sprintf(s3,"%04X  %02X", pascalSp & 0xFFFF, (pascalMinFree >> 8) & 0xFF);
+		
+	int pascalSp = memory[0x08] + (memory[0x0b] << 9);
+	if (isAnimation) {
+		fflush(stdout);
+	    sprintf(s2,"%04X  %02X", pcSample, spMin);
+	    sprintf(s3,"%04X  %02X", spSample, (pascalMinFree >> 8) & 0xFF);
+
+	}
+	else {
+		sprintf(s2,"%04X  %02X",pc, spMin);
+		sprintf(s3,"%04X  %02X", pascalSp & 0xFFFF, (pascalMinFree >> 8) & 0xFF);
+	}
         
     if ((memory[M8_SFLAG] & 1) == 0)
         sprintf(s3,"%05d %02X",0,0);

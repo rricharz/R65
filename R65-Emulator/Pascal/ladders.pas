@@ -150,6 +150,7 @@ var f:integer;
       else init;
     fx:=1.0; fy:=1; fxspeed:=0.0; ffloor:=0;
     showresult;
+    _delay10msec(100);
   end;
 
 begin

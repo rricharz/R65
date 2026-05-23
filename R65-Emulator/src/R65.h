@@ -80,3 +80,5 @@ extern int pascalMinFree;
 extern int T;
 extern int isAnimation;
 extern int global_forceCrtUpdate;
+extern int pcSample;
+extern int spSample;

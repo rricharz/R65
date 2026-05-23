@@ -143,9 +143,8 @@ begin {main}
     end;
     entry := entry + 1;
   until done;
-  writeln(@PRINTER);
-  writeln(PRTON,
-        'checkbuild complete, errors: ',errors);
+  writeln(PRTON);
+  writeln('CHECKBUILD complete, errors: ',errors);
   writeln('Files checked:               ', files);
   if errors > 0 then
     writeln(INVVID,
