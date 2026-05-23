@@ -34,8 +34,7 @@ const
 
     STACKSIZE = 256;   {stack size}
     PAGELENGHT= 60;    {no of lines per page}
-    MAXFI     = 3;     {max nbr  of nested input files
-}
+    MAXFI     = 3;     {max n  of nested input files}
     NRESW     = 63;    {number of res. words, max 64}
 
     SAT_EXPORT = 1;    {Bit mask for s_attr}
@@ -685,18 +684,18 @@ proc getlib;  { read library data }
 var i,j,nent,addr,size,num,x,base: integer;
     libfil: file;
     ch,ltyp2,dummy: char;
-    name: array[7] of char;
+    name: array[13] of char;
 begin
   scan; if token=' ,' then scan;
   testto('id');
   base:=pc-2;
   if makeoutput then write(@ofno,'L');
-  for i:=0 to 7 do begin
+  for i:=0 to 13 do begin
     name[i]:=ident[succ(i)];
     if makeoutput then
       write(@ofno,ident[succ(i)])
   end;
-  _asetfile(name&'        ',0,cdrive,'L');
+  _asetfile(name&'  ',0,0,'L');
   openr(libfil);  { get table file }
 
   { read and check header }
@@ -2674,7 +2673,7 @@ begin {main}
   if makeoutput then openw(ofno);
   scan;
 
-  { read used statement }
+  { read uses statement }
   if (token='us') and (libflg=false) then begin
     repeat
       getlib; scan

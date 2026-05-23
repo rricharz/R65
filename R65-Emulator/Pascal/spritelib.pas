@@ -1,6 +1,6 @@
-{ sprtlib - sprite library }
+{ spritelib - sprite library }
 
-library sprtlib;
+library spritelib;
 
 const NSPRITES    = 44;
       FRAMES      = 3;

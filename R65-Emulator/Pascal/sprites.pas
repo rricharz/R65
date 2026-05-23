@@ -1,5 +1,5 @@
 program sprites;
-uses syslib,strlib,striolib,plotlib,sprtlib;
+uses syslib,strlib,striolib,plotlib,spritelib;
 
 {$R+}
 {$U+}

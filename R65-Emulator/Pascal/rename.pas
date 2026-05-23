@@ -37,6 +37,11 @@ begin
   _agetstring(filename, default, cyclus, drive);
 
   _agetstring(newname, default, newcyclus, newdrive);
+  if default then begin
+    writeln(INVVID,'Usage: rename oldname newname',
+            NORVID);
+    _abort;
+  end;
 
   {find matching file entry }
   entry := 0;

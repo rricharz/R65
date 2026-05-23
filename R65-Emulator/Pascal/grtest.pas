@@ -1,7 +1,7 @@
 { grtest.pas - test graphics }
 
 program grtest;
-uses syslib,plotlib,sprtlib;
+uses syslib,plotlib,spritelib;
 
 const
     autorepeat    = false;

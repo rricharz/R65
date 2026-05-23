@@ -133,19 +133,19 @@ proc getbl(base:integer);  {get block }
   var i: integer;
       savsr: file;
       ch1: char;
-      lname: array[7] of char;
+      lname: array[13] of char;
       lcyclus,ldrive: integer;
 
   begin
     savsr:=source;
-    for i:=0 to 7 do begin
+    for i:=0 to 13 do begin
       read(@source,ch1);
       lname[i]:=ch1
     end;
-    lcyclus:=0; ldrive:=cdrive;
+    lcyclus:=0; ldrive:=0;
 
-    { loading library from same drive }
-    _asetfile(lname&'        ',
+    { loading library from drive 0 }
+    _asetfile(lname&'  ',
       lcyclus,ldrive,'T');
     openr(source);
     getbl(offset-2);

@@ -5,7 +5,7 @@
   2024 rricharz                      }
 
 program ladders;
-uses syslib,plotlib,ledlib,arglib,strlib,sprtlib;
+uses syslib,plotlib,ledlib,arglib,strlib,spritelib;
 
 const erase=0; ball=$6ff6;
       nfloors=5; vfloors=20; holesize=22;
@@ -150,7 +150,6 @@ var f:integer;
       else init;
     fx:=1.0; fy:=1; fxspeed:=0.0; ffloor:=0;
     showresult;
-    _delay10msec(100);
   end;
 
 begin
