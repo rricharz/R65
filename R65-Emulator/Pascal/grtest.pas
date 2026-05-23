@@ -70,16 +70,8 @@ begin
   _draw(203,50,WHITE);
   _move(203,20);
   _draw(20,50,WHITE);
-  j:=$8000;
-  for i:=0 to 15 do begin
-    _plot(45+4*i,110,WHITE);
-    _plot(45+4*i+1,110,WHITE);
-    _plot(45+4*i+2,110,WHITE);
-    _plot(45+4*i+3,110,WHITE);
-    _plotmap(45+4*i,112,j);
-    j:=j shr 1;
-  end;
-  _move(25,5);
+  { string }
+  _move(24,5);
   write(@PLOTDEV,'Testing string display');
 
   frame := 0;
@@ -87,4 +79,5 @@ begin
   stepx := STEP;
   lastax := -1;
   animate(autorepeat);
+  _splitview;
 end.

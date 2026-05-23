@@ -33,7 +33,7 @@ const gravity    = 0.15;
       escape     = chr(0);
 
 var   x,y,xspeed,yspeed: real;
-      xi,yi,xl,yl,keycode,mode,lastmode: integer;
+      i,xi,yi,xl,yl,keycode,mode,lastmode: integer;
       xc,yc,rc: real;
 
 {$I IRANDOM:P}
@@ -180,6 +180,7 @@ begin
   _grinit;
   _cleargr;
   _fullview;
+  for i := 0 to 11 do writeln;
   writeln
 ('up/down to increase/decrease vertical speed');
    write
