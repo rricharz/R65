@@ -78,3 +78,5 @@ extern uint8_t memory[65536];
 extern int spMin;
 extern int pascalMinFree;
 extern int T;
+extern int isAnimation;
+extern int global_forceCrtUpdate;

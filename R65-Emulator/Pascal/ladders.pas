@@ -5,7 +5,7 @@
   2024 rricharz                      }
 
 program ladders;
-uses syslib,plotlib,ledlib,arglib,strlib;
+uses syslib,plotlib,ledlib,arglib,strlib,sprtlib;
 
 const erase=0; ball=$6ff6;
       nfloors=5; vfloors=20; holesize=22;
@@ -16,11 +16,13 @@ const erase=0; ball=$6ff6;
       face1=$8b43; face2=$2a48;
       face3=$034a; face4=$084a;
 
+      LOOPSPERFRAME = 2;
+
 var bx,by,bxs,bys,bxspeed,byspeed,fx,fxs: real;
     fxspeed,jump,jumpspeed: real;
     floor,ffloor,fy,fys,fyspeed: integer;
     holes,ladders: array[nfloors] of integer;
-    score,count: integer;
+    score,count,loopcounter: integer;
     demomode:boolean;
 
 {$I IRANDOM:P}
@@ -67,18 +69,32 @@ begin
 end;
 
 proc showface;
-var fysum:integer;
+var fysum, frame, spriteindex:integer;
 begin
+  frame := loopcounter div LOOPSPERFRAME;
   fysum:=fy+trunc(jump);
-  _plotmap(trunc(fxs),fys,erase);
-  _plotmap(trunc(fxs)+4,fys,erase);
-  _plotmap(trunc(fxs),fys+4,erase);
-  _plotmap(trunc(fxs)+4,fys+4,erase);
-  _plotmap(trunc(fx),fysum,face1);
-  _plotmap(trunc(fx)+4,fysum,face2);
-  _plotmap(trunc(fx),fysum+4,face3);
-  _plotmap(trunc(fx)+4,fysum+4,face4);
+
+  if jump >0.0 then begin
+    if fxspeed > 0.0 then
+      spriteindex := S_JUMPR + frame
+    else
+      spriteindex := S_JUMPL + frame
+  end else if fyspeed > 0 then
+    spriteindex := S_UP + frame
+  else if fyspeed < 0 then
+    spriteindex := S_DOWN + frame
+  else if fxspeed = 0.0 then
+    spriteindex := S_STANDING + frame
+  else if fxspeed >0.0 then
+    spriteindex := S_RIGHT + frame
+  else
+    spriteindex := S_LEFT + frame;
+  _showsprite(trunc(fxs),fys,S_CLEAR);
+  _showsprite(trunc(fx),fysum, spriteindex);
   fxs:=fx; fys:=fysum;
+  loopcounter := loopcounter + 1;
+  if loopcounter >= (3 * LOOPSPERFRAME) then
+    loopcounter := 0;
 end;
 
 proc showladder(f:integer);
@@ -300,7 +316,9 @@ end;
 {$I IANIMATE:P}
 
 begin
-  score:=0; count:=0;
+  score :=  0;
+  count := 0;
+  loopcounter := 0;
   if option('H') then begin
     writeln('/D   endless demo mode');
     exit;

@@ -28,7 +28,7 @@ var shipmap: array[1] of integer;
 
     shipx,lastsx,lastsy,birdx,birdy,
     lastbirdx,birdcount,sbird,score,lastscore,dummy,
-    lasercount            : integer;
+    laserx, lasercount    : integer;
     landed                : boolean;
     shipy,sspeedx,sspeedy : real;
 
@@ -68,7 +68,6 @@ begin
   if shipy<=-0.5 then begin
     landed:=true;
     _move(0,YSIZE-9);
-    write(@PLOTDEV,'ALIENS LANDED   ');
   end;
 end;
 
@@ -86,16 +85,13 @@ end;
 
 proc showscore;
 begin
-  _move(XSIZE-17,YSIZE-9);
-  write(@PLOTDEV,
-    chr(score div 10 + ord('0')),
-    chr(_mod(score,10) + ord('0')));
+  _move(1, YSIZE - 9);
+  write(@PLOTDEV, score: 2);
 end;
 
 proc hitbird;
 begin
   _move(0,YSIZE-9);
-  write(@PLOTDEV,'YOU HIT A BIRD! ');
   score:=0;
   birdx:=-1;
   showbird;
@@ -104,55 +100,52 @@ end;
 proc hitship;
 begin
   _move(0,YSIZE-9);
-  write(@PLOTDEV,'YOU HIT A SHIP! ');
   score:=score+1;
   shipx:=-1;
   showship;
 end;
 
 proc laser;
-var laserx: integer;
 begin
-  showship;
-  if lasercount>=0 then begin
-    laserx:=XSIZE div 2;
+  if lasercount > 1 then begin
     _move(laserx,1);
-    _draw(laserx,YSIZE-8,WHITE);
-    _delay10msec(5);
+    _draw(laserx,YSIZE,WHITE);
     if (laserx>=(shipx-4)) and
-       (laserx<=(shipx+3)) then
-       hitship
+       (laserx<=(shipx+3)) then hitship
     else if (laserx>=birdx) and
-       (laserx<=(birdx+3)) then
-       hitbird
-    else begin
-       _move(0,YSIZE-9);
-       write(@PLOTDEV,'                ');
-    end;
+       (laserx<=(birdx+3)) then hitbird;
+  end else if lasercount = 1 then begin
     _move(laserx,1);
-    _draw(laserx,YSIZE-8,BLACK);
-    lasercount:=50;
-  end else
-    lasercount:=lasercount-1;
+    _draw(laserx,YSIZE,BLACK);
+  end;
+  if lasercount > 0 then
+    lasercount := lasercount - 1;
 end;
 
 proc init;
+var i: integer;
 begin
-  shipmap[0]:=$3f71;
-  shipmap[1]:=$cfe8;
-  birdmap[0]:=$9600;
-  birdmap[1]:=$0f00;
-  birdmap[2]:=$0690;
-  birdmap[3]:=$0f00;
-  shipx:=-1; lastsx:=-1;
-  birdx:=-1; lastbirdx:=-1;
-  birdcount:=0; lasercount:=0;
-  score:=0; lastscore:=-1;
-  landed:=false;
+  shipmap[0] := $3f71;
+  shipmap[1] := $cfe8;
+  birdmap[0] := $9600;
+  birdmap[1] := $0f00;
+  birdmap[2] := $0690;
+  birdmap[3] := $0f00;
+  shipx      := -1;
+  lastsx     := -1;
+  birdx      := -1;
+  lastbirdx  := -1;
+  birdcount  :=  0;
+  lasercount :=  0;
+  score      :=  0;
+  lastscore  :=- 1;
+  laserx := XSIZE div 2;
+  landed := false;
   _grinit;
   _cleargr;
-  _move(0,YSIZE-9);
-  write(@PLOTDEV,'USE SPACE BAR   ');
+  for i := 1 to 12 do writeln;
+  writeln('Hit space bar to activate laser.');
+  writeln('The score is set to 0 if you hit a bird.');
 end;
 
 func expaint:boolean;
@@ -162,7 +155,7 @@ begin
     if _random<16 then begin
       shipx:=irandom(5,XSIZE-5);
       shipy:=conv(YSIZE-14);
-      sspeedx:=rrandom(-2.0,2.0);
+      sspeedx:=rrandom(-1.0,1.0);
       sspeedy:=-0.5;
     end;
   end;
@@ -190,14 +183,14 @@ begin
     if birdx>XSIZE-4 then birdx:=-1;
     showbird;
   end;
+  laser;
   if landed then expaint:=true
   else expaint:=false;
 end;
 
 func exkey(ch:char):boolean;
 begin
-  if landed then writeln('landed');
-  if ch=' ' then laser;
+  if ch=' ' then lasercount := 6;
   exkey := (ch = chr(0));
 end;
 
@@ -206,9 +199,8 @@ end;
 begin
   init;
   animate(false);
-  _splitview;
+  _grend;
   if landed then
     writeln('The aliens are landed!');
-  writeln('You hit ',score,
-      ' alien ships');
+  writeln('Score: ', score);
 end.

@@ -4,8 +4,9 @@ program grtest;
 uses syslib,plotlib,sprtlib;
 
 const
-    autorepeat = false;
-    STEP       = 4;
+    autorepeat    = false;
+    STEP          = 2;
+    STEPSPERFRAME = 2;
 
 var ch:                char;
     i,j, frame:        integer;
@@ -15,19 +16,20 @@ func expaint: boolean;
 begin
   expaint := false;
   if lastax > 0 then
-    showsprite(lastax, 51, S_CLEAR);
+    _showsprite(lastax, 51, S_CLEAR);
   if stepx > 0 then
-    showsprite(ax, 51, S_RIGHT + frame)
+    _showsprite(ax, 51,
+      S_RIGHT + frame div STEPSPERFRAME )
   else
-    showsprite(ax, 51, S_LEFT + frame);
+    _showsprite(ax, 51,
+      S_LEFT + frame div STEPSPERFRAME);
   frame := frame + 1;
-  if frame >= 3 then frame := 0;
+  if frame >= 3 * STEPSPERFRAME then frame := 0;
   lastax := ax;
   ax := ax + stepx;
   if ((stepx > 0) and (ax > 195)) or
      ((stepx < 0) and (ax < 24)) then
     stepx := -stepx;
-  _delay10msec(5);
 end;
 
 func exkey(ch:char):boolean;

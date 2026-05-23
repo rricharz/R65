@@ -105,6 +105,7 @@ int  checkEventCounter = 0;
 long lastCrtSync = 0;
 long lastAnimationTime = 0;
 int  isAnimation = 0;
+int  global_forceCrtUpdate = 0;
 
 
 /********************/
@@ -660,8 +661,9 @@ void write6502(uint16_t address, uint8_t value)
 			int sleepmicros;
 			
 			isAnimation = 1;
-			lastAnimationTime = wall_micros();			
-			
+			global_pendingCrtUpdate = 1;
+			global_forceCrtUpdate = 1;
+			lastAnimationTime = wall_micros();					
 			now = wall_micros();
 
 			if (lastCrtSync == 0)
@@ -682,10 +684,10 @@ void write6502(uint16_t address, uint8_t value)
                 lastPrint = lastCrtSync;
 
 			if (lastCrtSync - lastPrint >= 1000000) {
-                printf("syncscreen frame rate: %.1f fps\n",
-                       1000000.0 * frameCount /
-                       (double)(lastCrtSync - lastPrint));
-                fflush(stdout);
+                //printf("syncscreen frame rate: %.1f fps\n",
+                //       1000000.0 * frameCount /
+                //       (double)(lastCrtSync - lastPrint));
+                //fflush(stdout);
                 frameCount = 0;
                 lastPrint = lastCrtSync;
 			}
@@ -1087,7 +1089,7 @@ int r65Loop()
             timeOfSpMin = time(NULL) % 86400;
             global_pendingCrtUpdate = 1;
         }
-        if (checkEventCounter++ > 200000) {
+        if (checkEventCounter++ > 100000) {
 			if (isAnimation && (wall_micros() - lastAnimationTime > 500000))
 				isAnimation = 0;
             checkPendingEvents();

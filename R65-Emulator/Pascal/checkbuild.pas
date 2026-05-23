@@ -149,7 +149,8 @@ begin {main}
   writeln('Files checked:               ', files);
   if errors > 0 then
     writeln(INVVID,
-      'Check listing for errors', NORVID);
+      'Errors found, check listing for errors',
+      NORVID);
   write(PRTOFF);
 
 end.

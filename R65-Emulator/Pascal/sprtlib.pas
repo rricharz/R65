@@ -16,7 +16,7 @@ const NSPRITES    = 44;
 
 var sprites: array[176] of integer;
 
-proc readsprites;
+proc _readsprites;
 var  i, j, index: integer;
     f: file;
 
@@ -64,7 +64,7 @@ begin
   close(f);
 end;
 
-proc showsprite(x, y, index: integer);
+proc _showsprite(x, y, index: integer);
 var base: integer;
 
   proc plotmap(x,y,m:integer);
@@ -94,5 +94,5 @@ begin
 end;
 
 begin
-  readsprites;
+  _readsprites;
 end.

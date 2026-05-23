@@ -70,7 +70,7 @@ begin
   write(@PLOTDEV, 'Sprite # ', selected:2);
   for j := 0 to NSPRITES - 1 do begin
     coordinates(j);
-    showsprite(xoff, yoff, j);
+    _showsprite(xoff, yoff, j);
   end;
   coordinates(last);
   rectangle(xoff - 1, yoff - 1,
@@ -146,14 +146,14 @@ begin
     _move(5, 22);
     write(@PLOTDEV, 'Frames', frames: 5);
     rectangle(xoff - 1, yoff - 1, 10, 10, WHITE);
-    showsprite(xoff, yoff, index);
+    _showsprite(xoff, yoff, index);
     framecounter := 0;
   end;
 
   if frames > 0 then begin
-    framenumber := _mod(framecounter div LOOPS, frames
-);
-    showsprite(xoff, yoff, index + framenumber);
+    framenumber :=
+      _mod(framecounter div LOOPS, frames);
+    _showsprite(xoff, yoff, index + framenumber);
     framecounter := framecounter + 1;
   end;
 

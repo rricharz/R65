@@ -212,6 +212,8 @@ void infoPanel()
     char s1[16], s2[16], s3[16];
     char * s;
     
+    // printf("Update info panel, pc=%4X\n", pc);
+    fflush(stdout);
     // show Quit button
     SETBUTTONCOLOR;
 
@@ -316,8 +318,8 @@ void crtUpdate()
     
     checkInfoBarButtons();
     
-    if (global_pendingCrtUpdate) {
-        
+	if (global_pendingCrtUpdate && (!isAnimation || global_forceCrtUpdate)) {
+       
         clock_t start = clock();
         
         Background(0.2, 0.2, 0.2);
@@ -468,7 +470,8 @@ void crtUpdate()
         }
         
         // Update complete
-        global_pendingCrtUpdate = 0;
+		global_pendingCrtUpdate = 0;
+		global_forceCrtUpdate = 0;
         Paint();
         
         // printf("Updating screen took %0.f msec\n", (double)((clock() - start)/1000));

@@ -19,7 +19,7 @@ begin
     writeln(' arguments of program');
     _abort;
   end;
-  cyclus:=0; drive:=1;
+  cyclus:=0; drive:=0;
   _agetstring(name,default,cyclus,drive);
   _asetfile(name,cyclus,drive,'R');
   for i:=_carg to 31 do begin
