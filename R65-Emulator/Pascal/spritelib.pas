@@ -2,20 +2,22 @@
 
 library spritelib;
 
-const NSPRITES    = 64;
-      FRAMES      = 3;
-      S_CLEAR     = 0;
-      S_STANDING  = 1;
-      S_RIGHT     = 9;
-      S_LEFT      = 32;
-      S_UP        = 14;
-      S_DOWN      = 35;
-      S_JUMPR     = 38;
-      S_JUMPL     = 41;
-      S_TURN      = 19;
-      S_CIRCLE    = 45;
-      S_BALL      = 46;
-      S_SMILEY    = 47;
+const NSPRITES      = 64;
+      FRAMES        = 3;
+      S_CLEAR       = 0;
+      S_STANDING    = 1;
+      S_RIGHT       = 9;
+      S_LEFT        = 32;
+      S_UP          = 14;
+      S_DOWN        = 35;
+      S_JUMPR       = 38;
+      S_JUMPL       = 41;
+      S_TURN        = 19;
+      S_CIRCLE      = 45;
+      S_BALL        = 46;
+      S_SMILEY      = 47;
+      S_PIECE_WHITE = 51;
+      S_PIECE_BLACK = 52;
 
 var sprites: array[256] of integer; { 4 * NSPRITES }
 

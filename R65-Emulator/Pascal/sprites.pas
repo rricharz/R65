@@ -1,3 +1,19 @@
+{ ***********************************
+  * SPRITES - view and edit sprites *
+  ***********************************
+
+  SPRITETABLE:B is stored on disk 0 and is
+  used there by the sprite library SPRITELIB
+
+  SPRITES allows to view the sprites in
+  SPRITETABLE:B, to show animations of sprites
+  and to copy and edit sprites.
+
+  If sprites are edited, a new copy of
+  SPRITETABLE:B is made on disk 0
+                                              }
+
+
 program sprites;
 uses syslib,strlib,striolib,plotlib,filelib,spritelib;
 
@@ -15,23 +31,24 @@ const NX        = 12;
       NBLINKS   = 10;  {no of loops until bink}
       LOOPS     = 10;  {no of loops until next frame}
       STATUSLN  = 36;
+      DISK      = 0;
 
 mem sflag=$1781: integer&;
 
 var selected, lastselected: integer;
     frames, framecounter:   integer;
-    in, scyclus, editbit:   integer;
+    in, editbit:            integer;
     isedited, editflag:     boolean;
     ch:                     char;
     blink, elapsed:         integer;
     copied_sprites:         array[3] of integer;
 
-proc writetable(cyc: integer);
+proc writetable;
 var i, j, cyclus, drive, index: integer;
     f: file;
 begin
-  cyclus := cyc;
-  drive  := 1;
+  cyclus := 0;
+  drive  := DISK;
   _strfio('SPRITETABLE:B', cyclus, drive);
   openw(f);
   index := 0;
@@ -229,7 +246,6 @@ begin
   base := 4 * fromindex;
   for i := 0 to 3 do
     copied_sprites[i] := sprites[base + i];
-
 end;
 
 proc paste(toindex: integer);
@@ -242,16 +258,17 @@ end;
 
 
 begin
-  { sprites are edited on drive 1 }
-  writeln('Reading SPRITETABLE:B,1');
-  _readsprites(1);
   _grinit;
   _fullview;
   _cleargr;
-  writeln('Q: Save and quit  K: Quit without saving');
-  writeln('E: Edit           Blank: change pixel');
-  writeln('C: Copy sprite    V: Paste sprite');
-  scyclus := FILCYC;
+  writeln(
+'Q:   Save and quit   K:     Quit without saving');
+  writeln(
+'E:   Start Edit mode BLANK: Toggle pixel');
+  writeln(
+'C:   Copy sprite     V:     Paste sprite');
+  writeln(
+'1..4 Animate frames  ESC:   Leave edit mode');
   lastselected := 0;
   selected := 0;
   frames := 0;
@@ -282,9 +299,8 @@ begin
       '3':    frames := 3;
       '4':    frames := 4;
       'Q':    begin
-                if isedited then begin
-                  writetable(scyclus + 1);
-                end;
+                if isedited then
+                  writetable;
               end;
       'E':    begin
                 _move(5,STATUSLN);
@@ -299,7 +315,9 @@ begin
                 _move(5,STATUSLN);
                 write(@PLOTDEV,'VIEW');
                 editflag := false;
-                ch := 'C'; { continue }
+                ch := 'C'; { do not exit }
+                if isedited then
+                  writetable;
               end;
       CRIGHT: if editflag then
                 editbit := editbit + 1
