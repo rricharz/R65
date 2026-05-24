@@ -1,10 +1,10 @@
 program sprites;
-uses syslib,strlib,striolib,plotlib,spritelib;
+uses syslib,strlib,striolib,plotlib,filelib,spritelib;
 
 {$R+}
 {$U+}
 
-const NX        = 8;
+const NX        = 12;
       NPIXELS   = 8;
       LARGEPIX  = 12;
       CLEFT     = chr($03);
@@ -17,17 +17,17 @@ const NX        = 8;
 mem sflag=$1781: integer&;
 
 var selected, lastselected: integer;
-    frames, framecounter: integer;
+    frames, framecounter:   integer;
+    in, scyclus:            integer;
     ch: char;
 
-{
-proc writefile;
+proc writetable(cyc: integer);
 var i, j, cyclus, drive, index: integer;
     f: file;
 begin
-  cyclus := 0;
+  cyclus := cyc;
   drive  := 1;
-  _strfio('SPRITES:B', cyclus, drive);
+  _strfio('SPRITETABLE:B', cyclus, drive);
   openw(f);
   index := 0;
 
@@ -42,7 +42,6 @@ begin
 
   close(f);
 end;
-}
 
 proc rectangle(x, y, xs, ys, color: integer);
 begin
@@ -198,6 +197,8 @@ begin
   _grinit;
   _fullview;
   _cleargr;
+  writeln('W: write SPRITETABLE:B');
+  scyclus := FILCYC;
   lastselected := 0;
   selected := 0;
   frames := 0;
@@ -219,6 +220,10 @@ begin
       '2':    frames := 2;
       '3':    frames := 3;
       '4':    frames := 4;
+      'W':    begin
+                writeln('write SPRITETABLE:B');
+                writetable(scyclus + 1);
+              end;
       CRIGHT: selected := selected + 1;
       CLEFT:  selected := selected - 1;
       CUP:    selected := selected - NX;
@@ -226,8 +231,8 @@ begin
     end; { case }
     if selected < 0 then
       selected := 0;
-    if selected > NSPRITES - frames then
-      selected := NSPRITES - frames;
+    if selected > NSPRITES - frames - 1 then
+      selected := NSPRITES - frames - 1;
 
     spritetable(lastselected, selected);
     showlarge(selected);

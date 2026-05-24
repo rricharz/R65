@@ -2,7 +2,7 @@
 
 library spritelib;
 
-const NSPRITES    = 44;
+const NSPRITES    = 64;
       FRAMES      = 3;
       S_CLEAR     = 0;
       S_STANDING  = 1;
@@ -14,7 +14,7 @@ const NSPRITES    = 44;
       S_JUMPL     = 41;
       S_TURN      = 19;
 
-var sprites: array[176] of integer;
+var sprites: array[256] of integer; { 4 * NSPRITES }
 
 proc _readsprites;
 var  i, j, index: integer;
@@ -52,7 +52,7 @@ var  i, j, index: integer;
   end;
 
 begin
-  setfio('SPRITES:B');
+  setfio('SPRITETABLE:B');
   openr(f);
   index := 0;
   for j:= 0 to NSPRITES - 1 do begin
