@@ -13,10 +13,13 @@ const NSPRITES    = 64;
       S_JUMPR     = 38;
       S_JUMPL     = 41;
       S_TURN      = 19;
+      S_CIRCLE    = 45;
+      S_BALL      = 46;
+      S_SMILEY    = 47;
 
 var sprites: array[256] of integer; { 4 * NSPRITES }
 
-proc _readsprites;
+proc _readsprites(drv: integer);
 var  i, j, index: integer;
     f: file;
 
@@ -34,7 +37,7 @@ var  i, j, index: integer;
   var i,j, cyclus, drive: integer;
   begin
     cyclus := 0;
-    drive  := 0;
+    drive  := drv;
     i := 0;
     while (name[i]<>ENDMARK) and (i<=15) do begin
       FILNAM[i] := name[i];
@@ -94,5 +97,5 @@ begin
 end;
 
 begin
-  _readsprites;
+  _readsprites(0);
 end.

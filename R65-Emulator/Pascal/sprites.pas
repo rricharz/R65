@@ -12,14 +12,19 @@ const NX        = 12;
       CDOWN     = chr($18);
       ESC       = chr(0);
       TOGGLE    = chr($0c);
-      LOOPS     = 5;  { no of loops until next frame }
+      NBLINKS   = 10;  {no of loops until bink}
+      LOOPS     = 10;  {no of loops until next frame}
+      STATUSLN  = 36;
 
 mem sflag=$1781: integer&;
 
 var selected, lastselected: integer;
     frames, framecounter:   integer;
-    in, scyclus:            integer;
-    ch: char;
+    in, scyclus, editbit:   integer;
+    isedited, editflag:     boolean;
+    ch:                     char;
+    blink, elapsed:         integer;
+    copied_sprites:         array[3] of integer;
 
 proc writetable(cyc: integer);
 var i, j, cyclus, drive, index: integer;
@@ -43,15 +48,6 @@ begin
   close(f);
 end;
 
-proc rectangle(x, y, xs, ys, color: integer);
-begin
-  _move(x, y);
-  _draw(x + xs, y, color);
-  _draw(x + xs, y + ys, color);
-  _draw(x, y + ys, color);
-  _draw(x, y, color);
-end;
-
 proc spritetable(last, current: integer);
 var j, xoff, yoff: integer;
 
@@ -72,10 +68,10 @@ begin
     _showsprite(xoff, yoff, j);
   end;
   coordinates(last);
-  rectangle(xoff - 1, yoff - 1,
+  _rectangle(xoff - 1, yoff - 1,
                 NPIXELS + 1, NPIXELS + 1, BLACK);
   coordinates(current);
-  rectangle(xoff - 1, yoff - 1,
+  _rectangle(xoff - 1, yoff - 1,
                 NPIXELS + 1, NPIXELS + 1, WHITE);
 end;
 
@@ -110,6 +106,30 @@ begin
     getbit := 0;
 end;
 
+proc toggle(index: integer);
+var base, part, bitno, mask, bx, by: integer;
+begin
+  base := 4 * index;
+  by := editbit div 8;
+  bx := editbit - by * 8;
+
+  if by < 4 then
+    part := 2
+  else
+    part := 0;
+  if bx >= 4 then
+    part := part + 1;
+
+  bitno := _mod(7 - by, 4) * 4 + _mod(bx, 4);
+  mask := $8000 shr bitno;
+
+  sprites[base + part] :=
+    sprites[base + part] xor mask;
+
+  isedited := true;
+
+end;
+
 proc showlarge(index: integer);
 var x, y, bx, by, color, margin, size: integer;
 begin
@@ -117,9 +137,7 @@ begin
   margin := ((YSIZE + 1) - size) div 2;
   x := XSIZE - size - margin;
   y := margin;
-  rectangle(x - 1, y - 1,
-            8 * LARGEPIX + 2,
-            8 * LARGEPIX + 2, WHITE);
+  _rectangle(x - 1, y - 1, size + 2, size + 2, WHITE);
 
   for by := 0 to 7 do
     for bx := 0 to 7 do begin
@@ -131,20 +149,41 @@ begin
 
       filled_rectangle(x + LARGEPIX * bx,
                        y + LARGEPIX * by,
-                       LARGEPIX, LARGEPIX,
-                       color);
+                       LARGEPIX, LARGEPIX, color);
     end;
 end;
 
-proc showframe(index: integer);
-const xoff = 48;
-      yoff = 36;
-var framenumber : integer;
+proc showcursor;
+var x, y, bx, by, color, margin, size: integer;
 begin
+  if editflag then begin
+    by := editbit div 8;
+    bx := editbit - by * 8;
+    size := 8 * LARGEPIX;
+    margin := ((YSIZE + 1) - size) div 2;
+    x := XSIZE - size - margin;
+    y := margin;
+    if (blink < NBLINKS) then
+      color := BLACK
+    else
+      color := WHITE;
+    _rectangle(x + LARGEPIX * bx,
+               y + LARGEPIX * by,
+               LARGEPIX - 1, LARGEPIX - 1, color);
+    blink := blink + 1;
+    if blink >= 2 * NBLINKS then blink := 0;
+  end;
+end;
+
+proc showframe(index: integer);
+const xoff = 83;
+var framenumber, yoff : integer;
+begin
+  yoff := STATUSLN;
   if framecounter = -1 then begin
     _move(5, 22);
     write(@PLOTDEV, 'Frames', frames: 5);
-    rectangle(xoff - 1, yoff - 1, 10, 10, WHITE);
+    _rectangle(xoff - 1, yoff - 1, 9, 9, WHITE);
     _showsprite(xoff, yoff, index);
     framecounter := 0;
   end;
@@ -182,34 +221,56 @@ begin
   sprites[tbase + 2] := mirror4(sprites[fbase + 3]);
   sprites[tbase + 3] := mirror4(sprites[fbase + 2]);
 end;
-
-proc copy(fromindex, toindex: integer);
-var i, fbase, tbase: integer;
-begin
-  fbase := 4 * fromindex;
-  tbase := 4 * toindex;
-  for i := 0 to 3 do
-    sprites[tbase + i] := sprites[fbase + i];
-end;
 }
 
+proc copy(fromindex: integer);
+var i, base: integer;
 begin
+  base := 4 * fromindex;
+  for i := 0 to 3 do
+    copied_sprites[i] := sprites[base + i];
+
+end;
+
+proc paste(toindex: integer);
+var i, base: integer;
+begin
+  base := 4 * toindex;
+  for i := 0 to 3 do
+    sprites[base + i] := copied_sprites[i];
+end;
+
+
+begin
+  { sprites are edited on drive 1 }
+  writeln('Reading SPRITETABLE:B,1');
+  _readsprites(1);
   _grinit;
   _fullview;
   _cleargr;
-  writeln('W: write SPRITETABLE:B');
+  writeln('Q: Save and quit  K: Quit without saving');
+  writeln('E: Edit           Blank: change pixel');
+  writeln('C: Copy sprite    V: Paste sprite');
   scyclus := FILCYC;
   lastselected := 0;
   selected := 0;
   frames := 0;
   framecounter := -1;
+  isedited := false;
+  editflag := false;
+  editbit := 0;
+  blink := 0;
   spritetable(lastselected, selected);
   showlarge(selected);
+  _move(5,STATUSLN); write(@PLOTDEV,'VIEW');
+
   repeat { main loop }
     repeat { wait for key pressed }
       ch := KEYPRESSED;
       { sflag bit 8 is escape flag. Pass it through }
       showframe(selected);
+      showcursor;
+      elapsed := _syncscreen;
     until (ord(ch)<>0) or ((sflag and $80)<>0);
     read(@KEY,ch);
     sflag:=sflag and $7f; { clear escape flag }
@@ -220,23 +281,57 @@ begin
       '2':    frames := 2;
       '3':    frames := 3;
       '4':    frames := 4;
-      'W':    begin
-                writeln('write SPRITETABLE:B');
-                writetable(scyclus + 1);
+      'Q':    begin
+                if isedited then begin
+                  writetable(scyclus + 1);
+                end;
               end;
-      CRIGHT: selected := selected + 1;
-      CLEFT:  selected := selected - 1;
-      CUP:    selected := selected - NX;
-      CDOWN:  selected := selected + NX
-    end; { case }
+      'E':    begin
+                _move(5,STATUSLN);
+                write(@PLOTDEV,'EDIT');
+                editflag := true;
+                frames := 0;
+              end;
+      ' ':    toggle(selected);
+      'C':    copy(selected);
+      'V':    paste(selected);
+      ESC:    if editflag then begin
+                _move(5,STATUSLN);
+                write(@PLOTDEV,'VIEW');
+                editflag := false;
+                ch := 'C'; { continue }
+              end;
+      CRIGHT: if editflag then
+                editbit := editbit + 1
+              else
+                selected := selected + 1;
+      CLEFT:  if editflag then
+                editbit := editbit - 1
+              else
+                selected := selected - 1;
+      CUP:    if editflag then
+                editbit := editbit + 8
+              else
+                selected := selected - NX;
+      CDOWN:  if editflag then
+                editbit := editbit - 8
+              else
+                selected := selected + NX
+    end {case};
+
     if selected < 0 then
       selected := 0;
     if selected > NSPRITES - frames - 1 then
       selected := NSPRITES - frames - 1;
+    if editbit < 0 then
+      editbit := 0;
+    if editbit > 63 then
+      editbit := 63;
 
     spritetable(lastselected, selected);
     showlarge(selected);
     lastselected := selected;
     framecounter := -1;
   until (ch='Q') or (ch='K') or (ch=ESC);
+  _grend;
 end.

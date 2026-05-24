@@ -290,5 +290,14 @@ begin
   end;
 end;
 
+proc _rectangle(x, y, sx, sy, mode: integer);
+begin
+  _move(x, y);
+  _draw(x + sx, y, mode);
+  _draw(x + sx, y + sy, mode);
+  _draw(x, y + sy, mode);
+  _draw(x, y, mode);
+end;
+
 begin {initialization}
 end.
