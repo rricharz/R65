@@ -1,8 +1,10 @@
-{ ladders: climb up the ladders
+{ ***********************************
+  *  LADDERS: climb up the ladders  *
+  ***********************************
 
   Demo mode: ladders /D
 
-  2024 rricharz                      }
+  2024-2026 rricharz                      }
 
 program ladders;
 uses syslib,plotlib,ledlib,arglib,strlib,spritelib;
@@ -13,17 +15,18 @@ const erase=0; ball=$6ff6;
       laddersize=8; autorepeat=false;
       cleft=chr($03); cright=chr($16);
       cup=chr($1a); cdown=chr($18); esc=chr(0);
-      face1=$8b43; face2=$2a48;
-      face3=$034a; face4=$084a;
 
       LOOPSPERFRAME = 2;
+      XDOORSIZE     = 8;
+      YDOORSIZE     = 12;
 
 var bx,by,bxs,bys,bxspeed,byspeed,fx,fxs: real;
     fxspeed,jump,jumpspeed: real;
     floor,ffloor,fy,fys,fyspeed: integer;
     holes,ladders: array[nfloors] of integer;
-    score,count,loopcounter: integer;
+    score,loopcounter,level: integer;
     demomode:boolean;
+    xdoor,ydoor: array[2] of integer;
 
 {$I IRANDOM:P}
 
@@ -32,8 +35,7 @@ var i,dummy,save_carg:integer;
     options:array[15] of char;
     default:boolean;
 begin
-  save_carg:=_carg; { save for next call to getoption
-}
+  save_carg:=_carg; {save for next call to getoption}
   _agetstring(options,default,dummy,dummy);
   getoption:=false;
   if not default then begin
@@ -68,13 +70,13 @@ begin
       (x<=conv(holes[f]+holesize+1));
 end;
 
-proc showface;
+proc showplayer;
 var fysum, frame, spriteindex:integer;
 begin
   frame := loopcounter div LOOPSPERFRAME;
   fysum:=fy+trunc(jump);
 
-  if jump >0.0 then begin
+  if jump > 0.0 then begin
     if fxspeed > 0.0 then
       spriteindex := S_JUMPR + frame
     else
@@ -101,14 +103,48 @@ proc showladder(f:integer);
 var i,x1,x2,y1,y2:integer;
 begin
   if f<nfloors then begin
-    x1:=ladders[f]; x2:=x1+laddersize;
-    y1:=f*vfloors+1; y2:=y1+vfloors-1;
-    _move(x1,y1); _draw(x1,y2,WHITE);
-    _move(x2,y1); _draw(x2,y2,WHITE);
+    x1:=ladders[f];
+    x2:=x1+laddersize;
+    y1:=f*vfloors+1;
+    y2:=y1+vfloors-1;
+    _move(x1,y1);
+    _draw(x1,y2,WHITE);
+    _move(x2,y1);
+    _draw(x2,y2,WHITE);
     i:=1;
     for i:=1 to 5 do begin
-      _move(x1,y1+4*i-1); _draw(x2,y1+4*i-1,WHITE);
+      _move(x1,y1+4*i-1);
+      _draw(x2,y1+4*i-1,WHITE);
     end;
+  end;
+end;
+
+proc showdoor(i: integer);
+var x1, y1,x2,y2: integer;
+begin
+  x1:=xdoor[i];
+  x2:=x1+XDOORSIZE;
+  y1:=ydoor[i];
+  y2:=y1+YDOORSIZE;
+  _move(x1,y1);
+  _draw(x1,y2,WHITE);
+  _draw(x2,y2,WHITE);
+  _draw(x2,y1,WHITE);
+  _plot(x2-2,y1+5,WHITE);
+end;
+
+proc flashplayer;
+var i,time: integer;
+begin
+  for i:= 1 to 10 do begin
+    _showsprite(trunc(fxs),fys,S_STANDING);
+    showdoor(1);
+    time:=_syncscreen;
+    time:=_syncscreen;
+    _showsprite(trunc(fxs),fys,S_CLEAR);
+    showdoor(1);
+    time:=_syncscreen;
+    time:=_syncscreen;
   end;
 end;
 
@@ -118,7 +154,7 @@ proc showresult;
 var s:cpnt;
 begin
   s:=_new;
-  write(@s,' ',score,' 0F ',count);
+  write(@s,level:1,score:7);
   _ledstring(s);
   _release(s);
 end;
@@ -139,17 +175,15 @@ var f:integer;
 
   proc nextround;
   begin
-      if count >= 10 then begin
-        if demomode then begin
-          score := 0;
-          count := 0;
-          init;
-        end
-        else expaint := true;
-      end
-      else init;
-    fx:=1.0; fy:=1; fxspeed:=0.0; ffloor:=0;
+    if (score >= 10*level) then begin
+      level:=level+1;
+    end;
+    fx:=3.0; fy:=1;
+    fxspeed:=0.0; ffloor:=0;
+    fyspeed:=0;
     showresult;
+    flashplayer;
+    init;
   end;
 
 begin
@@ -169,9 +203,10 @@ begin
   end;
 
   expaint:=false;
-  if (ffloor=nfloors) and (trunc(fx)>XSIZE-10) then
+  { check for exit on top flooe }
+  if (ffloor=nfloors) and (trunc(fx)>XSIZE-9) then
   begin
-    score:=score+1; count:=count+1;
+    score:=score+1;
     nextround;
     exit;
   end;
@@ -184,14 +219,14 @@ begin
     if onfloor(ffloor-1,fy) then begin
       ffloor:=ffloor-1; fyspeed:=0;
     end;
-  { paint face }
-  showface;
+  { paint player }
+  showplayer;
   { paint ball }
   _plotmap(trunc(bxs),trunc(bys),erase);
   _plotmap(trunc(bx),trunc(by),ball);
   for f:=0 to nfloors-1 do showladder(f);
   bxs:=bx; bys:=by;
-  { _move face }
+  { _move player }
   fx:=fx+fxspeed; fy:=fy+fyspeed;
   if fx>conv(XSIZE-8) then begin
     fx:=conv(XSIZE-8); fxspeed:=0.0;
@@ -202,7 +237,7 @@ begin
   { check for ladder }
   if onupladder(ffloor,fx) or ondownladder(ffloor,fx)
     then fxspeed:=0.0;
-  { check for hole (face) and jump over it }
+  { check for hole (player) and jump over it }
   if (jump<=0.01) and onhole(ffloor,fx) then begin
     jumpspeed:=1.3; jump:=jump+jumpspeed;
   end else if jump>0.0 then begin
@@ -248,9 +283,12 @@ begin
   if (bx>=fx-4.0) and (bx<=fx+8.0) and
      (trunc(by)>=fy-4) and (trunc(by)<=fy+8)
     then begin
-      count:=count+1;
+      score:=score-1;
+      if score<0 then score:=0;
       nextround;
     end;
+  showdoor(0);
+  showdoor(1);
 end;
 
 proc ladderdown;
@@ -285,14 +323,15 @@ begin
   bx:=2.0; by:=conv(nfloors*vfloors+1);
   bxs:=bx; bys:=by;
   bxspeed:=2.0; byspeed:=0.0;
-  fx:=1.0; fy:=1; jump:=0.0;  jumpspeed:=0.0;
+  fx:=3.0; fy:=1; jump:=0.0;  jumpspeed:=0.0;
   fxs:=fx; fys:=fy;
   fxspeed:=0.0; fyspeed:=0;
   { make and show holes }
   holes[0]:=-50;
   _move(0,0); _draw(XSIZE,0,WHITE);
   for floor:=1 to nfloors do begin
-    holes[floor]:=irandom(1,XSIZE-holesize-1);
+    holes[floor]:=
+      irandom(XDOORSIZE+2,XSIZE-holesize-1-XDOORSIZE);
     _move(0,floor*vfloors);
     _draw(XSIZE-1,floor*vfloors,WHITE);
     _move(holes[floor],floor*vfloors);
@@ -306,19 +345,29 @@ begin
       or (ladders[floor]>holes[floor]+holesize)) and
       ((ladders[floor]+laddersize<holes[floor+1])
       or (ladders[floor]>holes[floor+1]+holesize));
-      showladder(floor);
+    if (floor=0) then
+      if (ladders[0] < XDOORSIZE+10) then
+        ladders[0]:=XDOORSIZE+10;
+    showladder(floor);
   end;
   ladders[nfloors]:=-laddersize;
   floor:=nfloors;
   ffloor:=0;
+  { make and show doors }
+  xdoor[0]:=2;
+  ydoor[0]:=0;
+  xdoor[1]:=XSIZE-XDOORSIZE-2;
+  ydoor[1]:=vfloors*nfloors;
+  showdoor(0);
+  showdoor(1);
 end;
 
 {$I IANIMATE:P}
 
 begin
-  score :=  0;
-  count := 0;
-  loopcounter := 0;
+  score:=0;
+  level:=1;
+  loopcounter:=0;
   if option('H') then begin
     writeln('/D   endless demo mode');
     exit;
@@ -326,9 +375,11 @@ begin
   demomode:=option('D');
   if demomode then writeln('Demo mode');
   _grinit; _fullview;
+  writeln('Reach the exit on the top floor.');
+  writeln('Collect gems and avoid the ball.');
   init;
   animate(autorepeat);
   _splitview;
   showresult;
-  writeln('Score ',score,' of ',count);
+  writeln('Final score ',score);
 end.
