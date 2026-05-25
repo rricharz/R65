@@ -9,24 +9,40 @@
 program ladders;
 uses syslib,plotlib,ledlib,arglib,strlib,spritelib;
 
-const erase=0; ball=$6ff6;
-      nfloors=5; vfloors=20; holesize=22;
-      gravity=-0.25; reflection=-0.7;
-      laddersize=8; autorepeat=false;
-      cleft=chr($03); cright=chr($16);
-      cup=chr($1a); cdown=chr($18); esc=chr(0);
+const ERASE         = 0;
+      BALL          = $6ff6;
 
+      NFLOORS       = 5;
+      VFLOORS       = 20;
+      HOLESIZE      = 22;
+
+      GRAVITY       = -0.25;
+      REFLECTION    = -0.7;
+
+      LADDERSIZE    = 8;
       LOOPSPERFRAME = 2;
       XDOORSIZE     = 8;
       YDOORSIZE     = 12;
 
-var bx,by,bxs,bys,bxspeed,byspeed,fx,fxs: real;
-    fxspeed,jump,jumpspeed: real;
-    floor,ffloor,fy,fys,fyspeed: integer;
-    holes,ladders: array[nfloors] of integer;
-    score,loopcounter,level: integer;
-    demomode:boolean;
-    xdoor,ydoor: array[2] of integer;
+      MAXNGEMS      = 10;
+
+      AUTOREPEAT    = false;
+      CLEFT         = chr($03);
+      CRIGHT        = chr($16);
+      CUP           = chr($1a);
+      CDOWN         = chr($18);
+      ESC           = chr(0);
+
+var bx, by, bxs, bys, fx,fxs:     real;
+    bxspeed, byspeed, fxspeed:    real;
+    jump,jumpspeed:               real;
+    floor,ffloor,fy,fys,fyspeed:  integer;
+    score,loopcounter,level:      integer;
+    demomode:                     boolean;
+    xdoor,ydoor:          array[2] of integer;
+    holes,ladders:        array[NFLOORS] of integer;
+    xgem, valgem:         array[NFLOORS] of integer;
+
 
 {$I IRANDOM:P}
 
@@ -48,7 +64,7 @@ end;
 
 func onfloor(f,y:integer):boolean;
 begin
-  onfloor:=(f*vfloors+1=y);
+  onfloor:=(f*VFLOORS+1=y);
 end;
 
 func onupladder(f:integer;x:real):boolean;
@@ -67,7 +83,13 @@ end;
 func onhole(f:integer;x:real):boolean;
 begin
   onhole:=(x>=conv(holes[f]-5)) and
-      (x<=conv(holes[f]+holesize+1));
+      (x<=conv(holes[f]+HOLESIZE+1));
+end;
+
+proc showball;
+begin
+  _plotmap(trunc(bxs),trunc(bys),ERASE);
+  _plotmap(trunc(bx),trunc(by),BALL);
 end;
 
 proc showplayer;
@@ -102,11 +124,11 @@ end;
 proc showladder(f:integer);
 var i,x1,x2,y1,y2:integer;
 begin
-  if f<nfloors then begin
+  if f<NFLOORS then begin
     x1:=ladders[f];
-    x2:=x1+laddersize;
-    y1:=f*vfloors+1;
-    y2:=y1+vfloors-1;
+    x2:=x1+LADDERSIZE;
+    y1:=f*VFLOORS+1;
+    y2:=y1+VFLOORS-1;
     _move(x1,y1);
     _draw(x1,y2,WHITE);
     _move(x2,y1);
@@ -131,6 +153,14 @@ begin
   _draw(x2,y2,WHITE);
   _draw(x2,y1,WHITE);
   _plot(x2-2,y1+5,WHITE);
+end;
+
+proc showgem(f: integer);
+var sprite: integer;
+begin
+  if valgem[f]=0 then sprite:=S_CLEAR
+  else sprite:=S_GEMS+valgem[f]-1;
+  _showsprite(xgem[f],f*VFLOORS+1,sprite);
 end;
 
 proc flashplayer;
@@ -161,21 +191,32 @@ end;
 
 proc ladderup;
 begin
-  if (ffloor<nfloors) and onupladder(ffloor,fx)
+  if (ffloor<NFLOORS) and onupladder(ffloor,fx)
   then begin
     fx:=conv(ladders[ffloor]+1);
     fyspeed:=1; fxspeed:=0.0;
   end;
 end;
 
+proc newball;
+begin
+  bx:=2.0;
+  by:=conv(NFLOORS*VFLOORS-6);
+  showball;
+  bxs:=bx;
+  bys:=by;
+  bxspeed:=2.0; byspeed:=0.0;
+  floor:=NFLOORS;
+end;
+
 func expaint: boolean;
 { paint picture and apply motion }
-var f:integer;
+var f,distx,fxt:integer;
     s:cpnt;
 
   proc nextround;
   begin
-    if (score >= 10*level) then begin
+    if (score >= 100*level) then begin
       level:=level+1;
     end;
     fx:=3.0; fy:=1;
@@ -187,31 +228,43 @@ var f:integer;
   end;
 
 begin
-  if demomode then begin
-    if ffloor=nfloors then fxspeed:=2.0
-    else if (ffloor<nfloors) and onupladder(ffloor,fx)
-    then ladderup
-    else if onfloor(ffloor,fy) then  begin
-      if (trunc(fx)>=ladders[ffloor]+1) then begin
-        if fxspeed>1.0 then fxspeed:=0.0
-        else fxspeed:=-2.0;
-      end else begin
-        if fxspeed<-1.0 then fxspeed:=0.0
-        else fxspeed:=2.0
+  if score>32000 then begin
+    expaint:=true;
+    exit;
+  end;
+  if demomode and (jump<0.01) then begin
+    if valgem[ffloor]>0 then begin
+      { first collect gem }
+      if xgem[ffloor]<trunc(fx) then
+        fxspeed:=-2.0
+      else
+        fxspeed:=2.0;
+    end else begin
+      if ffloor=NFLOORS then fxspeed:=2.0 else
+      if (ffloor<NFLOORS) and onupladder(ffloor,fx)
+      then ladderup
+      else if onfloor(ffloor,fy) then  begin
+        if (trunc(fx)>=ladders[ffloor]+1) then begin
+          if fxspeed>1.0 then fxspeed:=0.0
+          else fxspeed:=-2.0;
+        end else begin
+          if fxspeed<-1.0 then fxspeed:=0.0
+          else fxspeed:=2.0
+        end;
       end;
     end;
   end;
-
   expaint:=false;
-  { check for exit on top flooe }
-  if (ffloor=nfloors) and (trunc(fx)>XSIZE-9) then
+  { check for exit on top floor }
+  if (ffloor=NFLOORS) and (trunc(fx)>=XSIZE-9) then
   begin
-    score:=score+1;
+    score:=score+10;
+    fx:=conv(XSIZE-9);
     nextround;
     exit;
   end;
   { check for next floor on ladder }
-  if ffloor<nfloors then
+  if ffloor<NFLOORS then
     if onfloor(ffloor+1,fy) then begin
       ffloor:=ffloor+1; fyspeed:=0;
     end;
@@ -219,14 +272,7 @@ begin
     if onfloor(ffloor-1,fy) then begin
       ffloor:=ffloor-1; fyspeed:=0;
     end;
-  { paint player }
-  showplayer;
-  { paint ball }
-  _plotmap(trunc(bxs),trunc(bys),erase);
-  _plotmap(trunc(bx),trunc(by),ball);
-  for f:=0 to nfloors-1 do showladder(f);
-  bxs:=bx; bys:=by;
-  { _move player }
+  { move player horizontally }
   fx:=fx+fxspeed; fy:=fy+fyspeed;
   if fx>conv(XSIZE-8) then begin
     fx:=conv(XSIZE-8); fxspeed:=0.0;
@@ -234,18 +280,26 @@ begin
   if (fx<1.0) then begin
     fx:=1.0; fxspeed:=-0.0;
   end;
-  { check for ladder }
+  { check for player hitting gem }
+  distx:=_abs(trunc(fx)-xgem[ffloor]);
+  if (distx<8) then begin
+    score:=score+valgem[ffloor];
+    showresult;
+    valgem[ffloor]:=0;
+  end;
+  { check for player at ladder }
   if onupladder(ffloor,fx) or ondownladder(ffloor,fx)
     then fxspeed:=0.0;
-  { check for hole (player) and jump over it }
+  { check for hole and jump over it }
   if (jump<=0.01) and onhole(ffloor,fx) then begin
     jumpspeed:=1.3; jump:=jump+jumpspeed;
   end else if jump>0.0 then begin
     jump:=jump+jumpspeed;
-    jumpspeed:=jumpspeed+gravity;
+    jumpspeed:=jumpspeed+GRAVITY;
   end;
   if jump<=0.0 then jump:=0.0;
-  { _move ball }
+  { move ball }
+  bxs:=bx; bys:=by;
   bx:=bx+bxspeed; by:=by+byspeed;
   { check for borders }
   if bx>=conv(XSIZE-4) then begin
@@ -253,42 +307,48 @@ begin
   end else if bx<2.0 then begin
     bx:=2.0; bxspeed:=-bxspeed;
   end;
-  { check for reflection on ceiling }
-  if by>=conv((floor+1)*vfloors-4) then begin
-    by:=conv((floor+1)*vfloors-4);
-    byspeed:=reflection*byspeed;
+  { check for REFLECTION on ceiling }
+  if by>=conv((floor+1)*VFLOORS-4) then begin
+    by:=conv((floor+1)*VFLOORS-4);
+    byspeed:=REFLECTION*byspeed;
   end;
   { check for hole (ball) }
   if (bx>=conv(holes[floor])) and
-      (bx<=conv(holes[floor]+holesize-4)) and
-     (by<=conv(floor*vfloors+1)) then begin
+      (bx<=conv(holes[floor]+HOLESIZE-4)) and
+     (by<=conv(floor*VFLOORS+1)) then begin
      { fall through hole }
-    byspeed:=byspeed+gravity;
+    byspeed:=byspeed+GRAVITY;
     if floor>0 then floor:=floor-1;
-  end else if by<conv(floor*vfloors+1) then begin
-    { reflection on floor }
-    by:=conv(floor*vfloors+2); { jump a bit }
-    byspeed:=reflection*byspeed;
+  end else if by<conv(floor*VFLOORS+1) then begin
+    { REFLECTION on floor }
+    by:=conv(floor*VFLOORS+2); { jump a bit }
+    byspeed:=REFLECTION*byspeed;
   end else
-    byspeed:=byspeed+gravity;
+    byspeed:=byspeed+GRAVITY;
   { check for border on bottom floor }
-  if (by<4.0) and ((bx<=2.0) or (bx>=conv(XSIZE-4)))
+  if (by<8.0) and ((bx<=2.0) or (bx>=conv(XSIZE-4)))
   then begin
-    if bx<2.0 then bx:=2.0
-    else if bx>=conv(XSIZE-4) then bx:=conv(XSIZE-4);
-    by:=conv(nfloors*vfloors+1);
-    byspeed:=0.0; floor:=nfloors;
+    newball;
   end;
   { check for hit }
   if (bx>=fx-4.0) and (bx<=fx+8.0) and
      (trunc(by)>=fy-4) and (trunc(by)<=fy+8)
     then begin
-      score:=score-1;
+      score:=score-10;
       if score<0 then score:=0;
       nextround;
     end;
   showdoor(0);
   showdoor(1);
+  { paint ball }
+  showball;
+  { paint player }
+  showplayer;
+  { paint ladders and gems }
+  for f:=0 to NFLOORS do begin
+    showladder(f);
+    showgem(f);
+  end;
 end;
 
 proc ladderdown;
@@ -303,63 +363,79 @@ end;
 func exkey(key:char):boolean;
 { check for key typed }
 begin
-  exkey:=(key=esc);
+  exkey:=(key=ESC);
   case key of
-   cup:    ladderup;
-   cdown:  ladderdown;
-   cleft:  if onfloor(ffloor,fy) then
+   CUP:    ladderup;
+   CDOWN:  ladderdown;
+   CLEFT:  if onfloor(ffloor,fy) then
              if fxspeed>1.0 then fxspeed:=0.0
              else fxspeed:=-2.0;
-   cright: if onfloor(ffloor,fy) then
+   CRIGHT: if onfloor(ffloor,fy) then
              if fxspeed<-1.0 then fxspeed:=0.0
              else fxspeed:=2.0
    end {case};
 end;
 
 proc init;
+var f:integer;
 begin
   _cleargr;
   showresult;
-  bx:=2.0; by:=conv(nfloors*vfloors+1);
-  bxs:=bx; bys:=by;
-  bxspeed:=2.0; byspeed:=0.0;
+  { initialize ball }
+  bxs:=2.0; bys:=conv(NFLOORS*VFLOORS-10);
+  newball;
+  { initialize player }
   fx:=3.0; fy:=1; jump:=0.0;  jumpspeed:=0.0;
   fxs:=fx; fys:=fy;
   fxspeed:=0.0; fyspeed:=0;
   { make and show holes }
   holes[0]:=-50;
   _move(0,0); _draw(XSIZE,0,WHITE);
-  for floor:=1 to nfloors do begin
+  for floor:=1 to NFLOORS do begin
     holes[floor]:=
-      irandom(XDOORSIZE+2,XSIZE-holesize-1-XDOORSIZE);
-    _move(0,floor*vfloors);
-    _draw(XSIZE-1,floor*vfloors,WHITE);
-    _move(holes[floor],floor*vfloors);
-    _draw(holes[floor]+holesize,floor*vfloors,BLACK);
+      irandom(XDOORSIZE+2,XSIZE-HOLESIZE-1-XDOORSIZE);
+    _move(0,floor*VFLOORS);
+    _draw(XSIZE-1,floor*VFLOORS,WHITE);
+    _move(holes[floor],floor*VFLOORS);
+    _draw(holes[floor]+HOLESIZE,floor*VFLOORS,BLACK);
   end;
-  { make and show ladders }
-  for floor:=0 to nfloors-1 do begin
+  { make ladders }
+  for floor:=0 to NFLOORS-1 do begin
     repeat
-      ladders[floor]:=irandom(2,XSIZE-laddersize-2);
-    until ((ladders[floor]+laddersize<holes[floor])
-      or (ladders[floor]>holes[floor]+holesize)) and
-      ((ladders[floor]+laddersize<holes[floor+1])
-      or (ladders[floor]>holes[floor+1]+holesize));
+      ladders[floor]:=irandom(2,XSIZE-LADDERSIZE-2);
+    until ((ladders[floor]+LADDERSIZE<holes[floor])
+      or (ladders[floor]>holes[floor]+HOLESIZE)) and
+      ((ladders[floor]+LADDERSIZE<holes[floor+1])
+      or (ladders[floor]>holes[floor+1]+HOLESIZE));
     if (floor=0) then
       if (ladders[0] < XDOORSIZE+10) then
         ladders[0]:=XDOORSIZE+10;
-    showladder(floor);
   end;
-  ladders[nfloors]:=-laddersize;
-  floor:=nfloors;
+  ladders[NFLOORS]:=-LADDERSIZE;
+  floor:=NFLOORS;
   ffloor:=0;
   { make and show doors }
   xdoor[0]:=2;
   ydoor[0]:=0;
   xdoor[1]:=XSIZE-XDOORSIZE-2;
-  ydoor[1]:=vfloors*nfloors;
+  ydoor[1]:=VFLOORS*NFLOORS;
   showdoor(0);
   showdoor(1);
+  { make gems }
+  for f:= 0 to NFLOORS do begin
+    xgem[f]:=irandom(1,XSIZE-9);
+    { make sure gem is not at same place as ladder }
+    while (xgem[f]>ladders[f]-9) and
+          (xgem[f]<ladders[f]+9) do
+      xgem[f]:=irandom(1,XSIZE-9);
+    valgem[f]:=1;
+  end;
+  valgem[irandom(0,NFLOORS)]:=3; { one coin }
+  { show ladders and gems }
+  for f:=0 to NFLOORS do begin
+    showladder(f);
+    showgem(f);
+  end;
 end;
 
 {$I IANIMATE:P}
@@ -378,7 +454,7 @@ begin
   writeln('Reach the exit on the top floor.');
   writeln('Collect gems and avoid the ball.');
   init;
-  animate(autorepeat);
+  animate(AUTOREPEAT);
   _splitview;
   showresult;
   writeln('Final score ',score);

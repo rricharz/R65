@@ -18,6 +18,7 @@ const NSPRITES      = 64;
       S_SMILEY      = 47;
       S_PIECE_WHITE = 51;
       S_PIECE_BLACK = 52;
+      S_GEMS        = 53;
 
 var sprites: array[256] of integer; { 4 * NSPRITES }
 
