@@ -658,6 +658,7 @@ void write6502(uint16_t address, uint8_t value)
 											// since last call
 			static long long lastPrint = 0;
 			static int frameCount = 0;
+			static long long sleepSum = 0;
 
 			long long now;
 			int sleepmicros;
@@ -681,16 +682,19 @@ void write6502(uint16_t address, uint8_t value)
 			lastCrtSync = wall_micros();
 
 			frameCount++;
+			sleepSum += sleepmicros;
 
 			if (lastPrint == 0)
                 lastPrint = lastCrtSync;
 
 			if (lastCrtSync - lastPrint >= 1000000) {
-                //printf("syncscreen frame rate: %.1f fps\n",
-                //       1000000.0 * frameCount /
-                //       (double)(lastCrtSync - lastPrint));
+                //printf("average spare time: %.1f msec\n",
+                //       (double)sleepSum /
+                //       (1000.0 * frameCount));
                 //fflush(stdout);
+
                 frameCount = 0;
+                sleepSum = 0;
                 lastPrint = lastCrtSync;
 			}
 
