@@ -169,7 +169,8 @@ begin
     24: write('Identifier already defined');
     25: write('Formatted write');
     26: write('Wrong library version');
-    27: write('Identifier too long')
+    27: write('Identifier too long');
+    28: write('Unsupported type')
   end {case};
   writeln(' at line ', line, ', pos ', tpos, NORVID);
   if makeoutput then close(ofno);
@@ -2232,7 +2233,7 @@ begin {body of statement }
                         code1(27); code1(27);
                         code1(53)
                         end
-                  else error(114)
+                  else error(28)
                 end {case};
                 gpval(idpnt,true,vartyp2)
               end {mainloop of read}
@@ -2308,7 +2309,7 @@ begin {body of statement }
                       code2(33,248)
                     end
                     else
-                      merror(14,'09')
+                      error(28)
                   end
                   else begin
                     if vtype1='r' then begin
@@ -2336,7 +2337,7 @@ begin {body of statement }
                                 code1(52);
                                 code1(29);
                               end
-                        else merror(14,'09')
+                        else error(28)
                       end
                     end
                   end

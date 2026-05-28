@@ -388,7 +388,7 @@ CPOINT  LDX CURSEQ
 **********************************
 * ENTRY: x,FILDRV
 * EXIT: FILERR IN Y AND STATUS, CHAR IN A
-* CHAR =$1F MEANS EOF, CHAR=$1D MEANS ERROR
+* CHAR =$7F MEANS EOF, CHAR=$1D MEANS ERROR
 *
 READCH  LDA =0          MUST BE READ FILE
         JSR TESTFN
@@ -427,9 +427,9 @@ READC4  CMP =$FE        EOR?
         BEQ READCH      OK, GET CHAR
         RTS             ERROR, RETURN
 *
-READC5  CMP =$FF        END OF FILE?
+READC5  CMP =$7F        EOF?
         BNE READC6
-        LDA =$7F        END OF FILE
+        LDA =$7F
         BNE READC7      ALLWAYS TAKEN, OK
 *
 READC6  SEC             COUNT ONE BLANK
