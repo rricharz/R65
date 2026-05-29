@@ -74,14 +74,11 @@ const char *mnemonic[] = {           // p-codes
 };
 
 uint8_t memory[65536] = {0};
-int timeOfSpMin;
-int timeOfPascalMin;
-int timeOfTemp;          // time of last temperature read
+time_t timeOfSpMin;
+time_t timeOfPascalMin;
 
 int spMin;              // minimum value of sp during execution
 int pascalMinFree;      // minimal value of pascalFreeStack
-
-int T = 0;
 
 int rawPrint = 0;       // for Tektronix plotter
 
@@ -101,7 +98,7 @@ int curLocLow               = 0;
 
 int dotrace = 0;        // pascal user program tracer
 
-int  checkEventCounter = 0;
+int  checkStepCounter = 0;
 long lastCrtSync = 0;
 long lastAnimationTime = 0;
 int  isAnimation = 0;
@@ -114,42 +111,32 @@ int  spSample = 0;
 void checkMinTimeout()
 /********************/
 {
-    // keep displayed figures for n seconds, then reset
-    
-    int now = time(NULL) % 86400;
-    
-    if ((now - timeOfSpMin) > 5) {
+    time_t now = time(NULL);
+
+    if ((sp < spMin) || ((now - timeOfSpMin) >= 1)) {
         spMin = sp;
         timeOfSpMin = now;
         global_pendingCrtUpdate = 1;
     }
-    if ((now - timeOfTemp) > 1) {
-        timeOfTemp = now;
-        T = -1;   // force temperature read
-        global_pendingCrtUpdate = 1;
-    }
-    if ((now - timeOfSpMin) > 5) {
-        spMin = sp;
-        timeOfSpMin = now;
-        global_pendingCrtUpdate = 1;
-    }
-    if (memory[M8_SFLAG] & 1) {  // if Pascal runs
+
+    if (memory[M8_SFLAG] & 1) { // if Pascal is running
         int psp = memory[0x08] + (memory[0x09] << 8);
         int pend = memory[0x0e] + (memory[0x0f] << 8);
         int free = pend - psp;
-        int now = time(NULL) % 86400;
 
         if (free < 0)
             free = 0;
 
-        if ((free < pascalMinFree) || ((now - timeOfPascalMin) > 3)) {
+        if ((free < pascalMinFree) ||
+            ((now - timeOfPascalMin) >= 1)) {
             pascalMinFree = free;
             timeOfPascalMin = now;
+            global_pendingCrtUpdate = 1;
         }
     }
     else {
         pascalMinFree = 0xFFFF;
-        timeOfPascalMin = time(NULL) % 86400;
+        timeOfPascalMin = now;
     }
 }
 
@@ -263,6 +250,28 @@ void setDateAndTime()
     memory[M8_TIME + 3] = bcd(hours);
 }
 
+/*******************************************************/
+void showtrace(uint16_t address, uint16_t watch, char* s)
+/*******************************************************/
+{
+    if (address != watch)
+        return;
+
+    printf(
+        "TRACE %04X=%02X (%s): "
+        "PC=%04X A=%02X X=%02X Y=%02X SP=%02X P=%02X\n",
+        address,
+        memory[address],
+        s,
+        pc-1,
+        a,
+        x,
+        y,
+        sp,
+        status
+    );
+}
+
 /********************************/
 uint8_t read6502(uint16_t address)
 /********************************/
@@ -270,41 +279,8 @@ uint8_t read6502(uint16_t address)
 // handles memory mapped io
 
 {
-    // pascal user program tracer (slow!)
-    /*
-    if (address == 0x29b9) {  // EXCODE ADDRESS
-        int ipc = memory[0xa] + (memory[0xb] << 8);
-        int pcode = memory[ipc];
-        if (pcode == 0x41) {      // pcode RUNP turns tracer on
-            dotrace = 1;
-            printf("Starting Pascal user program\n");
-        }
-        else if (pcode == 0) {    // pcode STOP turns tracer off
-            dotrace = 0;
-            printf("Stopping Pascal user program\n");
-        }
-        else if (dotrace) {
-            int stprog = memory[0x11] + (memory[0x12] << 8);
-            printf("%05d PCODE=%02d(0x%02x) ", ipc - stprog + 2,pcode, pcode);
-            if ((pcode >=0) && (pcode < sizeof(mnemonic) / sizeof(mnemonic[0])))
-                printf("%s ", mnemonic[pcode]);
-            int x;
-            switch (pcode) {
-                case 0x24:  x = (memory[ipc+2] << 8) + memory[ipc+1] + ipc - stprog + 3;
-                            if (x > 32768) x -= 65536;
-                            printf("%05d", x);
-                            break;
-            }
-            
-            printf("\n            ");
-            printf("ACCU=%02x%02x, SP=%02x%02x, PC=%02x%02x, ABASE=%02x%02x, BASE=%02x%02x\n",
-                memory[0x1],memory[0x0],memory[0x9],memory[0x8],memory[0xb],memory[0xa],
-                memory[0x1a],memory[0x19],memory[0x18],memory[0x17]);
-        }
-    } */
-    
-    // optimization for speed, only check addresses in the io area
-    // otherwise return right away
+
+	{ showtrace(address, 0x2B63, "EXEC3"); }
     
     if (address < 0x1400)
         return memory[address];
@@ -353,7 +329,7 @@ uint8_t read6502(uint16_t address)
             if (!isAnimation)
                 usleep(10000);              // avoid 100% cpu usage during waiting for key
             checkMotorTurnoff(1);
-            checkMinTimeout();
+            // checkMinTimeout();
         }
     }
         
@@ -650,7 +626,7 @@ void write6502(uint16_t address, uint8_t value)
             checkPendingEvents();
             usleep(10000);              	// avoid 100% cpu usage during wait
             checkMotorTurnoff(2);
-            checkMinTimeout();
+            // checkMinTimeout();
             memory[R8_EMURES] = 0;
             memory[R8_EMUCOM] = 0;
         }
@@ -665,7 +641,7 @@ void write6502(uint16_t address, uint8_t value)
 			
 			isAnimation = 1;
 			global_pendingCrtUpdate = 1;
-			global_forceCrtUpdate = 1;
+			global_forceCrtUpdate = 1;		// update screen if in animation
 			lastAnimationTime = wall_micros();					
 			now = wall_micros();
 
@@ -1094,19 +1070,28 @@ int r65Loop()
             timeOfSpMin = time(NULL) % 86400;
             global_pendingCrtUpdate = 1;
         }
-        if (checkEventCounter++ > 100000) {
-			if (isAnimation && (wall_micros() - lastAnimationTime > 500000))
-				isAnimation = 0;
-			// sample pc and sp for info display in animation loop
-			fflush(stdout);
-			pcSample = pc;
-			spSample = memory[0x08] + (memory[0x0b] << 9);
-            checkPendingEvents();
-            checkMotorTurnoff(1);
-            crtUpdate();
-            checkEventCounter = 0;
-            checkMinTimeout();
-        }
+        
+	static long lastCheckTime = 0;
+	long now = wall_micros();
+
+	if (lastCheckTime == 0)
+		lastCheckTime = now;
+
+	if (now - lastCheckTime >= INFO_SAMPLE_US) {
+		lastCheckTime = now;
+
+		if (isAnimation && (now - lastAnimationTime > 500000))
+			isAnimation = 0;
+
+		// sample pc and sp for info display in animation loop
+		pcSample = pc;
+		spSample = memory[0x08] + (memory[0x0b] << 9);
+
+		checkPendingEvents();
+		checkMotorTurnoff(1);
+		crtUpdate();
+		checkMinTimeout();
+		}
     }
     while (1);
 }

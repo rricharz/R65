@@ -30,6 +30,8 @@
 #define WINDOW_NAME     "R65-Emulator"    // name of main window
 #define ICON_NAME       "computer"       // path to icon for window
 
+#define INFO_SAMPLE_US 100000 // sampling interval for 7 segment displays
+
 extern int      global_pendingCrtUpdate;
 extern int      global_videoBaseAddress;
 extern int      global_curlin;

@@ -279,7 +279,7 @@ void infoPanel()
 		s1[0] = 0;
 		
 	int pascalSp = memory[0x08] + (memory[0x0b] << 9);
-	if (isAnimation) {
+	if (isAnimation) { 
 		fflush(stdout);
 	    sprintf(s2,"%04X  %02X", pcSample, spMin);
 	    sprintf(s3,"%04X  %02X", spSample, (pascalMinFree >> 8) & 0xFF);

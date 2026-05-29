@@ -526,17 +526,30 @@ end;
 
 func exkey(key:char):boolean;
 { check for key typed }
+
+  func canwalk:boolean;
+  begin
+    canwalk := onfloor(ffloor,fy) and (jump<=0.01)
+  end;
+
 begin
   exkey:=(key=ESC);
   case key of
     CUP:    tryladderup;
     CDOWN:  tryladderdown;
-    CLEFT:  if onfloor(ffloor,fy) then
-              if fxspeed>1.0 then fxspeed:=0.0
-              else fxspeed:=-2.0;
-    CRIGHT: if onfloor(ffloor,fy) then
-              if fxspeed<-1.0 then fxspeed:=0.0
-              else fxspeed:=2.0;
+    CLEFT:
+            if canwalk then
+              if fxspeed>0.0 then
+                fxspeed:=0.0
+              else
+                fxspeed:=-2.0;
+    CRIGHT:
+            if canwalk then
+              if fxspeed<0.0 then
+                fxspeed:=0.0
+              else
+                fxspeed:=2.0;
+
     '>':    level:=2 { cheat key }
    end {case};
 end;

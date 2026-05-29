@@ -157,9 +157,7 @@ begin
       ateof0 := true;
       done := true;
     end;
-    if (not done) and (ch = chr($0d)) then
-      done := true;
-    if (not done) and (ch = chr($0a)) then
+    if (ch = chr($0d)) or (ch = chr($0a)) then
       done := true;
     if not done then
       if i < STRSIZE-1 then

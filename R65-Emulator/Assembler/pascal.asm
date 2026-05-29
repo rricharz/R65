@@ -1791,6 +1791,15 @@ LINE8   JMP STOP        STOP EXECUTION
 *
 LINE9   RTS
 *
+* P-code 5A: CHAIN: chain Pascal program
+****************************************
+*
+CHAIN   LDA =0
+        STA LSTLIN
+        STA LSTLIN+1
+        LDA STPROG
+        LDX STPROG+1
+        JMP EXEC3
 *
 * PRTL: PRINT A,X, KEEP ACCU,ARG2,ARG3
 **************************************
@@ -2069,7 +2078,7 @@ LOOP    LDX SAVS        RESTORE STACK POINTER
 *
 *
 EXCODE  JSR FETCH
-        CMP =$5A        TEST CODENUMBER
+        CMP =$5B        VALID CODES ARE <$5B
         BCC *+7
 ILLC    LDX =$86        PASCAL RUNTIME ERROR
         JMP PERROR      ILLEGAL P-CODE
@@ -2105,6 +2114,7 @@ TABLE   WRD STOP,RETN,NEGA,ADDA,SUBA,MULA
         WRD FEQU,FNEQ,FLES,FGRE,FGRT,FLEE
         WRD FCOM,TFER,OPRA,GETR,PUTR,SWA2
         WRD LDXI,STXI,CPNT,WRCP,ADPS,LINE
+        WRD CHAIN
 *
 * COLDSTART
 ***********
