@@ -147,7 +147,7 @@ begin
   FILCYC := cyclus;
   FILCY1 := cyclus;
   FILDRV := drive;
-  FILFLG := 0;
+  FILFLG := $40;
 end;
 
 proc _getdiskname(s: cpnt; drive: integer);
@@ -190,27 +190,18 @@ begin
   call(afloppy);
 end;
 
-proc _srunprog(name: cpnt; cyc, drv: integer);
-{********************************************}
-const
-    ENDMARK = chr(0);
-mem
-    FILFLG = $00da: integer&;
-    FILNM1 = $0320: array[15] of char&;
-    FILCY1 = $0330: integer&;
-    FILDRV = $00dc: integer&;
-var
-    i: integer;
+proc _s_runprog(name: cpnt; cyc, drv: integer);
+{*********************************************}
 begin
-  for i := 0 to NAMESIZE do FILNM1[i] := ' ';
-  i := 0;
-  while (name[i] <> ENDMARK) and (i <= NAMESIZE)
-  do begin
-    FILNM1[i]:=name[i];
-    i := i + 1;
-  end;
-  FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
+  _strfio(name, cyc, drv);
   run;
+end;
+
+proc _s_chainprog(name: cpnt; cyc, drv: integer);
+{******************************************_*****}
+begin
+  _strfio(name, cyc, drv);
+  chain;
 end;
 
 func _readint(f:file; var n:integer): boolean;

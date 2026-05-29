@@ -35,11 +35,11 @@ const
     STACKSIZE = 256;   {stack size}
     PAGELENGHT= 60;    {no of lines per page}
     MAXFI     = 3;     {max n  of nested input files}
-    NRESW     = 63;    {number of res. words, max 64}
+    NRESW     = 64;    {number of reserved words}
 
     SAT_EXPORT = 1;    {Bit mask for s_attr}
 
-var reswtab: array[ 512] of char; {8*(NRESW+1)}
+var reswtab: array[ 520] of char; {8*(NRESW+1)}
 
     ident:   array[IDLENGTH] of char;
     idpack:  array[PIDSIZE] of packed char;
@@ -2436,6 +2436,10 @@ begin {body of statement }
 
     'ru': begin
             code1($41); scan;
+          end;
+
+    'cn': begin
+            code1($5a); scan;
           end;
 
     'fi': begin

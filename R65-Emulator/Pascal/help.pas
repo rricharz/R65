@@ -66,7 +66,7 @@ begin
 
   if found then begin
     copyback;
-    _srunprog('VIEW:R', 0, 0);
+    _s_runprog('VIEW:R', 0, 0);
   end else
     writeln('No help file for this topic available');
 
