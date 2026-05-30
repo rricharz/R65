@@ -130,8 +130,8 @@ begin {main}
       writeln(':P.', hex(FILCYC));
       cyclus := FILCYC;
       setargs(name,0, cyclus, 1);
-      setargs('/FN             ', 10, 0, 1);
-      runprog('COMPILE1:R      ', 0, 0);
+      setargs('/N              ', 10, 0, 1);
+      runprog('COMPILE:R       ', 0, 0);
       files := files + 1;
       { runprog('ARGLIST:R       ', 0, 0); }
       if (RUNERR > 0) and (RUNERR <> 135)
