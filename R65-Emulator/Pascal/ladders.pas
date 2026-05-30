@@ -7,7 +7,8 @@
   2024-2026 rricharz                      }
 
 program ladders;
-uses syslib,plotlib,ledlib,arglib,strlib,spritelib;
+uses  syslib,plotlib,ledlib,arglib,strlib,
+      spritelib, striolib;
 
 const ERASE         = 0;
       BALL          = $6ff6;
@@ -217,7 +218,10 @@ proc showgem(f: integer);
 var sprite: integer;
 begin
   if valgem[f]=0 then sprite:=S_CLEAR
-  else sprite:=S_GEMS+valgem[f]-1;
+  else if
+    valgem[f]=30 then sprite:=S_GEMS+2
+  else
+    sprite:=S_GEMS;
   _showsprite(xgem[f],f*VFLOORS+1,sprite);
 end;
 
@@ -320,27 +324,24 @@ begin
   end
 end;
 
+proc nextround;
+begin
+  fx:=3.0; fy:=1;
+  fxspeed:=0.0; ffloor:=0;
+  fyspeed:=0;
+  showresult;
+  flashplayer;
+  init;
+end;
+
 func expaint: boolean;
 { paint picture and apply motion }
 var f,distx,fxt:integer;
     yline:real;
     s:cpnt;
 
-  proc nextround;
-  begin
-    if (score >= 100) then begin
-      level:=2;
-    end;
-    fx:=3.0; fy:=1;
-    fxspeed:=0.0; ffloor:=0;
-    fyspeed:=0;
-    showresult;
-    flashplayer;
-    init;
-  end;
-
 begin
-  if score>32000 then begin
+  if score>=10000 then begin
     expaint:=true;
     exit;
   end;
@@ -380,7 +381,7 @@ begin
   { check for exit on top floor }
   if (ffloor=NFLOORS) and (trunc(fx)>=XSIZE-9) then
   begin
-    score:=score+10;
+    score:=score+100 ;
     fx:=conv(XSIZE-9);
     nextround;
     exit;
@@ -497,8 +498,6 @@ begin
   if (bx>=trunc(fx)-4) and (bx<=trunc(fx)+8) and
      (trunc(by)>=fy-4) and (trunc(by)<=fy+8)
     then begin
-      score:=score-10;
-      if score<0 then score:=0;
       nextround;
     end;
 
@@ -522,6 +521,24 @@ begin
       fyspeed:=0;
     end
   end;
+end;
+
+proc savescore;
+var f:file;
+begin
+  _strfio('LADDERSCORE:B',0,1);
+  openw(f);
+  writeln(@f,score);
+  close(f);
+end;
+
+proc loadscore;
+var f:file;
+begin
+  _strfio('LADDERSCORE:B',0,1);
+  openr(f);
+  if not _readint(f,score) then score:=0;
+  close(f);
 end;
 
 func exkey(key:char):boolean;
@@ -550,7 +567,16 @@ begin
               else
                 fxspeed:=2.0;
 
-    '>':    level:=2 { cheat key }
+    'L':    begin
+              loadscore;
+                showresult;
+            end;
+
+    '!':    begin
+              score:=score+500; { cheat key }
+              showresult;
+              init;
+            end
    end {case};
 end;
 
@@ -559,7 +585,12 @@ var f:integer;
 begin
   on_elev:=false;
   _cleargr;
+  level:=score div 1000+1;
   showresult;
+  if (level>2) then begin
+    savescore;
+    _s_chainprog('LADDERS3:R',0,1);
+  end;
   { initialize ball }
   bxs:=2; bys:=conv(NFLOORS*VFLOORS-10);
   newball;
@@ -607,9 +638,9 @@ begin
     while (xgem[f]>ladders[f]-9) and
           (xgem[f]<ladders[f]+9) do
       xgem[f]:=irandom(1,XSIZE-9);
-    valgem[f]:=1;
+    valgem[f]:=10;
   end;
-  valgem[irandom(0,NFLOORS)]:=3; { one coin }
+  valgem[irandom(0,NFLOORS)]:=30; { one coin }
   { make elevator for level 2 }
   ecount:=0;
   if level=2 then begin
@@ -650,9 +681,11 @@ begin
   _grinit; _fullview;
   writeln('Reach the exit on the top floor.');
   writeln('Collect gems and avoid the ball.');
+  writeln('L load saved score, <arrow> move player');
   init;
   animate(AUTOREPEAT);
   _splitview;
   showresult;
   writeln('Final score ',score);
+  savescore;
 end.

@@ -2714,9 +2714,11 @@ begin {main}
   write(PRTOFF);
 
   { clean up }
+  writeln('RUNERR=',RUNERR);
   if makeoutput then
     RUNERR := _emulator(9);
   close(fno);
+  writeln('RUNERR=',RUNERR);
 
   { check whether second pass is required }
   if (RUNERR=0) then
