@@ -73,7 +73,7 @@ begin
       ARGLIST[10]:=0; {copy to drive 0}
       ARGTYPE[11]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
-      runprog('COPY:R          ',cyclus,drive);
+      _runprog('COPY:R          ',cyclus,drive);
     end;
     if (filerr<>0) or (RUNERR<>0) then begin
       ok:=false;
@@ -99,7 +99,7 @@ begin
       drive:=0; filerr:=0;
       setargi(0,8);
       setargs('/Q              ', 10, 0, 0);
-      runprog('DELETE:R        ',cyclus,drive);
+      _runprog('DELETE:R        ',cyclus,drive);
       if (filerr<>0) or (RUNERR<>0) then  begin
         ok:=false;
         writeln(INVVID,
@@ -116,7 +116,7 @@ begin
       { setargi(0,0);                              }
       { ARGTYPE[1]:=chr(0);                        }
       { cyclus:=0; drive:=0; filerr:=0; RUNERR:=0; }
-      { runprog('CLEAN:R         ',cyclus,drive);  }
+      { _runprog('CLEAN:R         ',cyclus,drive); }
       { if (filerr<>0) or (RUNERR<>0) then begin   }
       {    ok:=false;                              }
       {    writeln(INVVID,                         }
@@ -128,7 +128,7 @@ begin
       { setargi(0,0);                              }
       { ARGTYPE[1]:=chr(0);                        }
       { cyclus:=0; drive:=0; filerr:=0;            }
-      { runprog('PACK:R          ',cyclus,drive);  }
+      { _runprog('PACK:R          ',cyclus,drive); }
       { if (filerr<>0) or (RUNERR<>0) then         }
       {  ok:=false;                                }
     end;

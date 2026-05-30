@@ -61,6 +61,26 @@ begin
   FILFLG:=$40; { Do not show file entry }
 end;
 
+proc _runprog(name0: array[15] of char;
+             cyc: integer; drv: integer);
+{***************************************}
+var ii: integer;
+begin
+  _asetfile(name0,cyc,drv,'R');
+  FILFLG:=FILFLG or $40;
+  run;
+end;
+
+proc _chainprog(name0: array[15] of char;
+             cyc: integer; drv: integer);
+{***************************************}
+var ii: integer;
+begin
+  _asetfile(name0,cyc,drv,'R');
+  FILFLG:=FILFLG or $40;
+  chain;
+end;
+
 proc _write_label;
 {****************}
 { print label without leading and trailing linefeed }

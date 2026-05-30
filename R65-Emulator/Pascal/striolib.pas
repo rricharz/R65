@@ -204,39 +204,5 @@ begin
   chain;
 end;
 
-func _readint(f:file; var n:integer): boolean;
-{********************************************}
-var
-  ch: char;
-  neg, digit: boolean;
-begin
-  n := 0;
-  neg := false;
-  digit := false;
-
-  read(@f,ch);
-  while (ch=' ') or (ch=',') or (ch=chr(13)) do
-    read(@f,ch);
-
-  if ch=chr($7f) then
-    _readint:=false
-  else begin
-    if ch='-' then begin
-      neg:=true;
-      read(@f,ch)
-    end else if ch='+' then
-      read(@f,ch);
-
-    while (ch>='0') and (ch<='9') do begin
-      digit:=true;
-      n:=10*n+ord(ch)-ord('0');
-      read(@f,ch)
-    end;
-
-    if neg then n:=-n;
-    _readint:=digit
-  end
-end;
-
 begin
 end.

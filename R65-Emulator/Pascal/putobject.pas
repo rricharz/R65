@@ -63,19 +63,19 @@ begin
     if libflag then begin
       setsubtype('L');
       setargs(fname,0,0,1);
-      runprog('COPY:R          ',cyclus,drive);
+      _runprog('COPY:R          ',cyclus,drive);
       if (filerr <> 0) or (RUNERR <> 0) then begin
         writeln('COPY completed with error');
         ok:=false;
       end else begin
         setsubtype('T');
         setargs(fname,0,0,1);
-        runprog('COPY:R          ',cyclus,drive);
+        _runprog('COPY:R          ',cyclus,drive);
       end
     end else begin  { not a library }
       setsubtype('R');
       setargs(fname,0,0,1);
-      runprog('COPY:R          ',cyclus,drive);
+      _runprog('COPY:R          ',cyclus,drive);
     end;
     if (filerr<>0) or (RUNERR<>0) then begin
       ok:=false;
@@ -89,7 +89,7 @@ begin
       setargi(0,8);
       drive:=0; filerr:=0;
       setargs('/Q              ', 10, 0, 0);
-      runprog('DELETE:R        ',cyclus,drive);
+      _runprog('DELETE:R        ',cyclus,drive);
       if (filerr <> 0) or (RUNERR <> 0) then begin
         write('DELETE completed with error');
         ok:=false;
@@ -98,7 +98,7 @@ begin
         setsubtype('L');
         setargs(fname,0,0,1);
         setargs('/Q              ', 10, 0, 0);
-        runprog('DELETE:R        ',cyclus,drive);
+        _runprog('DELETE:R        ',cyclus,drive);
         if (filerr <> 0) or (RUNERR <> 0) then begin
           write('DELETE completed with error');
           ok:=false;
@@ -111,13 +111,13 @@ begin
       fname[0]:='*';
       setargs(fname,0,0,1);
       setargs('/Q              ', 10, 0, 0);
-      runprog('DELETE:R        ',cyclus,drive);
+      _runprog('DELETE:R        ',cyclus,drive);
       { clean the destination drive }
       setargi(0,0);
       ARGTYPE[1]:=chr(0);
       cyclus:=0; drive:=0; filerr:=0;
       setargs('/Q              ', 1, 0, 0);
-      runprog('CLEAN:R         ',cyclus,drive);
+      _runprog('CLEAN:R         ',cyclus,drive);
       if (filerr<>0) or (RUNERR<>0) then begin
          ok:=false;
          writeln('CLEAN completed with error');
@@ -128,7 +128,7 @@ begin
       cyclus := 0;
       drive := 0;
       filerr := 0;
-      runprog('PACK:R          ',cyclus,drive);
+      _runprog('PACK:R          ',cyclus,drive);
       if (filerr <> 0) or (RUNERR <> 0) then begin
         write('PACK completed with error');
         ok:=false;

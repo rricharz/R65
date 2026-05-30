@@ -1,150 +1,156 @@
-
-R65 COMPILE 4.8: program FILELIB          28/4/26 page 1
-
-
-   1 (    4) 
-   2 (    4) { *************************************** }
-   3 (    4) { *         FILELIB - LIBRARY           * }
-   4 (    4) { *************************************** }
-   5 (    4) 
-   6 (    4) 
-   7 (    4) { Provides functions for the handling of  }
-   8 (    4) { files and disk directories.             }
-   9 (    4) 
-  10 (    4) { The directory table has 256 entries of  }
-  11 (    4) { 32 bytes. The disk name is stored in    }
-  12 (    4) { the last entry (255). The last          }
-  13 (    4) { used entry has filtyp=DEND              }
-  14 (    4) 
-  15 (    4) {$U+}
-  16 (    4) 
-  17 (    4) library filelib;
-  18 (    4) 
-  19 (    4) mem
-  20 (    4)     FILFLG = $00da: integer&;
-  21 (    7)     FILDRV = $00dc: integer&;
-  22 (    7)     FILTYP = $0300:char&;
-  23 (    7)     FILNAM = $0301: array[15] of char&;
-  24 (    7)     FILCYC = $0311: integer&;
-  25 (    7)     FILSTP = $0312: char&;
-  26 (    7)     FILNM1 = $0320: array[15] of char&;
-  27 (    7)     FILCY1 = $0330: integer&;
-  28 (    7) 
-  29 (    7) func _uppercase(ch1: char): char;
-  30 (    7) {*******************************}
-  31 (    7) { returns uppercase of char }
-  32 (    7) begin
-  33 (    7)   if (ch1 >= 'a') and (ch1 <= 'z') then
-  34 (   26)     _uppercase := chr(ord(ch1) - 32)
-  35 (   36)   else
-  36 (   37)     _uppercase := ch1;
-  37 (   45) end;
-  38 (   53) 
-  39 (   54) proc _asetfile(name: array[15] of char;
-  40 (   54)       cyclus,device: integer; subtype: char);
-  41 (   54) {*******************************************}
-  42 (   54) { prepare for disk io }
-  43 (   54) var i,e: integer;
-  44 (   57) begin
-  45 (   57)   e:=0;
-  46 (   61)   for i:=0 to 15 do begin
-  47 (   82)     FILNAM[i]:=_uppercase(name[i]);
-  48 (  102)     FILNM1[i]:=_uppercase(name[i]);
-  49 (  129)     if (e=0) and ((name[i]=':')
-  50 (  153)         or (name[i]=' ')) then
-  51 (  166)       e:=i;
-  52 (  170)   end;
-  53 (  178)   if (subtype<>' ') and (e<>0)
-  54 (  205)       and (e<15) then begin
-  55 (  215)     FILSTP :=subtype;
-  56 (  218)     FILNAM[e]:=':'; FILNM1[e]:=':';
-  57 (  246)     FILNAM[e+1]:=subtype; FILNM1[e+1]:=subtype
-  58 (  278)   end;
-  59 (  289)   FILCYC:=cyclus; FILCY1:=cyclus;
-
-R65 COMPILE 4.8: library FILELIB          28/4/26 page 2
-
-  60 (  298)   FILDRV:=device;
-  61 (  307)   FILFLG:=$40; { Do not show file entry }
-  62 (  321) end;
-  63 (  321) 
-  64 (  322) proc _write_label;
-  65 (  322) {****************}
-  66 (  322) { print label without leading and trailing linefeed }
-  67 (  322) const prflbnolf   = $ece3;
-  68 (  325) begin
-  69 (  325)   call(prflbnolf);
-  70 (  331) end;
-  71 (  331) 
-  72 (  332) func _bestmatch: boolean;
-  73 (  332) {***********************}
-  74 (  332) {find the best (highers cyclus) entry in directory}
-  75 (  332) const
-  76 (  332)   preprd = $f62c;
-  77 (  335)   mem filerr = $00db: integer&;
-  78 (  335) begin
-  79 (  335)   filerr := 0;
-  80 (  339)   call(preprd); { find entry with system subroutine }
-  81 (  347)   if (filerr = 0) then begin
-  82 (  353)     _write_label;
-  83 (  360)   end;
-  84 (  360)   _bestmatch := (filerr = 0);
-  85 (  366) end;
-  86 (  370) 
-  87 (  371) func _freedrv(drive:integer; printit:boolean);
-  88 (  371) {********************************************}
-  89 (  371) { gets and prints % of free sectors }
-  90 (  371) const
-  91 (  371)   aprepdo  = $f4a7;
-  92 (  374)   aenddo   = $f625;
-  93 (  374)   agetentx = $f63a;
-  94 (  374)   DSECTORS = 2560;
-  95 (  374)   INVVID   = chr($0e);
-  96 (  374)   NORVID   = chr($0b);
-  97 (  374)   DEND     = chr(0); { directory end mark }
-  98 (  374)   MMAXSEQ  = 8;      {max no of seq. files}
-  99 (  374)   MAXENT   = 255;    { max no of entries }
- 100 (  374) 
- 101 (  374) mem
- 102 (  374)   MAXSEQ   = $0336: integer&;
- 103 (  374)   _fidrtp  = $0339: array[MMAXSEQ] of integer&;
- 104 (  374)   filloc   = $0313:integer;
- 105 (  374)   scyfc    = $037c:integer&;
- 106 (  374) 
- 107 (  374) var
- 108 (  374)   s:integer;
- 109 (  374)   r:real;
- 110 (  374) 
- 111 (  374) begin
- 112 (  374)   FILDRV:=drive;
- 113 (  376)   call(aprepdo);
- 114 (  388)   s := 0;
- 115 (  390)   repeat
- 116 (  394)     scyfc := s;
- 117 (  394)     call(agetentx);
- 118 (  407)     s := s+1;
- 119 (  413)   until (FILTYP = DEND) or (s >= MAXENT);
-
-R65 COMPILE 4.8: library FILELIB          28/4/26 page 3
-
- 120 (  432)   r := conv(DSECTORS  -filloc);
- 121 (  444)   s := trunc(100.0*r/conv(DSECTORS)+0.5);
- 122 (  476)   _freedrv := s; { return no of free sectors }
- 123 (  489)   call(aenddo);
- 124 (  493)   if printit then begin
- 125 (  497)     if s < 20 then write(INVVID);
- 126 (  513)     writeln( 'Free space on drive ', drive,
- 127 (  534)       ': ',s,'%',NORVID);
- 128 (  558)   end;
- 129 (  558) end;
- 130 (  558) 
- 131 (  559) begin
- 132 (  559) end.
- 133 (  561) 
-
-End compile
-
-Code lenght:          560
-Compiler stack size:  11
-Ident stack size:     33
-Pascal errors:        0
+   1     4 
+   2     4 { *************************************** }
+   3     4 { *         FILELIB - LIBRARY           * }
+   4     4 { *************************************** }
+   5     4 
+   6     4 
+   7     4 { Provides functions for the handling of  }
+   8     4 { files and disk directories.             }
+   9     4 
+  10     4 { The directory table has 256 entries of  }
+  11     4 { 32 bytes. The disk name is stored in    }
+  12     4 { the last entry (255). The last          }
+  13     4 { used entry has filtyp=DEND              }
+  14     4 
+  15     4 {$U+}
+  16     4 
+  17     4 library filelib;
+  18     4 
+  19     4 mem
+  20     4     FILFLG = $00da: integer&;
+  21     7     FILDRV = $00dc: integer&;
+  22     7     FILTYP = $0300:char&;
+  23     7     FILNAM = $0301: array[15] of char&;
+  24     7     FILCYC = $0311: integer&;
+  25     7     FILSTP = $0312: char&;
+  26     7     FILNM1 = $0320: array[15] of char&;
+  27     7     FILCY1 = $0330: integer&;
+  28     7 
+  29     7 func _uppercase(ch1: char): char;
+  30     7 {*******************************}
+  31     7 { returns uppercase of char }
+  32     7 begin
+  33     7   if (ch1 >= 'a') and (ch1 <= 'z') then
+  34    26     _uppercase := chr(ord(ch1) - 32)
+  35    36   else
+  36    37     _uppercase := ch1;
+  37    45 end;
+  38    53 
+  39    54 proc _asetfile(name: array[15] of char;
+  40    54       cyclus,device: integer; subtype: char);
+  41    54 {*******************************************}
+  42    54 { prepare for disk io }
+  43    54 var i,e: integer;
+  44    57 begin
+  45    57   e:=0;
+  46    61   for i:=0 to 15 do begin
+  47    82     FILNAM[i]:=_uppercase(name[i]);
+  48   102     FILNM1[i]:=_uppercase(name[i]);
+  49   129     if (e=0) and ((name[i]=':')
+  50   153         or (name[i]=' ')) then
+  51   166       e:=i;
+  52   170   end;
+  53   178   if (subtype<>' ') and (e<>0)
+  54   205       and (e<15) then begin
+  55   215     FILSTP :=subtype;
+  56   218     FILNAM[e]:=':'; FILNM1[e]:=':';
+  57   246     FILNAM[e+1]:=subtype; FILNM1[e+1]:=subtype
+  58   278   end;
+  59   289   FILCYC:=cyclus; FILCY1:=cyclus;
+  60   298   FILDRV:=device;
+  61   307   FILFLG:=$40; { Do not show file entry }
+  62   321 end;
+  63   321 
+  64   322 proc _runprog(name0: array[15] of char;
+  65   322              cyc: integer; drv: integer);
+  66   322 {***************************************}
+  67   322 var ii: integer;
+  68   325 begin
+  69   325   _asetfile(name0,cyc,drv,'R');
+  70   349   FILFLG:=FILFLG or $40;
+  71   354   run;
+  72   360 end;
+  73   360 
+  74   361 proc _chainprog(name0: array[15] of char;
+  75   361              cyc: integer; drv: integer);
+  76   361 {***************************************}
+  77   361 var ii: integer;
+  78   364 begin
+  79   364   _asetfile(name0,cyc,drv,'R');
+  80   388   FILFLG:=FILFLG or $40;
+  81   393   chain;
+  82   399 end;
+  83   399 
+  84   400 proc _write_label;
+  85   400 {****************}
+  86   400 { print label without leading and trailing linefeed }
+  87   400 const prflbnolf   = $ece3;
+  88   403 begin
+  89   403   call(prflbnolf);
+  90   409 end;
+  91   409 
+  92   410 func _bestmatch: boolean;
+  93   410 {***********************}
+  94   410 {find the best (highers cyclus) entry in directory}
+  95   410 const
+  96   410   preprd = $f62c;
+  97   413   mem filerr = $00db: integer&;
+  98   413 begin
+  99   413   filerr := 0;
+ 100   417   call(preprd); { find entry with system subroutine }
+ 101   425   if (filerr = 0) then begin
+ 102   431     _write_label;
+ 103   438   end;
+ 104   438   _bestmatch := (filerr = 0);
+ 105   444 end;
+ 106   448 
+ 107   449 func _freedrv(drive:integer; printit:boolean);
+ 108   449 {********************************************}
+ 109   449 { gets and prints % of free sectors }
+ 110   449 const
+ 111   449   aprepdo  = $f4a7;
+ 112   452   aenddo   = $f625;
+ 113   452   agetentx = $f63a;
+ 114   452   DSECTORS = 2560;
+ 115   452   INVVID   = chr($0e);
+ 116   452   NORVID   = chr($0b);
+ 117   452   DEND     = chr(0); { directory end mark }
+ 118   452   MMAXSEQ  = 8;      {max no of seq. files}
+ 119   452   MAXENT   = 255;    { max no of entries }
+ 120   452 
+ 121   452 mem
+ 122   452   MAXSEQ   = $0336: integer&;
+ 123   452   _fidrtp  = $0339: array[MMAXSEQ] of integer&;
+ 124   452   filloc   = $0313:integer;
+ 125   452   scyfc    = $037c:integer&;
+ 126   452 
+ 127   452 var
+ 128   452   s:integer;
+ 129   452   r:real;
+ 130   452 
+ 131   452 begin
+ 132   452   FILDRV:=drive;
+ 133   454   call(aprepdo);
+ 134   466   s := 0;
+ 135   468   repeat
+ 136   472     scyfc := s;
+ 137   472     call(agetentx);
+ 138   485     s := s+1;
+ 139   491   until (FILTYP = DEND) or (s >= MAXENT);
+ 140   510   r := conv(DSECTORS  -filloc);
+ 141   522   s := trunc(100.0*r/conv(DSECTORS)+0.5);
+ 142   554   _freedrv := s; { return no of free sectors }
+ 143   567   call(aenddo);
+ 144   571   if printit then begin
+ 145   575     if s < 20 then write(INVVID);
+ 146   591     writeln( 'Free space on drive ', drive,
+ 147   612       ': ',s,'%',NORVID);
+ 148   636   end;
+ 149   636 end;
+ 150   636 
+ 151   637 begin
+ 152   637 end.
+ 153   639 
+Code length:             638
+Compiler stack size:      21
+Ident stack size:         35

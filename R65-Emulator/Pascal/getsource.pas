@@ -69,7 +69,7 @@ begin
     ARGLIST[10]:=1; {copy to drive 1}
     cyclus:=0; drive:=0;
     filerr:=0; RUNERR:=0;
-    runprog('COPY:R          ',cyclus,drive);
+    _runprog('COPY:R          ',cyclus,drive);
     if (filerr<>0) or (RUNERR<>0) then begin
       ok:=false;
       if filerr=6 then writeln(INVVID,

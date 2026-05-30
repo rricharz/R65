@@ -1,15 +1,5 @@
 { IFILE:P - common file handling procedures }
 
-proc runprog
-  (name: array[15] of char;
-   cyc: integer; drv: integer);
-var i: integer;
-begin
-  for i:=0 to 15 do FILNM1[i]:=name[i];
-  FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
-  run
-end;
-
 proc writename_nobl(text: array[15] of char);
 { write name without blanks }
 var i: integer;
