@@ -1,20 +1,20 @@
+{  ******************************
+   *                            *
+   *  R65 Mini Pascal Compiler  *
+   *      Pass 2  (Loader)      *
+   *                            *
+   ******************************
 
-{  ******************************  }
-{  *                            *  }
-{  *  R65 Mini Pascal Compiler  *  }
-{  *      Pass 2  (Loader)      *  }
-{  *                            *  }
-{  ******************************  }
-
-{ 03/31/2026 cleaned up printing to disk }
+  03/31/2026 cleaned up printing to disk }
 
 program compile2;
 uses syslib,arglib,filelib;
 
 const
-    wrfile = $e81b;
-    sblock = $6000;
-    eblock = TOPMEM;
+    wrfile  = $e81b;
+    adelete = $c80c;
+    sblock  = $6000;
+    eblock  = TOPMEM;
 
 mem ENDSTK=$e,
     stprog=$11: integer;
@@ -75,9 +75,6 @@ begin
   FILSA1:=lowlim;
   FILTYP:='B';
   call(wrfile);
-  FILTYP := 'B';
-  {_write_label;
-  write('+');}
   testerr
 end {blocksave};
 
@@ -226,14 +223,24 @@ end;
 begin {main}
   init; maxsize:=eblock-sblock-2;
   pointer:=sblock+2; offset:=2;
+
   getbl(0);
+
   mem[pointer-1]:=0;
   mem[pointer]:=255;
   mem[pointer+1]:=255;
   pointer:=pointer+1;
+
   close(source);
-  blocksave(sblock,pointer);
   showused;
+  blocksave(sblock,pointer);
+
   ENDSTK:=TOPMEM-144;
+  { delete intermediate file }
+  _asetfile(name,scyclus,sdrive,'Q');
+  call(adelete);
+
+  RUNERR:=0;
+  { display free space available }
   dummy:=_freedrv(sdrive,true);
 end.

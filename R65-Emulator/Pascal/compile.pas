@@ -2708,17 +2708,16 @@ begin {main}
   { write statistics }
   writeln(@lpr);
   if makeoutput then write(PRTON);
-  writeln('Code length:           ',pc:5);
-  writeln('Compiler stack size:   ',stackmax:5);
-  writeln('Ident stack size:      ',spntmax:5);
+  writeln('Code length:           ',pc);
+  writeln('Compiler stack size:   ',stackmax);
+  writeln('Ident stack size:      ',spntmax,
+          '/',SYMBSIZE);
   write(PRTOFF);
 
   { clean up }
-  writeln('RUNERR=',RUNERR);
   if makeoutput then
     RUNERR := _emulator(9);
   close(fno);
-  writeln('RUNERR=',RUNERR);
 
   { check whether second pass is required }
   if (RUNERR=0) then
