@@ -142,10 +142,12 @@ STOP    LDA =0
         BNE STOP1
 *
         JSR PRTINF      NO, STOP PASCAL
-        BYT $0D,$0A,'Quit Pascal'+$80
+        BYT 'Quit Pascal'+$80
         LDA SFLAG
         AND =$7E        CLEAR PASCAL RUNTIME BIT
         STA SFLAG       IN SFLAG
+        LDX SAVS
+        TXS
         JMP (VMON)
 *
 STOP1   SEC             YES, COMPUTE OLD SP

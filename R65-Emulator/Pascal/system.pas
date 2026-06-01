@@ -26,8 +26,8 @@ Examples:
 First tries to run program from drive 1,
 unless a drive is specified in the call.
 If not found there and not specified,
-tries to run it from drive 0.
-Default for arguments is drive 1.       }
+tries to run it from drive 0. User input
+of drive in the command is ignored       }
 
 program system;
 {does not use libraries to save memory}
@@ -210,8 +210,11 @@ begin {main}
   repeat {main loop (endless)}
     write('P*');
     next;
-    if ch=CR then call(STOPCODE);
-    while (ch=' ') or (ch=chr(13)) do next;
+    while ch=CR do begin
+      write('P*');
+      next;
+    end;
+    while (ch=' ') do next;
     { default for program to run is drive 1,
       if not found, run from drive 0,
       user INPUT is ignored }
