@@ -1,8 +1,7 @@
 program quit;
-const astop = $2010;
-mem  USERST = $2009: integer;
-     STPROG = $0011: integer;
+
+const aquit = $2013;
+
 begin
-  STPROG := USERST; { force exit from Pascal }
-  call(astop);
+  call(aquit);
 end. 

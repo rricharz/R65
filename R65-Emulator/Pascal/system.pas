@@ -201,10 +201,10 @@ end;
 { * main * }
 
 begin {main}
+  RUNERR := 0;
   MAXSEQ := MMAXSEQ - 1;
   for i:=0 to MMAXSEQ-1 do FIDRTB[i]:=0;
-  clearinput; writeln;
-  writeln(title);
+  clearinput;
   ok:=true;
 
   repeat {main loop (endless)}
