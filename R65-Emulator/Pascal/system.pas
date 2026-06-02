@@ -30,15 +30,16 @@ tries to run it from drive 0. User input
 of drive in the command is ignored       }
 
 program system;
+uses syslib;
 {does not use libraries to save memory}
 
 const
-  title='R65 PASCAL VERSION 5.9';
+  title='R65 PASCAL VERSION 6.0';
   STOPCODE = $2010;
-  INPUT    = @0;
+{  INPUT    = @0;
   CR       = chr(13);
-  NORVID   = chr($0b);  {normal video}
-  INVVID   = chr($0e);  {inverse video}
+  NORVID   = chr($0b);
+  INVVID   = chr($0e); }
   MMAXSEQ  = 8;         {max no of seq. files}
   TOPMEM   = $c780;
 
@@ -195,7 +196,6 @@ end;
 { * clearinput * }
 
 proc clearinput;
-
 begin
   BUFFPN:=-1;
 end;
@@ -204,13 +204,18 @@ end;
 
 proc checkrunerr;
 begin
-  if RUNERR=$84 then
-    writeln(INVVID,'Program not found',NORVID)
-  else if (RUNERR>0) and (RUNERR<=8) then begin
-    write(INVVID,'File: ');
-    for i:=0 to 15 do write(FILNM1[i]);
-    writeln(NORVID);
-  end;
+  write(INVVID);
+  case RUNERR of
+    $84: writeln('Program not found');
+    $01: writeln('File read/write');
+    $03: writeln('Escape during read/write');
+    $04: writeln('Wrong record number');
+    $05: writeln('Wrong file type');
+    $06: writeln('File not found');
+    $07: writeln('Disk not ready');
+    $08: writeln('Directory full, not stored')
+    end {case}
+  write(NORVID);
   ENDSTK:=TOPMEM-144;
   IOCHECK:=true;
   RUNERR:=0;
@@ -329,8 +334,13 @@ begin {main}
     else argerr:=106;
 
   if argerr<>0 then begin
-    writeln;
-    writeln(INVVID,'Argument error ', argerr,NORVID);
+    write(INVVID);
+    case argerr of
+        105: writeln('Unknown drive in argument');
+        106: writeln('Argument syntax error');
+        107: writeln('Too many arguments')
+        end {case};
+    write(NORVID)
   end else begin
     clearinput;
     ENDSTK:=TOPMEM-144;
