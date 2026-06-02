@@ -190,6 +190,8 @@ STOP0   LDA =0
         CPX USERST+1
         BNE STOP1
 *
+        LDX SAVS
+        TXS
         JMP WARMST
 *
 STOP1   SEC             YES, COMPUTE OLD SP
@@ -2063,9 +2065,16 @@ EXEC3   STA STPROG
         LDA FILSTP
         CMP ='R'        IS PASCAL PROGRAM?
         BEQ RUN
-EXECE   LDA =$84        PASCAL RUNPROG ERROR
+EXECE   LDA RUNERR      AVOID ENDLESS LOOP
+        CMP =$84        IF IT CANNOT LOAD SYSTEM
+        BEQ SYSFAIL
+        LDA =$84        PASCAL RUNPROG ERROR
         STA RUNERR
         JMP STOP        SILENT ERROR
+SYSFAIL JSR PRTINF
+        BYT $0E,'Cannot load SYSTEM:P'
+        BYT $0D,$0A,$8B
+        JMP QUIT
 *
 RUN     LDY =0          READ END ADDRESS
         LDA (STPROG),Y  FROM FILE
@@ -2095,8 +2104,6 @@ RUN     LDY =0          READ END ADDRESS
         BCC *+3
         INX
         STX PC+1
-        LDA =0
-        STA RUNERR
 LOOP    LDX SAVS        RESTORE STACK POINTER
         TXS
         JSR EXCODE
@@ -2154,6 +2161,7 @@ COLDST  JSR PRTINF
         STA LSTLIN+1
         STA BRKPNT      CLEAR BRKPNT
         STA BRKPNT+1
+        STA RUNERR
         CLI
         CLD
         LDA USERST
