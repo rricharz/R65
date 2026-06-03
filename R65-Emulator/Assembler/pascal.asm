@@ -624,7 +624,7 @@ INCS2A  CMP ENDSTK      TEST STACK OVERFLOW
         STA EMUCOM      SP HAS BEEN INCREASED
         RTS
 *
-INCS2B  LDY =$82        PASCAL RUN TIME ERROR
+INCS2B  LDX =$82        PASCAL RUN TIME ERROR
         JMP PERROR      STACK OVERFLOW
 *
 * GETS2
@@ -1594,7 +1594,26 @@ TFER    LDX IOCHECK
         BNE TFER2
 TFER1   RTS             OK
 *
-TFER2   JMP PERROR
+TFER2   JSR PRTINF
+        BYT $0E,'OPEN '+$80
+*
+        LDX =0
+TFER3   TXA
+        PHA
+        LDA FILNM1,X
+        CMP =$20
+        BEQ TFER4
+        JSR PRTCHR
+TFER4   PLA
+        TAX
+        INX
+        CPX =16
+        BNE TFER3
+*
+        JSR PRTINF
+        BYT ' '+$80
+        LDX FILERR      REPORT ERROR NUMBER
+        JMP PERROR
 *
 * P-CODE 50: OPRA       OPEN RA-FILE
 *****************
@@ -1959,7 +1978,8 @@ PRTCHR9 LDX =$91        STRING OVERFLOW
 *
 * PERROR: PASCAL RUNTIME ERROR
 ******************************
-* ERROR IN X (BCD)
+* INPUT:  ERROR IN X (BCD)
+* OUTPUT: ERROR IN RUNERR
 *
 PERROR  LDA =47         CHECK CHARS/LINE
         CMP NUMCHR
@@ -1968,7 +1988,7 @@ PERROR  LDA =47         CHECK CHARS/LINE
         JSR PRTINF      AND CLEAR SCREEN
         BYT $01,$91     HOME,CLRSCR
 PERROR0 JSR PRTINF      INVVID,MESSAGE
-        BYT $0D,$A,$0E,'Pascal error '+128
+        BYT $0E,'Error '+128
         LDA =0
         STA DEVICE
         STA DEVPNT
@@ -2041,6 +2061,7 @@ EXEC    LDY =0
         BCC EXEC+2
         LDA =0
         STA FILCY1
+        STA FILDRV
 *
 EXECUTE LDA =$40
         STA FILFLG

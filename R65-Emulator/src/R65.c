@@ -259,7 +259,9 @@ void showtrace(uint16_t address, uint16_t watch, char* s)
 
     printf(
         "TRACE %04X=%02X (%s): "
-        "PC=%04X A=%02X X=%02X Y=%02X SP=%02X P=%02X\n",
+        "PC=%04X A=%02X X=%02X Y=%02X SP=%02X P=%02X "
+        "RUNERR=%02X FILERR=%02X FILDRV=%02X "
+        "FILNM=\"%.16s\"\n",
         address,
         memory[address],
         s,
@@ -268,7 +270,11 @@ void showtrace(uint16_t address, uint16_t watch, char* s)
         x,
         y,
         sp,
-        status
+        status,
+        memory[0x000C],   /* RUNERR */
+        memory[0x00DB],   /* FILERR */
+        memory[0x00DC],   /* FILDRV */
+        (char *)&memory[0x0320] /* FILNM1 */
     );
 }
 
@@ -280,7 +286,7 @@ uint8_t read6502(uint16_t address)
 
 {
 
-	{ showtrace(address, 0x2B63, "EXEC3"); }
+	// showtrace(address, 0x2063, "STOP");
     
     if (address < 0x1400)
         return memory[address];
