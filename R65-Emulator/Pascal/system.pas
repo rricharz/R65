@@ -31,28 +31,17 @@ of drive in the command is ignored       }
 
 program system;
 uses syslib;
-{does not use libraries to save memory}
 
 const
   title='R65 PASCAL VERSION 6.0';
   STOPCODE = $2010;
-{  INPUT    = @0;
-  CR       = chr(13);
-  NORVID   = chr($0b);
-  INVVID   = chr($0e); }
   MMAXSEQ  = 8;         {max no of seq. files}
-  TOPMEM   = $c780;
 
 mem
-  RUNERR   = $000c: integer&;
-  IOCHECK  = $0023: boolean&;
-  ENDSTK   = $000e: integer;
   BUFFPN   = $0015: integer&;
   FILERR   = $00db: integer&;
   FILNAM   = $0301: array[15] of char&;
-  FILCY1   = $0330: integer&;
   FIDRTB   = $0339: array[8] of integer&;
-  FILNM1   = $0320: array[15] of char&;
   NUMARG   = $005f: integer&;
   FILDRV   = $00dc: integer&;
   FILFLG   = $00da: integer&;
@@ -60,7 +49,8 @@ mem
   ARGLIST  = $0060: array[10] of integer;
   ARGLISTS = $0060: array[63] of char&;
   ARGTYPE  = $00a0: array[31] of char&;
-
+  FILNM1   = $0320: array[15] of char&;
+  FILCY1   = $0330: integer&;
 
 var
   i, m, n: integer;
@@ -76,11 +66,9 @@ var
 proc chainprog
   (name: array[15] of char;
    drv: integer; cyc: integer);
-
-var i: integer;
-
+var j: integer;
 begin
-  for i:=0 to 15 do FILNM1[i]:=name[i];
+  for j:=0 to 15 do FILNM1[j]:=name[j];
   FILCY1:=cyc;
   FILDRV:=drv;
   FILFLG:=$40;
@@ -105,14 +93,6 @@ proc next;
 begin
   read(@INPUT,ch);
   ch:=_uppercase(ch);
-end;
-
-{ * nextraw * }
-
-proc nextraw;
-
-begin
-  read(@INPUT,ch);
 end;
 
 { * getnum * }
@@ -140,7 +120,7 @@ end;
 
 proc getfname
   (var name: array[15] of char;
-   ptype: char; var ok: boolean;
+   ptype: char; var isok: boolean;
    var drv: integer; var cyc: integer);
 
 var i, j: integer;
@@ -156,13 +136,13 @@ var i, j: integer;
     else if (ch>='A') and (ch<='Z') then
       nexthexdigit:= ord(ch)-ord('A')+10
     else begin
-      ok:=false;
+      isok:=false;
     nexthexdigit:=0;
     end;
   end;
 
 begin
-  ok:=((ch>='A') and (ch<='Z'))
+  isok:=((ch>='A') and (ch<='Z'))
     or (ch='*') or (ch='?') or (ch='/');
   i:=0;
   repeat
@@ -206,15 +186,28 @@ proc checkrunerr;
 begin
   write(INVVID);
   case RUNERR of
+    $81: writeln('Division by zero');
+    $82: writeln('Stack overflow');
+    $83: writeln('Index out of bounds');
     $84: writeln('Program not found');
+    $85: writeln('P-code not implemented');
+    $88: writeln('Heap overflow');
+    $89: writeln('Pointer not allocated (NIL)');
+    $90: writeln('Writing to constant string');
+    $91: writeln('String too long');
+    $92: writeln('String cannot be released');
     $01: writeln('File read/write');
     $03: writeln('Escape during read/write');
     $04: writeln('Wrong record number');
     $05: writeln('Wrong file type');
     $06: writeln('File not found');
     $07: writeln('Disk not ready');
-    $08: writeln('Directory full, not stored')
-    end {case}
+    $08: writeln('Directory full, not stored');
+    $23: writeln('Too many open files');
+    $24: writeln('Directory error');
+    $25: writeln('Wrong file number, file not open');
+    $26: writeln('Disk full, not stored')
+  end {case}
   write(NORVID);
   ENDSTK:=TOPMEM-144;
   IOCHECK:=true;
@@ -260,14 +253,14 @@ begin {main}
           else begin
             for i:=0 to 15 do aname[i]:=' ';
             i:=0;
-            nextraw;
+            next;
             while (ch<>'"') and (ch<>CR) do begin
               if i<=15 then begin
                 aname[i]:=ch;
                 i:=succ(i);
               end else
                 argerr:=106;
-              nextraw;
+              next;
             end;
             if ch<>'"' then
               argerr:=106

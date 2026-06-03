@@ -83,7 +83,9 @@ proc checkfilerr;
 {***************}
 begin
   if filerr<>0 then begin
-    writeln('Cannot read directory');
+    if name_given then
+      _change_disk(cfloppy,1);
+    writeln(INVVID,'Cannot read directory',NORVID);
     _abort;
   end;
 end;
@@ -145,7 +147,7 @@ begin {main}
     _agetval(drive,default);
     _carg:=1;
     if (drive<0) or (drive>1) then begin
-      writeln('Drive must be 0 or 1');
+      writeln(INVVID,'Drive must be 0 or 1',NORVID);
       _abort
     end
   end else if ARGTYPE[_carg]='s' then begin

@@ -21,6 +21,16 @@ begin
   else hexdigit := chr(d + ord('0'));
 end;
 
+func upper(ch1: char): char;
+{***************************}
+begin
+  if (ch1 >= 'a') and (ch1 <= 'z') then
+    upper := chr(ord(ch1) - 32)
+  else
+    upper := ch1;
+end;
+
+
 proc grep_in_file(name: cpnt; f: file );
 {**************************************}
 var nchar, linecount, stop,
@@ -45,21 +55,18 @@ var nchar, linecount, stop,
 
       i := 0;
       while i <= stop do begin
-        if line[i] = pattern[0] then begin
+        if upper(line[i]) = pattern[0] then begin
           j := 1;
           ok := true;
 
           while ok and (j < pattern_length) do begin
-            if line[i+j] <> pattern[j] then
+            if upper(line[i+j]) <> pattern[j] then
               ok := false
             else
               j := j + 1;
           end;
 
           if ok then begin
-            { highlight whole match }
-            { for j := 0 to pattern_length-1 do
-              line[i+j]:=chr(ord(line[i+j]) or 128); }
 
             find_pattern := true;
             exit;
@@ -81,8 +88,8 @@ begin
     if find_pattern then begin
       while line[0]=' ' do _strdelc(0, line);
       writeln(name,':',linecount,' ', line);
+      end;
     linecount := linecount + 1;
-    end;
   until ateof;
 end;
 

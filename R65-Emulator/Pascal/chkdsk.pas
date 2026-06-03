@@ -40,7 +40,7 @@ proc checkfilerr;
 begin
   if filerr<>0 then begin
     call(aenddo);
-    writeln('Cannot read directory');
+    writeln(INVVID,'Cannot read directory',NORVID);
     _abort;
   end;
 end;
@@ -65,7 +65,7 @@ begin
   filerr:=0;
   if ARGTYPE[_carg]='i' then _agetval(drive,default);
   if (drive<0) or (drive>1) then begin
-    writeln('Drive must be 0 or 1');
+    writeln(INVVID,'Drive must be 0 or 1',NORVID);
     _abort
   end;
   FILDRV:=drive;

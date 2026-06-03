@@ -192,18 +192,9 @@ int translateKey(int key)
 				return key;
 			}
 
-			/* Pascal: quote toggles literal mode */
-			if (key == '"') {
-				in_quote = !in_quote;
-				return key;
-			}
-
-			/* Pascal outside quotes: keep old uppercase behaviour */
-			if (!in_quote && (NUMCHAR == 48) &&
-				(key >= 'a') && (key <= 'z'))
+			/* Capitalize of NUMCHAR=48 */
+			if ((NUMCHAR == 48) && (key >= 'a') && (key <= 'z'))
 				return key - 0x20;
-			
-			/* Pascal inside quotes, or non-lowercase char */
 			return key;
 		}  // end of default
 	} // end of case

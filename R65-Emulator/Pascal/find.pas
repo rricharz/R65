@@ -28,7 +28,7 @@ proc checkfilerr;
 {***************}
 begin
   if filerr<>0 then begin
-    writeln('Cannot read directory');
+    writeln(INVVID,'Cannot read directory',NORVID);
     _abort;
   end;
 end;

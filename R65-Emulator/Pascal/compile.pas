@@ -141,7 +141,7 @@ proc merror(x: integer; code: packed char);
 var k: integer;
     answer: char;
 begin
-  write(INVVID,'ERROR: ');
+  write(INVVID);
   case x of
     01: write('Ident');
     02: write('Ident ',code,' expected');
@@ -162,10 +162,10 @@ begin
     17: write('Real');
     18: write('File table overflow');
     19: write('Parameter');
-    20: write('Compiler directive syntax');
+    20: write('Compiler directive');
     21: write('Nested include files');
     22: write('Unexpected EOF');
-    23: write('End mark for comment or string');
+    23: write('End mark comment/string');
     24: write('Identifier already defined');
     25: write('Formatted write');
     26: write('Wrong library version');
