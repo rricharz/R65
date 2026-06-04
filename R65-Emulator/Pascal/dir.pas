@@ -82,7 +82,7 @@ end;
 proc checkfilerr;
 {***************}
 begin
-  if filerr<>0 then begin
+  if FILERR<>0 then begin
     if name_given then
       _change_disk(cfloppy,1);
     writeln(INVVID,'Cannot read directory',NORVID);
@@ -132,7 +132,7 @@ begin {main}
   newname := _new;
   name_given := false;
   drive := 1;
-  filerr := 0;
+  FILERR := 0;
   sortit := false;
   full := false;
   show_deleted := false;

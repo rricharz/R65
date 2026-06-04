@@ -17,8 +17,7 @@
 program export;
 uses syslib, arglib, filelib;
 
-mem filerr=$db: integer&;
-    filstp=$312:char&;
+mem filstp=$312:char&;
 
 var cyclus,drive,free: integer;
     name: array[15] of char;
@@ -62,7 +61,7 @@ begin { main }
     exit;
   end;
   writeln('v');
-  filerr := _emulator(ECEXPORT);
-  if filerr<>0 then bcderror(filerr);
+  FILERR := _emulator(ECEXPORT);
+  if FILERR<>0 then bcderror(FILERR);
 end.
   

@@ -20,8 +20,6 @@ const
     afloppy=$c827; { exdos vector }
     VERBOSE = false;
 
-mem filerr=$db: integer&;
-
 var cyclus,drive,k: integer;
     fname,dname: array[15] of char;
     default,ok,libflag: boolean;
@@ -30,7 +28,7 @@ var cyclus,drive,k: integer;
 
 begin
   ok:=true;
-  filerr:=0;
+  FILERR:=0;
   { get the argument (file name) }
   cyclus:=0; drive:=0;
   _agetstring(fname,default,cyclus,drive);
@@ -43,28 +41,28 @@ begin
     cyclus:=0; drive:=1;
     _asetfile('WORK            ',cyclus,drive,' ');
     call(afloppy);
-    if (filerr<>0) then ok:=false;
+    if (FILERR<>0) then ok:=false;
     { make sure that PASCAL is on drive 0 }
     if VERBOSE then
       writeln('Putting disk PASCAL in drive 0');
     cyclus:=0; drive:=0;
     _asetfile('PASCAL          ',cyclus,drive,' ');
     call(afloppy);
-    if (filerr<>0) then ok:=false;
+    if (FILERR<>0) then ok:=false;
     { find out which files to copy }
     libflag := contains('LIB     ');
     { copy the object file(s) }
     ARGTYPE[10]:='i';
     ARGLIST[10]:=0; {copy to drive 0}
     ARGTYPE[11]:=chr(0);
-    cyclus:=0; drive:=0; filerr:=0;
+    cyclus:=0; drive:=0; FILERR:=0;
     if VERBOSE then
       writeln('Copying object file(S):');
     if libflag then begin
       setsubtype('L');
       setargs(fname,0,0,1);
       _runprog('COPY:R          ',cyclus,drive);
-      if (filerr <> 0) or (RUNERR <> 0) then begin
+      if (FILERR <> 0) or (RUNERR <> 0) then begin
         writeln('COPY completed with error');
         ok:=false;
       end else begin
@@ -77,9 +75,9 @@ begin
       setargs(fname,0,0,1);
       _runprog('COPY:R          ',cyclus,drive);
     end;
-    if (filerr<>0) or (RUNERR<>0) then begin
+    if (FILERR<>0) or (RUNERR<>0) then begin
       ok:=false;
-      if filerr=6 then
+      if FILERR=6 then
         writeln(INVVID,
              'Object file not found',NORVID)
       else
@@ -87,10 +85,10 @@ begin
     end else begin {if successfull}
       { delete the original file }
       setargi(0,8);
-      drive:=0; filerr:=0;
+      drive:=0; FILERR:=0;
       setargs('/Q              ', 10, 0, 0);
       _runprog('DELETE:R        ',cyclus,drive);
-      if (filerr <> 0) or (RUNERR <> 0) then begin
+      if (FILERR <> 0) or (RUNERR <> 0) then begin
         write('DELETE completed with error');
         ok:=false;
       end;
@@ -99,7 +97,7 @@ begin
         setargs(fname,0,0,1);
         setargs('/Q              ', 10, 0, 0);
         _runprog('DELETE:R        ',cyclus,drive);
-        if (filerr <> 0) or (RUNERR <> 0) then begin
+        if (FILERR <> 0) or (RUNERR <> 0) then begin
           write('DELETE completed with error');
           ok:=false;
         end;
@@ -115,10 +113,10 @@ begin
       { clean the destination drive }
       setargi(0,0);
       ARGTYPE[1]:=chr(0);
-      cyclus:=0; drive:=0; filerr:=0;
+      cyclus:=0; drive:=0; FILERR:=0;
       setargs('/Q              ', 1, 0, 0);
       _runprog('CLEAN:R         ',cyclus,drive);
-      if (filerr<>0) or (RUNERR<>0) then begin
+      if (FILERR<>0) or (RUNERR<>0) then begin
          ok:=false;
          writeln('CLEAN completed with error');
       end;
@@ -127,9 +125,9 @@ begin
       ARGTYPE[1] := chr(0);
       cyclus := 0;
       drive := 0;
-      filerr := 0;
+      FILERR := 0;
       _runprog('PACK:R          ',cyclus,drive);
-      if (filerr <> 0) or (RUNERR <> 0) then begin
+      if (FILERR <> 0) or (RUNERR <> 0) then begin
         write('PACK completed with error');
         ok:=false;
       end;
@@ -137,7 +135,7 @@ begin
   end;
   if (not ok) or (RUNERR<>0) then begin
     writeln(INVVID,'Putobject failed',NORVID);
-    filerr:=0; RUNERR:=0;
+    FILERR:=0; RUNERR:=0;
   end;
 end.
 

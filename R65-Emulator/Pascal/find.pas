@@ -17,8 +17,7 @@ const afloppy  = $c827;
       agetentx = $f63a;
       MAXENT   = 255;
 
-mem   filerr=$db: integer&;
-      scyfc   =$037c: integer&;
+mem   scyfc   =$037c: integer&;
 
 var   cyclus,drive,entry,saventry,nfound: integer;
       default,found,last: boolean;
@@ -27,7 +26,7 @@ var   cyclus,drive,entry,saventry,nfound: integer;
 proc checkfilerr;
 {***************}
 begin
-  if filerr<>0 then begin
+  if FILERR<>0 then begin
     writeln(INVVID,'Cannot read directory',NORVID);
     _abort;
   end;
@@ -41,7 +40,7 @@ var first: boolean;
     nm2: array[NAMESIZE] of char;
 
 begin
-  filerr:=0;
+  FILERR:=0;
   first:=true;
   FILDRV:=drv;
   if nm[0]<>' ' then begin
@@ -54,7 +53,7 @@ begin
     checkfilerr;
     for i:=0 to NAMESIZE do nm2[i]:=FILNAM[i];
   end;
-  if filerr=0 then begin
+  if FILERR=0 then begin
     last:=false; entry:=0;
     while (entry<NUMENTRIES) and not last do begin
       cyclus:=0; saventry:=entry;

@@ -1,239 +1,221 @@
-
-R65 COMPILE 4.7: program COPY             26/4/26 page 1
-
-
-   1 (    4) { *************************************** }
-   2 (    4) { *                                     * }
-   3 (    4) { * COPY filename, source, destination) * }
-   4 (    4) { *                                     * }
-   5 (    4) { *************************************** }
-   6 (    4) 
-   7 (    4) {  2019 rricharz                        }
-   8 (    4) {  2023 RR: Added wildcard handling     }
-   9 (    4) {  2024-2026 RR: small improvements     }
-  10 (    4) 
-  11 (    4) {  COPY fixes the following problems silently:    }
-  12 (    4) {  Old style EOF ($1F) is replaced with new ($7F) }
-  13 (    4) {  $00 is removed                                 }
-  14 (    4) 
-  15 (    4) {$U+}
-  16 (    4) 
-  17 (    4) program copy;
-  18 (    4) uses syslib, arglib, wildlib, filelib;
-  19 ( 2656) 
-  20 ( 2656) const MAXLINES = 13;
-  21 ( 2659)       rdfile=$e815;
-  22 ( 2659)       wrfile=$eb2c; {keep date}
-  23 ( 2659)       sblock=$6000;
-  24 ( 2659)       eblock=TOPMEM;
-  25 ( 2659) 
-  26 ( 2659) mem   filerr=$db: integer&;
-  27 ( 2659)       filsa=$031a,
-  28 ( 2659)       filea=$031c,
-  29 ( 2659)       filsa1=$0331: integer;
-  30 ( 2659)       filtyp=$0300: char&;
-  31 ( 2659) 
-  32 ( 2659) var name,savename: array[15] of char;
-  33 ( 2659)     ii,fcount:integer;
-  34 ( 2659)     fno,ofno: file;
-  35 ( 2659)     cyclus,scyclus,drive,ddrive: integer;
-  36 ( 2659)     default: boolean;
-  37 ( 2659)     ch,k: char;
-  38 ( 2659)     entry: integer;
-  39 ( 2659)     last, found: boolean;
-  40 ( 2659) 
-  41 ( 2659) { **** isblockf **** }
-  42 ( 2659) 
-  43 ( 2659) func isblockf(nm: array[15] of char): boolean;
-  44 ( 2659) var j: integer;
-  45 ( 2662) begin
-  46 ( 2662)   j:=0;
-  47 ( 2666)   while (nm[j]<>':') and (j<14) do j:=j+1;
-  48 ( 2698)   if nm[j]=':' then
-  49 ( 2716)     begin
-  50 ( 2717)       if nm[j+1]='R' then isblockf:=true
-  51 ( 2737)       else isblockf:=false
-  52 ( 2746)     end
-  53 ( 2748)   else
-  54 ( 2752)     begin
-  55 ( 2755)       writeln(INVVID,'Cannot copy',NORVID);
-  56 ( 2779)       _abort;
-  57 ( 2783)     end;
-  58 ( 2783) end;
-  59 ( 2783) 
-
-R65 COMPILE 4.7: program COPY             26/4/26 page 2
-
-  60 ( 2784) { **** blockload ***** }
-  61 ( 2784) 
-  62 ( 2784) proc blockload(lowlim: integer);
-  63 ( 2784) var i: integer;
-  64 ( 2787) begin
-  65 ( 2787)   _asetfile(name,cyclus,drive,' ');
-  66 ( 2811)   FILFLG:=$40;
-  67 ( 2813)   filsa:=lowlim;
-  68 ( 2817)   filsa1:=lowlim;
-  69 ( 2825)   filtyp:='B';
-  70 ( 2835)   filerr:=0;
-  71 ( 2842)   FILFLG := $40;
-  72 ( 2848)   call(rdfile);
-  73 ( 2856) end {blockload};
-  74 ( 2856) 
-  75 ( 2857) { **** blocksave ***** }
-  76 ( 2857) 
-  77 ( 2857) proc blocksave(lowlim,highlim: integer);
-  78 ( 2857) var i: integer;
-  79 ( 2860) begin
-  80 ( 2860)   _asetfile(name,cyclus,ddrive,' ');
-  81 ( 2884)   FILFLG:=$40;
-  82 ( 2886)   filsa:=lowlim;
-  83 ( 2890)   filea:=highlim;
-  84 ( 2898)   filsa1:=lowlim;
-  85 ( 2906)   filtyp:='B';
-  86 ( 2916)   filerr:=0;
-  87 ( 2923)   call(wrfile);
-  88 ( 2931) end {blocksave};
-  89 ( 2931) 
-  90 ( 2932) { ***** error ***** }
-  91 ( 2932) 
-  92 ( 2932) proc error(x:integer);
-  93 ( 2932) begin
-  94 ( 2932)   writeln;
-  95 ( 2937)   writeln(INVVID,'COPY: file error ',
-  96 ( 2964)     (x shr 4),(x and 15),NORVID);
-  97 ( 2989) end {error};
-  98 ( 2989) 
-  99 ( 2990) { **** copyfile ***** }
- 100 ( 2990) 
- 101 ( 2990) proc copyfile;
- 102 ( 2990) begin
- 103 ( 2990)   if isblockf(name) then
- 104 ( 3009)     begin
- 105 ( 3009)       ENDSTK:=sblock-144; {reserve memory}
- 106 ( 3021)       blockload(sblock);
- 107 ( 3030)       _write_label;
- 108 ( 3034)       write('=');
- 109 ( 3036)       if ord(filerr)<>0 then
- 110 ( 3041)         begin
- 111 ( 3042)           error(filerr);
- 112 ( 3054)           ENDSTK:=TOPMEM-144; {_release memory}
- 113 ( 3063)           _abort;
- 114 ( 3067)         end;
- 115 ( 3067)       if filea>=TOPMEM then
- 116 ( 3074)         begin
- 117 ( 3075)           writeln('Error: File too large');
- 118 ( 3106)           ENDSTK:=TOPMEM-144; {_release memory}
- 119 ( 3115)           _abort;
-
-R65 COMPILE 4.7: program COPY             26/4/26 page 3
-
- 120 ( 3119)         end;
- 121 ( 3119)       cyclus:=FILCYC;
- 122 ( 3123)       FILDRV:=ddrive;
- 123 ( 3127)       blocksave(sblock,filea);
- 124 ( 3148)       if ord(filerr)<>0 then
- 125 ( 3153)           error(filerr);
- 126 ( 3166)       ENDSTK:=TOPMEM-144; {_release memory}
- 127 ( 3175)       writeln;
- 128 ( 3175)     end
- 129 ( 3181) 
- 130 ( 3181)   else
- 131 ( 3181)     begin
- 132 ( 3184)       _asetfile(name,cyclus,drive,' ');
- 133 ( 3206)       openr(fno);
- 134 ( 3212)       _write_label;
- 135 ( 3216)       writeln('=');
- 136 ( 3224)       FILCY1:=FILCYC;
- 137 ( 3228)       FILDRV:=ddrive;
- 138 ( 3233)       openw(ofno);
- 139 ( 3247)       { write('.'); }
- 140 ( 3247)       repeat
- 141 ( 3247)         read(@fno,ch);
- 142 ( 3257) {chr(31) for compatibility with old files; and fix it}
- 143 ( 3258)         if (ch<>chr(31)) and (ch<>chr(0)) then
- 144 ( 3274)           write(@ofno,ch);
- 145 ( 3289)         until (ch=EOF) or (ch=chr(31));
- 146 ( 3304)       write(@ofno,EOF);
- 147 ( 3317)       close(ofno);
- 148 ( 3323)       close(fno);
- 149 ( 3329)     end;
- 150 ( 3329) end;
- 151 ( 3329) 
- 152 ( 3330) func haswildcard(nm1:array[15] of char): boolean;
- 153 ( 3330) var kk:integer;
- 154 ( 3333) begin
- 155 ( 3333)   haswildcard:=false;
- 156 ( 3337)   for kk:=0 to 15 do
- 157 ( 3349)     if (nm1[kk]='*') or (nm1[kk]='?') then
- 158 ( 3380)       haswildcard:=true;
- 159 ( 3386) end;
- 160 ( 3404) 
- 161 ( 3405) { **** main **** }
- 162 ( 3405) 
- 163 ( 3405) begin
- 164 ( 3405)   cyclus:=0;
- 165 ( 3409)   _agetstring(name,default,cyclus,drive);
- 166 ( 3453)   scyclus:=cyclus;
- 167 ( 3453)   if (drive<0) or (drive>1) then
- 168 ( 3475)     begin
- 169 ( 3476)       writeln(INVVID,
- 170 ( 3481)         'Specify source drive (0 or 1)',NORVID);
- 171 ( 3521)       _abort;
- 172 ( 3525)     end;
- 173 ( 3525) 
- 174 ( 3525)   _agetval(ddrive,default); {destination drive}
- 175 ( 3545)   if default then
- 176 ( 3545)     begin
- 177 ( 3549)       writeln(INVVID,
- 178 ( 3554)         'Specify destination drive (0 or 1)');
- 179 ( 3596)       writeln('Usage: copy name',
-
-R65 COMPILE 4.7: program COPY             26/4/26 page 4
-
- 180 ( 3613)         '[,source_drive] dest_drive',NORVID);
- 181 ( 3649)       _abort;
- 182 ( 3653)     end;
- 183 ( 3653)   if (ddrive<0) or (ddrive>1) then
- 184 ( 3667)     begin
- 185 ( 3668)       writeln(INVVID,
- 186 ( 3673)         'Destination drive must be 0 or 1',NORVID);
- 187 ( 3716)       _abort;
- 188 ( 3720)     end;
- 189 ( 3720)   if drive=ddrive then
- 190 ( 3724)     begin
- 191 ( 3729)       writeln(INVVID,'Source and destination',
- 192 ( 3758)        ' drives must be different',NORVID);
- 193 ( 3793)       _abort;
- 194 ( 3797)     end;
- 195 ( 3797) 
- 196 ( 3797)   if haswildcard(name) then begin
- 197 ( 3811)     fcount:=0; last:=false; entry:= 0;
- 198 ( 3828)     while (entry<NUMENTRIES) and not last do begin
- 199 ( 3848)       cyclus:=scyclus;
- 200 ( 3848)       _findentry(name,drive,entry,found,last);
- 201 ( 3902)       if found and (not last) and
- 202 ( 3911)         ((scyclus=0) or (scyclus=FILCYC)) then begin
- 203 ( 3930)         for ii:=0 to 15 do begin
- 204 ( 3950)           savename[ii]:=name[ii];
- 205 ( 3958)           name[ii]:=FILNAM[ii];
- 206 ( 3977)         end;
- 207 ( 3983)         cyclus:=FILCYC;
- 208 ( 4001)         copyfile;
- 209 ( 4009)         fcount:=fcount+1;
- 210 ( 4015)         for ii:=0 to 15 do
- 211 ( 4028)           name[ii]:=savename[ii];
- 212 ( 4045)       end;
- 213 ( 4067)     end;
- 214 ( 4067)       if fcount=0 then writeln('No files copied')
- 215 ( 4096)       else writeln(fcount, ' files copied');
- 216 ( 4130)   end else
- 217 ( 4130)     copyfile;
- 218 ( 4137) end.
- 219 ( 4137) 
-
-End compile
-
-Code lenght:          4136
-Compiler stack size:  85
-Ident stack size:     120
-Pascal errors:        0
+   1     4 { *************************************** }
+   2     4 { *                                     * }
+   3     4 { * COPY filename, source, destination) * }
+   4     4 { *                                     * }
+   5     4 { *************************************** }
+   6     4 
+   7     4 {  2019 rricharz                        }
+   8     4 {  2023 RR: Added wildcard handling     }
+   9     4 {  2024-2026 RR: small improvements     }
+  10     4 
+  11     4 {  COPY fixes the following problems silently:    }
+  12     4 {  Old style EOF ($1F) is replaced with new ($7F) }
+  13     4 {  $00 is removed                                 }
+  14     4 
+  15     4 {$U+}
+  16     4 
+  17     4 program copy;
+  18     4 uses syslib, arglib, wildlib, filelib;
+  19  2979 
+  20  2979 const MAXLINES = 13;
+  21  2982       rdfile=$e815;
+  22  2982       wrfile=$eb2c; {keep date}
+  23  2982       sblock=$6000;
+  24  2982       eblock=TOPMEM;
+  25  2982 
+  26  2982 mem   filsa=$031a,
+  27  2982       filea=$031c,
+  28  2982       filsa1=$0331: integer;
+  29  2982       filtyp=$0300: char&;
+  30  2982 
+  31  2982 var name,savename: array[15] of char;
+  32  2982     ii,fcount:integer;
+  33  2982     fno,ofno: file;
+  34  2982     cyclus,scyclus,drive,ddrive: integer;
+  35  2982     default: boolean;
+  36  2982     ch,k: char;
+  37  2982     entry: integer;
+  38  2982     last, found: boolean;
+  39  2982 
+  40  2982 { **** isblockf **** }
+  41  2982 
+  42  2982 func isblockf(nm: array[15] of char): boolean;
+  43  2982 var j: integer;
+  44  2985 begin
+  45  2985   j:=0;
+  46  2989   while (nm[j]<>':') and (j<14) do j:=j+1;
+  47  3021   if nm[j]=':' then
+  48  3039     begin
+  49  3040       if nm[j+1]='R' then isblockf:=true
+  50  3060       else isblockf:=false
+  51  3069     end
+  52  3071   else
+  53  3075     begin
+  54  3078       writeln(INVVID,'Cannot copy',NORVID);
+  55  3102       _abort;
+  56  3106     end;
+  57  3106 end;
+  58  3106 
+  59  3107 { **** blockload ***** }
+  60  3107 
+  61  3107 proc blockload(lowlim: integer);
+  62  3107 var i: integer;
+  63  3110 begin
+  64  3110   _asetfile(name,cyclus,drive,' ');
+  65  3134   FILFLG:=$40;
+  66  3136   filsa:=lowlim;
+  67  3140   filsa1:=lowlim;
+  68  3148   filtyp:='B';
+  69  3158   FILERR:=0;
+  70  3165   FILFLG := $40;
+  71  3171   call(rdfile);
+  72  3179 end {blockload};
+  73  3179 
+  74  3180 { **** blocksave ***** }
+  75  3180 
+  76  3180 proc blocksave(lowlim,highlim: integer);
+  77  3180 var i: integer;
+  78  3183 begin
+  79  3183   _asetfile(name,cyclus,ddrive,' ');
+  80  3207   FILFLG:=$40;
+  81  3209   filsa:=lowlim;
+  82  3213   filea:=highlim;
+  83  3221   filsa1:=lowlim;
+  84  3229   filtyp:='B';
+  85  3239   FILERR:=0;
+  86  3246   call(wrfile);
+  87  3254 end {blocksave};
+  88  3254 
+  89  3255 { ***** error ***** }
+  90  3255 
+  91  3255 proc error(x:integer);
+  92  3255 begin
+  93  3255   writeln;
+  94  3260   writeln(INVVID,'COPY: file error ',
+  95  3287     (x shr 4),(x and 15),NORVID);
+  96  3312 end {error};
+  97  3312 
+  98  3313 { **** copyfile ***** }
+  99  3313 
+ 100  3313 proc copyfile;
+ 101  3313 begin
+ 102  3313   if isblockf(name) then
+ 103  3332     begin
+ 104  3332       ENDSTK:=sblock-144; {reserve memory}
+ 105  3344       blockload(sblock);
+ 106  3353       _write_label;
+ 107  3357       write('=');
+ 108  3359       if FILERR<>0 then
+ 109  3364         begin
+ 110  3365           error(FILERR);
+ 111  3377           ENDSTK:=TOPMEM-144; {_release memory}
+ 112  3386           _abort;
+ 113  3390         end;
+ 114  3390       if filea>=TOPMEM then
+ 115  3397         begin
+ 116  3398           writeln('Error: File too large');
+ 117  3429           ENDSTK:=TOPMEM-144; {_release memory}
+ 118  3438           _abort;
+ 119  3442         end;
+ 120  3442       cyclus:=FILCYC;
+ 121  3446       FILDRV:=ddrive;
+ 122  3450       blocksave(sblock,filea);
+ 123  3471       if FILERR<>0 then
+ 124  3476           error(FILERR);
+ 125  3489       ENDSTK:=TOPMEM-144; {_release memory}
+ 126  3498       writeln;
+ 127  3498     end
+ 128  3504 
+ 129  3504   else
+ 130  3504     begin
+ 131  3507       _asetfile(name,cyclus,drive,' ');
+ 132  3529       openr(fno);
+ 133  3535       _write_label;
+ 134  3539       writeln('=');
+ 135  3547       FILCY1:=FILCYC;
+ 136  3551       FILDRV:=ddrive;
+ 137  3556       openw(ofno);
+ 138  3570       { write('.'); }
+ 139  3570       repeat
+ 140  3570         read(@fno,ch);
+ 141  3580 {chr(31) for compatibility with old files; and fix it}
+ 142  3581         if (ch<>chr(31)) and (ch<>chr(0)) then
+ 143  3597           write(@ofno,ch);
+ 144  3612         until (ch=EOF) or (ch=chr(31));
+ 145  3627       write(@ofno,EOF);
+ 146  3640       close(ofno);
+ 147  3646       close(fno);
+ 148  3652     end;
+ 149  3652 end;
+ 150  3652 
+ 151  3653 func haswildcard(nm1:array[15] of char): boolean;
+ 152  3653 var kk:integer;
+ 153  3656 begin
+ 154  3656   haswildcard:=false;
+ 155  3660   for kk:=0 to 15 do
+ 156  3672     if (nm1[kk]='*') or (nm1[kk]='?') then
+ 157  3703       haswildcard:=true;
+ 158  3709 end;
+ 159  3727 
+ 160  3728 { **** main **** }
+ 161  3728 
+ 162  3728 begin
+ 163  3728   cyclus:=0;
+ 164  3732   _agetstring(name,default,cyclus,drive);
+ 165  3776   scyclus:=cyclus;
+ 166  3776   if (drive<0) or (drive>1) then
+ 167  3798     begin
+ 168  3799       writeln(INVVID,
+ 169  3804         'Specify source drive (0 or 1)',NORVID);
+ 170  3844       _abort;
+ 171  3848     end;
+ 172  3848 
+ 173  3848   _agetval(ddrive,default); {destination drive}
+ 174  3868   if default then
+ 175  3868     begin
+ 176  3872       writeln(INVVID,
+ 177  3877         'Specify destination drive (0 or 1)');
+ 178  3919       writeln('Usage: copy name',
+ 179  3936         '[,source_drive] dest_drive',NORVID);
+ 180  3972       _abort;
+ 181  3976     end;
+ 182  3976   if (ddrive<0) or (ddrive>1) then
+ 183  3990     begin
+ 184  3991       writeln(INVVID,
+ 185  3996         'Destination drive must be 0 or 1',NORVID);
+ 186  4039       _abort;
+ 187  4043     end;
+ 188  4043   if drive=ddrive then
+ 189  4047     begin
+ 190  4052       writeln(INVVID,'Source and destination',
+ 191  4081        ' drives must be different',NORVID);
+ 192  4116       _abort;
+ 193  4120     end;
+ 194  4120 
+ 195  4120   if haswildcard(name) then begin
+ 196  4134     fcount:=0; last:=false; entry:= 0;
+ 197  4151     while (entry<NUMENTRIES) and not last do begin
+ 198  4171       cyclus:=scyclus;
+ 199  4171       _findentry(name,drive,entry,found,last);
+ 200  4225       if found and (not last) and
+ 201  4234         ((scyclus=0) or (scyclus=FILCYC)) then begin
+ 202  4253         for ii:=0 to 15 do begin
+ 203  4273           savename[ii]:=name[ii];
+ 204  4281           name[ii]:=FILNAM[ii];
+ 205  4300         end;
+ 206  4306         cyclus:=FILCYC;
+ 207  4324         copyfile;
+ 208  4332         fcount:=fcount+1;
+ 209  4338         for ii:=0 to 15 do
+ 210  4351           name[ii]:=savename[ii];
+ 211  4368       end;
+ 212  4390     end;
+ 213  4390       if fcount=0 then writeln('No files copied')
+ 214  4419       else writeln(fcount, ' files copied');
+ 215  4453   end else
+ 216  4453     copyfile;
+ 217  4460 end.
+ 218  4460 
+Code length:           4459
+Compiler stack size:   94
+Ident stack size:      118/256

@@ -535,10 +535,15 @@ end;
 proc loadscore;
 var f:file;
 begin
+  IOCHECK := false;
+  FILERR := 0;
   _strfio('LADDERSCORE:B',0,1);
   openr(f);
-  if not _readint(f,score) then score:=0;
+  if (FILERR<>0) then
+  writeln(INVVID,'No stored score available',NORVID)
+  else if not _readint(f,score) then score:=0;
   close(f);
+  IOCHECK := true;
 end;
 
 func exkey(key:char):boolean;

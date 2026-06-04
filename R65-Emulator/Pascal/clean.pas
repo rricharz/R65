@@ -32,7 +32,6 @@ mem   filtyp  =$0300: char&;
       filsiz  =$0315: integer;
       fillnk  =$031e: integer;
       scyfc   =$037c: integer&;
-      filerr  =$db: integer&;
 
 var default, quiet: boolean;
     drive,index,i,ti,maxlen,nument,sfree,
@@ -153,9 +152,9 @@ begin { mani }
          name[i]:=nametab[16*ti+i];
          _asetfile(name,cyctab[ti],drive,
                ' ');
-      filerr:=0;
+      FILERR:=0;
       call(adelete);
-      if filerr<>0 then bcderror(filerr);
+      if FILERR<>0 then bcderror(FILERR);
       sfound:=sfound+sizetab[ti];
     end
   end;

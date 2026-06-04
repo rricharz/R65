@@ -23,8 +23,7 @@ const MAXLINES = 13;
       sblock=$6000;
       eblock=TOPMEM;
 
-mem   filerr=$db: integer&;
-      filsa=$031a,
+mem   filsa=$031a,
       filea=$031c,
       filsa1=$0331: integer;
       filtyp=$0300: char&;
@@ -67,7 +66,7 @@ begin
   filsa:=lowlim;
   filsa1:=lowlim;
   filtyp:='B';
-  filerr:=0;
+  FILERR:=0;
   FILFLG := $40;
   call(rdfile);
 end {blockload};
@@ -83,7 +82,7 @@ begin
   filea:=highlim;
   filsa1:=lowlim;
   filtyp:='B';
-  filerr:=0;
+  FILERR:=0;
   call(wrfile);
 end {blocksave};
 
@@ -106,9 +105,9 @@ begin
       blockload(sblock);
       _write_label;
       write('=');
-      if ord(filerr)<>0 then
+      if FILERR<>0 then
         begin
-          error(filerr);
+          error(FILERR);
           ENDSTK:=TOPMEM-144; {_release memory}
           _abort;
         end;
@@ -121,8 +120,8 @@ begin
       cyclus:=FILCYC;
       FILDRV:=ddrive;
       blocksave(sblock,filea);
-      if ord(filerr)<>0 then
-          error(filerr);
+      if FILERR<>0 then
+          error(FILERR);
       ENDSTK:=TOPMEM-144; {_release memory}
       writeln;
     end

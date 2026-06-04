@@ -18,9 +18,7 @@ uses syslib, arglib, filelib;
 const
     ECIMPORT = 2;
 
-mem filerr = $db: integer&;
-
-var cyclus,drive,free: integer;
+    var cyclus,drive,free: integer;
     name: array[15] of char;
     default: boolean;
 
@@ -56,8 +54,8 @@ begin { main }
   _agetstring(name,default,cyclus,drive);
   setsubtype('P');
   _asetfile(name,cyclus,drive,' ');
-  filerr := _emulator(ECIMPORT);
-  if filerr<>0 then bcderror(filerr);
+  FILERR := _emulator(ECIMPORT);
+  if FILERR<>0 then bcderror(FILERR);
   _write_label;
   writeln('+')
   free:=_freedrv(FILDRV,true);

@@ -85,9 +85,8 @@ var   i: integer;
   end;
 
   proc checkfilerr;
-  mem filerr = $db: integer&;
   begin
-    if filerr<>0 then begin
+    if FILERR<>0 then begin
       writeln(INVVID,'Directory read error',NORVID);
       _abort;
     end;

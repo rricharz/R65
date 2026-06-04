@@ -51,6 +51,7 @@ const
 mem
   { The & below is required for 8-bit }
   RUNERR   = $000c: integer&;
+  FILERR   = $00db: integer&;
   ENDSTK   = $000e: integer;
   IOCHECK  = $0023: boolean&;
   CURPOS   = $00ee: integer&;
@@ -235,6 +236,14 @@ begin
     if neg then n:=-n;
     _readint:=digit
   end
+end;
+
+func _isesc:boolean;
+{*****************}
+mem SFLAG=$1781:integer&;
+begin
+  _isesc:=((SFLAG and $80) <> 0);
+  SFLAG:=SFLAG and $7f;
 end;
 
 begin {main}

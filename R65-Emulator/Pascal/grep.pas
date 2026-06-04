@@ -3,8 +3,6 @@ uses syslib,arglib,strlib,filelib,wildlib;
 
 const DEBUG = false;
 
-mem filerr = $00db: integer&;
-
 var pattern, fullname, line: cpnt;
     filespec:                array[15] of char;
     cyclus, drive,
@@ -137,7 +135,7 @@ begin { main }
   entry := 0;
   while (entry<NUMENTRIES) and not last do begin
     _findentry(filespec, drive, entry, found, last);
-    if filerr<>0 then begin
+    if FILERR<>0 then begin
       writeln('Error while reading directory');
       last:=true;
     end;
@@ -158,13 +156,14 @@ begin { main }
       FILCY1 := FILCYC;
       FILFLG := 0;
       openr(f0);
-      if filerr <> 0 then
+      if FILERR <> 0 then
         writeln('Cannot open file')
       else begin
         grep_in_file(fullname, f0);
         close(f0);
         end;
     end;
+    if _isesc then last := true;
   end;
 
 end.

@@ -25,251 +25,250 @@
   25     4 
   26     4 program paint;
   27     4 uses syslib,arglib,wildlib,plotlib,strlib,filelib;
-  28  5604 
-  29  5604 const startcanvas=$700; sizecanvas=3304; {224x118/8}
-  30  5607       rdfile=$e815; wrfile=$e81b;
-  31  5607       toggle=chr($0c); {ctrl-l}
-  32  5607       cleft=chr($03); cright=chr($16);
-  33  5607       cup=chr($1a); cdown=chr($18); esc=chr(0);
-  34  5607       dreset=0; dline=1; drect=2; dchar=3;
-  35  5607 
-  36  5607 mem   FILFLG=$da:   char&;
-  37  5607       filerr=$db:   integer&;
-  38  5607       filsa=$031a:  integer;
-  39  5607       filea=$031c:  integer;
-  40  5607       filsa1=$0331: integer;
-  41  5607       filtyp=$0300: char&;
-  42  5607 
-  43  5607 var cyclus,drive:integer;
-  44  5607     x,y,cmode,startx,starty:integer;
-  45  5607     name:array[15] of char;
-  46  5607     ch:char;
-  47  5607     dmode:integer;
-  48  5607 
-  49  5607 proc forcesubtype(subtype:char);
-  50  5607 var i:integer;
-  51  5610 begin
-  52  5610   i:=0;
-  53  5614   repeat
-  54  5618     i:=i+1;
-  55  5624   until (name[i]=':') or
-  56  5640     (name[i]=' ') or (i>=14);
-  57  5659   name[i]:=':';
-  58  5669   name[i+1]:=subtype;
-  59  5680 end;
-  60  5688 
-  61  5689 proc loadcanvas;
-  62  5689 var entry: integer;
-  63  5692     last,found,default:  boolean;
-  64  5692 begin
-  65  5692   cyclus:=0; drive:=1;
-  66  5702   _agetstring(name,default,cyclus,drive);
-  67  5746   if default then begin
-  68  5750     _grend;
-  69  5757     writeln(INVVID,'No file specified',NORVID);
-  70  5787     writeln('Usage: PAINT filename');
-  71  5815     _abort;
-  72  5819   end;
-  73  5819   { check whether file exists, wildcards allowed }
-  74  5819   entry:=0;
-  75  5821   forcesubtype('I');
-  76  5833   _findentry(name,drive,entry,found,last);
-  77  5879   if (not found) or last then exit;
-  78  5893   _asetfile(name,cyclus,drive,'I');
-  79  5915   FILFLG:=chr($40); { silent load }
-  80  5922   filsa:=startcanvas;
-  81  5925   filea:=startcanvas+sizecanvas;
-  82  5935   filsa1:=startcanvas;
-  83  5943   filtyp:='I';
-  84  5949   filerr:=0;
-  85  5956   call(rdfile);
-  86  5964   writeln;
-  87  5964   if filerr<>0 then
-  88  5975     writeln(INVVID,'File error ',filerr shr 4,
-  89  5999       filerr and 15,NORVID);
-  90  6017 end;
-  91  6017 
-  92  6018 proc savecanvas;
-  93  6018 { save the canvas on disk }
-  94  6018 begin
-  95  6018   _asetfile(name,cyclus,drive,'I');
-  96  6045   FILFLG:=chr($40); { silent store }
-  97  6052   filsa:=startcanvas;
-  98  6055   filea:=startcanvas+sizecanvas;
-  99  6065   filsa1:=startcanvas;
- 100  6073   filtyp:='I';
- 101  6079   filerr:=0;
- 102  6086   call(wrfile);
- 103  6094   if filerr<>0 then
- 104  6099     writeln(INVVID,'File error ',filerr shr 4,
- 105  6123       filerr and 15,NORVID);
- 106  6141 end;
- 107  6141 
- 108  6142 proc showcursor(ax,ay:integer);
- 109  6142 var i:integer;
- 110  6145 begin
- 111  6145   case dmode of
- 112  6147     dreset: begin
- 113  6158               _plot(ax,ay,INVERSE);
- 114  6174             end;
- 115  6174     dline:  begin
- 116  6184               _move(startx,starty);
- 117  6198               _draw(x,y,INVERSE);
- 118  6214             end;
- 119  6214     drect:  begin
- 120  6224               _move(startx,starty);
- 121  6238               _draw(x,starty,INVERSE);
- 122  6254               _draw(x,y,INVERSE);
- 123  6270               _draw(startx,y,INVERSE);
- 124  6286               _draw(startx,starty,INVERSE);
- 125  6302             end;
- 126  6302     dchar: begin
- 127  6312                if (x>XSIZE-8) then x:=XSIZE-8;
- 128  6329                if (y<2) then y:=2;
- 129  6346                if (y>YSIZE-9) then y:=y-9;
- 130  6369                _move(x+2,y-2);
- 131  6394                _draw(x+8,y-2,INVERSE);
- 132  6416              end
- 133  6416   end {case};
- 134  6418 end;
- 135  6418 
- 136  6419 proc blink;
- 137  6419 const bcount=50; { 50x10 msec interval for blinking }
- 138  6422 mem sflag=$1781:integer&;
- 139  6422 var count:integer;
- 140  6422     displayed:boolean;
- 141  6422 begin
- 142  6422   count:=0; { start with cursor on }
- 143  6430   displayed:=false;
- 144  6432   repeat
- 145  6436     ch:=KEYPRESSED; { sleeps for 10 msec }
- 146  6444     count:=count-1;
- 147  6450     if count<=0 then begin
- 148  6462       showcursor(x,y);
- 149  6479       displayed:=not displayed;
- 150  6479       count:=bcount;
- 151  6490     end;
- 152  6494   { sflag bit 8 is escape flag. Pass it through }
- 153  6494   until (ord(ch)<>0) or ((sflag and $80)<>0);
- 154  6511   read(@KEY,ch);
- 155  6523   sflag:=sflag and $7f; { clear escape flag }
- 156  6536   if displayed then showcursor(x,y);
- 157  6557 end;
- 158  6557 
- 159  6558 proc drawline;
- 160  6558 begin
- 161  6558   _move(startx,starty); _draw(x,y,cmode);
- 162  6595   startx:=x; starty:=y;
- 163  6603 end;
- 164  6611 
- 165  6612 proc drawrect;
- 166  6612 begin
- 167  6612    _move(startx,starty);
- 168  6631    _draw(x,starty,cmode);
- 169  6649    _draw(x,y,cmode);
- 170  6667    _draw(startx,y,cmode);
- 171  6685    _draw(startx,starty,cmode);
- 172  6703 end;
- 173  6703 
- 174  6704 proc drawchar;
- 175  6704 begin
- 176  6704   _move(x,y); write(@PLOTDEV,ch);
- 177  6732   x:=x+8;
- 178  6738   if (x>XSIZE-8) then begin
- 179  6753     x:=0; y:=y-10;
- 180  6768     if y<2 then y:=YSIZE-10;
- 181  6787   end;
- 182  6792 end;
- 183  6792 
- 184  6793 func printable:boolean;
- 185  6793 var a:integer;
- 186  6796 begin
- 187  6796   a:=ord(ch);
- 188  6802   if (a>ord('Z')) then a:=a-32;
- 189  6822   printable:=(a>=ord('A')) and (a<=ord('Z'));
- 190  6841 end;
- 191  6846 
- 192  6847 proc paint;
- 193  6847 { This is the main painting loop }
- 194  6847 begin
- 195  6847   x:=XSIZE div 2; y:=YSIZE div 2;
- 196  6865   cmode:=WHITE; dmode:=dreset;
- 197  6878   writeln('Drawing point mode');
- 198  6907   repeat
- 199  6907     blink; { blink cursor and get next KEY }
- 200  6911     if (dmode=dchar) and printable then drawchar
- 201  6925     else case ch of
- 202  6935       toggle: write(ch);
- 203  6951       cleft:  if x>0 then x:=x-1;
- 204  6977       cright: if x<XSIZE then x:=x+1;
- 205  7008       cup:    if (y<YSIZE) then y:=y+1;
- 206  7039       cdown:  if (y>0) then y:=y-1;
- 207  7070       'C':    _cleargr;
- 208  7089       'M':    begin
- 209  7099                 cmode:=cmode+1;
- 210  7105                 if cmode>2 then cmode:=0;
- 211  7122                 case cmode of
- 212  7126                   WHITE: writeln('Drawing WHITE');
- 213  7157                   BLACK: writeln('Drawing BLACK');
- 214  7187                   INVERSE: writeln('Drawing INVERSE')
- 215  7213                 end {case};
- 216  7221               end;
- 217  7221       'P':    begin
- 218  7231                 writeln('Drawing point mode');
- 219  7256                 _plot(x,y,cmode);
- 220  7274                 x:=x+1;
- 221  7280                 if x>XSIZE then x:=0;
- 222  7297               end;
- 223  7301       'L':    begin
- 224  7311                 writeln('Drawing line mode');
- 225  7335                 if dmode=dline then drawline;
- 226  7349                 startx:=x; starty:=y;
- 227  7357                 dmode:=dline;
- 228  7367                 x:=x+4; {minimum size for visibility}
- 229  7382                 y:=y+4;
- 230  7388                 if x>XSIZE then x:=x-4;
- 231  7409                 if y>YSIZE then y:=y-4;
- 232  7430               end;
- 233  7435       'R':    begin
- 234  7445                 writeln('Drawing rectange mode');
- 235  7473                 if dmode=drect then drawrect;
- 236  7487                 startx:=x; starty:=y;
- 237  7495                 dmode:=drect;
- 238  7505                 x:=x+4; {minimum size for visibility}
- 239  7520                 y:=y+4;
- 240  7526                 if x>XSIZE then x:=XSIZE-4;
- 241  7545                 if y>YSIZE then y:=YSIZE-4;
- 242  7564               end;
- 243  7569       'S':    begin
- 244  7579                 writeln('Drawing character mode');
- 245  7608                 dmode:=dchar;
- 246  7610                 startx:=x; starty:=y;
- 247  7622               end;
- 248  7630       CR:     begin
- 249  7640                  case dmode of
- 250  7640                    dline:   drawline;
- 251  7655                    drect:   drawrect;
- 252  7669                    dchar:   drawchar
- 253  7679                 end {case};
- 254  7685                 dmode:=dreset;
- 255  7687                 writeln('Drawing point mode');
- 256  7716              end;
- 257  7716       esc:   dmode:=dreset;
- 258  7728       'W','Q':  begin
- 259  7749                 writeln('saving canvas');
- 260  7769                 savecanvas;
- 261  7773              end
- 262  7773     end; {case}
- 263  7775   until (ch='Q') or (ch='K');
- 264  7789 end;
- 265  7793 
- 266  7794 begin
- 267  7794   _grinit; _cleargr; _fullview;
- 268  7808   loadcanvas;
- 269  7812   paint;
- 270  7816   _grend;
- 271  7820 end.
- 272  7820 
-Code length:            7819
-Compiler stack size:     147
-Ident stack size:        164
+  28  6002 
+  29  6002 const startcanvas=$700; sizecanvas=3304; {224x118/8}
+  30  6005       rdfile=$e815; wrfile=$e81b;
+  31  6005       toggle=chr($0c); {ctrl-l}
+  32  6005       cleft=chr($03); cright=chr($16);
+  33  6005       cup=chr($1a); cdown=chr($18); esc=chr(0);
+  34  6005       dreset=0; dline=1; drect=2; dchar=3;
+  35  6005 
+  36  6005 mem   FILFLG=$da:   char&;
+  37  6005       filsa=$031a:  integer;
+  38  6005       filea=$031c:  integer;
+  39  6005       filsa1=$0331: integer;
+  40  6005       filtyp=$0300: char&;
+  41  6005 
+  42  6005 var cyclus,drive:integer;
+  43  6005     x,y,cmode,startx,starty:integer;
+  44  6005     name:array[15] of char;
+  45  6005     ch:char;
+  46  6005     dmode:integer;
+  47  6005 
+  48  6005 proc forcesubtype(subtype:char);
+  49  6005 var i:integer;
+  50  6008 begin
+  51  6008   i:=0;
+  52  6012   repeat
+  53  6016     i:=i+1;
+  54  6022   until (name[i]=':') or
+  55  6038     (name[i]=' ') or (i>=14);
+  56  6057   name[i]:=':';
+  57  6067   name[i+1]:=subtype;
+  58  6078 end;
+  59  6086 
+  60  6087 proc loadcanvas;
+  61  6087 var entry: integer;
+  62  6090     last,found,default:  boolean;
+  63  6090 begin
+  64  6090   cyclus:=0; drive:=1;
+  65  6100   _agetstring(name,default,cyclus,drive);
+  66  6144   if default then begin
+  67  6148     _grend;
+  68  6155     writeln(INVVID,'No file specified',NORVID);
+  69  6185     writeln('Usage: PAINT filename');
+  70  6213     _abort;
+  71  6217   end;
+  72  6217   { check whether file exists, wildcards allowed }
+  73  6217   entry:=0;
+  74  6219   forcesubtype('I');
+  75  6231   _findentry(name,drive,entry,found,last);
+  76  6277   if (not found) or last then exit;
+  77  6291   _asetfile(name,cyclus,drive,'I');
+  78  6313   FILFLG:=chr($40); { silent load }
+  79  6320   filsa:=startcanvas;
+  80  6323   filea:=startcanvas+sizecanvas;
+  81  6333   filsa1:=startcanvas;
+  82  6341   filtyp:='I';
+  83  6347   FILERR:=0;
+  84  6354   call(rdfile);
+  85  6362   writeln;
+  86  6362   if FILERR<>0 then
+  87  6373     writeln(INVVID,'File error ',FILERR shr 4,
+  88  6397       FILERR and 15,NORVID);
+  89  6415 end;
+  90  6415 
+  91  6416 proc savecanvas;
+  92  6416 { save the canvas on disk }
+  93  6416 begin
+  94  6416   _asetfile(name,cyclus,drive,'I');
+  95  6443   FILFLG:=chr($40); { silent store }
+  96  6450   filsa:=startcanvas;
+  97  6453   filea:=startcanvas+sizecanvas;
+  98  6463   filsa1:=startcanvas;
+  99  6471   filtyp:='I';
+ 100  6477   FILERR:=0;
+ 101  6484   call(wrfile);
+ 102  6492   if FILERR<>0 then
+ 103  6497     writeln(INVVID,'File error ',FILERR shr 4,
+ 104  6521       FILERR and 15,NORVID);
+ 105  6539 end;
+ 106  6539 
+ 107  6540 proc showcursor(ax,ay:integer);
+ 108  6540 var i:integer;
+ 109  6543 begin
+ 110  6543   case dmode of
+ 111  6545     dreset: begin
+ 112  6556               _plot(ax,ay,INVERSE);
+ 113  6572             end;
+ 114  6572     dline:  begin
+ 115  6582               _move(startx,starty);
+ 116  6596               _draw(x,y,INVERSE);
+ 117  6612             end;
+ 118  6612     drect:  begin
+ 119  6622               _move(startx,starty);
+ 120  6636               _draw(x,starty,INVERSE);
+ 121  6652               _draw(x,y,INVERSE);
+ 122  6668               _draw(startx,y,INVERSE);
+ 123  6684               _draw(startx,starty,INVERSE);
+ 124  6700             end;
+ 125  6700     dchar: begin
+ 126  6710                if (x>XSIZE-8) then x:=XSIZE-8;
+ 127  6727                if (y<2) then y:=2;
+ 128  6744                if (y>YSIZE-9) then y:=y-9;
+ 129  6767                _move(x+2,y-2);
+ 130  6792                _draw(x+8,y-2,INVERSE);
+ 131  6814              end
+ 132  6814   end {case};
+ 133  6816 end;
+ 134  6816 
+ 135  6817 proc blink;
+ 136  6817 const bcount=50; { 50x10 msec interval for blinking }
+ 137  6820 mem sflag=$1781:integer&;
+ 138  6820 var count:integer;
+ 139  6820     displayed:boolean;
+ 140  6820 begin
+ 141  6820   count:=0; { start with cursor on }
+ 142  6828   displayed:=false;
+ 143  6830   repeat
+ 144  6834     ch:=KEYPRESSED; { sleeps for 10 msec }
+ 145  6842     count:=count-1;
+ 146  6848     if count<=0 then begin
+ 147  6860       showcursor(x,y);
+ 148  6877       displayed:=not displayed;
+ 149  6877       count:=bcount;
+ 150  6888     end;
+ 151  6892   { sflag bit 8 is escape flag. Pass it through }
+ 152  6892   until (ord(ch)<>0) or ((sflag and $80)<>0);
+ 153  6909   read(@KEY,ch);
+ 154  6921   sflag:=sflag and $7f; { clear escape flag }
+ 155  6934   if displayed then showcursor(x,y);
+ 156  6955 end;
+ 157  6955 
+ 158  6956 proc drawline;
+ 159  6956 begin
+ 160  6956   _move(startx,starty); _draw(x,y,cmode);
+ 161  6993   startx:=x; starty:=y;
+ 162  7001 end;
+ 163  7009 
+ 164  7010 proc drawrect;
+ 165  7010 begin
+ 166  7010    _move(startx,starty);
+ 167  7029    _draw(x,starty,cmode);
+ 168  7047    _draw(x,y,cmode);
+ 169  7065    _draw(startx,y,cmode);
+ 170  7083    _draw(startx,starty,cmode);
+ 171  7101 end;
+ 172  7101 
+ 173  7102 proc drawchar;
+ 174  7102 begin
+ 175  7102   _move(x,y); write(@PLOTDEV,ch);
+ 176  7130   x:=x+8;
+ 177  7136   if (x>XSIZE-8) then begin
+ 178  7151     x:=0; y:=y-10;
+ 179  7166     if y<2 then y:=YSIZE-10;
+ 180  7185   end;
+ 181  7190 end;
+ 182  7190 
+ 183  7191 func printable:boolean;
+ 184  7191 var a:integer;
+ 185  7194 begin
+ 186  7194   a:=ord(ch);
+ 187  7200   if (a>ord('Z')) then a:=a-32;
+ 188  7220   printable:=(a>=ord('A')) and (a<=ord('Z'));
+ 189  7239 end;
+ 190  7244 
+ 191  7245 proc paint;
+ 192  7245 { This is the main painting loop }
+ 193  7245 begin
+ 194  7245   x:=XSIZE div 2; y:=YSIZE div 2;
+ 195  7263   cmode:=WHITE; dmode:=dreset;
+ 196  7276   writeln('Drawing point mode');
+ 197  7305   repeat
+ 198  7305     blink; { blink cursor and get next KEY }
+ 199  7309     if (dmode=dchar) and printable then drawchar
+ 200  7323     else case ch of
+ 201  7333       toggle: write(ch);
+ 202  7349       cleft:  if x>0 then x:=x-1;
+ 203  7375       cright: if x<XSIZE then x:=x+1;
+ 204  7406       cup:    if (y<YSIZE) then y:=y+1;
+ 205  7437       cdown:  if (y>0) then y:=y-1;
+ 206  7468       'C':    _cleargr;
+ 207  7487       'M':    begin
+ 208  7497                 cmode:=cmode+1;
+ 209  7503                 if cmode>2 then cmode:=0;
+ 210  7520                 case cmode of
+ 211  7524                   WHITE: writeln('Drawing WHITE');
+ 212  7555                   BLACK: writeln('Drawing BLACK');
+ 213  7585                   INVERSE: writeln('Drawing INVERSE')
+ 214  7611                 end {case};
+ 215  7619               end;
+ 216  7619       'P':    begin
+ 217  7629                 writeln('Drawing point mode');
+ 218  7654                 _plot(x,y,cmode);
+ 219  7672                 x:=x+1;
+ 220  7678                 if x>XSIZE then x:=0;
+ 221  7695               end;
+ 222  7699       'L':    begin
+ 223  7709                 writeln('Drawing line mode');
+ 224  7733                 if dmode=dline then drawline;
+ 225  7747                 startx:=x; starty:=y;
+ 226  7755                 dmode:=dline;
+ 227  7765                 x:=x+4; {minimum size for visibility}
+ 228  7780                 y:=y+4;
+ 229  7786                 if x>XSIZE then x:=x-4;
+ 230  7807                 if y>YSIZE then y:=y-4;
+ 231  7828               end;
+ 232  7833       'R':    begin
+ 233  7843                 writeln('Drawing rectange mode');
+ 234  7871                 if dmode=drect then drawrect;
+ 235  7885                 startx:=x; starty:=y;
+ 236  7893                 dmode:=drect;
+ 237  7903                 x:=x+4; {minimum size for visibility}
+ 238  7918                 y:=y+4;
+ 239  7924                 if x>XSIZE then x:=XSIZE-4;
+ 240  7943                 if y>YSIZE then y:=YSIZE-4;
+ 241  7962               end;
+ 242  7967       'S':    begin
+ 243  7977                 writeln('Drawing character mode');
+ 244  8006                 dmode:=dchar;
+ 245  8008                 startx:=x; starty:=y;
+ 246  8020               end;
+ 247  8028       CR:     begin
+ 248  8038                  case dmode of
+ 249  8038                    dline:   drawline;
+ 250  8053                    drect:   drawrect;
+ 251  8067                    dchar:   drawchar
+ 252  8077                 end {case};
+ 253  8083                 dmode:=dreset;
+ 254  8085                 writeln('Drawing point mode');
+ 255  8114              end;
+ 256  8114       esc:   dmode:=dreset;
+ 257  8126       'W','Q':  begin
+ 258  8147                 writeln('saving canvas');
+ 259  8167                 savecanvas;
+ 260  8171              end
+ 261  8171     end; {case}
+ 262  8173   until (ch='Q') or (ch='K');
+ 263  8187 end;
+ 264  8191 
+ 265  8192 begin
+ 266  8192   _grinit; _cleargr; _fullview;
+ 267  8206   loadcanvas;
+ 268  8210   paint;
+ 269  8214   _grend;
+ 270  8218 end.
+ 271  8218 
+Code length:           8217
+Compiler stack size:   166
+Ident stack size:      169/256

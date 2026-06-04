@@ -13,8 +13,6 @@ library striolib;
 
 const
     NAMESIZE = 15;
-mem
-    filerr  =$00db: integer&;
 
 proc _checkfilerr;
 {****************}
@@ -23,13 +21,13 @@ const
     NORVID   = chr($0b);  {normal video}
     INVVID   = chr($0e);  {inverse video}
     STOP=$2010;
-mem
+mem FILERR=$00db: integer&;
     RUNERR=$000c: integer&;
     FILNM1  = $0320: array[NAMESIZE] of char&;
 var i: integer;
 begin
-  if filerr<>0 then begin
-    write(INVVID,'File Error ', filerr,
+  if FILERR<>0 then begin
+    write(INVVID,'File Error ', FILERR,
     ' in file ');
     for i := 0 to 15 do
       write(FILNM1[i]);

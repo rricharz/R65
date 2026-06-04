@@ -25,7 +25,7 @@ const aprepdo  = $f4a7;
       TSECTORS = 2560;   {number of sectors on disk }
       TEND     = chr(0); {end mark last used entry  }
 
-mem   filerr   = $00db:integer&;
+mem
       filtyp   = $0300:char&;
       filloc   = $0313:integer;
       filsiz   = $0315:integer;
@@ -38,7 +38,7 @@ var entry, sector,drive: integer;
 proc checkfilerr;
 {***************}
 begin
-  if filerr<>0 then begin
+  if FILERR<>0 then begin
     call(aenddo);
     writeln(INVVID,'Cannot read directory',NORVID);
     _abort;
@@ -62,7 +62,7 @@ var i:integer;
 { get drive number, default drive 1 }
 begin
   drive:=1; {default drive}
-  filerr:=0;
+  FILERR:=0;
   if ARGTYPE[_carg]='i' then _agetval(drive,default);
   if (drive<0) or (drive>1) then begin
     writeln(INVVID,'Drive must be 0 or 1',NORVID);

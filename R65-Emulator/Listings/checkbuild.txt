@@ -9,151 +9,151 @@
    9     4 
   10     4 program checkbuild;
   11     4 uses syslib;
-  12   892 { minimized library calls to save memory }
-  13   892 
-  14   892 mem
-  15   892   FILFLG  = $00da: integer&;
-  16   895   FILERR  = $db:   integer&;
-  17   895   FILDRV  = $00dc: integer&;
-  18   895   FILTYP  = $0300:char&;
-  19   895   FILNAM  = $0301: array[15] of char&;
-  20   895   FILCYC  = $0311: integer&;
-  21   895   FILSTP  = $0312: char&;
-  22   895   FILNM1  = $0320: array[15] of char&;
-  23   895   FILCY1  = $0330: integer&;
-  24   895 
-  25   895   ARGLIST  = $0060: array[10] of integer;
-  26   895   ARGLISTS = $0060: array[63] of char&;
-  27   895   ARGTYPE  = $00a0: array[31] of char&;
-  28   895 
-  29   895 var
-  30   895   entry, cyclus, drive: integer;
-  31   895   i, errors, files:     integer;
-  32   895   done, deleted:        boolean;
-  33   895   name:                 array[15] of char;
-  34   895 
-  35   895 func hex(i8: integer): packed char;
-  36   895 {*********************************}
-  37   895 var hi, lo: integer;
-  38   898     c1, c2: char;
-  39   898 begin
-  40   898   hi := (i8 shr 4) and $0f;
-  41   909   lo := i8 and $0f;
-  42   920   if hi < 10 then c1 := chr(ord('0') + hi)
-  43   937              else c1 := chr(ord('A') + hi - 10);
-  44   960   if lo < 10 then c2 := chr(ord('0') + lo)
-  45   977              else c2 := chr(ord('A') + lo - 10);
-  46  1000   hex := packed(c1, c2);
-  47  1014 end;
-  48  1018 
-  49  1019 proc runprog(name0: array[15] of char;
-  50  1019              cyc: integer; drv: integer);
-  51  1019 {****************************************}
-  52  1019 var ii: integer;
-  53  1022 begin
-  54  1022   RUNERR:=0;
-  55  1026   for ii:=0 to 15 do FILNM1[ii]:=name0[ii];
-  56  1055   FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
-  57  1099   run
-  58  1103 end;
-  59  1104 
-  60  1105 proc setargs(name0:array[15] of char;
-  61  1105              carg,cyc,drv:integer);
-  62  1105 {**********************************}
-  63  1105 var k9:integer;
-  64  1108 begin
-  65  1108   ARGTYPE[carg] :='s';
-  66  1116   for k9:=0 to 7 do
-  67  1130     ARGLIST[carg+k9]:=
-  68  1148       ord(packed(name0[2*k9+1], name0[2*k9]));
-  69  1174   ARGTYPE[carg+8]:='i';
-  70  1205   ARGLIST[carg+8]:=cyc;
-  71  1218   ARGTYPE[carg+9]:='i';
-  72  1239   ARGLIST[carg+9]:=drv;
-  73  1252   ARGTYPE[carg+10]:=chr(0);
-  74  1273 end;
-  75  1280 
-  76  1281 func getentry(drv0, ent0: integer;
-  77  1281               var deleted0: boolean): boolean;
-  78  1281 {********************************************}
-  79  1281 const
-  80  1281   agetentx = $f63a;
-  81  1284   aenddo   = $f625;
-  82  1284 mem
-  83  1284   filtyp   = $0300: char&;
-  84  1284   fillnk   = $031e: integer;
-  85  1284   scyfc    = $037c: integer&;
-  86  1284 
-  87  1284 begin
-  88  1284   scyfc := ent0;
-  89  1286   FILDRV:= drive;
-  90  1295   call(agetentx);
-  91  1307   if FILERR <> 0 then begin
-  92  1313     writeln(INVVID, 'Error: Cannot read directory',
-  93  1348             NORVID);
-  94  1357     _abort;
-  95  1361   end;
-  96  1361   if filtyp = chr(0) then begin { end mark }
-  97  1372     getentry := false;
-  98  1374     call(aenddo);
-  99  1382     getentry := false;
- 100  1384     exit;
- 101  1389   end;
- 102  1389   deleted0 := (fillnk and $80) = $80;
- 103  1398   call(aenddo);
- 104  1407   getentry := true;
- 105  1409 end;
- 106  1413 
- 107  1414 begin {main}
- 108  1414 {*********}
- 109  1414   entry  := 0;
- 110  1418   drive  := 1;
- 111  1424   errors := 0;
- 112  1430   files  := 0;
- 113  1436 
- 114  1440   repeat
- 115  1440     done := not getentry(drive, entry, deleted);
- 116  1464 {   writeln('deleted= ', deleted,
- 117  1469            ' done= ',done); }
- 118  1469     if (not (deleted or done)) and
- 119  1479         (FILSTP = 'P') then begin
- 120  1487       name := '                ';
- 121  1508       i := 0;
- 122  1516       writeln(@PRINTER);
- 123  1530       write(PRTON);
- 124  1533       { compile1 requires name without subtype }
- 125  1533       while (i<=15) and  (FILNAM[i]<>':') do begin
- 126  1556         name[i] := FILNAM[i];
- 127  1567         write(name[i]);
- 128  1582         i := i + 1;
- 129  1588       end;
- 130  1593       writeln(':P.', hex(FILCYC));
- 131  1623       cyclus := FILCYC;
- 132  1627       setargs(name,0, cyclus, 1);
- 133  1651       setargs('/N              ', 10, 0, 1);
- 134  1681       runprog('COMPILE:R       ', 0, 0);
- 135  1709       files := files + 1;
- 136  1715       { runprog('ARGLIST:R       ', 0, 0); }
- 137  1720       if (RUNERR > 0) and (RUNERR <> 135)
- 138  1731         or (FILERR <> 0) then begin
- 139  1740         errors := errors + 1;
- 140  1749         {writeln('RE=',hex(RUNERR),
- 141  1754                ' FE=',hex(FILERR));}
- 142  1754       end;
- 143  1754     end;
- 144  1754     entry := entry + 1;
- 145  1760   until done;
- 146  1765   writeln(PRTON);
- 147  1781   writeln('CHECKBUILD complete, errors: ',errors);
- 148  1822   writeln('Files checked:               ', files);
- 149  1863   if errors > 0 then
- 150  1869     writeln(INVVID,
- 151  1875       'Errors found, check listing for errors',
- 152  1915       NORVID);
- 153  1924   write(PRTOFF);
- 154  1927 
- 155  1927 end.
- 156  1927 
-Code length:            1926
-Compiler stack size:      45
-Ident stack size:         84
+  12   924 { minimized library calls to save memory }
+  13   924 
+  14   924 mem
+  15   924   FILFLG  = $00da: integer&;
+  16   927   FILDRV  = $00dc: integer&;
+  17   927   FILTYP  = $0300:char&;
+  18   927   FILNAM  = $0301: array[15] of char&;
+  19   927   FILCYC  = $0311: integer&;
+  20   927   FILSTP  = $0312: char&;
+  21   927   FILNM1  = $0320: array[15] of char&;
+  22   927   FILCY1  = $0330: integer&;
+  23   927 
+  24   927   ARGLIST  = $0060: array[10] of integer;
+  25   927   ARGLISTS = $0060: array[63] of char&;
+  26   927   ARGTYPE  = $00a0: array[31] of char&;
+  27   927 
+  28   927 var
+  29   927   entry, cyclus, drive: integer;
+  30   927   i, errors, files:     integer;
+  31   927   done, deleted:        boolean;
+  32   927   name:                 array[15] of char;
+  33   927 
+  34   927 func hex(i8: integer): packed char;
+  35   927 {*********************************}
+  36   927 var hi, lo: integer;
+  37   930     c1, c2: char;
+  38   930 begin
+  39   930   hi := (i8 shr 4) and $0f;
+  40   941   lo := i8 and $0f;
+  41   952   if hi < 10 then c1 := chr(ord('0') + hi)
+  42   969              else c1 := chr(ord('A') + hi - 10);
+  43   992   if lo < 10 then c2 := chr(ord('0') + lo)
+  44  1009              else c2 := chr(ord('A') + lo - 10);
+  45  1032   hex := packed(c1, c2);
+  46  1046 end;
+  47  1050 
+  48  1051 proc runprog(name0: array[15] of char;
+  49  1051              cyc: integer; drv: integer);
+  50  1051 {****************************************}
+  51  1051 var ii: integer;
+  52  1054 begin
+  53  1054   RUNERR:=0;
+  54  1058   for ii:=0 to 15 do FILNM1[ii]:=name0[ii];
+  55  1087   FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
+  56  1131   run
+  57  1135 end;
+  58  1136 
+  59  1137 proc setargs(name0:array[15] of char;
+  60  1137              carg,cyc,drv:integer);
+  61  1137 {**********************************}
+  62  1137 var k9:integer;
+  63  1140 begin
+  64  1140   ARGTYPE[carg] :='s';
+  65  1148   for k9:=0 to 7 do
+  66  1162     ARGLIST[carg+k9]:=
+  67  1180       ord(packed(name0[2*k9+1], name0[2*k9]));
+  68  1206   ARGTYPE[carg+8]:='i';
+  69  1237   ARGLIST[carg+8]:=cyc;
+  70  1250   ARGTYPE[carg+9]:='i';
+  71  1271   ARGLIST[carg+9]:=drv;
+  72  1284   ARGTYPE[carg+10]:=chr(0);
+  73  1305 end;
+  74  1312 
+  75  1313 func getentry(drv0, ent0: integer;
+  76  1313               var deleted0: boolean): boolean;
+  77  1313 {********************************************}
+  78  1313 const
+  79  1313   agetentx = $f63a;
+  80  1316   aenddo   = $f625;
+  81  1316 mem
+  82  1316   filtyp   = $0300: char&;
+  83  1316   fillnk   = $031e: integer;
+  84  1316   scyfc    = $037c: integer&;
+  85  1316 
+  86  1316 begin
+  87  1316   scyfc := ent0;
+  88  1318   FILDRV:= drive;
+  89  1327   call(agetentx);
+  90  1339   if FILERR <> 0 then begin
+  91  1345     writeln(INVVID, 'Error: Cannot read directory',
+  92  1380             NORVID);
+  93  1389     _abort;
+  94  1393   end;
+  95  1393   if filtyp = chr(0) then begin { end mark }
+  96  1404     getentry := false;
+  97  1406     call(aenddo);
+  98  1414     getentry := false;
+  99  1416     exit;
+ 100  1421   end;
+ 101  1421   deleted0 := (fillnk and $80) = $80;
+ 102  1430   call(aenddo);
+ 103  1439   getentry := true;
+ 104  1441 end;
+ 105  1445 
+ 106  1446 begin {main}
+ 107  1446 {*********}
+ 108  1446   entry  := 0;
+ 109  1450   drive  := 1;
+ 110  1456   errors := 0;
+ 111  1462   files  := 0;
+ 112  1468 
+ 113  1472   repeat
+ 114  1472     done := not getentry(drive, entry, deleted);
+ 115  1496 {   writeln('deleted= ', deleted,
+ 116  1501            ' done= ',done); }
+ 117  1501     if (not (deleted or done)) and
+ 118  1511         (FILSTP = 'P') then begin
+ 119  1519       name := '                ';
+ 120  1540       i := 0;
+ 121  1548       writeln(@PRINTER);
+ 122  1562       write(PRTON);
+ 123  1565       { compile1 requires name without subtype }
+ 124  1565       while (i<=15) and  (FILNAM[i]<>':') do begin
+ 125  1588         name[i] := FILNAM[i];
+ 126  1599         write(name[i]);
+ 127  1614         i := i + 1;
+ 128  1620       end;
+ 129  1625       writeln(':P.', hex(FILCYC));
+ 130  1655       cyclus := FILCYC;
+ 131  1659       setargs(name,0, cyclus, 1);
+ 132  1683       setargs('/N              ', 10, 0, 1);
+ 133  1713       runprog('COMPILE:R       ', 0, 0);
+ 134  1741       files := files + 1;
+ 135  1747       { runprog('ARGLIST:R       ', 0, 0); }
+ 136  1752       if (RUNERR > 0) and (RUNERR <> 135)
+ 137  1763         or (FILERR <> 0) then begin
+ 138  1772         errors := errors + 1;
+ 139  1781         {writeln('RE=',hex(RUNERR),
+ 140  1786                ' FE=',hex(FILERR));}
+ 141  1786       end;
+ 142  1786     end;
+ 143  1786     entry := entry + 1;
+ 144  1792     if _isesc then done := true;
+ 145  1808   until done;
+ 146  1812   writeln(PRTON);
+ 147  1828   writeln('CHECKBUILD complete, errors: ',errors);
+ 148  1869   writeln('Files checked:               ', files);
+ 149  1910   if errors > 0 then
+ 150  1916     writeln(INVVID,
+ 151  1922       'Errors found, check listing for errors',
+ 152  1962       NORVID);
+ 153  1971   write(PRTOFF);
+ 154  1974 
+ 155  1974 end.
+ 156  1974 
+Code length:           1973
+Compiler stack size:   45
+Ident stack size:      86/256

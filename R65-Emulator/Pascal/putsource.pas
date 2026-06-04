@@ -25,8 +25,6 @@ const afloppy = $c827; { exdos vector }
       CUP    = chr($1a);
       VERBOSE = false;
 
-mem filerr=$db: integer&;
-
 var cyclus,drive,k,dummy,free: integer;
     fname,dname: array[15] of char;
     default,ok: boolean;
@@ -35,7 +33,7 @@ var cyclus,drive,k,dummy,free: integer;
 
 begin
   ok:=true;
-  filerr:=0;
+  FILERR:=0;
   { get the argument (file name) }
   cyclus:=0; drive:=0;
   _agetstring(fname,default,cyclus,drive);
@@ -50,7 +48,7 @@ begin
     cyclus:=0; drive:=1;
     _asetfile('WORK            ',cyclus,drive,' ');
     call(afloppy);
-    if (filerr<>0) then ok:=false;
+    if (FILERR<>0) then ok:=false;
     { make sure that dname is on drive 0 }
     if VERBOSE then begin
       write('Putting disk ');
@@ -60,7 +58,7 @@ begin
     cyclus:=0; drive:=0;
     _asetfile(dname,cyclus,drive,' ');
     call(afloppy);
-    if (filerr<>0) then ok:=false;
+    if (FILERR<>0) then ok:=false;
 { copy the source file }
     if ok then begin
       if VERBOSE then begin
@@ -72,12 +70,12 @@ begin
       ARGTYPE[10]:='i';
       ARGLIST[10]:=0; {copy to drive 0}
       ARGTYPE[11]:=chr(0);
-      cyclus:=0; drive:=0; filerr:=0;
+      cyclus:=0; drive:=0; FILERR:=0;
       _runprog('COPY:R          ',cyclus,drive);
     end;
-    if (filerr<>0) or (RUNERR<>0) then begin
+    if (FILERR<>0) or (RUNERR<>0) then begin
       ok:=false;
-      if filerr=6 then
+      if FILERR=6 then
         writeln(INVVID,
           'Source file not found',NORVID)
       else
@@ -96,11 +94,11 @@ begin
       { delete the source file               }
       if VERBOSE then
         writeln('Deleting source file(s) on WORK');
-      drive:=0; filerr:=0;
+      drive:=0; FILERR:=0;
       setargi(0,8);
       setargs('/Q              ', 10, 0, 0);
       _runprog('DELETE:R        ',cyclus,drive);
-      if (filerr<>0) or (RUNERR<>0) then  begin
+      if (FILERR<>0) or (RUNERR<>0) then  begin
         ok:=false;
         writeln(INVVID,
            'Deleting original failed',NORVID);
@@ -115,9 +113,9 @@ begin
       { clean the destination drive                }
       { setargi(0,0);                              }
       { ARGTYPE[1]:=chr(0);                        }
-      { cyclus:=0; drive:=0; filerr:=0; RUNERR:=0; }
+      { cyclus:=0; drive:=0; FILERR:=0; RUNERR:=0; }
       { _runprog('CLEAN:R         ',cyclus,drive); }
-      { if (filerr<>0) or (RUNERR<>0) then begin   }
+      { if (FILERR<>0) or (RUNERR<>0) then begin   }
       {    ok:=false;                              }
       {    writeln(INVVID,                         }
       {       'Cleaning PSOURCE failed',NORVID);   }
@@ -127,9 +125,9 @@ begin
       { writeln('Packing PSOURCE');                }
       { setargi(0,0);                              }
       { ARGTYPE[1]:=chr(0);                        }
-      { cyclus:=0; drive:=0; filerr:=0;            }
+      { cyclus:=0; drive:=0; FILERR:=0;            }
       { _runprog('PACK:R          ',cyclus,drive); }
-      { if (filerr<>0) or (RUNERR<>0) then         }
+      { if (FILERR<>0) or (RUNERR<>0) then         }
       {  ok:=false;                                }
     end;
 
@@ -139,11 +137,11 @@ begin
     cyclus:=0; drive:=0;
     _asetfile('PASCAL          ',cyclus,drive,' ');
     call(afloppy);
-    if (filerr<>0) then ok:=false;
+    if (FILERR<>0) then ok:=false;
   end;
   if not ok then begin
     writeln(INVVID,'Putsource failed',NORVID);
-    filerr:=0; RUNERR:=0;
+    FILERR:=0; RUNERR:=0;
   end
 end.
 

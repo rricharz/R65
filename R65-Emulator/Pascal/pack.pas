@@ -14,7 +14,6 @@ program pack;
 uses syslib, arglib, filelib;
 
 const apack=$c809; { exdos vector }
-mem filerr=$db: integer&;
 
 var drive,dummy: integer;
     default: boolean;
@@ -35,7 +34,7 @@ begin
   end;
   FILDRV := drive;
   call(apack);
-  if filerr<>0 then bcderror(filerr);
+  if FILERR<>0 then bcderror(FILERR);
   if CURPOS>1 then writeln;
   dummy:=_freedrv(drive,true);
 end.

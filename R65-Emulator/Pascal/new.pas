@@ -25,8 +25,6 @@ uses syslib, arglib, filelib;
 const anew=$c812; { exdos vector }
       cup=chr($1a);
 
-mem filerr=$db: integer&;
-
 var cyclus,drive: integer;
     name: array[15] of char;
     default: boolean;
@@ -72,7 +70,7 @@ begin
     _asetfile(name,cyclus,drive,' ');
     write(cup); { avoid empty line }
     call(anew);
-    if filerr<>0 then bcderror(filerr);
+    if FILERR<>0 then bcderror(FILERR);
     writeln;
   end;
 end.

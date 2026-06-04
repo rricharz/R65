@@ -32,14 +32,17 @@ of drive in the command is ignored       }
 program system;
 uses syslib;
 
+{$U+}
+
 const
   title='R65 PASCAL VERSION 6.0';
   STOPCODE = $2010;
-  MMAXSEQ  = 8;         {max no of seq. files}
+  MMAXSEQ  = 8;     {max no of sequential files}
+
+  CLRSCR   = chr($11);  {clear to end of screen}
 
 mem
   BUFFPN   = $0015: integer&;
-  FILERR   = $00db: integer&;
   FILNAM   = $0301: array[15] of char&;
   FIDRTB   = $0339: array[8] of integer&;
   NUMARG   = $005f: integer&;
@@ -53,7 +56,7 @@ mem
   FILCY1   = $0330: integer&;
 
 var
-  i, m, n: integer;
+  k, m, n: integer;
   ch: char;
   ok: boolean;
   argerr: integer;
@@ -220,7 +223,7 @@ begin {main}
   checkrunerr;
 
   MAXSEQ := MMAXSEQ - 1;
-  for i:=0 to MMAXSEQ-1 do FIDRTB[i]:=0;
+  for k:=0 to MMAXSEQ-1 do FIDRTB[k]:=0;
   clearinput;
   ok:=true;
 
@@ -236,7 +239,7 @@ begin {main}
   cyclus1:=0;
   getfname(runname,'R',ok,drive1,cyclus1);
 
-  for i:=0 to 31 do ARGTYPE[i]:=chr(0);
+  for k:=0 to 31 do ARGTYPE[k]:=chr(0);
 
   if ok then begin
     NUMARG:=0;
@@ -251,13 +254,13 @@ begin {main}
           ARGTYPE[n]:='q';
           if n>23 then argerr:=107
           else begin
-            for i:=0 to 15 do aname[i]:=' ';
-            i:=0;
+            for k:=0 to 15 do aname[k]:=' ';
+            k:=0;
             next;
             while (ch<>'"') and (ch<>CR) do begin
-              if i<=15 then begin
-                aname[i]:=ch;
-                i:=succ(i);
+              if k<=15 then begin
+                aname[k]:=ch;
+                k:=succ(k);
               end else
                 argerr:=106;
               next;
@@ -266,10 +269,10 @@ begin {main}
               argerr:=106
             else
               next;
-            for i:=0 to 7 do
-              ARGLIST[n+i]:=
-                  ord(packed(aname[2*i+1],
-                  aname[2*i]));
+            for k:=0 to 7 do
+              ARGLIST[n+k]:=
+                  ord(packed(aname[2*k+1],
+                  aname[2*k]));
             n:=n+7;
           end
         end
@@ -291,10 +294,10 @@ begin {main}
           ARGTYPE[n]:='s';
           if n>22 then argerr:=107
           else begin
-            for i:=0 to 7 do
-              ARGLIST[n+i]:=
-                    ord(packed(aname[2*i+1],
-                    aname[2*i]));
+            for k:=0 to 7 do
+              ARGLIST[n+k]:=
+                    ord(packed(aname[2*k+1],
+                    aname[2*k]));
             n:=n+7;
           end;
           ARGLIST[n+1]:=cyclus2;
@@ -336,6 +339,7 @@ begin {main}
     write(NORVID)
   end else begin
     clearinput;
+    write(CLRSCR);
     ENDSTK:=TOPMEM-144;
     chainprog(runname,drive1,cyclus1);
   end;

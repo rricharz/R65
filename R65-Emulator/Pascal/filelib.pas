@@ -94,14 +94,14 @@ func _bestmatch: boolean;
 {find the best (highers cyclus) entry in directory}
 const
   preprd = $f62c;
-  mem filerr = $00db: integer&;
+  mem FILERR = $00db: integer&;
 begin
-  filerr := 0;
+  FILERR := 0;
   call(preprd); { find entry with system subroutine }
-  if (filerr = 0) then begin
+  if (FILERR = 0) then begin
     _write_label;
   end;
-  _bestmatch := (filerr = 0);
+  _bestmatch := (FILERR = 0);
 end;
 
 func _freedrv(drive:integer; printit:boolean);

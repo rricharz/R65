@@ -1,185 +1,170 @@
-
-R65 COMPILE 4.8: program CLEAN            29/4/26 page 1
-
-
-   1 (    4) 
-   2 (    4) {         *****************                 }
-   3 (    4) {         *  clean drive  *                 }
-   4 (    4) {         *****************                 }
-   5 (    4) 
-   6 (    4) {    2018 rricharz (r77@bluewin.ch)         }
-   7 (    4) 
-   8 (    4) { Clean disk. Only the latest cyclus of     }
-   9 (    4) { each file is kept. Uses EPROM (disk.asm)  }
-  10 (    4) { calls to get info from disk directory     }
-  11 (    4) { and EXDOS delete.                         }
-  12 (    4) 
-  13 (    4) { Usage:  clean [drive]                     }
-  14 (    4) {         default: drive 1                  }
-  15 (    4) 
-  16 (    4) {$U+}
-  17 (    4) 
-  18 (    4) program clean;
-  19 (    4) uses syslib,arglib, filelib;
-  20 ( 1780) 
-  21 ( 1780) {R65 disk eprom calls and params: }
-  22 ( 1780) const
-  23 ( 1780)       DEBUG = false;
-  24 ( 1783)       aprepdo =$f4a7;
-  25 ( 1783)       agetentx=$f63a;
-  26 ( 1783)       aenddo  =$f625;
-  27 ( 1783)       adelete =$c80c;
-  28 ( 1783) mem   filtyp  =$0300: char&;
-  29 ( 1783)       filcyc  =$0311: integer&;
-  30 ( 1783)       filstp  =$0312: char&;
-  31 ( 1783)       filloc  =$0313: integer;
-  32 ( 1783)       filsiz  =$0315: integer;
-  33 ( 1783)       fillnk  =$031e: integer;
-  34 ( 1783)       scyfc   =$037c: integer&;
-  35 ( 1783)       filerr  =$db: integer&;
-  36 ( 1783) 
-  37 ( 1783) var default, quiet: boolean;
-  38 ( 1783)     drive,index,i,ti,maxlen,nument,sfree,
-  39 ( 1783)     sdel,sfound : integer;
-  40 ( 1783)     { array size = 16 * 256 }
-  41 ( 1783)     nametab     : array[4096] of char;
-  42 ( 1783)     filstptab   : array[255] of char;
-  43 ( 1783)     cyctab      : array[255] of integer;
-  44 ( 1783)     foundtab    : array[255] of boolean;
-  45 ( 1783)     sizetab     : array[255] of integer;
-  46 ( 1783)     name        : array[15] of char;
-  47 ( 1783) 
-  48 ( 1783) proc bcderror(e:integer);
-  49 ( 1783) begin
-  50 ( 1783)   writeln;
-  51 ( 1788)   write(INVVID,'ERROR ');
-  52 ( 1804)   write((e shr 4) and 15);
-  53 ( 1815)   writeln(e and 15,NORVID);
-  54 ( 1832) end;
-  55 ( 1832) 
-  56 ( 1833) func hex(d:integer):char;
-  57 ( 1833) { convert hex digit to hex char }
-  58 ( 1833) begin
-  59 ( 1833)   if (d>=0) and (d<10) then
-
-R65 COMPILE 4.8: program CLEAN            29/4/26 page 2
-
-  60 ( 1852)     hex:=chr(d+ord('0'))
-  61 ( 1862)   else if (d>=10) and (d<16) then
-  62 ( 1885)     hex:=chr(d+ord('A')-10)
-  63 ( 1898)   else hex:='?';
-  64 ( 1909) end;
-  65 ( 1913) 
-  66 ( 1914) proc mark(i3: integer);
-  67 ( 1914) {mark entry for delete}
-  68 ( 1914) var j: integer;
-  69 ( 1917) begin
-  70 ( 1917)   if not quiet then begin
-  71 ( 1924)     write('Deleting ');
-  72 ( 1937)     for j:=0 to maxlen do
-  73 ( 1943)       write(nametab[16*i3+j]);
-  74 ( 1973)     write('.');
-  75 ( 1989)     writeln(hex(cyctab[i3] shr 4),
-  76 ( 2008)             hex(cyctab[i3] and 15));
-  77 ( 2035)   end;
-  78 ( 2035)   foundtab[i3]:=true
-  79 ( 2039) end;
-  80 ( 2045) 
-  81 ( 2046) proc check(i1,i2: integer);
-  82 ( 2046) {check and mark entries for delete}
-  83 ( 2046) var j: integer;
-  84 ( 2049) begin
-  85 ( 2049)   if filstptab[i2]='Q' then mark(i2)
-  86 ( 2065)   else begin
-  87 ( 2078)     j:=-1;
-  88 ( 2080)     repeat
-  89 ( 2085)      j:=j+1;
-  90 ( 2091)       until (j>maxlen) or
-  91 ( 2105)            (nametab[16*i1+j]<>
-  92 ( 2117)           nametab[16*i2+j]);
-  93 ( 2138)     if j>maxlen then mark(i1)
-  94 ( 2154)   end
-  95 ( 2164) end;
-  96 ( 2164) 
-  97 ( 2165) begin { mani }
-  98 ( 2165)   drive := 1; {default drive}
-  99 ( 2174)   if ARGTYPE[_carg] = 'i' then
- 100 ( 2184)     _agetval(drive,default);
- 101 ( 2208)   if (drive<0) or (drive>1) then begin
- 102 ( 2223)     writeln('Drive must be 0 or 1');
- 103 ( 2253)     _abort
- 104 ( 2253)   end;
- 105 ( 2257)   if ARGTYPE[_carg] = 's' then
- 106 ( 2267)     quiet := option('Q');
- 107 ( 2281) 
- 108 ( 2285)   FILDRV:=drive;
- 109 ( 2285)   call(aprepdo);
- 110 ( 2297) 
- 111 ( 2297)   scyfc:=255; { write disk name }
- 112 ( 2304)   call(agetentx);
- 113 ( 2308) 
- 114 ( 2308)   index:=0; ti:=0; maxlen:=0;
- 115 ( 2322)   sdel:=0; sfound:=0;
- 116 ( 2334)   repeat
- 117 ( 2338)     scyfc:=index;
- 118 ( 2338)     call(agetentx);
- 119 ( 2351)     { check for end mark }
-
-R65 COMPILE 4.8: program CLEAN            29/4/26 page 3
-
- 120 ( 2351)     if filtyp<>chr(0) then begin
- 121 ( 2359)       { check for deleted flag }
- 122 ( 2362)       if (fillnk and 255)<128 then begin
- 123 ( 2372)         if DEBUG then writeln('ii=', ti);
- 124 ( 2395)         for i:=0 to 15 do
- 125 ( 2403)           nametab[16*ti+i]:=FILNAM[i];
- 126 ( 2431)         i:=16;
- 127 ( 2453)         repeat
- 128 ( 2457)           i:=i-1;
- 129 ( 2463)         until (i=0) or
- 130 ( 2475)           (nametab[16*ti+i]<>' ');
- 131 ( 2494)         if maxlen<i then maxlen:=i;
- 132 ( 2510)         filstptab[ti]:=filstp;
- 133 ( 2526)         cyctab[ti]:=filcyc;
- 134 ( 2538)         foundtab[ti]:=false;
- 135 ( 2548)         sizetab[ti]:=filsiz shr 8;
- 136 ( 2562)         for i:=0 to ti-1 do
- 137 ( 2579)           if (foundtab[i]=false) and
- 138 ( 2600)                (foundtab[ti]=false) then
- 139 ( 2611)             check(i,ti);
- 140 ( 2629)         ti:=ti+1
- 141 ( 2647)       end else {deleted}
- 142 ( 2657)         sdel:=sdel+(filsiz shr 8);
- 143 ( 2668)     end else {end mark}
- 144 ( 2676)       sfree:=2560-filloc;
- 145 ( 2683)     index:=index+1
- 146 ( 2692)   until (index>=255) or (filtyp=chr(0));
- 147 ( 2714)   call(aenddo);
- 148 ( 2722)   nument:=ti;
- 149 ( 2722) 
- 150 ( 2730)   for ti:=0 to nument-1 do begin
- 151 ( 2752)     if foundtab[ti] then begin
- 152 ( 2760)       for i:=0 to 15 do
- 153 ( 2771)          name[i]:=nametab[16*ti+i];
- 154 ( 2796)          _asetfile(name,cyctab[ti],drive,
- 155 ( 2832)                ' ');
- 156 ( 2844)       filerr:=0;
- 157 ( 2846)       call(adelete);
- 158 ( 2854)       if filerr<>0 then bcderror(filerr);
- 159 ( 2872)       sfound:=sfound+sizetab[ti];
- 160 ( 2880)     end
- 161 ( 2889)   end;
- 162 ( 2889) 
- 163 ( 2903)   if not quiet then
- 164 ( 2903)     writeln('Free: ',sfree,', found: ',sfound,
- 165 ( 2933)       ', now deleted: ',sdel+sfound);
- 166 ( 2970) 
- 167 ( 2970) end.
- 168 ( 2970) 
-
-End compile
-
-Code lenght:          2969
-Compiler stack size:  59
-Ident stack size:     111
-Pascal errors:        0
+   1     4 
+   2     4 {         *****************                 }
+   3     4 {         *  clean drive  *                 }
+   4     4 {         *****************                 }
+   5     4 
+   6     4 {    2018 rricharz (r77@bluewin.ch)         }
+   7     4 
+   8     4 { Clean disk. Only the latest cyclus of     }
+   9     4 { each file is kept. Uses EPROM (disk.asm)  }
+  10     4 { calls to get info from disk directory     }
+  11     4 { and EXDOS delete.                         }
+  12     4 
+  13     4 { Usage:  clean [drive]                     }
+  14     4 {         default: drive 1                  }
+  15     4 
+  16     4 {$U+}
+  17     4 
+  18     4 program clean;
+  19     4 uses syslib,arglib, filelib;
+  20  2092 
+  21  2092 {R65 disk eprom calls and params: }
+  22  2092 const
+  23  2092       DEBUG = false;
+  24  2095       aprepdo =$f4a7;
+  25  2095       agetentx=$f63a;
+  26  2095       aenddo  =$f625;
+  27  2095       adelete =$c80c;
+  28  2095 mem   filtyp  =$0300: char&;
+  29  2095       filcyc  =$0311: integer&;
+  30  2095       filstp  =$0312: char&;
+  31  2095       filloc  =$0313: integer;
+  32  2095       filsiz  =$0315: integer;
+  33  2095       fillnk  =$031e: integer;
+  34  2095       scyfc   =$037c: integer&;
+  35  2095 
+  36  2095 var default, quiet: boolean;
+  37  2095     drive,index,i,ti,maxlen,nument,sfree,
+  38  2095     sdel,sfound : integer;
+  39  2095     { array size = 16 * 256 }
+  40  2095     nametab     : array[4096] of char;
+  41  2095     filstptab   : array[255] of char;
+  42  2095     cyctab      : array[255] of integer;
+  43  2095     foundtab    : array[255] of boolean;
+  44  2095     sizetab     : array[255] of integer;
+  45  2095     name        : array[15] of char;
+  46  2095 
+  47  2095 proc bcderror(e:integer);
+  48  2095 begin
+  49  2095   writeln;
+  50  2100   write(INVVID,'ERROR ');
+  51  2116   write((e shr 4) and 15);
+  52  2127   writeln(e and 15,NORVID);
+  53  2144 end;
+  54  2144 
+  55  2145 func hex(d:integer):char;
+  56  2145 { convert hex digit to hex char }
+  57  2145 begin
+  58  2145   if (d>=0) and (d<10) then
+  59  2164     hex:=chr(d+ord('0'))
+  60  2174   else if (d>=10) and (d<16) then
+  61  2197     hex:=chr(d+ord('A')-10)
+  62  2210   else hex:='?';
+  63  2221 end;
+  64  2225 
+  65  2226 proc mark(i3: integer);
+  66  2226 {mark entry for delete}
+  67  2226 var j: integer;
+  68  2229 begin
+  69  2229   if not quiet then begin
+  70  2236     write('Deleting ');
+  71  2249     for j:=0 to maxlen do
+  72  2255       write(nametab[16*i3+j]);
+  73  2285     write('.');
+  74  2301     writeln(hex(cyctab[i3] shr 4),
+  75  2320             hex(cyctab[i3] and 15));
+  76  2347   end;
+  77  2347   foundtab[i3]:=true
+  78  2351 end;
+  79  2357 
+  80  2358 proc check(i1,i2: integer);
+  81  2358 {check and mark entries for delete}
+  82  2358 var j: integer;
+  83  2361 begin
+  84  2361   if filstptab[i2]='Q' then mark(i2)
+  85  2377   else begin
+  86  2390     j:=-1;
+  87  2392     repeat
+  88  2397      j:=j+1;
+  89  2403       until (j>maxlen) or
+  90  2417            (nametab[16*i1+j]<>
+  91  2429           nametab[16*i2+j]);
+  92  2450     if j>maxlen then mark(i1)
+  93  2466   end
+  94  2476 end;
+  95  2476 
+  96  2477 begin { mani }
+  97  2477   drive := 1; {default drive}
+  98  2486   if ARGTYPE[_carg] = 'i' then
+  99  2496     _agetval(drive,default);
+ 100  2520   if (drive<0) or (drive>1) then begin
+ 101  2535     writeln('Drive must be 0 or 1');
+ 102  2565     _abort
+ 103  2565   end;
+ 104  2569   if ARGTYPE[_carg] = 's' then
+ 105  2579     quiet := option('Q');
+ 106  2593 
+ 107  2597   FILDRV:=drive;
+ 108  2597   call(aprepdo);
+ 109  2609 
+ 110  2609   scyfc:=255; { write disk name }
+ 111  2616   call(agetentx);
+ 112  2620 
+ 113  2620   index:=0; ti:=0; maxlen:=0;
+ 114  2634   sdel:=0; sfound:=0;
+ 115  2646   repeat
+ 116  2650     scyfc:=index;
+ 117  2650     call(agetentx);
+ 118  2663     { check for end mark }
+ 119  2663     if filtyp<>chr(0) then begin
+ 120  2671       { check for deleted flag }
+ 121  2674       if (fillnk and 255)<128 then begin
+ 122  2684         if DEBUG then writeln('ii=', ti);
+ 123  2707         for i:=0 to 15 do
+ 124  2715           nametab[16*ti+i]:=FILNAM[i];
+ 125  2743         i:=16;
+ 126  2765         repeat
+ 127  2769           i:=i-1;
+ 128  2775         until (i=0) or
+ 129  2787           (nametab[16*ti+i]<>' ');
+ 130  2806         if maxlen<i then maxlen:=i;
+ 131  2822         filstptab[ti]:=filstp;
+ 132  2838         cyctab[ti]:=filcyc;
+ 133  2850         foundtab[ti]:=false;
+ 134  2860         sizetab[ti]:=filsiz shr 8;
+ 135  2874         for i:=0 to ti-1 do
+ 136  2891           if (foundtab[i]=false) and
+ 137  2912                (foundtab[ti]=false) then
+ 138  2923             check(i,ti);
+ 139  2941         ti:=ti+1
+ 140  2959       end else {deleted}
+ 141  2969         sdel:=sdel+(filsiz shr 8);
+ 142  2980     end else {end mark}
+ 143  2988       sfree:=2560-filloc;
+ 144  2995     index:=index+1
+ 145  3004   until (index>=255) or (filtyp=chr(0));
+ 146  3026   call(aenddo);
+ 147  3034   nument:=ti;
+ 148  3034 
+ 149  3042   for ti:=0 to nument-1 do begin
+ 150  3064     if foundtab[ti] then begin
+ 151  3072       for i:=0 to 15 do
+ 152  3083          name[i]:=nametab[16*ti+i];
+ 153  3108          _asetfile(name,cyctab[ti],drive,
+ 154  3144                ' ');
+ 155  3156       FILERR:=0;
+ 156  3158       call(adelete);
+ 157  3166       if FILERR<>0 then bcderror(FILERR);
+ 158  3184       sfound:=sfound+sizetab[ti];
+ 159  3192     end
+ 160  3201   end;
+ 161  3201 
+ 162  3215   if not quiet then
+ 163  3215     writeln('Free: ',sfree,', found: ',sfound,
+ 164  3245       ', now deleted: ',sdel+sfound);
+ 165  3282 
+ 166  3282 end.
+ 167  3282 
+Code length:           3281
+Compiler stack size:   72
+Ident stack size:      115/256

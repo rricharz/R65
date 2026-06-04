@@ -79,7 +79,6 @@ var   i: integer;
   end;
 
   proc checkfilerr;
-
   const
       STOPCODE=$2010;
       NORVID   = chr($0b);  {normal video}

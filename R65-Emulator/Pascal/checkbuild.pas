@@ -13,7 +13,6 @@ uses syslib;
 
 mem
   FILFLG  = $00da: integer&;
-  FILERR  = $db:   integer&;
   FILDRV  = $00dc: integer&;
   FILTYP  = $0300:char&;
   FILNAM  = $0301: array[15] of char&;
@@ -142,6 +141,7 @@ begin {main}
       end;
     end;
     entry := entry + 1;
+    if _isesc then done := true;
   until done;
   writeln(PRTON);
   writeln('CHECKBUILD complete, errors: ',errors);

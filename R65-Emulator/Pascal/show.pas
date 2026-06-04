@@ -12,7 +12,6 @@ const startcanvas = $700;
       rdfile      = $e815;
 
 mem   FILFLG=$da:   char&;
-      filerr=$db:   integer&;
       filsa=$031a:  integer;
       filea=$031c:  integer;
       filsa1=$0331: integer;
@@ -47,11 +46,11 @@ begin
   filea:=startcanvas+sizecanvas;
   filsa1:=startcanvas;
   filtyp:='I';
-  filerr:=0;
+  FILERR:=0;
   call(rdfile);
-  if filerr<>0 then
-    writeln(INVVID,'File error ',filerr shr 4,
-      filerr and 15,NORVID);
+  if FILERR<>0 then
+    writeln(INVVID,'File error ',FILERR shr 4,
+      FILERR and 15,NORVID);
 end;
 
 begin

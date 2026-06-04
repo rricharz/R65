@@ -20,8 +20,7 @@ uses syslib, arglib, filelib;
 const cup      = chr($1a);
       PRFLAB   = $ece3;
 
-mem filerr = $db: integer&;
-    filstp=$312:char&;
+mem filstp=$312:char&;
 
 var cyclus,drive,free: integer;
     name:    array[15] of char;
@@ -64,26 +63,26 @@ begin { main }
     exit;
   end;
   writeln('e');
-  filerr := _emulator(ECEXPORT);
-  if filerr<>0 then begin
-    bcderror(filerr);
+  FILERR := _emulator(ECEXPORT);
+  if FILERR<>0 then begin
+    bcderror(FILERR);
     writeln;
     exit;
   end;
-  filerr := _emulator(ECEDIT);
-  if filerr<>0 then begin
-    if filerr=$69 then
+  FILERR := _emulator(ECEDIT);
+  if FILERR<>0 then begin
+    if FILERR=$69 then
       writeln(INVVID,'File not stored',NORVID)
     else begin
-      bcderror(filerr);
+      bcderror(FILERR);
       writeln;
       end;
     exit;
   end;
 
-  filerr := _emulator(ECIMPORT);
-  if filerr<>0 then begin
-    bcderror(filerr);
+  FILERR := _emulator(ECIMPORT);
+  if FILERR<>0 then begin
+    bcderror(FILERR);
     writeln;
     exit;
   end;

@@ -1,7 +1,7 @@
 program pcodes;
 uses syslib,arglib,strlib,ralib,mathlib,filelib;
 
-const npcodes=$59;
+const npcodes=$5a;
 
 var codename: array[npcodes] of cpnt;
     codebytes: array[npcodes] of integer;
@@ -329,6 +329,7 @@ begin
   set($57,'WRCP',1);
   set($58,'ADPS',1);
   set($59,'LINE',3);
+  set($5a,'CHAI',1);
 end;
 
 begin {main}

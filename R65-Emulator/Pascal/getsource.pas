@@ -19,10 +19,9 @@
 program getsource;
 uses syslib,arglib,filelib,wildlib;
 
-const afloppy=$c827; { exdos vector }
-  VERBOSE = false;
-
-mem filerr=$db: integer&;
+const
+    afloppy=$c827; { exdos vector }
+    VERBOSE = false;
 
 var cyclus,drive,k,dummy: integer;
     fname,dname: array[15] of char;
@@ -32,7 +31,7 @@ var cyclus,drive,k,dummy: integer;
 
 begin
   ok:=true;
-  filerr:=0;
+  FILERR:=0;
   { get the argument (file name) }
   cyclus:=0; drive:=0;
   _agetstring(fname,default,cyclus,drive);
@@ -47,7 +46,7 @@ begin
     cyclus:=0; drive:=1;
     _asetfile('WORK            ',cyclus,drive,' ');
     call(afloppy);
-    if (filerr<>0) then ok:=false;
+    if (FILERR<>0) then ok:=false;
     { make sure that dname is on drive 0 }
     if VERBOSE then begin
       write('Putting disk ');
@@ -57,7 +56,7 @@ begin
     cyclus:=0; drive:=0;
     _asetfile(dname,cyclus,drive,' ');
     call(afloppy);
-    if (filerr<>0) then ok:=false;
+    if (FILERR<>0) then ok:=false;
     { copy the source file }
     if VERBOSE then begin
       write('Copying ');
@@ -68,11 +67,11 @@ begin
     ARGTYPE[10]:='i';
     ARGLIST[10]:=1; {copy to drive 1}
     cyclus:=0; drive:=0;
-    filerr:=0; RUNERR:=0;
+    FILERR:=0; RUNERR:=0;
     _runprog('COPY:R          ',cyclus,drive);
-    if (filerr<>0) or (RUNERR<>0) then begin
+    if (FILERR<>0) or (RUNERR<>0) then begin
       ok:=false;
-      if filerr=6 then writeln(INVVID,
+      if FILERR=6 then writeln(INVVID,
         'Source file not found',NORVID)
       else writeln(INVVID,
         'Copy failed',NORVID);
@@ -83,11 +82,11 @@ begin
     cyclus:=0; drive:=0;
     _asetfile('PASCAL          ',cyclus,drive,' ');
     call(afloppy);
-    if (filerr<>0) then ok:=false;
+    if (FILERR<>0) then ok:=false;
   end;
   if (not ok) or (RUNERR<>0) then begin
     writeln(INVVID,'Getsource failed',NORVID);
-    filerr:=0; RUNERR:=0;
+    FILERR:=0; RUNERR:=0;
   end;
   dummy:=_freedrv(1,true);
 end.
