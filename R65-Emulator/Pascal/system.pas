@@ -30,30 +30,25 @@ tries to run it from drive 0. User input
 of drive in the command is ignored       }
 
 program system;
-uses syslib;
+uses syslib, arglib, filelib, strlib, striolib;
 
 {$U+}
 
 const
-  title='R65 PASCAL VERSION 6.0';
-  STOPCODE = $2010;
   MMAXSEQ  = 8;     {max no of sequential files}
-
   CLRSCR   = chr($11);  {clear to end of screen}
+  NHISTORY = 4; { entries in history }
 
 mem
   BUFFPN   = $0015: integer&;
-  FILNAM   = $0301: array[15] of char&;
   FIDRTB   = $0339: array[8] of integer&;
-  NUMARG   = $005f: integer&;
-  FILDRV   = $00dc: integer&;
-  FILFLG   = $00da: integer&;
   MAXSEQ   = $0336: integer&;
-  ARGLIST  = $0060: array[10] of integer;
-  ARGLISTS = $0060: array[63] of char&;
-  ARGTYPE  = $00a0: array[31] of char&;
-  FILNM1   = $0320: array[15] of char&;
-  FILCY1   = $0330: integer&;
+
+  { persistent SYSTEM memory area }
+  HISTMAG  = $df00: integer&; { initialized }
+  HISTHEAD = $df01: integer&; { next slot }
+  HISTCNT  = $df02: integer&; { current entries }
+  { $df03-$dfc7 are used for history strings }
 
 var
   k, m, n: integer;
@@ -63,12 +58,14 @@ var
   runname,aname: array[15] of char;
   drive1,drive2: integer;
   cyclus1,cyclus2: integer;
+  gline: cpnt;
+  histpos: integer;
+  history: array[NHISTORY] of cpnt;
+  spos: integer;
 
-{ * runprog * }
-
-proc chainprog
-  (name: array[15] of char;
-   drv: integer; cyc: integer);
+proc chainprog(name: array[15] of char;
+               cyc: integer; drv: integer);
+{*****************************************}
 var j: integer;
 begin
   for j:=0 to 15 do FILNM1[j]:=name[j];
@@ -78,33 +75,200 @@ begin
   chain
 end;
 
-{ * _uppercase * }
-
-func _uppercase(ch1: char): char;
-
-begin
-  if (ch1 >= 'a') and (ch1 <= 'z') then
-    _uppercase := chr(ord(ch1) - 32)
-  else
-    _uppercase := ch1;
-end;
-
-{ * next * }
-
 proc next;
-
+{********}
 begin
-  read(@INPUT,ch);
-  ch:=_uppercase(ch);
+  if gline[spos] = ENDMARK then
+    ch := CR
+  else begin
+    ch := _uppercase(gline[spos]);
+    spos := spos + 1;
+  end;
 end;
 
-{ * getnum * }
+proc init_persistent;
+{*******************}
+var i: integer;
+    s: cpnt;
+begin
+  history[0] := cpnt($df03);
+  history[1] := cpnt($df34);
+  history[2] := cpnt($df65);
+  history[3] := cpnt($df96);
+  histpos  := 0;
+  if HISTMAG <> $a5 then begin
+    HISTMAG  := $a5;
+    HISTHEAD := 0;
+    HISTCNT  := 0;
+    { This initialization should not be required }
+    for i := 0 to 3 do begin
+      s := history[i];
+      s[0] := ENDMARK;
+    end;
+  end;
+end;
 
-proc getnum
-  (var num: integer);
+proc add_history(line: cpnt);
+{***************************}
+begin
+  _strcpy(line, history[HISTHEAD]);
+  HISTHEAD := _mod(HISTHEAD + 1, NHISTORY);
+  if HISTCNT < NHISTORY then
+    HISTCNT := HISTCNT + 1;
+end;
 
+proc up_history(line: cpnt);
+{**************************}
+var entry: integer;
+begin
+  if HISTCNT = 0 then
+    exit;
+  if histpos < HISTCNT then
+    histpos := histpos + 1;
+  entry := _mod(HISTHEAD - histpos + NHISTORY,
+                NHISTORY);
+{  writeln('Up history: histpos=', histpos,
+          ' entry=', entry); }
+  _strcpy(history[entry], line);
+end;
+
+proc down_history(line: cpnt);
+{****************************}
+var entry: integer;
+begin
+  if histpos > 0 then
+    histpos := histpos - 1;
+
+  if histpos = 0 then
+    line[0] := ENDMARK
+  else begin
+    entry := _mod(HISTHEAD - histpos + NHISTORY,
+                  NHISTORY);
+    _strcpy(history[entry], line);
+  end;
+end;
+
+proc readline(line: cpnt);
+{************************}
+const CLEFT       = chr($03);
+      CRIGHT      = chr($16);
+      CDOWN       = chr($18);
+      INSCHR      = chr($15);
+      DELCHR      = chr($19);
+      RUBOUT      = chr($7f);
+      SCRUP       = chr($08); {scroll}
+      SCRDOWN     = chr($02);
+      GRSIZE      = chr($0c);
+      ESC         = chr($00);
+      LINELENGTH  = 45;  { 47 - 2 for prompt }
+var lch: char;
+    pos, len: integer;
+begin
+  line[0] := ENDMARK;
+  pos := 0;
+  len := 0;
+
+  write(NORVID,'P*',CLRLIN);
+
+  repeat
+    read(@KEY,lch); { raw read character }
+
+    if (ord(lch)>=$20) and (ord(lch)<=$7e) then begin
+      if len < LINELENGTH then begin
+        _strinsc(lch,pos,line);
+        len := len + 1;
+        write(INSCHR,lch);
+        pos := pos + 1;
+      end;
+    end else begin
+      case lch of
+
+        CLEFT:
+          begin
+            if pos > 0 then begin
+              write(CLEFT);
+              pos := pos - 1;
+            end;
+          end;
+
+        CRIGHT:
+          begin
+            if pos < len then begin
+              write(CRIGHT);
+              pos := pos + 1;
+            end;
+          end;
+
+        RUBOUT:
+          begin
+            if pos > 0 then begin
+              pos := pos - 1;
+              _strdelc(pos,line);
+              len := len - 1;
+              write(CLEFT,DELCHR);
+            end;
+          end;
+
+        ESC:
+          begin
+            while pos > 0 do begin
+              write(CLEFT);
+              pos := pos - 1;
+              end;
+            line[0] := ENDMARK;
+            pos := 0;
+            len := 0;
+            write(CLRLIN);
+          end;
+
+        CUP:
+          begin
+            up_history(line);
+            while pos > 0 do begin
+              write(CLEFT);
+              pos := pos - 1;
+              end;
+            write(CLRLIN, line);
+            len := _strlen(line);
+            pos := len;
+          end;
+
+        CDOWN:
+          begin
+            down_history(line);
+            while pos > 0 do begin
+              write(CLEFT);
+              pos := pos - 1;
+              end;
+            write(CLRLIN, line);
+            len := _strlen(line);
+            pos := len;
+          end;
+
+        CR:
+          begin
+          if line[0] <> ENDMARK then
+            add_history(line);
+          end;
+
+        SCRUP, SCRDOWN, GRSIZE:
+          write(lch) { pass through }
+
+        else
+          begin
+            { ignore all other control characters }
+          end
+
+      end {case};
+    end;
+  until lch=CR;
+
+  writeln;
+end;
+
+proc getnum(var num: integer);
+{****************************}
 var sign: integer;
-
 begin
   sign:=1; num:=0;
   case ch of
@@ -119,19 +283,15 @@ begin
   num:=sign*num
 end;
 
-{ * getfname * }
-
 proc getfname
   (var name: array[15] of char;
    ptype: char; var isok: boolean;
    var drv: integer; var cyc: integer);
-
+{*************************************}
 var i, j: integer;
 
   func nexthexdigit: integer;
-
   var d: integer;
-
   begin
     next;
     if (ch>='0') and (ch<='9') then
@@ -176,16 +336,14 @@ begin
   end
 end;
 
-{ * clearinput * }
-
 proc clearinput;
+{**************}
 begin
   BUFFPN:=-1;
 end;
 
-{ * check for errors * }
-
 proc checkrunerr;
+{***************}
 begin
   write(INVVID);
   case RUNERR of
@@ -217,20 +375,24 @@ begin
   RUNERR:=0;
 end;
 
-{ * main * }
-
 begin {main}
+{**********}
   checkrunerr;
+  gline := _new;
+  init_persistent;
 
   MAXSEQ := MMAXSEQ - 1;
   for k:=0 to MMAXSEQ-1 do FIDRTB[k]:=0;
   clearinput;
   ok:=true;
 
-  write('P*');
+  spos := 0;
+  readline(gline);
   next;
+
   while ch=CR do begin
-    write('P*');
+    spos := 0;
+    readline(gline);
     next;
   end;
   while (ch=' ') do next;
@@ -341,6 +503,6 @@ begin {main}
     clearinput;
     write(CLRSCR);
     ENDSTK:=TOPMEM-144;
-    chainprog(runname,drive1,cyclus1);
+    chainprog(runname, cyclus1, drive1);
   end;
 end.

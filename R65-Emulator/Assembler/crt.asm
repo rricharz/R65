@@ -367,8 +367,8 @@ DELCH2  LDA =' '
         STA (VIDPNT),Y
         RTS
 *
-INSCHR  JSR ROLLOC-2    -- INSERT CHAR --
-        LDY NUMCHR
+INSCHR  JMP INSCH2    -- INSERT CHAR --
+        LDY NUMCHR     -- PATCHED 2026 RR --
         DEY
         LDA (VIDPNT),Y
         INY
@@ -832,7 +832,7 @@ PRTCH1  LDA VIDKEY
         BPL *-6
 *
 PRTCH0  LDA VIDKEY
-        CMP =$7F        IF NOT FOUND, RUBOUT?
+        CMP =$5F        IF NOT FOUND, RUBOUT?
         BEQ *+6
         CMP =$7F
         BNE PRTCH4
@@ -1145,7 +1145,20 @@ PRTHEX  AND =$0F
         ADC =$30
         JMP PRTCHR
 *
+* PATCHED VERSION OF INSCHR, 2026 RR
 *
+INSCH2  JSR ROLLOC-2
+        LDY NUMCHR
+        DEY
+        DEY
+        LDA (VIDPNT),Y
+        INY
+        STA (VIDPNT),Y
+        DEY
+        CPY CURPOS
+        BPL *-9
+        INY
+        JMP DELCH2
         PAG
 *
 * TABLE OF OPCODES AND ADDRESSING MODES
