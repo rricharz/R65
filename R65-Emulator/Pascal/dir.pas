@@ -185,6 +185,13 @@ begin {main}
   filnam_to_str(cfloppy);
   if name_given then begin
     _change_disk(newname, 1);
+    if FILERR<>0 then begin
+      writeln(INVVID,'Disk ',newname,
+        ' does not exist', NORVID);
+        FILERR := 0;
+        _change_disk(cfloppy,1);
+      _abort;
+    end;
     drive:= 1;
     FILDRV:=drive;
     call(aprepdo);
@@ -196,11 +203,9 @@ begin {main}
 
 { display info at top of table }
   if name_given then
-    writeln(INVVID,'Directory drive ',drive,': ',
-    newname,NORVID)
+    writeln('Directory drive ',drive,': ', newname)
   else
-    writeln(INVVID,'Directory drive ',drive,': ',
-    cfloppy,NORVID);
+    writeln('Directory drive ',drive,': ',cfloppy);
 
 { read file table }
   index:=0; ti:=0; maxlen:=0;

@@ -347,16 +347,6 @@ proc checkrunerr;
 begin
   write(INVVID);
   case RUNERR of
-    $81: writeln('Division by zero');
-    $82: writeln('Stack overflow');
-    $83: writeln('Index out of bounds');
-    $84: writeln('Program not found');
-    $85: writeln('P-code not implemented');
-    $88: writeln('Heap overflow');
-    $89: writeln('Pointer not allocated (NIL)');
-    $90: writeln('Writing to constant string');
-    $91: writeln('String too long');
-    $92: writeln('String cannot be released');
     $01: writeln('File read/write');
     $03: writeln('Escape during read/write');
     $04: writeln('Wrong record number');
@@ -367,7 +357,23 @@ begin
     $23: writeln('Too many open files');
     $24: writeln('Directory error');
     $25: writeln('Wrong file number, file not open');
-    $26: writeln('Disk full, not stored')
+    $26: writeln('Disk full, not stored');
+    $65: writeln('Argument is not string or default');
+    $66: writeln('Argument is not number or default');
+    $67: writeln('Argument is not starting with /');
+    $68: writeln('Drive is not 0 or 1');
+    $69: writeln('Argument syntax error');
+    $6a: writeln('Too many arguments');
+    $81: writeln('Division by zero');
+    $82: writeln('Stack overflow');
+    $83: writeln('Index out of bounds');
+    $84: writeln('Program not found');
+    $85: writeln('P-code not implemented');
+    $88: writeln('Heap overflow');
+    $89: writeln('Pointer not allocated (NIL)');
+    $90: writeln('Writing to constant string');
+    $91: writeln('String too long');
+    $92: writeln('String cannot be released')
   end {case}
   write(NORVID);
   ENDSTK:=TOPMEM-144;
@@ -401,10 +407,11 @@ begin {main}
   cyclus1:=0;
   getfname(runname,'R',ok,drive1,cyclus1);
 
+  { erase all arguments }
   for k:=0 to 31 do ARGTYPE[k]:=chr(0);
+  NUMARG:=0;
 
   if ok then begin
-    NUMARG:=0;
     n:=0;
     argerr:=0;
     if ch=' ' then begin  {arguments}

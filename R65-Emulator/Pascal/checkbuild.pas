@@ -3,7 +3,9 @@
   ********************
 
   checks whether all programs can
-  be compiled                      }
+  be compiled. Uses chain to run COMPILE
+  with option /N@.
+  COMPILE chains checkbuild again }
 
 {$U+}
 
@@ -47,13 +49,32 @@ end;
 
 proc runprog(name0: array[15] of char;
              cyc: integer; drv: integer);
-{****************************************}
+{***************************************}
 var ii: integer;
 begin
   RUNERR:=0;
   for ii:=0 to 15 do FILNM1[ii]:=name0[ii];
   FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
   run
+end;
+
+proc chainprog(name0: array[15] of char;
+               cyc: integer; drv: integer);
+{*****************************************}
+var ii: integer;
+begin
+  RUNERR:=0;
+  for ii:=0 to 15 do FILNM1[ii]:=name0[ii];
+  FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
+  chain
+end;
+
+proc setargi(argi, carg: integer);
+{********************************}
+begin
+  ARGTYPE[carg]:='i';
+  ARGLIST[carg]:=argi;
+  ARGTYPE[carg+1]:=chr(0);
 end;
 
 proc setargs(name0:array[15] of char;
@@ -110,6 +131,16 @@ begin {main}
   errors := 0;
   files  := 0;
 
+  if (ARGTYPE[20]='i') and (ARGTYPE[21]='i')
+                       and (ARGTYPE[22]='i') then
+  begin
+    { get back values saved in arglist }
+    entry:=ARGLIST[20] + 1;
+    files:=ARGLIST[21] + 1;
+    errors:=ARGLIST[22];
+{    writeln('checkbuild get back ',
+                      entry:4,files:4,errors:4); }
+  end;
   repeat
     done := not getentry(drive, entry, deleted);
 {   writeln('deleted= ', deleted,
@@ -129,15 +160,22 @@ begin {main}
       writeln(':P.', hex(FILCYC));
       cyclus := FILCYC;
       setargs(name,0, cyclus, 1);
-      setargs('/N              ', 10, 0, 1);
-      runprog('COMPILE:R       ', 0, 0);
-      files := files + 1;
+      setargs('/N@             ', 10, 0, 1);
+      { save values for chain }
+      setargi(entry, 20);
+      setargi(files, 21);
+      setargi(errors,22);
       { runprog('ARGLIST:R       ', 0, 0); }
+      if _isesc then
+        done := true
+      else
+        chainprog('COMPILE:R       ', 0, 1);
+{      files := files + 1;
       if (RUNERR > 0) and (RUNERR <> 135)
         or (FILERR <> 0) then begin
         errors := errors + 1;
         {writeln('RE=',hex(RUNERR),
-               ' FE=',hex(FILERR));}
+               ' FE=',hex(FILERR));  }
       end;
     end;
     entry := entry + 1;
@@ -148,7 +186,7 @@ begin {main}
   writeln('Files checked:               ', files);
   if errors > 0 then
     writeln(INVVID,
-      'Errors found, check listing for errors',
+      'Errors found, check listing for details',
       NORVID);
   write(PRTOFF);
 

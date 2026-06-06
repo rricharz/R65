@@ -1,16 +1,25 @@
 
-{  ***************************************  }
-{  *                                     *  }
-{  *  R65 Computer System                *  }
-{  *  Pascal LIBRARY ARGLIB              *  }
-{  *                                     *  }
-{  ***************************************  }
+{  ***************************************
+   *                                     *
+   *  R65 Computer System                *
+   *  Pascal LIBRARY ARGLIB              *
+   *                                     *
+   ***************************************
 
-{      Version 07 01/08/82 rricharz         }
-{      Recovered 2018 by rricharz           }
+       Version 07 01/08/82 rricharz
+       Recovered 2018 by rricharz
 
-{ gets arguments given to app               }
-{ prepares system disk io                   }
+  gets arguments given to app
+
+  Size of argument list: 64 bytes/32 words
+
+  Argument types
+    0:    empty slot
+    'd':  integer
+    'i':  integer
+    's':  string                  }
+
+
 
 {$U+}
 
@@ -18,7 +27,7 @@ library arglib;
 
 mem
     NUMARG   = $005f: integer&;
-    ARGLIST  = $0060: array[10] of integer;
+    ARGLIST  = $0060: array[31] of integer;
     ARGLISTS = $0060: array[63] of char&;
     ARGTYPE  = $00a0: array[31] of char&;
 
@@ -26,15 +35,10 @@ var _carg: integer;
 
 proc _argerror(e: integer);
 {*************************}
-{ display argument error e and stop app }
 const STOP=$2010;
-      NORVID   = chr($0b);  {normal video}
-      INVVID   = chr($0e);  {inverse video}
 mem RUNERR=$000c: integer&;
 begin
-    writeln;
-    writeln(INVVID,'Argument error ',e,NORVID);
-    RUNERR:=255;
+    RUNERR:=e;
     call(STOP)
 end;
 

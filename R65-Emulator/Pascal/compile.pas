@@ -54,7 +54,7 @@ var reswtab: array[ 520] of char; {8*(NRESW+1)}
     token: packed char;
     libflg,rcheck,ateof: boolean;
     ucheck,lineflg,nlflg: boolean;
-    makeoutput: boolean;
+    makeoutput, chaincheckb: boolean;
     fno,ofno,savefno,lpr: file;
     incname: array[15] of char;
     filstk: array[MAXFI] of file;
@@ -174,6 +174,11 @@ begin
   end {case};
   writeln(' at line ', line, ', pos ', tpos, NORVID);
   if makeoutput then close(ofno);
+  if chaincheckb and not makeoutput then begin
+    { count error for checkbuild }
+    ARGLIST[22] := ARGLIST[22] + 1;
+    _chainprog('CHECKBUILD:R    ',0,1);
+  end;
   _abort;
 end {merror};
 
@@ -364,6 +369,7 @@ begin {init}
   ucheck:=false;
   makeoutput:=true;
   lineflg:=false;
+  chaincheckb:=false;
   if not default then begin
     if request[0]<>'/' then _argerror(103);
     for i:=1 to 8 do
@@ -371,6 +377,7 @@ begin {init}
         'L': lineflg:=true;
         'R': rcheck:=true;
         'N': makeoutput:=false;
+        '@': chaincheckb:=true;
         ' ': begin end
         else _argerror(104)
       end; {case}
@@ -2719,8 +2726,10 @@ begin {main}
     RUNERR := _emulator(9);
   close(fno);
 
+  if chaincheckb and not makeoutput then
+    _chainprog('CHECKBUILD:R    ',0,1);
   { check whether second pass is required }
   if (RUNERR=0) then
     if makeoutput and not libflg then
-      _chainprog('COMPILE2:R      ',0,0);
+      _chainprog('COMPILE2:R      ',0,1);
 end {main}.
