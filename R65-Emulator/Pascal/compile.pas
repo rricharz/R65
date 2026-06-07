@@ -29,8 +29,8 @@ const
     IDLENGTH  = 64;   {max. length of ident buffer}
     IDSIZE    = 16;   {chars per identifier in s_id}
     PIDSIZE   = 8;    {packed chars per identifier}
-    SYMBSIZE  = 256;  {id table entries}
-    IDTABSIZE = 2048; {SYMBSIZE * PIDSIZE}
+    SYMBSIZE  = 300;  {id table entries}
+    IDTABSIZE = 2400; {SYMBSIZE * PIDSIZE}
 
     STACKSIZE = 256;   {stack size}
     PAGELENGHT= 60;    {no of lines per page}
@@ -256,6 +256,7 @@ begin
     end;
     write(@lpr,' ');
     write(@lpr,(pc+2):5,' ');
+    write(@lpr,'[',spnt:3,'] ');
   end;
   if savefno<>@0 then
     line:=line-1; { do not count library line }

@@ -21,7 +21,11 @@ const ERASE         = 0;
       GRAVITY       = -0.25;
       REFLECTION    = -0.85;
 
-      LADDERSIZE    = 8;
+      LADDERSIZE    = 9;  { should be odd }
+      FXSTEPSIZE    = 2.0;
+      { automatic walk-to-ladder-center distance: }
+      SNAPWIDTH     = 6.0;
+      LADDTOL       = 2;
       LOOPSPERFRAME = 2;
       XDOORSIZE     = 8;
       YDOORSIZE     = 12;
@@ -31,7 +35,6 @@ const ERASE         = 0;
 
       MAXNGEMS      = 10;
 
-      AUTOREPEAT    = false;
       CLEFT         = chr($03);
       CRIGHT        = chr($16);
       CUP           = chr($1a);
@@ -40,7 +43,7 @@ const ERASE         = 0;
 
 var bx,bxspeed,bxs:               integer;
     by, bys, fx,fxs:              real;
-    byspeed,fxspeed:              real;
+    byspeed,fxstep:               real;
     jump,jumpspeed:               real;
     floor,ffloor,fy,fys,fyspeed:  integer;
     score,loopcounter,level:      integer;
@@ -79,23 +82,29 @@ begin
 end;
 
 func onupladder(f:integer;x:real):boolean;
+var xi,center:integer;
 begin
+  xi:=trunc(x);
   if (f<0) or (f>=NFLOORS) then
     onupladder:=false
-  else
-    onupladder:=(trunc(x)>=ladders[f]+1) and
-      (trunc(x)<=ladders[f]+2);
+  else begin
+    center:=ladders[f]+LADDERSIZE-8;
+    onupladder:=(xi>=center-LADDTOL) and
+                (xi<=center+LADDTOL);
+  end;
 end;
 
 func ondownladder(f:integer;x:real):boolean;
-var xi:integer;
+var xi,center:integer;
 begin
   xi:=trunc(x);
   if (f<=0) or (f>NFLOORS) then
     ondownladder:=false
-  else
-    ondownladder:=(xi>=ladders[f-1]+1) and
-      (xi<=ladders[f-1]+2);
+  else begin
+    center:=ladders[f-1]+LADDERSIZE-8;
+    ondownladder:=(xi>=center-LADDTOL) and
+                  (xi<=center+LADDTOL);
+  end;
 end;
 
 func onhole(f:integer;x:real):boolean;
@@ -124,7 +133,7 @@ begin
   fysum:=fy+trunc(jump);
 
   if jump > 0.0 then begin
-    if fxspeed > 0.0 then
+    if fxstep > 0.0 then
       spriteindex := S_JUMPR + frame
     else
       spriteindex := S_JUMPL + frame
@@ -132,9 +141,9 @@ begin
     spriteindex := S_UP + frame
   else if fyspeed < 0 then
     spriteindex := S_DOWN + frame
-  else if fxspeed = 0.0 then
+  else if fxstep = 0.0 then
     spriteindex := S_STANDING
-  else if fxspeed >0.0 then
+  else if fxstep >0.0 then
     spriteindex := S_RIGHT + frame
   else
     spriteindex := S_LEFT + frame;
@@ -269,7 +278,7 @@ begin
      onupladder(ffloor,fx)
   then begin
     fx:=conv(ladders[ffloor]+1);
-    fyspeed:=1; fxspeed:=0.0;
+    fyspeed:=1; fxstep:=0.0;
   end;
 end;
 
@@ -279,7 +288,7 @@ begin
      ondownladder(ffloor,fx)
   then begin
     fx:=conv(ladders[ffloor-1]+1);
-    fyspeed:=-1; fxspeed:=0.0;
+    fyspeed:=-1; fxstep:=0.0;
   end;
 end;
 
@@ -327,11 +336,74 @@ end;
 proc nextround;
 begin
   fx:=3.0; fy:=1;
-  fxspeed:=0.0; ffloor:=0;
+  fxstep:=0.0; ffloor:=0;
   fyspeed:=0;
   showresult;
   flashplayer;
   init;
+end;
+
+proc keepwalking(f: integer);
+var found: boolean;
+    center: real;
+
+  proc checkcenter(center: real; var found: boolean);
+  var dist: real;
+  begin
+    if fxstep > 0.0 then begin
+      if center >= fx then begin
+        dist := center - fx;
+
+        if dist <= 1.0 then begin
+          fx := center;
+          fxstep := 0.0;
+          found := true;
+        end else if dist <= SNAPWIDTH then begin
+          fxstep := 1.0;
+          found := true;
+        end;
+      end;
+
+    end else if fxstep < 0.0 then begin
+      if center <= fx then begin
+        dist := fx - center;
+
+        if dist <= 1.0 then begin
+          fx := center;
+          fxstep := 0.0;
+          found := true;
+        end else if dist <= SNAPWIDTH then begin
+          fxstep := -1.0;
+          found := true;
+        end;
+      end;
+    end;
+  end;
+
+begin
+  found := false;
+
+  if (not onfloor(f, fy)) or (jump > 0.01) then
+    exit;
+
+  if fxstep <> 0.0 then begin
+
+    { ladder up from current floor }
+    if (f >= 0) and (f < NFLOORS) then begin
+      center := conv(ladders[f] + LADDERSIZE - 8);
+      checkcenter(center, found);
+    end;
+
+    { ladder down to current floor }
+    if (not found) and (f > 0) then begin
+      center := conv(ladders[f-1] + LADDERSIZE - 8);
+      checkcenter(center, found);
+    end;
+
+    { no ladder center in snap range }
+    if not found then
+      fxstep := 0.0;
+  end;
 end;
 
 func expaint: boolean;
@@ -353,22 +425,23 @@ begin
     if valgem[ffloor]>0 then begin
       { first collect gem }
       if xgem[ffloor]<trunc(fx) then
-        fxspeed:=-2.0
+        fxstep := -FXSTEPSIZE
       else
-        fxspeed:=2.0;
+        fxstep := FXSTEPSIZE;
     end else begin
-      if ffloor=NFLOORS then fxspeed:=2.0 else
-      if (ffloor<NFLOORS) and onupladder(ffloor,fx)
+      if ffloor=NFLOORS then fxstep := FXSTEPSIZE
+      else if (ffloor<NFLOORS) and
+                            onupladder(ffloor,fx)
       then tryladderup
-      else if onfloor(ffloor,fy) then  begin
+{      else if onfloor(ffloor,fy) then  begin
         if (trunc(fx)>=ladders[ffloor]+1) then begin
-          if fxspeed>1.0 then fxspeed:=0.0
-          else fxspeed:=-2.0;
+          if fxstep>1.0 then fxstep:=0.0
+          else fxstep:=-FXSTEPSIZE;
         end else begin
-          if fxspeed<-1.0 then fxspeed:=0.0
-          else fxspeed:=2.0
+          if fxstep<-1.0 then fxstep:=0.0
+          else FXSTEPSIZE:=2.0
         end;
-      end;
+      end; }
     end;
   end;
 
@@ -400,10 +473,10 @@ begin
     fx:=conv(ex+1);
     fy:=ey+1;
     if (ey<>eytop) and (ey<>eybottom) then
-      fxspeed:=0.0
-    else if fxspeed<>0.0 then begin
+      fxstep:=0.0
+    else if fxstep<>0.0 then begin
       on_elev:=false;
-      fx:=fx+fxspeed; { move off already a bit }
+      fx:=fx+fxstep; { move off already a bit }
     end;
     fyspeed:=0;
     if ey=eytop then
@@ -413,12 +486,12 @@ begin
       end;
   if not on_elev then begin
     { move player horizontally }
-    fx:=fx+fxspeed; fy:=fy+fyspeed;
+    fx:=fx+fxstep; fy:=fy+fyspeed;
     if fx>conv(XSIZE-8) then begin
-      fx:=conv(XSIZE-8); fxspeed:=0.0;
+      fx:=conv(XSIZE-8); fxstep:=0.0;
     end;
     if (fx<1.0) then begin
-      fx:=1.0; fxspeed:=-0.0;
+      fx:=1.0; fxstep:=-0.0;
     end;
     { check for player hitting gem }
     distx:=_abs(trunc(fx)-xgem[ffloor]);
@@ -427,10 +500,6 @@ begin
       showresult;
       valgem[ffloor]:=0;
     end;
-    { check for player at ladder }
-    if onupladder(ffloor,fx) or ondownladder(ffloor,fx
-)
-      then fxspeed:=0.0;
     { check for hole and jump over it }
     if (jump<=0.01) and onhole(ffloor,fx) then begin
       jumpspeed:=1.3; jump:=jump+jumpspeed;
@@ -510,6 +579,8 @@ begin
   showball;
   { paint player }
   showplayer;
+  { decide whether to keep walking automatically }
+  keepwalking(ffloor);
   { paint ladders, elevators and doors }
   showforeground;
   { ride elevator }
@@ -517,9 +588,14 @@ begin
     if (ffloor=efloor) and (ey=eybottom) and
        onupladder(ffloor,fx) then begin
       on_elev:=true;
-      fxspeed:=0.0;
+      fxstep:=0.0;
       fyspeed:=0;
     end
+  end;
+  { keep walking if not on ladder }
+  if onupladder(ffloor,fx) or
+                 ondownladder(ffloor,fx) then begin
+
   end;
 end;
 
@@ -559,24 +635,14 @@ begin
   case key of
     CUP:    tryladderup;
     CDOWN:  tryladderdown;
-    CLEFT:
-            if canwalk then
-              if fxspeed>0.0 then
-                fxspeed:=0.0
-              else
-                fxspeed:=-2.0;
-    CRIGHT:
-            if canwalk then
-              if fxspeed<0.0 then
-                fxspeed:=0.0
-              else
-                fxspeed:=2.0;
-
+    CLEFT:  if canwalk then
+              fxstep := -FXSTEPSIZE;
+    CRIGHT: if canwalk then
+              fxstep := FXSTEPSIZE;
     'L':    begin
               loadscore;
-                showresult;
+              showresult;
             end;
-
     '!':    begin
               score:=score+500; { cheat key }
               showresult;
@@ -602,7 +668,7 @@ begin
   { initialize player }
   fx:=3.0; fy:=1; jump:=0.0;  jumpspeed:=0.0;
   fxs:=fx; fys:=fy;
-  fxspeed:=0.0; fyspeed:=0;
+  fxstep:=0.0; fyspeed:=0;
   { make and show holes }
   holes[0]:=-50;
   _move(0,0); _draw(XSIZE,0,WHITE);
@@ -688,7 +754,7 @@ begin
   writeln('Collect gems and avoid the ball.');
   writeln('L load saved score, <arrow> move player');
   init;
-  animate(AUTOREPEAT);
+  animate(true);
   _splitview;
   showresult;
   writeln('Final score ',score);
