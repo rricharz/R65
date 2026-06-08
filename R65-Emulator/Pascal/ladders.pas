@@ -27,6 +27,9 @@ const ERASE         = 0;
       SNAPWIDTH     = 6.0;
       LADDTOL       = 2;
       LOOPSPERFRAME = 2;
+      LASTXTIME     = 4; { frames }
+      JUMPOFFSPEED  = 1.7;
+
       XDOORSIZE     = 8;
       YDOORSIZE     = 12;
 
@@ -39,14 +42,16 @@ const ERASE         = 0;
       CRIGHT        = chr($16);
       CUP           = chr($1a);
       CDOWN         = chr($18);
+      JUMPKEY       = ' ';
       ESC           = chr(0);
 
 var bx,bxspeed,bxs:               integer;
     by, bys, fx,fxs:              real;
-    byspeed,fxstep:               real;
+    byspeed,fxstep,lastfxstep:    real;
     jump,jumpspeed:               real;
     floor,ffloor,fy,fys,fyspeed:  integer;
     score,loopcounter,level:      integer;
+    lastfxtimes:                  integer;
     demomode:                     boolean;
 
     efloor,ex,ey,eys,ecount:      integer;
@@ -108,9 +113,11 @@ begin
 end;
 
 func onhole(f:integer;x:real):boolean;
+var xc: integer;
 begin
-  onhole:=(x>=conv(holes[f]-5)) and
-      (x<=conv(holes[f]+HOLESIZE+1));
+  xc := trunc(x) + 4;  { center of 8-pixel sprite }
+  onhole := (xc >= holes[f]) and
+            (xc <= holes[f] + HOLESIZE);
 end;
 
 proc showball;
@@ -343,6 +350,11 @@ begin
   init;
 end;
 
+func airborne(f:integer; fy:integer): boolean;
+begin
+  airborne := (not onfloor(f, fy)) or (jump > 0.01);
+end;
+
 proc keepwalking(f: integer);
 var found: boolean;
     center: real;
@@ -383,7 +395,7 @@ var found: boolean;
 begin
   found := false;
 
-  if (not onfloor(f, fy)) or (jump > 0.01) then
+  if airborne(f, fy) then
     exit;
 
   if fxstep <> 0.0 then begin
@@ -451,6 +463,19 @@ begin
 
   { ***** HANDLE THE PLAYER ***** }
 
+  { remember fxstep for airborne state }
+  if not airborne(ffloor, fy) then begin
+    if fxstep <> 0.0 then begin
+      lastfxstep := fxstep;
+      lastfxtimes := LASTXTIME;
+    end else begin
+      if lastfxtimes > 0 then
+        lastfxtimes := lastfxtimes - 1
+      else
+        lastfxstep := 0.0;
+    end;
+  end;
+
   { check for exit on top floor }
   if (ffloor=NFLOORS) and (trunc(fx)>=XSIZE-9) then
   begin
@@ -485,12 +510,16 @@ begin
       ffloor:=efloor
       end;
   if not on_elev then begin
-    { move player horizontally }
-    fx:=fx+fxstep; fy:=fy+fyspeed;
-    if fx>conv(XSIZE-8) then begin
+    { move player }
+    if airborne(ffloor, fy) then
+      fx := fx + lastfxstep
+    else
+      fx := fx + fxstep;
+    fy:=fy+fyspeed;
+    if fx>conv(XSIZE-8) then begin { right wall }
       fx:=conv(XSIZE-8); fxstep:=0.0;
     end;
-    if (fx<1.0) then begin
+    if (fx<1.0) then begin { left wall }
       fx:=1.0; fxstep:=-0.0;
     end;
     { check for player hitting gem }
@@ -500,14 +529,22 @@ begin
       showresult;
       valgem[ffloor]:=0;
     end;
-    { check for hole and jump over it }
-    if (jump<=0.01) and onhole(ffloor,fx) then begin
-      jumpspeed:=1.3; jump:=jump+jumpspeed;
-    end else if jump>0.0 then begin
-      jump:=jump+jumpspeed;
-      jumpspeed:=jumpspeed+GRAVITY;
+    { jump }
+    jump:=jump+jumpspeed;
+    jumpspeed:=jumpspeed+GRAVITY;
+    if jump <= 0.0 then begin
+      if onhole(ffloor,fx) then begin
+        { continue falling to next floor }
+        ffloor := ffloor - 1;
+        jump := jump + conv(VFLOORS);
+        fy := ffloor * VFLOORS + 1;
+      end
+      else begin
+        { normal landing }
+        jump := 0.0;
+        jumpspeed := 0.0;
+      end;
     end;
-    if jump<=0.0 then jump:=0.0;
   end;
 
   { ***** HANDLE THE BALL ***** }
@@ -592,11 +629,6 @@ begin
       fyspeed:=0;
     end
   end;
-  { keep walking if not on ladder }
-  if onupladder(ffloor,fx) or
-                 ondownladder(ffloor,fx) then begin
-
-  end;
 end;
 
 proc savescore;
@@ -631,14 +663,19 @@ func exkey(key:char):boolean;
   end;
 
 begin
-  exkey:=(key=ESC);
+  exkey := (key = ESC);
   case key of
-    CUP:    tryladderup;
-    CDOWN:  tryladderdown;
-    CLEFT:  if canwalk then
-              fxstep := -FXSTEPSIZE;
-    CRIGHT: if canwalk then
-              fxstep := FXSTEPSIZE;
+    CUP:      tryladderup;
+    CDOWN:    tryladderdown;
+    CLEFT:    if canwalk then
+                fxstep := -FXSTEPSIZE;
+    CRIGHT:   if canwalk then
+               fxstep := FXSTEPSIZE;
+    JUMPKEY:  begin
+                if (not airborne(ffloor, fy)) and
+                        (not onhole(ffloor, fx)) then
+                  jumpspeed := JUMPOFFSPEED;
+              end;
     'L':    begin
               loadscore;
               showresult;
