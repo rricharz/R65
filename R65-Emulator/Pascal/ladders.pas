@@ -22,13 +22,14 @@ const ERASE         = 0;
       REFLECTION    = -0.85;
 
       LADDERSIZE    = 9;  { should be odd }
+      MINDIST       = 12; { distance between ladders }
       FXSTEPSIZE    = 2.0;
       { automatic walk-to-ladder-center distance: }
       SNAPWIDTH     = 6.0;
-      LADDTOL       = 2;
+      LADDTOL       = 4;
       LOOPSPERFRAME = 2;
       LASTXTIME     = 4; { frames }
-      JUMPOFFSPEED  = 1.7;
+      JUMPOFFSPEED  = 2.0;
 
       XDOORSIZE     = 8;
       YDOORSIZE     = 12;
@@ -345,9 +346,10 @@ begin
   fx:=3.0; fy:=1;
   fxstep:=0.0; ffloor:=0;
   fyspeed:=0;
+  bxs:=2; bys:=conv(NFLOORS*VFLOORS-10);
+  newball;
   showresult;
   flashplayer;
-  init;
 end;
 
 func airborne(f:integer; fy:integer): boolean;
@@ -424,6 +426,23 @@ var f,distx,fxt:integer;
     yline:real;
     s:cpnt;
 
+  func holeahead(f:integer; x,xstep:real):boolean;
+  var xc,nextxc: integer;
+  begin
+    if xstep = 0.0 then
+      holeahead:=false
+    else begin
+      xc:=trunc(x)+4;
+      nextxc:=trunc(x + 3.0*xstep)+4;
+      if xstep > 0.0 then
+        holeahead:=(xc < holes[f]) and
+                    (nextxc >= holes[f])
+      else
+         holeahead:=(xc > holes[f]+HOLESIZE) and
+                    (nextxc <= holes[f]+HOLESIZE);
+    end;
+  end;
+
 begin
   if score>=10000 then begin
     expaint:=true;
@@ -445,16 +464,21 @@ begin
       else if (ffloor<NFLOORS) and
                             onupladder(ffloor,fx)
       then tryladderup
-{      else if onfloor(ffloor,fy) then  begin
+      else if onfloor(ffloor,fy) then  begin
         if (trunc(fx)>=ladders[ffloor]+1) then begin
           if fxstep>1.0 then fxstep:=0.0
           else fxstep:=-FXSTEPSIZE;
         end else begin
           if fxstep<-1.0 then fxstep:=0.0
-          else FXSTEPSIZE:=2.0
+          else fxstep := FXSTEPSIZE
         end;
-      end; }
+      end;
     end;
+    if (jump < 0.01) and onfloor(ffloor,fy) then
+      if holeahead(ffloor,fx,fxstep) then begin
+        jumpspeed := JUMPOFFSPEED;
+        jump := 0.01;
+      end;
   end;
 
   { ***** HANDLE MOOVING OBJECTS ***** }
@@ -482,6 +506,7 @@ begin
     score:=score+100 ;
     fx:=conv(XSIZE-9);
     nextround;
+    init;
     exit;
   end;
   { check for next floor on ladder }
@@ -629,6 +654,7 @@ begin
       fyspeed:=0;
     end
   end;
+  fyspeed:=0;
 end;
 
 proc savescore;
@@ -690,6 +716,27 @@ end;
 
 proc init;
 var f:integer;
+
+  func nearhole(f,x:integer):boolean;
+  begin
+    nearhole := (x+LADDERSIZE+MINDIST >= holes[f]) and
+              (x <= holes[f]+HOLESIZE+MINDIST);
+  end;
+
+  func nearladder(f,x:integer):boolean;
+  begin
+    if f<=0 then
+      nearladder:=false
+    else
+      nearladder:=_abs(x-ladders[f-1]) <= MINDIST;
+  end;
+
+  func ladderok(f,x:integer):boolean;
+  begin
+    ladderok :=  not nearhole(f,x) and
+                not nearhole(f+1,x);
+  end;
+
 begin
   on_elev:=false;
   _cleargr;
@@ -721,13 +768,12 @@ begin
   for floor:=0 to NFLOORS-1 do begin
     repeat
       ladders[floor]:=irandom(2,XSIZE-LADDERSIZE-2);
-    until ((ladders[floor]+LADDERSIZE<holes[floor])
-      or (ladders[floor]>holes[floor]+HOLESIZE)) and
-      ((ladders[floor]+LADDERSIZE<holes[floor+1])
-      or (ladders[floor]>holes[floor+1]+HOLESIZE));
-    if (floor=0) then
-      if (ladders[0] < XDOORSIZE+10) then
-        ladders[0]:=XDOORSIZE+10;
+      { align with previous ladder if nearby }
+      if floor=0 then
+        if ladders[0] < XDOORSIZE+10 then
+          ladders[0]:=XDOORSIZE+10;
+    until ladderok(floor,ladders[floor]) and
+              not nearladder(floor,ladders[floor]);
   end;
   ladders[NFLOORS]:=-LADDERSIZE;
   floor:=NFLOORS;
@@ -755,7 +801,7 @@ begin
     efloor:=irandom(0,NFLOORS);
     ex:=ladders[efloor];
   end else begin
-    efloor:=NFLOORS+1; { ove off floors }
+    efloor:=NFLOORS+1; { move off floors }
     ex:=300; { move off screen }
   end;
   eybottom:=efloor*VFLOORS;
