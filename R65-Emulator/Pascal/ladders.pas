@@ -107,12 +107,6 @@ begin
             (xc <= holes[f] + HOLESIZE);
 end;
 
-proc showball;
-begin
-  _plotmap(bxs,trunc(bys),ERASE);
-  _plotmap(bx,trunc(by),BALL);
-end;
-
 func balloverlap(x1,x2: integer): boolean;
 begin
   { ball is bx..bx+3 }
@@ -126,6 +120,59 @@ begin
   _draw(XSIZE,f*VFLOORS,WHITE);
   _move(holes[f],f*VFLOORS);
   _draw(holes[f]+HOLESIZE,f*VFLOORS,BLACK);
+end;
+
+proc showladder(f:integer);
+var i,x1,x2,y1,y2:integer;
+begin
+  if f<NFLOORS then begin
+    x1:=ladders[f];
+    x2:=x1+LADDERSIZE;
+    y1:=f*VFLOORS+1;
+    y2:=y1+VFLOORS-1;
+    _move(x1,y1);
+    _draw(x1,y2,WHITE);
+    _move(x2,y1);
+    _draw(x2,y2,WHITE);
+    i:=1;
+    for i:=1 to 5 do begin
+      _move(x1,y1+4*i-1);
+      _draw(x2,y1+4*i-1,WHITE);
+    end;
+  end;
+end;
+
+proc showelevator;
+begin
+  if eys>eybottom then begin
+    _move(ex,eys);
+    _draw(ex+LADDERSIZE,eys,BLACK);
+  end;
+  _move(ex,ey);
+  _draw(ex+LADDERSIZE,ey,WHITE);
+  eys:=ey;
+end;
+
+proc repairladder(f, xmin, xmax: integer);
+begin
+  if (ladders[f] < xmax) and
+     (ladders[f] + LADDERSIZE > xmin) then begin
+     if f <> efloor then
+       showladder(f);
+  end;
+end;
+
+proc repair(f,x1,x2: integer);
+var xmin,xmax: integer;
+begin
+  if x1 < x2 then begin
+    xmin := x1 - 1;
+    xmax := x2 + 8;
+  end else begin
+    xmin := x2 - 1;
+    xmax := x1 + 8;
+  end;
+  repairladder(f, xmin, xmax);
 end;
 
 proc showplayer;
@@ -151,30 +198,11 @@ begin
     spriteindex := S_LEFT + frame;
   _showsprite(trunc(fxs),fys,S_CLEAR);
   _showsprite(trunc(fx),fysum, spriteindex);
+  repair(ffloor, trunc(fxs), trunc(fx));
   fxs:=fx; fys:=fysum;
   loopcounter := loopcounter + 1;
   if loopcounter >= (3 * LOOPSPERFRAME) then
     loopcounter := 0;
-end;
-
-proc showladder(f:integer);
-var i,x1,x2,y1,y2:integer;
-begin
-  if f<NFLOORS then begin
-    x1:=ladders[f];
-    x2:=x1+LADDERSIZE;
-    y1:=f*VFLOORS+1;
-    y2:=y1+VFLOORS-1;
-    _move(x1,y1);
-    _draw(x1,y2,WHITE);
-    _move(x2,y1);
-    _draw(x2,y2,WHITE);
-    i:=1;
-    for i:=1 to 5 do begin
-      _move(x1,y1+4*i-1);
-      _draw(x2,y1+4*i-1,WHITE);
-    end;
-  end;
 end;
 
 proc moveelevator;
@@ -198,17 +226,6 @@ begin
       ewait := EWAIT
     end
   end;
-end;
-
-proc showelevator;
-begin
-  if eys>eybottom then begin
-    _move(ex,eys);
-    _draw(ex+LADDERSIZE,eys,BLACK);
-  end;
-  _move(ex,ey);
-  _draw(ex+LADDERSIZE,ey,WHITE);
-  eys:=ey;
 end;
 
 proc showdoor(i: integer);
@@ -239,11 +256,9 @@ end;
 proc showforeground;
 var f:integer;
 begin
-  for f:=0 to NFLOORS do begin
-    if f=efloor then
-      showelevator
-    else
-      showladder(f);
+  for f := 0 to NFLOORS do begin
+    if f = efloor then
+      showelevator;
     showfloor(f);
   end;
   showdoor(0);
@@ -259,6 +274,7 @@ begin
     for j:= 0 to 2 do
         time:=_syncscreen;
     _showsprite(trunc(fxs),fys,S_CLEAR);
+    repair(ffloor,trunc(fxs), trunc(fx));
     showforeground;
     for j:= 0 to 2 do
         time:=_syncscreen;
@@ -294,6 +310,13 @@ begin
     fx:=conv(ladders[ffloor-1]+1);
     fyspeed:=-1; fxstep:=0.0;
   end;
+end;
+
+proc showball;
+begin
+  _plotmap(bxs,trunc(bys),ERASE);
+  _plotmap(bx,trunc(by),BALL);
+  repair(floor, bxs, bx);
 end;
 
 proc newball;

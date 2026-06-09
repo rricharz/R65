@@ -661,10 +661,10 @@ void write6502(uint16_t address, uint8_t value)
                 lastPrint = lastCrtSync;
 
 			if (lastCrtSync - lastPrint >= 1000000) {
-                //printf("average spare time: %.1f msec\n",
-                //       (double)sleepSum /
-                //       (1000.0 * frameCount));
-                //fflush(stdout);
+                printf("average spare time: %.1f msec\n",
+                       (double)sleepSum /
+                       (1000.0 * frameCount));
+                fflush(stdout);
 
                 frameCount = 0;
                 sleepSum = 0;

@@ -832,8 +832,10 @@ PRTCH1  LDA VIDKEY
         BPL *-6
 *
 PRTCH0  LDA VIDKEY
-        CMP =$5F        IF NOT FOUND, RUBOUT?
-        BEQ *+6
+        NOP             WAS RUBOUT, NOT USED
+        NOP             ANYMORE; PASCAL USES
+        NOP             NOW USES UNDERSCORE
+        NOP
         CMP =$7F
         BNE PRTCH4
         JSR CLEFT
