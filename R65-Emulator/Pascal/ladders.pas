@@ -21,12 +21,14 @@ const ERASE         = 0;
       GRAVITY       = -0.25;
       REFLECTION    = -0.85;
 
+      FXSTEPSIZE    = 2.0;
+
       LADDERSIZE    = 9;  { should be odd }
       MINDIST       = 12; { distance between ladders }
-      FXSTEPSIZE    = 2.0;
-      { automatic walk-to-ladder-center distance: }
-      SNAPWIDTH     = 6.0;
-      LADDTOL       = 4;
+      SNAPWIDTH     = 6.0; { keep walking to ladder }
+      LADDTOL       = 2;
+      SETPAUSE      = 8; { frames to pause at ladder }
+
       LOOPSPERFRAME = 2;
       LASTXTIME     = 4; { frames }
       JUMPOFFSPEED  = 2.0;
@@ -52,7 +54,7 @@ var bx,bxspeed,bxs:               integer;
     jump,jumpspeed:               real;
     floor,ffloor,fy,fys,fyspeed:  integer;
     score,loopcounter,level:      integer;
-    lastfxtimes:                  integer;
+    lastfxtimes, pause:           integer;
     demomode:                     boolean;
 
     efloor,ex,ey,eys,ecount:      integer;
@@ -65,22 +67,6 @@ var bx,bxspeed,bxs:               integer;
 
 
 {$I IRANDOM:P}
-
-func getoption(opt:char):boolean;
-var i,dummy,save_carg:integer;
-    options:array[15] of char;
-    default:boolean;
-begin
-  save_carg:=_carg; {save for next call to getoption}
-  _agetstring(options,default,dummy,dummy);
-  getoption:=false;
-  if not default then begin
-    if options[0]<>'/' then _argerror(103);
-    for i:=1 to 15 do
-      if options[i]=opt then getoption:=true;
-  end;
-  _carg:=save_carg;
-end;
 
 func onfloor(f,y:integer):boolean;
 begin
@@ -132,6 +118,14 @@ begin
   { ball is bx..bx+3 }
   { require more than 1 pixel overlap }
   balloverlap := (bx+2 >= x1) and (bx+1 <= x2)
+end;
+
+proc showfloor(f: integer);
+begin
+  _move(0,f*VFLOORS);
+  _draw(XSIZE,f*VFLOORS,WHITE);
+  _move(holes[f],f*VFLOORS);
+  _draw(holes[f]+HOLESIZE,f*VFLOORS,BLACK);
 end;
 
 proc showplayer;
@@ -245,11 +239,13 @@ end;
 proc showforeground;
 var f:integer;
 begin
-  for f:=0 to NFLOORS do
+  for f:=0 to NFLOORS do begin
     if f=efloor then
       showelevator
     else
       showladder(f);
+    showfloor(f);
+  end;
   showdoor(0);
   showdoor(1);
 end;
@@ -346,10 +342,9 @@ begin
   fx:=3.0; fy:=1;
   fxstep:=0.0; ffloor:=0;
   fyspeed:=0;
-  bxs:=2; bys:=conv(NFLOORS*VFLOORS-10);
-  newball;
   showresult;
   flashplayer;
+  newball;
 end;
 
 func airborne(f:integer; fy:integer): boolean;
@@ -357,66 +352,39 @@ begin
   airborne := (not onfloor(f, fy)) or (jump > 0.01);
 end;
 
-proc keepwalking(f: integer);
-var found: boolean;
-    center: real;
+proc checkcrossing(f: integer; var x: real);
+var center: real;
 
-  proc checkcenter(center: real; var found: boolean);
-  var dist: real;
+  proc checkcenter(c: real);
   begin
     if fxstep > 0.0 then begin
-      if center >= fx then begin
-        dist := center - fx;
-
-        if dist <= 1.0 then begin
-          fx := center;
-          fxstep := 0.0;
-          found := true;
-        end else if dist <= SNAPWIDTH then begin
-          fxstep := 1.0;
-          found := true;
-        end;
+      if (x < c) and (x + fxstep >= c) then begin
+        x := c;
+        fxstep := 0.0;
+        pause := SETPAUSE;
       end;
-
     end else if fxstep < 0.0 then begin
-      if center <= fx then begin
-        dist := fx - center;
-
-        if dist <= 1.0 then begin
-          fx := center;
-          fxstep := 0.0;
-          found := true;
-        end else if dist <= SNAPWIDTH then begin
-          fxstep := -1.0;
-          found := true;
-        end;
+      if (x > c) and (x + fxstep <= c) then begin
+        x := c;
+        fxstep := 0.0;
+        pause := SETPAUSE;
       end;
     end;
   end;
 
 begin
-  found := false;
-
-  if airborne(f, fy) then
-    exit;
-
-  if fxstep <> 0.0 then begin
-
-    { ladder up from current floor }
+  if pause > 0 then
+    pause := pause - 1
+  else begin
     if (f >= 0) and (f < NFLOORS) then begin
       center := conv(ladders[f] + LADDERSIZE - 8);
-      checkcenter(center, found);
+      checkcenter(center);
     end;
 
-    { ladder down to current floor }
-    if (not found) and (f > 0) then begin
+    if (pause = 0) and (f > 0) then begin
       center := conv(ladders[f-1] + LADDERSIZE - 8);
-      checkcenter(center, found);
+      checkcenter(center);
     end;
-
-    { no ladder center in snap range }
-    if not found then
-      fxstep := 0.0;
   end;
 end;
 
@@ -452,7 +420,7 @@ begin
 
   { ***** HANDLE DEMO MODE ***** }
 
-  if demomode and (jump<0.01) then begin
+  if  demomode and (jump<0.01) then begin
     if valgem[ffloor]>0 then begin
       { first collect gem }
       if xgem[ffloor]<trunc(fx) then
@@ -479,6 +447,7 @@ begin
         jumpspeed := JUMPOFFSPEED;
         jump := 0.01;
       end;
+    if pause > 0 then fxstep := 0.0;
   end;
 
   { ***** HANDLE MOOVING OBJECTS ***** }
@@ -536,6 +505,7 @@ begin
       end;
   if not on_elev then begin
     { move player }
+    checkcrossing(ffloor, fx);
     if airborne(ffloor, fy) then
       fx := fx + lastfxstep
     else
@@ -630,6 +600,8 @@ begin
      (trunc(by)>=fy-4) and (trunc(by)<=fy+8)
     then begin
       nextround;
+      { avoid endless loop in demo mode }
+      if demomode then init;
     end;
 
   { ***** paint ***** }
@@ -641,9 +613,7 @@ begin
   showball;
   { paint player }
   showplayer;
-  { decide whether to keep walking automatically }
-  keepwalking(ffloor);
-  { paint ladders, elevators and doors }
+  { paint ladders, elevators, floors and doors }
   showforeground;
   { ride elevator }
   if not on_elev then begin
@@ -655,6 +625,9 @@ begin
     end
   end;
   fyspeed:=0;
+  if not airborne(ffloor,fy) then
+    if pause = 0 then
+      fxstep := 0.0;
 end;
 
 proc savescore;
@@ -685,7 +658,8 @@ func exkey(key:char):boolean;
 
   func canwalk:boolean;
   begin
-    canwalk := onfloor(ffloor,fy) and (jump<=0.01)
+    canwalk := (pause = 0) and onfloor(ffloor,fy)
+               and (jump<=0.01)
   end;
 
 begin
@@ -699,8 +673,11 @@ begin
                fxstep := FXSTEPSIZE;
     JUMPKEY:  begin
                 if (not airborne(ffloor, fy)) and
-                        (not onhole(ffloor, fx)) then
+                  (not onhole(ffloor, fx)) then begin
                   jumpspeed := JUMPOFFSPEED;
+                  { jump a bit further }
+                  fxstep := lastfxstep;
+                end;
               end;
     'L':    begin
               loadscore;
@@ -738,6 +715,7 @@ var f:integer;
   end;
 
 begin
+  pause := 0;
   on_elev:=false;
   _cleargr;
   level:=score div 1000+1;
@@ -759,10 +737,7 @@ begin
   for floor:=1 to NFLOORS do begin
     holes[floor]:=
       irandom(XDOORSIZE+2,XSIZE-HOLESIZE-1-XDOORSIZE);
-    _move(0,floor*VFLOORS);
-    _draw(XSIZE,floor*VFLOORS,WHITE);
-    _move(holes[floor],floor*VFLOORS);
-    _draw(holes[floor]+HOLESIZE,floor*VFLOORS,BLACK);
+    showfloor(floor);
   end;
   { make ladders }
   for floor:=0 to NFLOORS-1 do begin
