@@ -156,6 +156,20 @@ begin
   eys:=ey;
 end;
 
+proc showdoor(i: integer);
+var x1, y1,x2,y2: integer;
+begin
+  x1:=xdoor[i];
+  x2:=x1+XDOORSIZE;
+  y1:=ydoor[i];
+  y2:=y1+YDOORSIZE;
+  _move(x1,y1);
+  _draw(x1,y2,WHITE);
+  _draw(x2,y2,WHITE);
+  _draw(x2,y1,WHITE);
+  _plot(x2-2,y1+5,WHITE);
+end;
+
 proc repairladder(f, xmin, xmax: integer);
 begin
   if (ladders[f] < xmax) and
@@ -163,6 +177,21 @@ begin
      if f <> efloor then
        showladder(f);
   end;
+end;
+
+proc repairdoor(f,xmin,xmax: integer);
+var i,x1,x2: integer;
+begin
+  if f=0 then
+    i:=0
+  else if f=NFLOORS then
+    i:=1
+  else
+    exit;
+  x1:=xdoor[i];
+  x2:=x1+XDOORSIZE;
+  if (x1 <= xmax) and (x2 >= xmin) then
+    showdoor(i);
 end;
 
 proc repair(f,x1,x2: integer);
@@ -176,6 +205,7 @@ begin
     xmax := x1 + 8;
   end;
   repairladder(f, xmin, xmax);
+  repairdoor(f, xmin, xmax);
 end;
 
 proc showplayer;
@@ -231,20 +261,6 @@ begin
   end;
 end;
 
-proc showdoor(i: integer);
-var x1, y1,x2,y2: integer;
-begin
-  x1:=xdoor[i];
-  x2:=x1+XDOORSIZE;
-  y1:=ydoor[i];
-  y2:=y1+YDOORSIZE;
-  _move(x1,y1);
-  _draw(x1,y2,WHITE);
-  _draw(x2,y2,WHITE);
-  _draw(x2,y1,WHITE);
-  _plot(x2-2,y1+5,WHITE);
-end;
-
 proc showgem(f: integer);
 var sprite: integer;
 begin
@@ -263,8 +279,6 @@ begin
     if f = efloor then
       showelevator;
   end;
-  showdoor(0);
-  showdoor(1);
 end;
 
 proc flashplayer;
@@ -272,12 +286,11 @@ var i,j,f,time: integer;
 begin
   for i:= 1 to 4 do begin
     _showsprite(trunc(fxs),fys,S_STANDING);
-    showforeground;
+    repair(ffloor,trunc(fxs), trunc(fxs));
     for j:= 0 to 2 do
         time:=_syncscreen;
     _showsprite(trunc(fxs),fys,S_CLEAR);
-    repair(ffloor,trunc(fxs), trunc(fx));
-    showforeground;
+    repair(ffloor,trunc(fxs), trunc(fxs));
     for j:= 0 to 2 do
         time:=_syncscreen;
   end;
@@ -309,6 +322,7 @@ begin
   if (ffloor>0) and (ffloor<>efloor+1) and
      ondownladder(ffloor,fx)
   then begin
+    floor:=ffloor-1;
     fx:=conv(ladders[ffloor-1]+1);
     fyspeed:=-1; fxstep:=0.0;
   end;
@@ -364,8 +378,10 @@ end;
 
 proc nextround;
 begin
-  fx:=3.0; fy:=1;
-  fxstep:=0.0; ffloor:=0;
+  fx:=conv(xdoor[0]+XDOORSIZE-8);
+  fy:=ydoor[0];
+  fxstep:=0.0;
+  ffloor:=0;
   fyspeed:=0;
   showresult;
   flashplayer;
@@ -493,12 +509,13 @@ begin
         lastfxstep := 0.0;
     end;
   end;
-
   { check for exit on top floor }
-  if (ffloor=NFLOORS) and (trunc(fx)>=XSIZE-9) then
-  begin
-    score:=score+100 ;
-    fx:=conv(XSIZE-9);
+  if (ffloor=NFLOORS) and
+     (trunc(fx) >= xdoor[1]) then begin
+    score:=score+100;
+    { align player with door before flashing/reset }
+    fx:=conv(xdoor[0]+XDOORSIZE-8);
+    fy:=ydoor[1];
     nextround;
     init;
     exit;
