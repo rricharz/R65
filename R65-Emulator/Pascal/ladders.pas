@@ -34,7 +34,7 @@ const ERASE         = 0;
       LASTXTIME     = 4; { frames }
       JUMPOFFSPEED  = 2.0;
 
-      XDOORSIZE     = 8;
+      XDOORSIZE     = 9; { should be odd }
       YDOORSIZE     = 12;
 
       EWAIT         = 20; { wait tics at bottom/top }
@@ -170,6 +170,17 @@ begin
   _plot(x2-2,y1+5,WHITE);
 end;
 
+proc showgem(f: integer);
+var sprite: integer;
+begin
+  if valgem[f]=0 then sprite:=S_CLEAR
+  else if
+    valgem[f]=30 then sprite:=S_GEMS+2
+  else
+    sprite:=S_GEMS;
+  _showsprite(xgem[f],f*VFLOORS+1,sprite);
+end;
+
 proc repairladder(f, xmin, xmax: integer);
 begin
   if (ladders[f] < xmax) and
@@ -194,6 +205,17 @@ begin
     showdoor(i);
 end;
 
+proc repairgem(f,xmin,xmax: integer);
+var gx1,gx2: integer;
+begin
+  if (f>=0) and (f<=NFLOORS) then begin
+    gx1:=xgem[f];
+    gx2:=gx1+7;
+    if (gx1 <= xmax) and (gx2 >= xmin) then
+      showgem(f);
+  end;
+end;
+
 proc repair(f,x1,x2: integer);
 var xmin,xmax: integer;
 begin
@@ -206,6 +228,7 @@ begin
   end;
   repairladder(f, xmin, xmax);
   repairdoor(f, xmin, xmax);
+  repairgem(f, xmin, xmax);
 end;
 
 proc showplayer;
@@ -261,17 +284,6 @@ begin
   end;
 end;
 
-proc showgem(f: integer);
-var sprite: integer;
-begin
-  if valgem[f]=0 then sprite:=S_CLEAR
-  else if
-    valgem[f]=30 then sprite:=S_GEMS+2
-  else
-    sprite:=S_GEMS;
-  _showsprite(xgem[f],f*VFLOORS+1,sprite);
-end;
-
 proc showforeground;
 var f:integer;
 begin
@@ -284,7 +296,7 @@ end;
 proc flashplayer;
 var i,j,f,time: integer;
 begin
-  for i:= 1 to 4 do begin
+  for i:=1 to 4 do begin
     _showsprite(trunc(fxs),fys,S_STANDING);
     repair(ffloor,trunc(fxs), trunc(fxs));
     for j:= 0 to 2 do
@@ -378,13 +390,13 @@ end;
 
 proc nextround;
 begin
+  flashplayer;
   fx:=conv(xdoor[0]+XDOORSIZE-8);
   fy:=ydoor[0];
   fxstep:=0.0;
   ffloor:=0;
   fyspeed:=0;
   showresult;
-  flashplayer;
   newball;
 end;
 
@@ -648,14 +660,11 @@ begin
 
   { ***** paint ***** }
 
-  { paint gems }
-  for f:=0 to NFLOORS do
-      showgem(f);
   { paint ball }
   showball;
   { paint player }
   showplayer;
-  { paint ladders, elevators, floors and doors }
+  { paint moving elevator, should be renamed }
   showforeground;
   { ride elevator }
   if not on_elev then begin
@@ -736,12 +745,6 @@ end;
 proc init;
 var f:integer;
 
-  func nearhole(f,x:integer):boolean;
-  begin
-    nearhole := (x+LADDERSIZE+MINDIST >= holes[f]) and
-              (x <= holes[f]+HOLESIZE+MINDIST);
-  end;
-
   func nearladder(f,x:integer):boolean;
   begin
     if f<=0 then
@@ -750,10 +753,43 @@ var f:integer;
       nearladder:=_abs(x-ladders[f-1]) <= MINDIST;
   end;
 
+  func nearhole(f,x:integer):boolean;
+  begin
+    nearhole :=
+      (x + LADDERSIZE >= holes[f] - HOLEMARGIN) and
+      (x <= holes[f] + HOLESIZE + HOLEMARGIN);
+  end;
+
   func ladderok(f,x:integer):boolean;
   begin
-    ladderok :=  not nearhole(f,x) and
+    ladderok := not nearhole(f,x) and
                 not nearhole(f+1,x);
+  end;
+
+  func gemok(f,x:integer):boolean;
+  begin
+    gemok:=true;
+
+    { avoid upward ladder starting on this floor }
+    if f<NFLOORS then
+      if _abs(x-ladders[f]) <= 9 then
+        gemok:=false;
+
+    { avoid visible hole on this floor }
+    if f>0 then
+      if (x >= holes[f]-HOLEMARGIN-8) and
+         (x <= holes[f]+HOLESIZE+HOLEMARGIN) then
+        gemok:=false;
+
+    { avoid bottom door }
+    if f=0 then
+      if x < XDOORSIZE+10 then
+        gemok:=false;
+
+    { avoid top door }
+    if f=NFLOORS then
+      if x > XSIZE-XDOORSIZE-10 then
+        gemok:=false;
   end;
 
 begin
@@ -764,7 +800,7 @@ begin
   showresult;
   if (level>2) then begin
     savescore;
-    _s_chainprog('LADDERS3:R',0,1);
+    exit;
   end;
   { initialize ball }
   bxs:=2; bys:=conv(NFLOORS*VFLOORS-10);
@@ -778,48 +814,51 @@ begin
   _move(0,0); _draw(XSIZE,0,WHITE);
   for floor:=1 to NFLOORS do begin
     holes[floor]:=
-      irandom(XDOORSIZE+2,XSIZE-HOLESIZE-1-XDOORSIZE);
+      irandom(XDOORSIZE+4+HOLEMARGIN,
+              XSIZE-HOLESIZE-3-XDOORSIZE-HOLEMARGIN);
     showfloor(floor);
   end;
   { make ladders }
   for floor:=0 to NFLOORS-1 do begin
     repeat
       ladders[floor]:=irandom(2,XSIZE-LADDERSIZE-2);
-      { align with previous ladder if nearby }
+
       if floor=0 then
         if ladders[0] < XDOORSIZE+10 then
           ladders[0]:=XDOORSIZE+10;
+
     until ladderok(floor,ladders[floor]) and
-              not nearladder(floor,ladders[floor]);
+          not nearladder(floor,ladders[floor]);
   end;
   ladders[NFLOORS]:=-LADDERSIZE;
   floor:=NFLOORS;
   ffloor:=0;
   { make and show doors }
   xdoor[0]:=2;
-  ydoor[0]:=0;
+  ydoor[0]:=1;
   xdoor[1]:=XSIZE-XDOORSIZE-2;
-  ydoor[1]:=VFLOORS*NFLOORS;
+  ydoor[1]:=VFLOORS*NFLOORS+1;
   showdoor(0);
   showdoor(1);
   { make gems }
-  for f:= 0 to NFLOORS do begin
-    xgem[f]:=irandom(1,XSIZE-9);
-    { make sure gem is not at same place as ladder }
-    while (xgem[f]>ladders[f]-9) and
-          (xgem[f]<ladders[f]+9) do
+  for f:=0 to NFLOORS do begin
+    repeat
       xgem[f]:=irandom(1,XSIZE-9);
+    until gemok(f,xgem[f]);
+
     valgem[f]:=10;
   end;
-  valgem[irandom(0,NFLOORS)]:=30; { one coin }
+  { one coin worth 30 points }
+  valgem[irandom(0,NFLOORS)]:=30;
   { make elevator for level 2 }
   ecount:=0;
+
   if level=2 then begin
-    efloor:=irandom(0,NFLOORS);
+    efloor:=irandom(0,NFLOORS-1);
     ex:=ladders[efloor];
   end else begin
     efloor:=NFLOORS+1; { move off floors }
-    ex:=300; { move off screen }
+    ex:=300;           { move off screen }
   end;
   eybottom:=efloor*VFLOORS;
   eytop:=eybottom+VFLOORS;
@@ -828,13 +867,14 @@ begin
   edir:=1;
   ewait:=EWAIT;
   { show ladders and gems }
-  for f:=0 to NFLOORS do begin
+  for f:=0 to NFLOORS-1 do begin
     if f=efloor then
       showelevator
     else
       showladder(f);
     showgem(f);
   end;
+  showgem(NFLOORS);
 end;
 
 {$I IANIMATE:P}
