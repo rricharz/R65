@@ -379,9 +379,9 @@ void write6502_8(uint16_t address, uint8_t value)
     memory[address] = value;
 }
 
-/************/
-int mousepad()
-/************/
+/**********/
+int editor()
+/**********/
 {
     int i, end, filtyp, filstp;
     int status;
@@ -607,12 +607,12 @@ void write6502(uint16_t address, uint8_t value)
             memory[R8_EMUCOM] = 0;          // and clear command
         }
         else if (value == 3) {
-            memory[R8_EMURES] = mousepad(); // execute mousepad
+            memory[R8_EMURES] = editor(); // external editor
             memory[R8_EMUCOM] = 0;          // and clear command
         }
         else if (value == 4) {
-            memory[R8_EMURES] = change_floppy(); // execute change floppy
-            memory[R8_EMUCOM] = 0;          // and clear command
+            memory[R8_EMURES] = change_floppy();
+            memory[R8_EMUCOM] = 0;
         }
         else if (value == 5) {
 			// obsolete emulator command, did let the emulator know of a stack overflow
@@ -823,41 +823,55 @@ int catchSubroutine(uint16_t ea)
 /******************************/
 {
     if (ea == 0xE95E) {
-        // printf("******** IO: PRTRSA (print to rs232) called, currently implemented in emulator\n");
-        if ((a == 0x12) && rawPrint) {         // device control 2, switch to normal mode
-                printf("Printer switched to normal mode\n");
-                rawPrint = 0;
-                return 1;
-            }
+		/* These are R65 screen/printer controls, never write them in normal text mode */
+		if (!rawPrint) {
+			if ((a == 0x0E) ||        /* INVVID */
+				(a == 0x0B) ||        /* NORVID */
+				(a == 0x12) ||        /* PRTON */
+				(a == 0x14)) {        /* PRTOFF */
+			return 1;
+			}
+		}
+
+		/* Raw mode control */
+		if (a == 0x12) {              /* end raw mode */
+			rawPrint = 0;
+			return 1;
+		}
+
+		/* Optional safety: PRTOFF always ends raw mode */
+		if (a == 0x14) {
+			rawPrint = 0;
+			return 1;
+		}
+		
         if ((lastPrintedCharacter == 0x1B) && (!rawPrint)) {   
-            // ignore printer control characted
+            // ignore printer control character
             lastPrintedCharacter = 0;
             return 1;
         }
+        
+        if ((a == 0x7F) && (!rawPrint)){ 
+			// ignore del character
+            return 1;
+        }
+        
         if ((a < 0x20) && (!rawPrint) && ( a != 0x0C)) { // FF is allowed to pass
             if (a == 0x0D) {                   // linux text files have no cr, change for windows
                 return 1;
             }
             if (a == 0x11) {                   // device control 1, switch to raw mode
                 printf("Printer switched to raw mode\n");
-                rawPrint = 1;
+				rawPrint = 1;
                 return 1;
             }
-            if (a == 0x14) {                   // ignore printer control character
-                return 1;
-            }
-            if (a == 0x7F) {                   // ignore del character
-                return 1;
-            }
+
             if (a == 0x1F) {                   // ignore US character
                 return 1;
             }
 
             if (a == 0x1B) {                   // ignore printer control character, also next one
                 lastPrintedCharacter = 0x1B;
-                return 1;
-            }
-            if (a == 0x12) {                   // bell, ignore
                 return 1;
             }
             if (a == 0x09) {                   // tab8
@@ -867,16 +881,14 @@ int catchSubroutine(uint16_t ea)
                 }
                 return 1;
             }
-            if ((a == 0x0e) || (a == 0x0b)) {  // invvid,norvid, do nothing
-                return 1;
-            }
             if (a == 0x0A) {                   // new line
                 fprintf(printFile, "%c", a);
-                fflush(printFile);             // required if emulator is not properly terminated
+                fflush(printFile);
                 colNumber = 0;
                 return 1;
             }
-            fprintf(printFile, ">%02X<", a);
+            // fprintf(printFile, ">%02X<", a);
+            return 1;
         }
         else {
             if ((a != 0x7F) || rawPrint)  fprintf(printFile, "%c", a);

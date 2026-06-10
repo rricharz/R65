@@ -10,7 +10,7 @@ uses syslib, arglib, strlib, filelib;
 
 const title='R65 PEDIT 2.2'; {max 20 chars}
 
-    maxlines= 360;      xmax   = 56;
+    maxlines= 400;      xmax   = 56;
     scrlins = 16;       mlenght= 19;
     inpx    = 37;       marked = 58;
     eol     = chr($00); esc    = chr($00);
@@ -648,6 +648,7 @@ begin
 end;
 
 begin {main}
+  write(PRTOFF);
   for ig:=0 to maxlines-1 do linepnt[ig]:=nil;
   stemp:=_new; stemp2:=_new; fs:=_new; debug:=0;
   setnumlin($0f,$37); write(HOM,clrscr);

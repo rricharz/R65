@@ -26,12 +26,10 @@ var cyclus,drive,free: integer;
     name:    array[15] of char;
     default: boolean;
 
-proc bcderror(e:integer);
+proc error(e:integer);
 begin
-  writeln;
-  write(INVVID,'ERROR ');
-  write((e shr 4) and 15);
-  write(e and 15,NORVID);
+  RUNERR:=e;
+  _abort;
 end;
 
 proc setsubtype(subtype:char);
@@ -55,6 +53,7 @@ end;
 begin { main }
   cyclus:=0; drive:=1;
   _agetstring(name,default,cyclus,drive);
+  if default then error(101);
   setsubtype('P');
   _asetfile(name,cyclus,drive,filstp);
   if not _bestmatch then begin
@@ -65,7 +64,7 @@ begin { main }
   writeln('e');
   FILERR := _emulator(ECEXPORT);
   if FILERR<>0 then begin
-    bcderror(FILERR);
+    error(FILERR);
     writeln;
     exit;
   end;
@@ -74,7 +73,7 @@ begin { main }
     if FILERR=$69 then
       writeln(INVVID,'File not stored',NORVID)
     else begin
-      bcderror(FILERR);
+      error(FILERR);
       writeln;
       end;
     exit;
@@ -82,7 +81,7 @@ begin { main }
 
   FILERR := _emulator(ECIMPORT);
   if FILERR<>0 then begin
-    bcderror(FILERR);
+    error(FILERR);
     writeln;
     exit;
   end;

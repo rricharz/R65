@@ -739,6 +739,7 @@ end;
 { ***** main program ***** }
 
 begin
+  write(PRTOFF);
   init;
   readinput;
   startview;

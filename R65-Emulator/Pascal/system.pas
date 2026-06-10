@@ -38,11 +38,14 @@ const
   MMAXSEQ  = 8;     {max no of sequential files}
   CLRSCR   = chr($11);  {clear to end of screen}
   NHISTORY = 4; { entries in history }
+  AUTOPR   = $08;
+  ENDRAW   = chr($12);
 
 mem
   BUFFPN   = $0015: integer&;
   FIDRTB   = $0339: array[8] of integer&;
   MAXSEQ   = $0336: integer&;
+  VFLAG    = $1780: integer&;
 
   { persistent SYSTEM memory area }
   HISTMAG  = $df00: integer&; { initialized }
@@ -162,11 +165,15 @@ const CLEFT       = chr($03);
       ESC         = chr($00);
       LINELENGTH  = 45;  { 47 - 2 for prompt }
 var lch: char;
-    pos, len: integer;
+    pos, len, oldvflag: integer;
 begin
   line[0] := ENDMARK;
   pos := 0;
   len := 0;
+
+  oldvflag := VFLAG;
+  if (VFLAG and AUTOPR) <> 0 then
+    VFLAG := VFLAG - AUTOPR;   { clear bit 3 }
 
   write(NORVID,'P*',CLRLIN);
 
@@ -262,6 +269,12 @@ begin
       end {case};
     end;
   until lch=CR;
+
+  write(CLRSCR); { ok, because AUTOPR is off }
+
+  if (oldvflag and AUTOPR) <> 0 then
+    write(@PRINTER, 'P*', line);
+  VFLAG := oldvflag;
 
   writeln;
 end;
@@ -391,6 +404,7 @@ begin {main}
   for k:=0 to MMAXSEQ-1 do FIDRTB[k]:=0;
   clearinput;
   ok:=true;
+  write(ENDRAW);
 
   spos := 0;
   readline(gline);
@@ -417,9 +431,11 @@ begin {main}
     if ch=' ' then begin  {arguments}
       repeat
         next;
+        if ch=' ' then
+          argerr:=106
 
         { quoted argument }
-        if ch='"' then begin
+        else if ch='"' then begin
           ARGTYPE[n]:='q';
           if n>23 then argerr:=107
           else begin
@@ -505,10 +521,9 @@ begin {main}
         106: writeln('Argument syntax error');
         107: writeln('Too many arguments')
         end {case};
-    write(NORVID)
+    write(@PRINTER, ENDRAW);
   end else begin
     clearinput;
-    write(CLRSCR);
     ENDSTK:=TOPMEM-144;
     chainprog(runname, cyclus1, drive1);
   end;
