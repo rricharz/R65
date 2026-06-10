@@ -17,6 +17,7 @@ const ERASE         = 0;
       VFLOORS       = 20;
       MAXBYSPEED    = 19.0;
       HOLESIZE      = 22;
+      HOLEMARGIN    = 4;
 
       GRAVITY       = -0.25;
       REFLECTION    = -0.85;
@@ -114,12 +115,14 @@ begin
   balloverlap := (bx+2 >= x1) and (bx+1 <= x2)
 end;
 
-proc showfloor(f: integer);
+proc showfloor(f:integer);
+var y:integer;
 begin
-  _move(0,f*VFLOORS);
-  _draw(XSIZE,f*VFLOORS,WHITE);
-  _move(holes[f],f*VFLOORS);
-  _draw(holes[f]+HOLESIZE,f*VFLOORS,BLACK);
+  y:=f*VFLOORS;
+  _move(0,y);
+  _draw(holes[f]-HOLEMARGIN,y,WHITE);
+  _move(holes[f]+HOLESIZE+HOLEMARGIN,y);
+  _draw(XSIZE,y,WHITE);
 end;
 
 proc showladder(f:integer);
@@ -259,7 +262,6 @@ begin
   for f := 0 to NFLOORS do begin
     if f = efloor then
       showelevator;
-    showfloor(f);
   end;
   showdoor(0);
   showdoor(1);
