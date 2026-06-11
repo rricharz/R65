@@ -38,6 +38,7 @@ const
     NRESW     = 64;    {number of reserved words}
 
     SAT_EXPORT = 1;    {Bit mask for s_attr}
+    NOTOPEN   = @129;
 
 var reswtab: array[ 520] of char; {8*(NRESW+1)}
 
@@ -144,7 +145,7 @@ begin
   write(INVVID);
   case x of
     01: write('Ident');
-    02: write('Ident ',code,' expected');
+    02: write('Token ',code,' expected');
     03: write('Var declaration');
     04: write('Const expected');
     05: write('Ident unknown');
@@ -170,10 +171,11 @@ begin
     25: write('Formatted write');
     26: write('Wrong library version');
     27: write('Identifier too long');
-    28: write('Unsupported type')
+    28: write('Unsupported type');
+    29: write('Program name <> file name')
   end {case};
   writeln(' at line ', line, ', pos ', tpos, NORVID);
-  if makeoutput then close(ofno);
+  if ofno<>NOTOPEN then close(ofno);
   if chaincheckb and not makeoutput then begin
     { count error for checkbuild }
     ARGLIST[22] := ARGLIST[22] + 1;
@@ -331,7 +333,8 @@ var i,j,dummy: integer;
     request: array[15] of char;
     default: boolean;
 begin {init}
-  lpr := PRINTER;
+  ofno:=NOTOPEN;
+  lpr:=PRINTER;
   ateof:=false; savefno:=@0;
   cdrive:=FILDRV; { drive of compile program }
   fipnt:=-1;
@@ -2674,16 +2677,21 @@ begin {main}
     else
       merror(2,'pg')
   end {case}
+
   parse('id');
   i:=0;
-  repeat
+  while (i<12) and
+        (pname[i]<>':') and
+        (pname[i]<>' ') and
+        (pname[i]=_uppercase(ident[i+1])) do
     i:=succ(i);
-  until (i>11) or (pname[i] = ':') or
-      (pname[i]<>_uppercase(ident[i+1]));
-  if i<12 then
-    merror(2,packed(pname[0],pname[1]));
-    { name differs from filename }
+  if (i=0) or
+     ((i<12) and
+      (pname[i]<>':') and
+      (pname[i]<>' ')) then
+    error(29); { name differs from file name }
   parse(' ;');
+
   if makeoutput then openw(ofno);
   scan;
 
