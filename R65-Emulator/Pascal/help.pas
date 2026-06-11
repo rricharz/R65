@@ -68,7 +68,9 @@ begin
     copyback;
     _s_runprog('VIEW:R', 0, 0);
   end else
-    writeln('No help file for this topic available');
+    writeln(INVVID,
+      'No help file for this topic available',
+      NORVID);
 
   if changed then begin
     _change_disk(diskname, 1);

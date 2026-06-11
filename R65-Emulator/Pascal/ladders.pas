@@ -137,7 +137,6 @@ begin
     _draw(x1,y2,WHITE);
     _move(x2,y1);
     _draw(x2,y2,WHITE);
-    i:=1;
     for i:=1 to 5 do begin
       _move(x1,y1+4*i-1);
       _draw(x2,y1+4*i-1,WHITE);
@@ -145,15 +144,26 @@ begin
   end;
 end;
 
+proc showshaft;
+begin
+  _move(ex,eybottom);
+  _draw(ex,eytop,WHITE);
+  _move(ex+LADDERSIZE,eybottom);
+  _draw(ex+LADDERSIZE,eytop,WHITE);
+end;
+
 proc showelevator;
 begin
   if eys>eybottom then begin
-    _move(ex,eys);
-    _draw(ex+LADDERSIZE,eys,BLACK);
+    _move(ex+1,eys);
+    _draw(ex+LADDERSIZE-1,eys,BLACK);
   end;
-  _move(ex,ey);
-  _draw(ex+LADDERSIZE,ey,WHITE);
+  _move(ex+1,ey);
+  _draw(ex+LADDERSIZE-1,ey,WHITE);
   eys:=ey;
+  { show floor element above }
+  _move(ex,(efloor+1)*VFLOORS);
+  _draw(ex+LADDERSIZE,(efloor+1)*VFLOORS,WHITE);
 end;
 
 proc showdoor(i: integer);
@@ -177,16 +187,18 @@ begin
   else if
     valgem[f]=30 then sprite:=S_GEMS+2
   else
-    sprite:=S_GEMS;
+    sprite:=S_GEMS+1;
   _showsprite(xgem[f],f*VFLOORS+1,sprite);
 end;
 
 proc repairladder(f, xmin, xmax: integer);
 begin
   if (ladders[f] < xmax) and
-     (ladders[f] + LADDERSIZE > xmin) then begin
-     if f <> efloor then
-       showladder(f);
+         (ladders[f] + LADDERSIZE > xmin) then begin
+    if f <> efloor then
+      showladder(f)
+    else
+      showshaft;
   end;
 end;
 
@@ -205,15 +217,22 @@ begin
     showdoor(i);
 end;
 
+proc cleargem(f: integer);
+begin
+  if (f>=0) and (f<=NFLOORS) then
+    _showsprite(xgem[f],f*VFLOORS+1,S_CLEAR);
+end;
+
 proc repairgem(f,xmin,xmax: integer);
 var gx1,gx2: integer;
 begin
-  if (f>=0) and (f<=NFLOORS) then begin
-    gx1:=xgem[f];
-    gx2:=gx1+7;
-    if (gx1 <= xmax) and (gx2 >= xmin) then
-      showgem(f);
-  end;
+  if (f>=0) and (f<=NFLOORS) then
+    if valgem[f]<>0 then begin
+      gx1:=xgem[f];
+      gx2:=gx1+7;
+      if (gx1 <= xmax) and (gx2 >= xmin) then
+        showgem(f);
+    end;
 end;
 
 proc repair(f,x1,x2: integer);
@@ -284,15 +303,6 @@ begin
   end;
 end;
 
-proc showforeground;
-var f:integer;
-begin
-  for f := 0 to NFLOORS do begin
-    if f = efloor then
-      showelevator;
-  end;
-end;
-
 proc flashplayer;
 var i,j,f,time: integer;
 begin
@@ -325,7 +335,9 @@ begin
      onupladder(ffloor,fx)
   then begin
     fx:=conv(ladders[ffloor]+1);
-    fyspeed:=1; fxstep:=0.0;
+    fyspeed:=1;
+    fxstep:=0.0;
+    lastfxstep:=0.0;
   end;
 end;
 
@@ -336,7 +348,9 @@ begin
   then begin
     floor:=ffloor-1;
     fx:=conv(ladders[ffloor-1]+1);
-    fyspeed:=-1; fxstep:=0.0;
+    fyspeed:=-1;
+    fxstep:=0.0;
+    lastfxstep:=0.0;
   end;
 end;
 
@@ -344,7 +358,13 @@ proc showball;
 begin
   _plotmap(bxs,trunc(bys),ERASE);
   _plotmap(bx,trunc(by),BALL);
-  repair(floor, bxs, bx);
+  repair(floor,bxs,bx);
+end;
+
+proc eraseball;
+begin
+  _plotmap(bxs,trunc(bys),ERASE);
+  repair(floor,bxs,bx);
 end;
 
 proc newball;
@@ -368,14 +388,6 @@ begin
   crossdown := (bys > yline) and (by <= yline)
 end;
 
-func ballon_elevator:boolean;
-begin
-  if floor<>efloor+1 then
-    ballon_elevator:=false
-  else
-    ballon_elevator:=balloverlap(ex,ex+LADDERSIZE-1)
-end;
-
 proc hreflect(xline: integer);
 begin
   if (bxs < xline) and (bx >= xline) then begin
@@ -390,6 +402,7 @@ end;
 
 proc nextround;
 begin
+  eraseball;
   flashplayer;
   fx:=conv(xdoor[0]+XDOORSIZE-8);
   fy:=ydoor[0];
@@ -576,6 +589,7 @@ begin
     if (distx<8) then begin
       score:=score+valgem[ffloor];
       showresult;
+      cleargem(ffloor);
       valgem[ffloor]:=0;
     end;
     { jump }
@@ -601,18 +615,6 @@ begin
   { move ball }
   bxs:=bx; bys:=by;
   bx:=bx+bxspeed; by:=by+byspeed;
-  { check for reflection on elevator }
-  if balloverlap(ex, ex+LADDERSIZE) then begin
-    if crossdown(conv(ey)) then begin
-      { ball hits elevator from above }
-      by:=conv(ey+1);
-      byspeed:=REFLECTION*byspeed;
-    end else if crossup(conv(ey)) then begin
-      { ball hits elevator from below }
-      by:=conv(ey-1);
-      byspeed:= REFLECTION*byspeed;
-    end
-  end;
   { check for wall }
   if bx>=XSIZE-4 then begin
     bx:=XSIZE-4; bxspeed:=-bxspeed;
@@ -628,9 +630,9 @@ begin
   { check for reflection on the floor }
   yline := conv(floor*VFLOORS+1);
   if (balloverlap(holes[floor],
-    holes[floor]+HOLESIZE-1)or ballon_elevator)
-    and (by<=yline) then begin
-    { fall through hole or elevator hole }
+          holes[floor]+HOLESIZE-1))
+          and (by<=yline) then begin
+    { fall through hole hole }
     if floor>0 then floor:=floor-1;
   end else if (by<yline) or crossdown(yline) then
   begin
@@ -655,7 +657,10 @@ begin
     then begin
       nextround;
       { avoid endless loop in demo mode }
-      if demomode then init;
+      if demomode then begin
+        init;
+        exit;
+      end;
     end;
 
   { ***** paint ***** }
@@ -663,9 +668,14 @@ begin
   { paint ball }
   showball;
   { paint player }
+  if fyspeed<>0 then
+    if trunc(fx)<>ladders[ffloor]+1 then
+      writeln('bad climb x ',trunc(fx),
+              ' should ',ladders[ffloor]+1,
+              ' floor ',ffloor);
   showplayer;
-  { paint moving elevator, should be renamed }
-  showforeground;
+  { paint moving elevator }
+  showelevator;
   { ride elevator }
   if not on_elev then begin
     if (ffloor=efloor) and (ey=eybottom) and
@@ -775,6 +785,11 @@ var f:integer;
       if _abs(x-ladders[f]) <= 9 then
         gemok:=false;
 
+    { avoid downward ladder arriving on this floor }
+    if f>0 then
+      if _abs(x-ladders[f-1]) <= 9 then
+        gemok:=false;
+
     { avoid visible hole on this floor }
     if f>0 then
       if (x >= holes[f]-HOLEMARGIN-8) and
@@ -797,10 +812,12 @@ begin
   on_elev:=false;
   _cleargr;
   level:=score div 1000+1;
+  if level>9 then level:=9;
   showresult;
-  if (level>2) then begin
+  if (level>2) and (not demomode) then begin
     savescore;
-    exit;
+    writeln('Level 2 Complete');
+    _abort;
   end;
   { initialize ball }
   bxs:=2; bys:=conv(NFLOORS*VFLOORS-10);
@@ -845,7 +862,6 @@ begin
     repeat
       xgem[f]:=irandom(1,XSIZE-9);
     until gemok(f,xgem[f]);
-
     valgem[f]:=10;
   end;
   { one coin worth 30 points }
@@ -853,7 +869,7 @@ begin
   { make elevator for level 2 }
   ecount:=0;
 
-  if level=2 then begin
+  if level>=2 then begin
     efloor:=irandom(0,NFLOORS-1);
     ex:=ladders[efloor];
   end else begin
@@ -866,14 +882,13 @@ begin
   eys:=eytop;
   edir:=1;
   ewait:=EWAIT;
-  { show ladders and gems }
+  { show ladders, elevator and gems }
   for f:=0 to NFLOORS-1 do begin
-    if f=efloor then
-      showelevator
-    else
+    if f<>efloor then
       showladder(f);
     showgem(f);
   end;
+  showshaft;
   showgem(NFLOORS);
 end;
 
