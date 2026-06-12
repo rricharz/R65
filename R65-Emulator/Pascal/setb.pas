@@ -20,5 +20,11 @@ begin
   end else begin
     brkpnt:=n;
     writeln('Breakpoint set at line ',n);
+    writeln('Keys valid at breakpoint:');
+    writeln('S    step');
+    writeln('C    continue');
+    writeln('R    reset breakpoint and continue');
+    writeln('1-9  trace n lines');
+    writeln('ESC  stop');
   end;
 end.

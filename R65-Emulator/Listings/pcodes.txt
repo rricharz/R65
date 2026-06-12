@@ -1,362 +1,360 @@
    1     4 program pcodes;
-   2     4 uses syslib,arglib,strlib,ralib,mathlib,filelib;
-   3  7999 
-   4  7999 const npcodes=$5a;
-   5  8002 
-   6  8002 var codename: array[npcodes] of cpnt;
-   7  8002     codebytes: array[npcodes] of integer;
-   8  8002     fcode,scode: file;
-   9  8002     cdsize,i,code,line,first,last: integer;
-  10  8002     name: array[15] of char;
-  11  8002     cyclus,drive:integer;
-  12  8002     default,silent: boolean;
-  13  8002     linestr:cpnt;
-  14  8002 
-  15  8002 func readline(f: file; pnt: cpnt): boolean;
-  16  8002 {#########################################}
-  17  8002 const alteof=chr(127);
-  18  8005 var ch1: char;
-  19  8005     pos: integer;
-  20  8005 begin
-  21  8005   pos := 0; read(@f,ch1);
-  22  8023   while (ch1>=' ') and (ch1<>alteof) and
-  23  8038       (pos<STRSIZE-1) do begin
-  24  8053     pnt[pos]:=ch1; pos:=pos+1; read(@f,ch1);
-  25  8086     end;
-  26  8087   pnt[pos]:=ENDMARK;
-  27  8096   readline:=(ch1=EOF) or (ch1=alteof);
-  28  8114 end;
-  29  8119 
-  30  8120 proc setsubtype(var nm:array[15] of char;subtype:char)
-  31  8120 ;
-  32  8120 {#####################################################
-  33  8120 }
-  34  8120 var i:integer;
-  35  8123 begin
-  36  8123   i:=0;
-  37  8127   repeat
-  38  8131     i:=i+1;
-  39  8137   until (nm[i]=':') or
-  40  8153     (nm[i]=' ') or (i>=14);
-  41  8172   nm[i]:=':';
-  42  8182   nm[i+1]:=subtype;
-  43  8193 end;
-  44  8201 
-  45  8202 proc writehex(a:integer);
-  46  8202 {#######################}
-  47  8202 var h:integer;
-  48  8205   func hexdigit(c:char):char;
-  49  8205   var d:integer;
-  50  8208   begin
-  51  8208     d:=ord(c) and 15;
-  52  8216     if d>9 then hexdigit:=chr(d-10+ord('A'))
-  53  8240     else hexdigit:=chr(d+ord('0'));
-  54  8256   end;
-  55  8261 begin
-  56  8262   h:=a and 255;
-  57  8270   write(hexdigit(chr(h shr 4)));
-  58  8292   write(hexdigit(chr(h and 15)));
-  59  8309 end;
-  60  8309 
-  61  8310 proc writeui(n:integer);
-  62  8310 {######################}
-  63  8310 var limit:integer;
-  64  8313 begin
-  65  8313   limit:=10000;
-  66  8318   while (limit>n) and (limit>0) do begin
-  67  8342     limit:=limit div 10; write(' ');
-  68  8355   end;
-  69  8355   write(n);
-  70  8363 end;
-  71  8363 
-  72  8364 proc showprog;
-  73  8364 {############}
-  74  8364 var pc,a,b,c,codesize:integer;
-  75  8367     r:real;
-  76  8367     done,normal:boolean;
-  77  8367 
-  78  8367   proc packreal(i1,i2:%integer;
-  79  8367     var r:array[1] of %integer);
-  80  8367   begin
-  81  8367     r[0]:=i1; r[1]:=i2;
-  82  8384   end;
-  83  8392 
-  84  8393 begin
-  85  8393   line:=1;
-  86  8397   getbyte(fcode,0,a);
-  87  8413   getbyte(fcode,1,b);
-  88  8425   codesize:=a+(b shl 8);
-  89  8436   writeln('Program size: ', codesize,' bytes, ',
-  90  8470     b+1,' sectors');
-  91  8493   writeln;
-  92  8493   pc:=2;
-  93  8501 
-  94  8505   repeat
-  95  8505     normal:=true;
-  96  8507     silent:=(line<first);
-  97  8520     getbyte(fcode,pc,code);
-  98  8538     if code<0 then begin
-  99  8545       writeln('Negative code');
- 100  8568       exit;
- 101  8569     end;
- 102  8569     if not silent then begin
- 103  8574       write('  '); writeui(pc);
- 104  8590       write(' '); writehex(code);
- 105  8602       write(' ',codebytes[code],' ');
- 106  8615     end;
- 107  8615     if (code<=npcodes) and (code>=0) then begin
- 108  8630       if not silent then write(codename[code])
- 109  8645     end else begin
- 110  8653       writeln('pcode not known');
- 111  8675       exit;
- 112  8676     end;
- 113  8676     c:=0;
- 114  8678     case codebytes[code] of
- 115  8686       2: begin
- 116  8697              getbyte(fcode,pc+1,a);
- 117  8714              if not silent then write(' ',a);
- 118  8729            end;
- 119  8729       3: begin
- 120  8739              getbyte(fcode,pc+1,a);
- 121  8756              getbyte(fcode,pc+2,b);
- 122  8773              c:=a+(b shl 8);
- 123  8784              if not silent then begin
- 124  8794                { exception for JUMP }
- 125  8797                if code=$24 then write(' ',c+pc+1)
- 126  8820                else write(' ',c);
- 127  8832              end;
- 128  8832            end;
- 129  8832       4: begin
- 130  8842              getbyte(fcode,pc+1,a);
- 131  8859              if not silent then write(' ',a,',');
- 132  8876              getbyte(fcode,pc+2,a);
- 133  8893              getbyte(fcode,pc+3,b);
- 134  8910              if not silent then write(' ',a+(b shl 8))
- 135  8931 ;
- 136  8933            end;
- 137  8933       5: begin
- 138  8943              getbyte(fcode,pc+1,a);
- 139  8960              getbyte(fcode,pc+2,b);
- 140  8977              if not silent then
- 141  8977                write(' ',a+(b shl 8),' ');
- 142  9002              getbyte(fcode,pc+3,a);
- 143  9019              getbyte(fcode,pc+4,b);
- 144  9036              if not silent then
- 145  9036                write(' ',a+(b shl 8));
- 146  9059          end;
- 147  9059       6: begin
- 148  9069            getbyte(fcode,pc+1,a);
- 149  9086            if not silent then write(' ',a,',');
- 150  9103            getbyte(fcode,pc+2,a);
- 151  9120            getbyte(fcode,pc+3,b);
- 152  9137            c:=a+(b shl 8); ;
- 153  9153            getbyte(fcode,pc+4,a);
- 154  9170            getbyte(fcode,pc+5,b);
- 155  9187            if not silent then begin
- 156  9192              if code=$3a then begin
- 157  9202                packreal(c, a+(b shl 8),r);
- 158  9239                  write(' '); write(r:11:3);
- 159  9257              end else begin
- 160  9260                write(' ',c,' ');
- 161  9269                write(' ',a+(b shl 8));
- 162  9284              end;
- 163  9284            end;
- 164  9284          end
- 165  9284       end; {case}
- 166  9286     case code of
- 167  9286       $32: begin { PRTI, stops with bit 8 set }
- 168  9297              normal:=false;
- 169  9299              pc:=pc+1;
- 170  9309              repeat
- 171  9314                getbyte(fcode,pc,a);
- 172  9328                if not silent then begin
- 173  9333                  write('<');
- 174  9338                  writehex(a);
- 175  9348                  write('>');
- 176  9350                  write(chr(a and $7f), ' ');
- 177  9361                end;
- 178  9361                pc:=pc+1;
- 179  9367                until (a and $80)<>0;
- 180  9381            end;
- 181  9385       $39: begin { NBYT, first argument is n bytes }
- 182  9395              normal:=false;
- 183  9397              getbyte(fcode,pc,a);
- 184  9415              if not silent then
- 185  9415                write(' ',a,',',chr($27));
- 186  9436              for i:=1 to a do begin
- 187  9455                getbyte(fcode,pc,b);
- 188  9469                if not silent then
- 189  9469                  write(chr(b and $7f));
- 190  9486                pc:=pc+1;
- 191  9492              end;
- 192  9497              if not silent then write(chr($27));
- 193  9523            end;
- 194  9523       $56: begin { CPNT, stops with ENDMARK }
- 195  9533              normal:=false;
- 196  9535              if not silent then write(' ',chr($27));
- 197  9553              repeat
- 198  9553                getbyte(fcode,pc,a);
- 199  9567                if (a<>0) and not silent then
- 200  9574                  write(chr(a and $7f));
- 201  9592                pc:=pc+1;
- 202  9598                until a=0;
- 203  9609              if not silent then write(chr($27));
- 204  9625            end;
- 205  9625       $59: begin { LINE }
- 206  9635              done:=false;
- 207  9637              while (line<=c) and not done do begin
- 208  9659                if (line<=last) then begin
- 209  9668                  if not silent then writeln;
- 210  9679                  done:=readline(scode,linestr);
- 211  9701                  if not silent then
- 212  9705                    write(INVVID,line,' ',
- 213  9723                      linestr,NORVID);
- 214  9731                end;
- 215  9731                line:=line+1;
- 216  9737              end;
- 217  9742            end
- 218  9745       end {case};
- 219  9747     if not silent then writeln;
- 220  9755 
- 221  9761     if codebytes[code]<>0 then
- 222  9771       pc:=pc+codebytes[code]
- 223  9779     else begin
- 224  9795       if normal then writeln('codebytes not known')
- 225  9822     end;
- 226  9828     until (pc>=codesize) or
- 227  9837       ((codebytes[code]=0) and normal) or
- 228  9853       (line>last+1);
- 229  9866 end;
- 230  9870 
- 231  9871 proc init;
- 232  9871 {########}
- 233  9871 var i:integer;
- 234  9874   proc set(p:integer;n:cpnt;b:integer);
- 235  9874   begin
- 236  9874     codename[p]:=n; codebytes[p]:=b;
- 237  9895   end;
- 238  9903 begin
- 239  9904   for i:=0 to npcodes+1 do begin
- 240  9926     codename[i]:=nil; codebytes[i]:=0;
- 241  9942   end;
- 242  9946   set($00,'STOP',1);
- 243  9977   set($01,'RETN',1);
- 244  9994   set($02,'NEGA',1);
- 245 10011   set($03,'ADDA',1);
- 246 10028   set($04,'SUBA',1);
- 247 10045   set($05,'MULA',1);
- 248 10062   set($06,'DIVA',1);
- 249 10079   set($07,'LOWB',1);
- 250 10096   set($08,'TEQU',1);
- 251 10113   set($09,'TNEQ',1);
- 252 10130   set($0a,'TLES',1);
- 253 10147   set($0b,'TGRE',1);
- 254 10164   set($0c,'TGRT',1);
- 255 10181   set($0d,'TLEE',1);
- 256 10198   set($0e,'ORAC',1);
- 257 10215   set($0f,'ANDA',1);
- 258 10232   set($10,'EORA',1);
- 259 10249   set($11,'NOTA',1);
- 260 10266   set($12,'LEFT',1);
- 261 10283   set($13,'RIGH',1);
- 262 10300   set($14,'INCA',1);
- 263 10317   set($15,'DECA',1);
- 264 10334   set($16,'COPY',1);
- 265 10351   set($17,'PEEK',1);
- 266 10368   set($18,'POKE',1);
- 267 10385   set($19,'CALA',1);
- 268 10402   set($1a,'RLIN',0);
- 269 10419   set($1b,'GETC',1);
- 270 10436   set($1c,'GETN',1);
- 271 10453   set($1d,'PRTC',1);
- 272 10470   set($1e,'PRTN',1);
- 273 10487   set($1f,'PRTS',0);
- 274 10504   set($20,'LITB',2);
- 275 10521   set($21,'INCB',2);
- 276 10538   set($22,'LITW',3);
- 277 10555   set($23,'INCW',3);
- 278 10572   set($24,'JUMP',3);
- 279 10589   set($25,'JMPZ',3);
- 280 10606   set($26,'JMPO',3);
- 281 10623   set($27,'LOAD',4);
- 282 10640   set($28,'LODX',4);
- 283 10657   set($29,'STOR',4);
- 284 10674   set($2a,'STOX',4);
- 285 10691   set($2b,'CALL',4);
- 286 10708   set($2c,'SDEV',1);
- 287 10725   set($2d,'RDEV',1);
- 288 10742   set($2e,'FNAM',1);
- 289 10759   set($2f,'OPNR',1);
- 290 10776   set($30,'OPNW',1);
- 291 10793   set($31,'CLOS',1);
- 292 10810   set($32,'PRTI',0);
- 293 10827   set($33,'GHGH',1);
- 294 10844   set($34,'GLOW',1);
- 295 10861   set($35,'PHGH',1);
- 296 10878   set($36,'PLOW',1);
- 297 10895   set($37,'GSEQ',1);
- 298 10912   set($38,'PSEQ',1);
- 299 10929   set($39,'NBYT',0);
- 300 10946   set($3a,'NWRD',6);
- 301 10963   set($3b,'LODN',2);
- 302 10980   set($3c,'STON',2);
- 303 10997   set($3d,'LODI',1);
- 304 11014   set($3e,'STOI',1);
- 305 11031   set($3f,'EXST',1);
- 306 11048   set($40,'TIND',5);
- 307 11065   set($41,'RUNP',1);
- 308 11082   set($42,'ADDF',1);
- 309 11099   set($43,'SUBF',1);
- 310 11116   set($44,'MULF',1);
- 311 11133   set($45,'DIVF',1);
- 312 11150   set($46,'FLOF',1);
- 313 11167   set($47,'FIXF',1);
- 314 11184   set($48,'FEQU',1);
- 315 11201   set($49,'FNEQ',1);
- 316 11218   set($4a,'FLES',1);
- 317 11235   set($4b,'FGRE',1);
- 318 11252   set($4c,'FGRT',1);
- 319 11269   set($4d,'FLEE',1);
- 320 11286   set($4e,'FCOM',1);
- 321 11303   set($4f,'TFER',1);
- 322 11320   set($50,'OPRA',1);
- 323 11337   set($51,'GTRA',1);
- 324 11354   set($52,'PTRA',1);
- 325 11371   set($53,'SWA2',1);
- 326 11388   set($54,'LDXI',1);
- 327 11405   set($55,'STXI',4);
- 328 11422   set($56,'CPNT',0);
- 329 11439   set($57,'WRCP',1);
- 330 11456   set($58,'ADPS',1);
- 331 11473   set($59,'LINE',3);
- 332 11490   set($5a,'CHAI',1);
- 333 11507 end;
- 334 11507 
- 335 11508 begin {main}
- 336 11508   init;
- 337 11515   linestr:=_new;
- 338 11521   cyclus:=0; drive:=1;
- 339 11533   _agetstring(name,default,cyclus,drive);
- 340 11577   setsubtype(name,'R');
- 341 11597   writeln('Opening object file ');
- 342 11624   fcode:=_attach(name,0,1,FREAD,0,0,'R');
- 343 11650   cdsize:=_getsize;
- 344 11660   writeln;
- 345 11664   writeln('Object file opened, file size ',
- 346 11701     cdsize div 256,' sectors');
- 347 11725   setsubtype(name,'P');
- 348 11745   _asetfile(name,cyclus,drive,'P');
- 349 11767   writeln('Opening source file ');
- 350 11794   openr(scode);
- 351 11800   writeln; writeln('Source file opened');
- 352 11831   first:=0; last:=32000;
- 353 11840   _agetval(first,default);
- 354 11864   _agetval(last,default);
- 355 11884   writeln('display from ',first,' to ',last);
- 356 11919   showprog;
- 357 11923   close(fcode);
- 358 11929   close(scode);
- 359 11935 end.
-Code length:           11934
+   2     4 [  0] uses syslib,arglib,strlib,ralib,mathlib,filelib;
+   3  7994 [137] 
+   4  7994 [137] const npcodes=$5a;
+   5  8000 [138] 
+   6  8000 [138] var codename: array[npcodes] of cpnt;
+   7  8003 [139]     codebytes: array[npcodes] of integer;
+   8  8006 [140]     fcode,scode: file;
+   9  8009 [142]     cdsize,i,code,line,first,last: integer;
+  10  8012 [148]     name: array[15] of char;
+  11  8015 [149]     cyclus,drive:integer;
+  12  8018 [151]     default,silent: boolean;
+  13  8021 [153]     linestr:cpnt;
+  14  8024 [154] 
+  15  8024 [154] func readline(f: file; pnt: cpnt): boolean;
+  16  8027 [158] {#########################################}
+  17  8030 [158] const alteof=chr(127);
+  18  8036 [159] var ch1: char;
+  19  8039 [160]     pos: integer;
+  20  8042 [161] begin
+  21  8045 [161]   pos := 0; read(@f,ch1);
+  22  8066 [161]   while (ch1>=' ') and (ch1<>alteof) and
+  23  8084 [161]       (pos<STRSIZE-1) do begin
+  24  8102 [161]     pnt[pos]:=ch1; pos:=pos+1; read(@f,ch1);
+  25  8138 [161]     end;
+  26  8142 [161]   pnt[pos]:=ENDMARK;
+  27  8154 [161]   readline:=(ch1=EOF) or (ch1=alteof);
+  28  8175 [161] end;
+  29  8183 [161] 
+  30  8184 [156] proc setsubtype(var nm:array[15] of char;
+  31  8187 [158]                                     subtype:char);
+  32  8190 [159] {################################################}
+  33  8193 [159] var i:integer;
+  34  8199 [160] begin
+  35  8202 [160]   i:=0;
+  36  8209 [160]   repeat
+  37  8216 [160]     i:=i+1;
+  38  8225 [160]   until (nm[i]=':') or
+  39  8244 [160]     (nm[i]=' ') or (i>=14);
+  40  8266 [160]   nm[i]:=':';
+  41  8279 [160]   nm[i+1]:=subtype;
+  42  8293 [160] end;
+  43  8304 [160] 
+  44  8305 [157] proc writehex(a:integer);
+  45  8308 [159] {#######################}
+  46  8311 [159] var h:integer;
+  47  8317 [160]   func hexdigit(c:char):char;
+  48  8320 [163]   var d:integer;
+  49  8326 [164]   begin
+  50  8329 [164]     d:=ord(c) and 15;
+  51  8340 [164]     if d>9 then hexdigit:=chr(d-10+ord('A'))
+  52  8367 [164]     else hexdigit:=chr(d+ord('0'));
+  53  8386 [164]   end;
+  54  8394 [164] begin
+  55  8398 [162]   h:=a and 255;
+  56  8409 [162]   write(hexdigit(chr(h shr 4)));
+  57  8434 [162]   write(hexdigit(chr(h and 15)));
+  58  8454 [162] end;
+  59  8457 [162] 
+  60  8458 [158] proc writeui(n:integer);
+  61  8461 [160] {######################}
+  62  8464 [160] var limit:integer;
+  63  8470 [161] begin
+  64  8473 [161]   limit:=10000;
+  65  8481 [161]   while (limit>n) and (limit>0) do begin
+  66  8508 [161]     limit:=limit div 10; write(' ');
+  67  8524 [161]   end;
+  68  8527 [161]   write(n);
+  69  8538 [161] end;
+  70  8541 [161] 
+  71  8542 [159] proc showprog;
+  72  8545 [160] {############}
+  73  8548 [160] var pc,a,b,c,m,codesize:integer;
+  74  8554 [166]     r:real;
+  75  8557 [167]     done,normal:boolean;
+  76  8560 [169] 
+  77  8560 [169]   proc packreal(i1,i2:%integer;
+  78  8563 [172]     var r:array[1] of %integer);
+  79  8566 [173]   begin
+  80  8569 [173]     r[0]:=i1; r[1]:=i2;
+  81  8589 [173]   end;
+  82  8600 [173] 
+  83  8601 [170] begin
+  84  8604 [170]   line:=1;
+  85  8611 [170]   getbyte(fcode,0,a);
+  86  8630 [170]   getbyte(fcode,1,b);
+  87  8645 [170]   codesize:=a+(b shl 8);
+  88  8659 [170]   writeln('Program size: ', codesize,' bytes, ',
+  89  8696 [170]     b+1,' sectors');
+  90  8722 [170]   writeln;
+  91  8725 [170]   pc:=2;
+  92  8736 [170] 
+  93  8740 [170]   repeat
+  94  8743 [170]     normal:=true;
+  95  8748 [170]     silent:=(line<first);
+  96  8764 [170]     getbyte(fcode,pc,code);
+  97  8785 [170]     if code<0 then begin
+  98  8795 [170]       writeln('Negative code');
+  99  8821 [170]       exit;
+ 100  8825 [170]     end;
+ 101  8828 [170]     if not silent then begin
+ 102  8836 [170]       write('  '); writeui(pc);
+ 103  8855 [170]       write(' '); writehex(code);
+ 104  8870 [170]       write(' ',codebytes[code],' ');
+ 105  8886 [170]     end;
+ 106  8889 [170]     if (code<=npcodes) and (code>=0) then begin
+ 107  8907 [170]       if not silent then write(codename[code])
+ 108  8925 [170]     end else begin
+ 109  8936 [170]       writeln('pcode not known');
+ 110  8961 [170]       exit;
+ 111  8965 [170]     end;
+ 112  8968 [170]     c:=0;
+ 113  8973 [170]     case codebytes[code] of
+ 114  8984 [170]       2: begin
+ 115  8998 [170]              getbyte(fcode,pc+1,a);
+ 116  9018 [170]              if not silent then write(' ',a);
+ 117  9036 [170]            end;
+ 118  9039 [170]       3: begin
+ 119  9052 [170]              getbyte(fcode,pc+1,a);
+ 120  9072 [170]              getbyte(fcode,pc+2,b);
+ 121  9092 [170]              c:=a+(b shl 8);
+ 122  9106 [170]              if not silent then begin
+ 123  9119 [170]                { exception for JUMP }
+ 124  9125 [170]                if code=$24 then write(' ',c+pc+1)
+ 125  9151 [170]                else write(' ',c);
+ 126  9166 [170]              end;
+ 127  9169 [170]            end;
+ 128  9172 [170]       4: begin
+ 129  9185 [170]              getbyte(fcode,pc+1,a);
+ 130  9205 [170]              if not silent then write(' ',a,',');
+ 131  9225 [170]              getbyte(fcode,pc+2,a);
+ 132  9245 [170]              getbyte(fcode,pc+3,b);
+ 133  9265 [170]              if not silent then write(' ',a+(b shl 8))
+ 134  9289 [170] ;
+ 135  9294 [170]            end;
+ 136  9297 [170]       5: begin
+ 137  9310 [170]              getbyte(fcode,pc+1,a);
+ 138  9330 [170]              getbyte(fcode,pc+2,b);
+ 139  9350 [170]              if not silent then
+ 140  9353 [170]                write(' ',a+(b shl 8),' ');
+ 141  9381 [170]              getbyte(fcode,pc+3,a);
+ 142  9401 [170]              getbyte(fcode,pc+4,b);
+ 143  9421 [170]              if not silent then
+ 144  9424 [170]                write(' ',a+(b shl 8));
+ 145  9450 [170]          end;
+ 146  9453 [170]       6: begin
+ 147  9466 [170]            getbyte(fcode,pc+1,a);
+ 148  9486 [170]            if not silent then write(' ',a,',');
+ 149  9506 [170]            getbyte(fcode,pc+2,a);
+ 150  9526 [170]            getbyte(fcode,pc+3,b);
+ 151  9546 [170]            c:=a+(b shl 8); ;
+ 152  9565 [170]            getbyte(fcode,pc+4,a);
+ 153  9585 [170]            getbyte(fcode,pc+5,b);
+ 154  9605 [170]            if not silent then begin
+ 155  9613 [170]              if code=$3a then begin
+ 156  9626 [170]                packreal(c, a+(b shl 8),r);
+ 157  9666 [170]                  write(' '); write(r:11:3);
+ 158  9687 [170]              end else begin
+ 159  9693 [170]                write(' ',c,' ');
+ 160  9705 [170]                write(' ',a+(b shl 8));
+ 161  9723 [170]              end;
+ 162  9726 [170]            end;
+ 163  9729 [170]          end
+ 164  9732 [170]       end; {case}
+ 165  9737 [170]     case code of
+ 166  9740 [170]       $32:  begin { PRTI, stops with bit 8 set }
+ 167  9754 [170]               normal:=false;
+ 168  9759 [170]               pc:=pc+1;
+ 169  9772 [170]               if not silent then write(' ',chr($27));
+ 170  9794 [170]               repeat
+ 171  9797 [170]                 getbyte(fcode,pc,a);
+ 172  9814 [170]                 m:=a and $7f;
+ 173  9823 [170]                 if not silent then begin
+ 174  9836 [170]                   if(ord(m)>$1f) and (ord(m)<$7f) then
+ 175  9856 [170]                     write(chr(m))
+ 176  9867 [170]                   else begin
+ 177  9875 [170]                     write('<');
+ 178  9880 [170]                     writehex(a);
+ 179  9893 [170]                     write('>');
+ 180  9898 [170]                   end;
+ 181  9901 [170]                 end;
+ 182  9904 [170]                 pc:=pc+1;
+ 183  9913 [170]               until (a and $80)<>0;
+ 184  9930 [170]               if not silent then write(chr($27));
+ 185  9949 [170]             end;
+ 186  9952 [170]       $39: begin { NBYT, first argument is n bytes }
+ 187  9965 [170]              normal:=false;
+ 188  9970 [170]              getbyte(fcode,pc,a);
+ 189  9991 [170]              if not silent then
+ 190  9994 [170]                write(' ',a,',',chr($27));
+ 191 10018 [170]              for i:=1 to a do begin
+ 192 10040 [170]                getbyte(fcode,pc,b);
+ 193 10057 [170]                if not silent then
+ 194 10060 [170]                  write(chr(b and $7f));
+ 195 10080 [170]                pc:=pc+1;
+ 196 10089 [170]              end;
+ 197 10097 [170]              if not silent then write(chr($27));
+ 198 10126 [170]            end;
+ 199 10129 [170]       $56: begin { CPNT, stops with ENDMARK }
+ 200 10142 [170]              normal:=false;
+ 201 10147 [170]              if not silent then write(' ',chr($27));
+ 202 10168 [170]              repeat
+ 203 10171 [170]                getbyte(fcode,pc,a);
+ 204 10188 [170]                if (a<>0) and not silent then
+ 205 10198 [170]                  write(chr(a and $7f));
+ 206 10219 [170]                pc:=pc+1;
+ 207 10228 [170]                until a=0;
+ 208 10242 [170]              if not silent then write(chr($27));
+ 209 10261 [170]            end;
+ 210 10264 [170]       $59: begin { LINE }
+ 211 10277 [170]              done:=false;
+ 212 10282 [170]              while (line<=c) and not done do begin
+ 213 10307 [170]                if (line<=last) then begin
+ 214 10319 [170]                  if not silent then writeln;
+ 215 10333 [170]                  done:=readline(scode,linestr);
+ 216 10358 [170]                  if not silent then
+ 217 10365 [170]                    write(INVVID,line,' ',
+ 218 10386 [170]                      linestr,NORVID);
+ 219 10397 [170]                end;
+ 220 10400 [170]                line:=line+1;
+ 221 10409 [170]              end;
+ 222 10417 [170]            end
+ 223 10423 [170]       end {case};
+ 224 10428 [170]     if not silent then writeln;
+ 225 10439 [170] 
+ 226 10445 [170]     if codebytes[code]<>0 then
+ 227 10458 [170]       pc:=pc+codebytes[code]
+ 228 10469 [170]     else begin
+ 229 10488 [170]       if normal then writeln('Codebytes not known')
+ 230 10518 [170]     end;
+ 231 10527 [170]     until (pc>=codesize) or
+ 232 10539 [170]       ((codebytes[code]=0) and normal) or
+ 233 10558 [170]       (line>last+1);
+ 234 10574 [170] end;
+ 235 10581 [170] 
+ 236 10582 [160] proc init;
+ 237 10585 [161] {########}
+ 238 10588 [161] var i:integer;
+ 239 10594 [162]   proc set(p:integer;n:cpnt;b:integer);
+ 240 10597 [166]   begin
+ 241 10600 [166]     codename[p]:=n; codebytes[p]:=b;
+ 242 10624 [166]   end;
+ 243 10635 [166] begin
+ 244 10639 [163]   for i:=0 to npcodes+1 do begin
+ 245 10664 [163]     codename[i]:=nil; codebytes[i]:=0;
+ 246 10683 [163]   end;
+ 247 10690 [163]   set($00,'STOP',1);
+ 248 10724 [163]   set($01,'RETN',1);
+ 249 10744 [163]   set($02,'NEGA',1);
+ 250 10764 [163]   set($03,'ADDA',1);
+ 251 10784 [163]   set($04,'SUBA',1);
+ 252 10804 [163]   set($05,'MULA',1);
+ 253 10824 [163]   set($06,'DIVA',1);
+ 254 10844 [163]   set($07,'LOWB',1);
+ 255 10864 [163]   set($08,'TEQU',1);
+ 256 10884 [163]   set($09,'TNEQ',1);
+ 257 10904 [163]   set($0a,'TLES',1);
+ 258 10924 [163]   set($0b,'TGRE',1);
+ 259 10944 [163]   set($0c,'TGRT',1);
+ 260 10964 [163]   set($0d,'TLEE',1);
+ 261 10984 [163]   set($0e,'ORAC',1);
+ 262 11004 [163]   set($0f,'ANDA',1);
+ 263 11024 [163]   set($10,'EORA',1);
+ 264 11044 [163]   set($11,'NOTA',1);
+ 265 11064 [163]   set($12,'LEFT',1);
+ 266 11084 [163]   set($13,'RIGH',1);
+ 267 11104 [163]   set($14,'INCA',1);
+ 268 11124 [163]   set($15,'DECA',1);
+ 269 11144 [163]   set($16,'COPY',1);
+ 270 11164 [163]   set($17,'PEEK',1);
+ 271 11184 [163]   set($18,'POKE',1);
+ 272 11204 [163]   set($19,'CALA',1);
+ 273 11224 [163]   set($1a,'RLIN',0);
+ 274 11244 [163]   set($1b,'GETC',1);
+ 275 11264 [163]   set($1c,'GETN',1);
+ 276 11284 [163]   set($1d,'PRTC',1);
+ 277 11304 [163]   set($1e,'PRTN',1);
+ 278 11324 [163]   set($1f,'PRTS',0);
+ 279 11344 [163]   set($20,'LITB',2);
+ 280 11364 [163]   set($21,'INCB',2);
+ 281 11384 [163]   set($22,'LITW',3);
+ 282 11404 [163]   set($23,'INCW',3);
+ 283 11424 [163]   set($24,'JUMP',3);
+ 284 11444 [163]   set($25,'JMPZ',3);
+ 285 11464 [163]   set($26,'JMPO',3);
+ 286 11484 [163]   set($27,'LOAD',4);
+ 287 11504 [163]   set($28,'LODX',4);
+ 288 11524 [163]   set($29,'STOR',4);
+ 289 11544 [163]   set($2a,'STOX',4);
+ 290 11564 [163]   set($2b,'CALL',4);
+ 291 11584 [163]   set($2c,'SDEV',1);
+ 292 11604 [163]   set($2d,'RDEV',1);
+ 293 11624 [163]   set($2e,'FNAM',1);
+ 294 11644 [163]   set($2f,'OPNR',1);
+ 295 11664 [163]   set($30,'OPNW',1);
+ 296 11684 [163]   set($31,'CLOS',1);
+ 297 11704 [163]   set($32,'PRTI',0);
+ 298 11724 [163]   set($33,'GHGH',1);
+ 299 11744 [163]   set($34,'GLOW',1);
+ 300 11764 [163]   set($35,'PHGH',1);
+ 301 11784 [163]   set($36,'PLOW',1);
+ 302 11804 [163]   set($37,'GSEQ',1);
+ 303 11824 [163]   set($38,'PSEQ',1);
+ 304 11844 [163]   set($39,'NBYT',0);
+ 305 11864 [163]   set($3a,'NWRD',6);
+ 306 11884 [163]   set($3b,'LODN',2);
+ 307 11904 [163]   set($3c,'STON',2);
+ 308 11924 [163]   set($3d,'LODI',1);
+ 309 11944 [163]   set($3e,'STOI',1);
+ 310 11964 [163]   set($3f,'EXST',1);
+ 311 11984 [163]   set($40,'TIND',5);
+ 312 12004 [163]   set($41,'RUNP',1);
+ 313 12024 [163]   set($42,'ADDF',1);
+ 314 12044 [163]   set($43,'SUBF',1);
+ 315 12064 [163]   set($44,'MULF',1);
+ 316 12084 [163]   set($45,'DIVF',1);
+ 317 12104 [163]   set($46,'FLOF',1);
+ 318 12124 [163]   set($47,'FIXF',1);
+ 319 12144 [163]   set($48,'FEQU',1);
+ 320 12164 [163]   set($49,'FNEQ',1);
+ 321 12184 [163]   set($4a,'FLES',1);
+ 322 12204 [163]   set($4b,'FGRE',1);
+ 323 12224 [163]   set($4c,'FGRT',1);
+ 324 12244 [163]   set($4d,'FLEE',1);
+ 325 12264 [163]   set($4e,'FCOM',1);
+ 326 12284 [163]   set($4f,'TFER',1);
+ 327 12304 [163]   set($50,'OPRA',1);
+ 328 12324 [163]   set($51,'GTRA',1);
+ 329 12344 [163]   set($52,'PTRA',1);
+ 330 12364 [163]   set($53,'SWA2',1);
+ 331 12384 [163]   set($54,'LDXI',1);
+ 332 12404 [163]   set($55,'STXI',4);
+ 333 12424 [163]   set($56,'CPNT',0);
+ 334 12444 [163]   set($57,'WRCP',1);
+ 335 12464 [163]   set($58,'ADPS',1);
+ 336 12484 [163]   set($59,'LINE',3);
+ 337 12504 [163]   set($5a,'CHAI',1);
+ 338 12524 [163] end;
+ 339 12527 [163] 
+ 340 12528 [161] begin {main}
+ 341 12531 [161]   init;
+ 342 12541 [161]   linestr:=_new;
+ 343 12550 [161]   cyclus:=0; drive:=1;
+ 344 12565 [161]   _agetstring(name,default,cyclus,drive);
+ 345 12612 [161]   setsubtype(name,'R');
+ 346 12635 [161]   fcode:=_attach(name,0,1,FREAD+FSILENT,0,0,'R');
+ 347 12667 [161]   cdsize:=_getsize;
+ 348 12680 [161]   setsubtype(name,'P');
+ 349 12707 [161]   _asetfile(name,cyclus,drive,'P');
+ 350 12732 [161]   openr(scode);
+ 351 12741 [161]   first:=0; last:=32000;
+ 352 12753 [161]   _agetval(first,default);
+ 353 12780 [161]   _agetval(last,default);
+ 354 12803 [161]   showprog;
+ 355 12810 [161]   close(fcode);
+ 356 12819 [161]   close(scode);
+ 357 12828 [161] end.
+Code length:           12830
 Compiler stack size:   190
-Ident stack size:      168/256
+Ident stack size:      173/300

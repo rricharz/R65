@@ -278,16 +278,17 @@ void infoPanel()
     if (!usedByUser)
 		s1[0] = 0;
 		
-	int pascalSp = memory[0x08] + (memory[0x0b] << 9);
+	int stprog = memory[0x11] + (memory[0x12] << 8);		
+	int pascalPc = memory[0x0a] + (memory[0x0b] << 8) - stprog - 1;
 	if (isAnimation) { 
 		fflush(stdout);
 	    sprintf(s2,"%04X  %02X", pcSample, spMin);
-	    sprintf(s3,"%04X  %02X", spSample, (pascalMinFree >> 8) & 0xFF);
+	    sprintf(s3,"%04X  %02X", pascalPcSample, (pascalMinFree >> 8) & 0xFF);
 
 	}
 	else {
 		sprintf(s2,"%04X  %02X",pc, spMin);
-		sprintf(s3,"%04X  %02X", pascalSp & 0xFFFF, (pascalMinFree >> 8) & 0xFF);
+		sprintf(s3,"%05d %02X", pascalPc & 0xFFFF, (pascalMinFree >> 8) & 0xFF);
 	}
         
     if ((memory[M8_SFLAG] & 1) == 0)
@@ -298,7 +299,7 @@ void infoPanel()
     crt_show7segmentDisplay(s2, quit_vpos + 2 * quit_vsize + 76 * panelScale,
         "6502 pc and s");
     crt_show7segmentDisplay(s3, quit_vpos + 2 * quit_vsize + 136 * panelScale,
-        "Pascal sp and free pages");
+        "Pascal pc and free pages");
 
     SETBUTTONCOLOR;
     Text(panelOffset + 14 * panelScale, 340 * panelScale,

@@ -89,6 +89,7 @@ GRC     EQU $03B0
 SFLAG   EQU $1781
 NUMCHR  EQU $178A
 VMON    EQU $17D5
+TRCNT   EQU $17D7
 SAVS    EQU $17FF
 *
 APLOTCH EQU $C818
@@ -180,6 +181,7 @@ STOP    LDA RUNERR      IF RUNERR ALREADY SET
 STOP0   LDA =0
         STA LSTLIN      CLEAR LSTLIN
         STA LSTLIN+1
+        STA TRCNT
         LDA =47
         STA NUMCHR      FORCE 48 CHARS/LINE
         JSR CLOSAL      CLOSE ALL OPEN FILES
@@ -1389,9 +1391,10 @@ TINDERR LDX =$83        RUNTIME ERROR
 *****************
 *
 RUNP    LDA =0
+        STA TRCNT
         STA LSTLIN      CLEAR LSTLIN
         STA LSTLIN+1
-                LDY =130
+        LDY =130
         LDA ACCU        SAVE ACCU
         LDX ACCU+1
         JSR SAVE
@@ -1595,7 +1598,7 @@ TFER    LDX IOCHECK
 TFER1   RTS             OK
 *
 TFER2   JSR PRTINF
-        BYT $0E,'OPEN '+$80
+        BYT $0E,'File '+$80
 *
         LDX =0
 TFER3   TXA
@@ -1793,6 +1796,12 @@ ADPS    CLC
 * P-CODE 59: LINE      SOURCE LINE
 *****************
 *
+* STARTS AT LINE, VECTORS ARE TO AVOID
+* BRANCH RANGE PROBLEMS
+*
+LINE8   JMP STOP        STOP EXECUTION
+LINE9   RTS             RETURN
+*
 LINE    JSR FETCH
         STA LSTLIN
         JSR FETCH
@@ -1811,9 +1820,34 @@ LINE    JSR FETCH
         JSR PRTINF
         BYT $D,$8A
 *
-LINE6   JSR GETKEY
+LINE6   LDA =0
+        STA TRCNT
+        JSR PRTINF
+        BYT '%'+128
+        JSR GETKEY
+        PHA
+        CMP =0          ESC?
+        BEQ LINE6E
+        JSR PRTCHR      ECHO KEY
+LINE6E  JSR PRTINF
+        BYT $0D,$8A
+        PLA
         CMP =0          ESC?
         BEQ LINE8
+        CMP ='S'
+        BEQ LINE5
+        CMP ='C'
+        BEQ LINE9
+        CMP ='R'
+        BEQ LINER
+        CMP ='1'
+        BCC LINE6
+        CMP ='9'+1
+        BCS LINE6
+        SEC
+        SBC ='0'
+        STA TRCNT
+*
 LINE5   LDY =0
         LDA (PC),Y
         CMP =$59
@@ -1827,6 +1861,10 @@ LINE5   LDY =0
         JSR PRTL
         JSR PRTINF
         BYT $D,$8A
+        LDA TRCNT
+        BEQ LINE6
+        DEC TRCNT
+        BNE LINE5
         JMP LINE6
 *
 LINE7   LDX SAVS
@@ -1834,14 +1872,17 @@ LINE7   LDX SAVS
         JSR EXCODE      EXECUTE NEXT CODE
         JMP LINE5
 *
-LINE8   JMP STOP        STOP EXECUTION
-*
-LINE9   RTS
+LINER   LDA =0
+        STA TRCNT
+        STA BRKPNT
+        STA BRKPNT+1
+        JMP LINE9
 *
 * P-code 5A: CHAIN: chain Pascal program
 ****************************************
 *
 CHAIN   LDA =0
+        STA TRCNT
         STA LSTLIN
         STA LSTLIN+1
         LDA STPROG
@@ -2046,6 +2087,7 @@ WARMST  LDA SFLAG       SET PASCAL RUNTIME BIT
         STX DEVICE
         STX DEVPNT
         STX DEVPNT+1
+        STX TRCNT
         DEX
         STX ENDBUF
         STX IOCHECK

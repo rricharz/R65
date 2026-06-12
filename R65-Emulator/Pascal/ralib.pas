@@ -8,9 +8,11 @@
 
 library ralib;
 
-const FREAD=$00;  {existing file, read}
-      FWRITE=$20; {existing file, write}
-      FNEW=$30;   {_new file, write }
+const FREAD   = $00;  {existing file, read}
+      FWRITE  = $20;  {existing file, write}
+      FNEW    = $30;  {new file, write }
+      FSILENT = $40;
+      { use e.g. FREAD+FSILENT for silent open }
 
 func _uppercase(ch:char):char;
 begin

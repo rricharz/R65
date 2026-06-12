@@ -27,10 +27,9 @@ begin
   readline:=(ch1=EOF) or (ch1=alteof);
 end;
 
-proc setsubtype(var nm:array[15] of char;subtype:char)
-;
-{#####################################################
-}
+proc setsubtype(var nm:array[15] of char;
+                                    subtype:char);
+{################################################}
 var i:integer;
 begin
   i:=0;
@@ -71,7 +70,7 @@ end;
 
 proc showprog;
 {############}
-var pc,a,b,c,codesize:integer;
+var pc,a,b,c,m,codesize:integer;
     r:real;
     done,normal:boolean;
 
@@ -164,20 +163,26 @@ begin
          end
       end; {case}
     case code of
-      $32: begin { PRTI, stops with bit 8 set }
-             normal:=false;
-             pc:=pc+1;
-             repeat
-               getbyte(fcode,pc,a);
-               if not silent then begin
-                 write('<');
-                 writehex(a);
-                 write('>');
-                 write(chr(a and $7f), ' ');
-               end;
-               pc:=pc+1;
-               until (a and $80)<>0;
-           end;
+      $32:  begin { PRTI, stops with bit 8 set }
+              normal:=false;
+              pc:=pc+1;
+              if not silent then write(' ',chr($27));
+              repeat
+                getbyte(fcode,pc,a);
+                m:=a and $7f;
+                if not silent then begin
+                  if(ord(m)>$1f) and (ord(m)<$7f) then
+                    write(chr(m))
+                  else begin
+                    write('<');
+                    writehex(a);
+                    write('>');
+                  end;
+                end;
+                pc:=pc+1;
+              until (a and $80)<>0;
+              if not silent then write(chr($27));
+            end;
       $39: begin { NBYT, first argument is n bytes }
              normal:=false;
              getbyte(fcode,pc,a);
@@ -221,7 +226,7 @@ begin
     if codebytes[code]<>0 then
       pc:=pc+codebytes[code]
     else begin
-      if normal then writeln('codebytes not known')
+      if normal then writeln('Codebytes not known')
     end;
     until (pc>=codesize) or
       ((codebytes[code]=0) and normal) or
@@ -338,21 +343,14 @@ begin {main}
   cyclus:=0; drive:=1;
   _agetstring(name,default,cyclus,drive);
   setsubtype(name,'R');
-  writeln('Opening object file ');
-  fcode:=_attach(name,0,1,FREAD,0,0,'R');
+  fcode:=_attach(name,0,1,FREAD+FSILENT,0,0,'R');
   cdsize:=_getsize;
-  writeln;
-  writeln('Object file opened, file size ',
-    cdsize div 256,' sectors');
   setsubtype(name,'P');
   _asetfile(name,cyclus,drive,'P');
-  writeln('Opening source file ');
   openr(scode);
-  writeln; writeln('Source file opened');
   first:=0; last:=32000;
   _agetval(first,default);
   _agetval(last,default);
-  writeln('display from ',first,' to ',last);
   showprog;
   close(fcode);
   close(scode);

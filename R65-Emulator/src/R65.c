@@ -104,7 +104,7 @@ long lastAnimationTime = 0;
 int  isAnimation = 0;
 int  global_forceCrtUpdate = 0;
 int  pcSample = 0;
-int  spSample = 0;
+int  pascalPcSample = 0;
 
 
 /********************/
@@ -1094,7 +1094,8 @@ int r65Loop()
 
 		// sample pc and sp for info display in animation loop
 		pcSample = pc;
-		spSample = memory[0x08] + (memory[0x0b] << 9);
+		int stprog = memory[0x11] + (memory[0x12] << 8);		
+		pascalPcSample = memory[0x0a] + (memory[0x0b] << 8) - stprog - 1;
 
 		checkPendingEvents();
 		checkMotorTurnoff(1);
