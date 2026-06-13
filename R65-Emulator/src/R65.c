@@ -724,7 +724,7 @@ void write6502(uint16_t address, uint8_t value)
 			rawPrint = 1;
 		}
 		else if (value == 12) {							// end raw printing
-			rawPrint = 1;
+			rawPrint = 0;
 		}
         else {
             printf("Unknown emulator command %02X, pc=%04X\n", value, pc-3);
