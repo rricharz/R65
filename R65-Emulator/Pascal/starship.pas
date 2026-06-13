@@ -193,11 +193,11 @@ begin
     write(@PLOTTER,' pc');
   end;
   angle:=0;
-  _setlinemode(2);
+  _setlinemode(DOTTED);
   _setchsize(2);
   _drawvector(cx-radarsize,cy,cx+radarsize,cy);
   _drawvector(cx,cy-radarsize,cx,cy+radarsize);
-  _setlinemode(1);
+  _setlinemode(SOLID);
   if (mode=1) then begin
     _drawrectangle(10,MAXY-200,240,MAXY-10);
     _moveto(20,MAXY-30);
@@ -245,7 +245,7 @@ end;
 proc showEnergy;
 var i: integer;
 begin
-  _setlinemode(1);
+  _setlinemode(SOLID);
   _setchsize(2);
   _drawrectangle(10,10,240,116);
   _moveto(20,90);
@@ -269,7 +269,7 @@ proc showStatus;
 var i: integer;
 begin
   _setchsize(2);
-  _setlinemode(1);
+  _setlinemode(SOLID);
   _drawrectangle(MAXX-240,MAXY-116,
     MAXX-10,MAXY-10);
   _moveto(MAXX-230,MAXY-36);

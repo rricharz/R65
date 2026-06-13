@@ -1,220 +1,223 @@
    1     4 {  Plot routines for Tektronix 4010 graphics
-   2     4    on the R65 PRINTER port. On the original
-   3     4    R65 computer, a PRINTER or PLOTTER could
-   4     4    be hooked up using RS-232. On the R65
-   5     4    emulator, the OUTPUT is stored in the Linux
-   6     4    file printout.txt. The tek4010 tektronix
-   7     4    emulator (github.com/rricharz/tek4010) must
-   8     4    be installed. starttek opens a tek4010 window }
-   9     4 
-  10     4 {$U+}
-  11     4 
-  12     4 library teklib;
-  13     4 
-  14     4 const MAXX = 1023; { Tektronix 4010 graphic mode }
-  15     7       MAXY = 780;
-  16     7 
-  17     7       MAXCOLUMNS = 74;
-  18     7       MAXLINES   = 35;
-  19     7 
-  20     7       SOLID      = 1;
-  21     7       DOTTED     = 2;
-  22     7       DOTDASH    = 3;
-  23     7       SHORTDASH  = 4;
-  24     7       LONGDASH   = 5;
-  25     7 
-  26     7       PLOTTER    = @1;
-  27     7 
-  28     7       { tek4010 window modes }
-  29     7       T_HALF     = 0;   { default }
-  30     7       T_FULLV    = 1;
-  31     7       T_GAMING   = 2;
-  32     7 
-  33     7 var   _xs,_ys: integer;
-  34     7 
-  35     7 proc _delay10msec(time:integer);
-  36     7 { _delay10msec: delay 10 msec }
-  37     7 { process is suspended during delay }
-  38     7 mem
-  39     7 {$I IHIDDENMEM}
-{I:IHIDDE}  1    10 { Shared memory between libraries and system }
-{I:IHIDDE}  2    10 { Not exposed to user program }
-{I:IHIDDE}  3    10     emucom = $1430:integer&;
-{I:IHIDDE}  4    10     emures = $1431: integer&;
-  40    10 var i:integer;
-  41    10 begin
-  42    10   for i:=1 to time do
-  43    18     emucom:=6;
-  44    33 end;
-  45    52 
-  46    53 proc _clearscreen;
-  47    53 begin
-  48    53   write(@PLOTTER,chr(27),chr(12));
-  49    70 end;
-  50    70 
-  51    71 proc _starttek(mode: integer);
-  52    71 { Switch R65 PRINTER device to raw mode
-  53    71   and start tek4010. All R65 system functions
-  54    71   are hidden. tek4010 is called with the following
-  55    71   arguments
-  56    71 
-  57    71   mode T_HALF:    -half        (default)
-  58    71   mode T_FULLV:   -fullv       (for large window)
-  59    71   mode T_GAMING:  -half -fast  (for games)       }
-  60    71 
-  61    71 const C_SHELL  = 10;
-  62    74       STOPCODE = $2010;
-  63    74       NORVID   = chr($0b);
-  64    74       INVVID   = chr($0e);
-  65    74 
-  66    74 mem   str    = $0004: cpnt;
-  67    74       RUNERR = $000c: integer&;
-  68    74 
-  69    74 {$I IHIDDENMEM:P}
-{I:IHIDDE}  1    74 { Shared memory between libraries and system }
-{I:IHIDDE}  2    74 { Not exposed to user program }
-{I:IHIDDE}  3    74     emucom = $1430:integer&;
-{I:IHIDDE}  4    74     emures = $1431: integer&;
-  70    74 
-  71    74 var dummy, res: integer;
-  72    74 
-  73    74   func sh(s: cpnt): integer;
-  74    74   { uses flp scratch register to transfer pointer }
-  75    74   var result:   integer;
-  76    77   begin
-  77    77     str := s;
-  78    79     emucom := (C_SHELL);
-  79    88     sh  := emures;
-  80    97   end;
-  81   101 
-  82   102 begin {starttek}
-  83   102 
-  84   102   dummy := sh('pkill tek4010');
-  85   128   _delay10msec(5);
-  86   140 
-  87   140   dummy := sh('truncate -s 0 printout.txt');
-  88   177   _delay10msec(5);
-  89   189 
-  90   189   case mode of
-  91   189     T_FULLV: dummy := sh(
-  92   202 '$HOME/bin/tek4010 -fullv tail -f printout.txt &');
-  93   258     T_GAMING: dummy := sh(
-  94   274 '$HOME/bin/tek4010 -half -fast tail -f printout.txt &'
-  95   274 )
-  96   329     else dummy := sh(
-  97   344 '$HOME/bin/tek4010 -half tail -f printout.txt &')
-  98   393     end {case}
-  99   405   _delay10msec(50);
- 100   413 
- 101   413   res := sh('pgrep -x tek4010 >/dev/null');
- 102   451   if res <> 0 then begin
- 103   462     writeln(INVVID, 'tek4010 did not start', NORVID);
- 104   499     RUNERR := 54;
- 105   501     call(STOPCODE);
- 106   509   end;
- 107   509 
- 108   509   write(@PLOTTER,chr(17)); { switch to raw mode }
- 109   517   _clearscreen;
- 110   521 
- 111   521 end {starttek};
- 112   521 
- 113   522 proc _endtek;
- 114   522 { switch R65 PRINTER device to normal mode
- 115   522   tek4010 window is not closed }
- 116   522 begin
- 117   522   write(@PLOTTER,chr(18));
- 118   535 end;
- 119   535 
- 120   536 proc _startdraw(x1,y1:integer);
- 121   536 var x,y: integer;
- 122   539 begin
- 123   539   x:=x1;
- 124   541   y:=y1;
- 125   549   if x<0 then x:=0;
- 126   569   if x>=MAXX then x:=MAXX-1;
- 127   589   if y<0 then y:=0;
- 128   606   if y>=MAXY then y:=MAXY;
- 129   624   write(@PLOTTER,chr(29));
- 130   636   write(@PLOTTER,chr((y shr 5)+32));
- 131   652   write(@PLOTTER,chr((y and 31)+96));
- 132   668   write(@PLOTTER,chr((x shr 5)+32));
- 133   684   write(@PLOTTER,chr((x and 31)+64));
- 134   700   _xs:=x;
- 135   700   _ys:=y;
- 136   708 end;
- 137   716 
- 138   717 proc _draw(x2,y2:integer);
- 139   717 var x,y: integer;
- 140   720     hxchange,lychange:boolean;
- 141   720 begin
- 142   720   x:=x2;
- 143   722   y:=y2;
- 144   730   if x<0 then x:=0;
- 145   750   if x>=MAXX then x:=MAXX-1;
- 146   770   if y<0 then y:=0;
- 147   787   if y>=MAXY then y:=MAXY;
- 148   805   if (y shr 5)<>(_ys shr 5) then
- 149   823     write(@PLOTTER,chr((y shr 5)+32));
- 150   843   hxchange:=(x shr 5) <> (_xs shr 5);
- 151   857   lychange:=(y and 31) <> (_ys and 31);
- 152   876   if hxchange or lychange then
- 153   885     write(@PLOTTER,chr((y and 31)+96));
- 154   909   if hxchange then
- 155   909     write(@PLOTTER,chr((x shr 5)+32));
- 156   932   write(@PLOTTER,chr((x and 31)+64));
- 157   948   _xs:=x;
- 158   948   _ys:=y;
- 159   956 end;
- 160   964 
- 161   965 proc _enddraw;
- 162   965 begin
- 163   965   write(@PLOTTER,chr(31));
- 164   978 end;
- 165   978 
- 166   979 proc _drawvector(x1,y1,x2,y2:integer);
- 167   979 begin
- 168   979   _startdraw(x1,y1);
- 169   998   _draw(x2,y2);
- 170  1012   _enddraw;
- 171  1016 end;
- 172  1016 
- 173  1017 proc _drawrectangle(x1,y1,x2,y2:integer);
- 174  1017 begin
- 175  1017   _startdraw(x1,y1);
- 176  1036   _draw(x2,y1);
- 177  1050   _draw(x2,y2);
- 178  1064   _draw(x1,y2);
- 179  1078   _draw(x1,y1);
- 180  1092   _enddraw;
- 181  1096 end;
- 182  1096 
- 183  1097 proc _moveto(x1,y1: integer);
- 184  1097 { move in graphics coordinate space }
- 185  1097 begin
- 186  1097   _startdraw(x1,y1);
- 187  1116   _enddraw;
- 188  1120 end;
- 189  1120 
- 190  1121 proc _setchsize(size:integer);
- 191  1121 { set character size }
- 192  1121 begin
- 193  1121   if (size>=1)and(size <= 4) then begin
- 194  1141   write(@PLOTTER,chr(27));
- 195  1152   write(@PLOTTER,chr(ord('7') + size));
- 196  1165   end;
- 197  1165 end;
- 198  1165 
- 199  1166 proc _setlinemode(type:integer);
- 200  1166 begin
- 201  1166   if (type>=SOLID)and(type<=LONGDASH) then begin
- 202  1186     write(@PLOTTER,chr(27));
- 203  1197     write(@PLOTTER,chr(95+type));
- 204  1210   end;
- 205  1210 end;
- 206  1210 
- 207  1211 begin
- 208  1211 end.
- 209  1213 
-Code length:            1212
-Compiler stack size:      27
-Ident stack size:         33
+   2     4 [  0]    on the R65 PRINTER port. On the original
+   3     4 [  0]    R65 computer, a PRINTER or PLOTTER could
+   4     4 [  0]    be hooked up using RS-232. On the R65
+   5     4 [  0]    emulator, the OUTPUT is stored in the Linux
+   6     4 [  0]    file printout.txt. The tek4010 tektronix
+   7     4 [  0]    emulator (github.com/rricharz/tek4010) must
+   8     4 [  0]    be installed. starttek opens a tek4010 window }
+   9     4 [  0] 
+  10     4 [  0] {$U+}
+  11     4 [  0] 
+  12     4 [  0] library teklib;
+  13     4 [  0] 
+  14     4 [  0] const MAXX = 1023; { Tektronix 4010 graphic mode }
+  15     7 [  1]       MAXY = 780;
+  16     7 [  2] 
+  17     7 [  2]       MAXCOLUMNS = 74;
+  18     7 [  3]       MAXLINES   = 35;
+  19     7 [  4] 
+  20     7 [  4]       SOLID      = 1;
+  21     7 [  5]       DOTTED     = 2;
+  22     7 [  6]       DOTDASH    = 3;
+  23     7 [  7]       SHORTDASH  = 4;
+  24     7 [  8]       LONGDASH   = 5;
+  25     7 [  9] 
+  26     7 [  9]       PLOTTER    = @1;
+  27     7 [ 10] 
+  28     7 [ 10]       { tek4010 window modes }
+  29     7 [ 10]       T_HALF     = 0;   { default }
+  30     7 [ 11]       T_FULLV    = 1;
+  31     7 [ 12]       T_GAMING   = 2;
+  32     7 [ 13] 
+  33     7 [ 13] var   _xs,_ys: integer;
+  34     7 [ 15] 
+  35     7 [ 15] proc _delay10msec(time:integer);
+  36     7 [ 17] { _delay10msec: delay 10 msec }
+  37     7 [ 17] { process is suspended during delay }
+  38     7 [ 17] mem
+  39     7 [ 17] {$I IHIDDENMEM}
+{I:IHIDDE}  1    10 [ 17] { Shared memory between libraries and system }
+{I:IHIDDE}  2    10 [ 17] { Not exposed to user program }
+{I:IHIDDE}  3    10 [ 17]     emucom = $1430:integer&;
+{I:IHIDDE}  4    10 [ 18]     emures = $1431: integer&;
+  40    10 [ 19] var i:integer;
+  41    10 [ 20] begin
+  42    10 [ 20]   for i:=1 to time do
+  43    18 [ 20]     emucom:=6;
+  44    33 [ 20] end;
+  45    52 [ 20] 
+  46    53 [ 16] proc _clearscreen;
+  47    53 [ 17] begin
+  48    53 [ 17]   write(@PLOTTER,chr(27),chr(12));
+  49    70 [ 17] end;
+  50    70 [ 17] 
+  51    71 [ 17] proc _starttek(mode: integer);
+  52    71 [ 19] { Switch R65 PRINTER device to raw mode
+  53    71 [ 19]   and start tek4010. All R65 system functions
+  54    71 [ 19]   are hidden. tek4010 is called with the following
+  55    71 [ 19]   arguments
+  56    71 [ 19] 
+  57    71 [ 19]   mode T_HALF:    -half        (default)
+  58    71 [ 19]   mode T_FULLV:   -fullv       (for large window)
+  59    71 [ 19]   mode T_GAMING:  -half -fast  (for games)       }
+  60    71 [ 19] 
+  61    71 [ 19] const C_SHELL  = 10;
+  62    74 [ 20]       STOPCODE = $2010;
+  63    74 [ 21]       NORVID   = chr($0b);
+  64    74 [ 22]       INVVID   = chr($0e);
+  65    74 [ 23] 
+  66    74 [ 23] mem   str    = $0004: cpnt;
+  67    74 [ 24]       RUNERR = $000c: integer&;
+  68    74 [ 25] 
+  69    74 [ 25] {$I IHIDDENMEM:P}
+{I:IHIDDE}  1    74 [ 25] { Shared memory between libraries and system }
+{I:IHIDDE}  2    74 [ 25] { Not exposed to user program }
+{I:IHIDDE}  3    74 [ 25]     emucom = $1430:integer&;
+{I:IHIDDE}  4    74 [ 26]     emures = $1431: integer&;
+  70    74 [ 27] 
+  71    74 [ 27] var dummy, res: integer;
+  72    74 [ 29] 
+  73    74 [ 29]   func sh(s: cpnt): integer;
+  74    74 [ 32]   { uses flp scratch register to transfer pointer }
+  75    74 [ 32]   var result:   integer;
+  76    77 [ 33]   begin
+  77    77 [ 33]     str := s;
+  78    79 [ 33]     emucom := (C_SHELL);
+  79    88 [ 33]     sh  := emures;
+  80    97 [ 33]   end;
+  81   101 [ 33] 
+  82   102 [ 31] begin {starttek}
+  83   102 [ 31] 
+  84   102 [ 31]   dummy := sh('pkill tek4010');
+  85   128 [ 31]   _delay10msec(5);
+  86   140 [ 31] 
+  87   140 [ 31]   dummy := sh('truncate -s 0 printout.txt');
+  88   177 [ 31]   _delay10msec(5);
+  89   189 [ 31] 
+  90   189 [ 31]   case mode of
+  91   189 [ 31]     T_FULLV: dummy := sh(
+  92   202 [ 31] '$HOME/bin/tek4010 -fullv tail -f printout.txt &');
+  93   258 [ 31]     T_GAMING: dummy := sh(
+  94   274 [ 31] '$HOME/bin/tek4010 -half -fast tail -f printout.txt &'
+  95   274 [ 31] )
+  96   329 [ 31]     else dummy := sh(
+  97   344 [ 31] '$HOME/bin/tek4010 -half tail -f printout.txt &')
+  98   393 [ 31]     end {case}
+  99   405 [ 31]   _delay10msec(50);
+ 100   413 [ 31] 
+ 101   413 [ 31]   res := sh('pgrep -x tek4010 >/dev/null');
+ 102   451 [ 31]   if res <> 0 then begin
+ 103   462 [ 31]     writeln(INVVID, 'tek4010 did not start', NORVID);
+ 104   499 [ 31]     RUNERR := 54;
+ 105   501 [ 31]     call(STOPCODE);
+ 106   509 [ 31]   end;
+ 107   509 [ 31] 
+ 108   509 [ 31]   emucom := 11; { start raw mode }
+ 109   516 [ 31]   _clearscreen;
+ 110   520 [ 31] 
+ 111   520 [ 31] end {starttek};
+ 112   520 [ 31] 
+ 113   521 [ 18] proc _endtek;
+ 114   521 [ 19] { switch R65 PRINTER device to normal mode
+ 115   521 [ 19]   tek4010 window is not closed }
+ 116   521 [ 19] mem
+ 117   521 [ 19] {$I IHIDDENMEM:P}
+{I:IHIDDE}  1   524 [ 19] { Shared memory between libraries and system }
+{I:IHIDDE}  2   524 [ 19] { Not exposed to user program }
+{I:IHIDDE}  3   524 [ 19]     emucom = $1430:integer&;
+{I:IHIDDE}  4   524 [ 20]     emures = $1431: integer&;
+ 118   524 [ 21] begin
+ 119   524 [ 21]   emucom := 12; { end raw mode }
+ 120   533 [ 21] end;
+ 121   533 [ 21] 
+ 122   534 [ 19] proc _startdraw(x1,y1:integer);
+ 123   534 [ 22] var x,y: integer;
+ 124   537 [ 24] begin
+ 125   537 [ 24]   x:=x1;
+ 126   539 [ 24]   y:=y1;
+ 127   547 [ 24]   if x<0 then x:=0;
+ 128   567 [ 24]   if x>=MAXX then x:=MAXX-1;
+ 129   587 [ 24]   if y<0 then y:=0;
+ 130   604 [ 24]   if y>=MAXY then y:=MAXY;
+ 131   622 [ 24]   write(@PLOTTER,chr(29));
+ 132   634 [ 24]   write(@PLOTTER,chr((y shr 5)+32));
+ 133   650 [ 24]   write(@PLOTTER,chr((y and 31)+96));
+ 134   666 [ 24]   write(@PLOTTER,chr((x shr 5)+32));
+ 135   682 [ 24]   write(@PLOTTER,chr((x and 31)+64));
+ 136   698 [ 24]   _xs:=x;
+ 137   698 [ 24]   _ys:=y;
+ 138   706 [ 24] end;
+ 139   714 [ 24] 
+ 140   715 [ 20] proc _draw(x2,y2:integer);
+ 141   715 [ 23] var x,y: integer;
+ 142   718 [ 25]     hxchange,lychange:boolean;
+ 143   718 [ 27] begin
+ 144   718 [ 27]   x:=x2;
+ 145   720 [ 27]   y:=y2;
+ 146   728 [ 27]   if x<0 then x:=0;
+ 147   748 [ 27]   if x>=MAXX then x:=MAXX-1;
+ 148   768 [ 27]   if y<0 then y:=0;
+ 149   785 [ 27]   if y>=MAXY then y:=MAXY;
+ 150   803 [ 27]   if (y shr 5)<>(_ys shr 5) then
+ 151   821 [ 27]     write(@PLOTTER,chr((y shr 5)+32));
+ 152   841 [ 27]   hxchange:=(x shr 5) <> (_xs shr 5);
+ 153   855 [ 27]   lychange:=(y and 31) <> (_ys and 31);
+ 154   874 [ 27]   if hxchange or lychange then
+ 155   883 [ 27]     write(@PLOTTER,chr((y and 31)+96));
+ 156   907 [ 27]   if hxchange then
+ 157   907 [ 27]     write(@PLOTTER,chr((x shr 5)+32));
+ 158   930 [ 27]   write(@PLOTTER,chr((x and 31)+64));
+ 159   946 [ 27]   _xs:=x;
+ 160   946 [ 27]   _ys:=y;
+ 161   954 [ 27] end;
+ 162   962 [ 27] 
+ 163   963 [ 21] proc _enddraw;
+ 164   963 [ 22] begin
+ 165   963 [ 22]   write(@PLOTTER,chr(31));
+ 166   976 [ 22] end;
+ 167   976 [ 22] 
+ 168   977 [ 22] proc _drawvector(x1,y1,x2,y2:integer);
+ 169   977 [ 27] begin
+ 170   977 [ 27]   _startdraw(x1,y1);
+ 171   996 [ 27]   _draw(x2,y2);
+ 172  1010 [ 27]   _enddraw;
+ 173  1014 [ 27] end;
+ 174  1014 [ 27] 
+ 175  1015 [ 23] proc _drawrectangle(x1,y1,x2,y2:integer);
+ 176  1015 [ 28] begin
+ 177  1015 [ 28]   _startdraw(x1,y1);
+ 178  1034 [ 28]   _draw(x2,y1);
+ 179  1048 [ 28]   _draw(x2,y2);
+ 180  1062 [ 28]   _draw(x1,y2);
+ 181  1076 [ 28]   _draw(x1,y1);
+ 182  1090 [ 28]   _enddraw;
+ 183  1094 [ 28] end;
+ 184  1094 [ 28] 
+ 185  1095 [ 24] proc _moveto(x1,y1: integer);
+ 186  1095 [ 27] { move in graphics coordinate space }
+ 187  1095 [ 27] begin
+ 188  1095 [ 27]   _startdraw(x1,y1);
+ 189  1114 [ 27]   _enddraw;
+ 190  1118 [ 27] end;
+ 191  1118 [ 27] 
+ 192  1119 [ 25] proc _setchsize(size:integer);
+ 193  1119 [ 27] { set character size }
+ 194  1119 [ 27] begin
+ 195  1119 [ 27]   if (size>=1)and(size <= 4) then begin
+ 196  1139 [ 27]   write(@PLOTTER,chr(27));
+ 197  1150 [ 27]   write(@PLOTTER,chr(ord('7') + size));
+ 198  1163 [ 27]   end;
+ 199  1163 [ 27] end;
+ 200  1163 [ 27] 
+ 201  1164 [ 26] proc _setlinemode(type:integer);
+ 202  1164 [ 28] begin
+ 203  1164 [ 28]   if (type>=SOLID)and(type<=LONGDASH) then begin
+ 204  1184 [ 28]     write(@PLOTTER,chr(27));
+ 205  1195 [ 28]     write(@PLOTTER,chr(95+type));
+ 206  1208 [ 28]   end;
+ 207  1208 [ 28] end;
+ 208  1208 [ 28] 
+ 209  1209 [ 27] begin
+ 210  1209 [ 27] end.
+ 211  1211 [ 27] 

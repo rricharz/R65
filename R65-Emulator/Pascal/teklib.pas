@@ -105,7 +105,7 @@ begin {starttek}
     call(STOPCODE);
   end;
 
-  write(@PLOTTER,chr(17)); { switch to raw mode }
+  emucom := 11; { start raw mode }
   _clearscreen;
 
 end {starttek};
@@ -113,8 +113,10 @@ end {starttek};
 proc _endtek;
 { switch R65 PRINTER device to normal mode
   tek4010 window is not closed }
+mem
+{$I IHIDDENMEM:P}
 begin
-  write(@PLOTTER,chr(18));
+  emucom := 12; { end raw mode }
 end;
 
 proc _startdraw(x1,y1:integer);

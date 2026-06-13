@@ -39,7 +39,6 @@ const
   CLRSCR   = chr($11);  {clear to end of screen}
   NHISTORY = 4; { entries in history }
   AUTOPR   = $08;
-  ENDRAW   = chr($12);
 
 mem
   BUFFPN   = $0015: integer&;
@@ -54,7 +53,7 @@ mem
   { $df03-$dfc7 are used for history strings }
 
 var
-  k, m, n: integer;
+  k, m, n,res: integer;
   ch: char;
   ok: boolean;
   argerr: integer;
@@ -270,7 +269,7 @@ begin
     end;
   until lch=CR;
 
-  write(CLRSCR); { ok, because AUTOPR is off }
+  write(CLRSCR);
 
   if (oldvflag and AUTOPR) <> 0 then
     write(@PRINTER, 'P*', line);
@@ -404,7 +403,7 @@ begin {main}
   for k:=0 to MMAXSEQ-1 do FIDRTB[k]:=0;
   clearinput;
   ok:=true;
-  write(ENDRAW);
+  res :=_emulator(12); { force end raw mode }
 
   spos := 0;
   readline(gline);
@@ -521,7 +520,7 @@ begin {main}
         106: writeln('Argument syntax error');
         107: writeln('Too many arguments')
         end {case};
-    write(@PRINTER, ENDRAW);
+    res := _emulator(12); { force end raw mode }
   end else begin
     clearinput;
     ENDSTK:=TOPMEM-144;

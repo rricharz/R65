@@ -720,6 +720,12 @@ void write6502(uint16_t address, uint8_t value)
 			memory[R8_EMURES] = (result != 0);			
 			fflush(stdout);
 		}
+		else if (value == 11) {							// start raw printing
+			rawPrint = 1;
+		}
+		else if (value == 12) {							// end raw printing
+			rawPrint = 1;
+		}
         else {
             printf("Unknown emulator command %02X, pc=%04X\n", value, pc-3);
         memory[R8_EMURES] = 0X67;           // set result to 0
@@ -833,12 +839,6 @@ int catchSubroutine(uint16_t ea)
 			}
 		}
 
-		/* Raw mode control */
-		if (a == 0x12) {              /* end raw mode */
-			rawPrint = 0;
-			return 1;
-		}
-
 		/* Optional safety: PRTOFF always ends raw mode */
 		if (a == 0x14) {
 			rawPrint = 0;
@@ -858,11 +858,6 @@ int catchSubroutine(uint16_t ea)
         
         if ((a < 0x20) && (!rawPrint) && ( a != 0x0C)) { // FF is allowed to pass
             if (a == 0x0D) {                   // linux text files have no cr, change for windows
-                return 1;
-            }
-            if (a == 0x11) {                   // device control 1, switch to raw mode
-                printf("Printer switched to raw mode\n");
-				rawPrint = 1;
                 return 1;
             }
 

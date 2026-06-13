@@ -35,12 +35,12 @@ const
     STACKSIZE = 256;   {stack size}
     PAGELENGHT= 60;    {no of lines per page}
     MAXFI     = 3;     {max n  of nested input files}
-    NRESW     = 64;    {number of reserved words}
+    NRESW     = 64;    {number of reserved words - 1}
 
     SAT_EXPORT = 1;    {Bit mask for s_attr}
     NOTOPEN   = @129;
 
-var reswtab: array[ 520] of char; {8*(NRESW+1)}
+var reswtab: array[ 528] of char; {8*(NRESW+1)}
 
     ident:   array[IDLENGTH] of char;
     idpack:  array[PIDSIZE] of packed char;
@@ -59,6 +59,7 @@ var reswtab: array[ 520] of char; {8*(NRESW+1)}
     fno,ofno,savefno,lpr: file;
     incname: array[15] of char;
     filstk: array[MAXFI] of file;
+    debugmode,makecode: boolean;
 
 { ****. START IF IDENTIFIER TABLE ****}
 
@@ -237,7 +238,9 @@ end {pop};
 {################}
 proc code1(x: %integer);  {set one byte p-code}
 begin
-  savebyte(x); pc:=succ(pc)
+  if makecode then begin
+    savebyte(x); pc:=succ(pc)
+  end;
 end;
 
 {###################}
@@ -374,6 +377,8 @@ begin {init}
   makeoutput:=true;
   lineflg:=false;
   chaincheckb:=false;
+  debugmode:=false;
+  makecode:=true;
   if not default then begin
     if request[0]<>'/' then _argerror(103);
     for i:=1 to 8 do
@@ -381,6 +386,7 @@ begin {init}
         'L': lineflg:=true;
         'R': rcheck:=true;
         'N': makeoutput:=false;
+        'D': debugmode:=true;
         '@': chaincheckb:=true;
         ' ': begin end
         else _argerror(104)
@@ -2254,10 +2260,18 @@ begin {body of statement }
             if device then code1(45);
           end {read};
 
-    'wr','wl':
-          begin {write,writeln}
-            if token='wl' then wln:=true
-            else wln:=false;
+      'wr','wl','db':
+          begin {write,writeln,debug}
+            makecode := true;
+            if token='db' then begin
+              wln := true;
+              if not debugmode then
+                makecode := false
+            end
+            else if token='wl' then
+              wln := true
+            else
+              wln := false;
             scan;
             if token=' (' then begin
               scan;
@@ -2367,8 +2381,9 @@ begin {body of statement }
             else if wln then begin {writeln}
               code2(32,13); code1(29);
               code2(32,10); code1(29);
-            end
-          end {write, writeln};
+            end;
+            makecode:=true;
+          end {write, writeln, debug};
 
     'cs': case1; {case statement}
 
@@ -2723,7 +2738,7 @@ begin {main}
 
   { write statistics }
   writeln(@lpr);
-  if makeoutput then write(PRTON);
+  {if makeoutput then write(PRTON);}
   writeln('Code length:           ',pc);
   writeln('Compiler stack size:   ',stackmax);
   writeln('Ident stack size:      ',spntmax,
