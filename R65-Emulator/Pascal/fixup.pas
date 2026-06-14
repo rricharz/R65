@@ -1,13 +1,12 @@
 program fixup;
 { Sceleton to fixup a pascal source file }
-{ does not do naything at present }
+{ does not do anything at present }
 
 {$U+}
 
 uses syslib, arglib, strlib, filelib;
 
-var debug:           boolean;
-    sline:           cpnt;
+var sline:           cpnt;
     numlines:        integer;
     linesfixed:      integer;
     iseof, iserror:  boolean;
@@ -43,16 +42,9 @@ begin
   _asetfile(name, cyclus, drive, ' ');
   openr(fno);
   writeln;
-  if debug then writeln('$$$ Input file open $$$');
   cyclus := 0;
-  if debug then begin
-    for i := 1 to 14 do
-      name[14 - i] := name [13 - i];
-    name[0] := 'F';
-  end;
   _asetfile(name, cyclus, drive, ' ');
   openw(ofno);
-  if debug then writeln('$$$ Output file open $$$');
 end;
 
 proc closefiles;
@@ -60,7 +52,6 @@ begin
   close(fno);
   write(@ofno,EOF);
   close(ofno);
-  if debug then writeln('$$$ Files closed $$$');
 end;
 
 func readline(input: file): boolean;
@@ -177,7 +168,6 @@ begin
 end;
 
 begin
-  debug := false;
   openfiles;
   sline := _new;
   numlines := 1;

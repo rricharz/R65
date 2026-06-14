@@ -138,13 +138,11 @@ begin {main}
     entry:=ARGLIST[20] + 1;
     files:=ARGLIST[21] + 1;
     errors:=ARGLIST[22];
-{    writeln('checkbuild get back ',
-                      entry:4,files:4,errors:4); }
+    debug('checkbuild get back',entry,files,errors);
   end;
   repeat
     done := not getentry(drive, entry, deleted);
-{   writeln('deleted= ', deleted,
-           ' done= ',done); }
+    debug(entry,files,deleted,done);
     if (not (deleted or done)) and
         (FILSTP = 'P') then begin
       name := '                ';
@@ -154,10 +152,8 @@ begin {main}
       { compile1 requires name without subtype }
       while (i<=15) and  (FILNAM[i]<>':') do begin
         name[i] := FILNAM[i];
-        write(name[i]);
         i := i + 1;
       end;
-      writeln(':P.', hex(FILCYC));
       cyclus := FILCYC;
       setargs(name,0, cyclus, 1);
       setargs('/N@             ', 10, 0, 1);
@@ -165,17 +161,10 @@ begin {main}
       setargi(entry, 20);
       setargi(files, 21);
       setargi(errors,22);
-      { runprog('ARGLIST:R       ', 0, 0); }
       if _isesc then
         done := true
       else
         chainprog('COMPILE:R       ', 0, 1);
-{      files := files + 1;
-      if (RUNERR > 0) and (RUNERR <> 135)
-        or (FILERR <> 0) then begin
-        errors := errors + 1;
-        {writeln('RE=',hex(RUNERR),
-               ' FE=',hex(FILERR));  }
       end;
     end;
     entry := entry + 1;

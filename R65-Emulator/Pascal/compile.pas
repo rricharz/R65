@@ -1238,16 +1238,16 @@ begin
   until token<>'id';
 end {memory};
 
-{######################}
-{ statmnt ( of block ) }
-{######################}
+{########################}
+{ statement ( of block ) }
+{########################}
 
-proc statmnt;
+proc statement;
 var idpnt, relad, k2, savpc,
     wrsize, bottom1: integer;
     device, wln: boolean;
     savtp1, vartyp2, vtype1: char;
-    wl: boolean;
+    wl,debugstmt: boolean;
 
 {########################}
 { code4 ( of statement ) }
@@ -2083,7 +2083,7 @@ var i1,i2,casave: integer;
     testto(' :'); savpc:=pc; code3(37,0);
     for k2:=1 to i1 do fixup(pop);
     push(savpc);
-    scan; statmnt
+    scan; statement
   end {case2};
 
 begin {case1}
@@ -2095,7 +2095,7 @@ begin {case1}
   end;
   if token='el' then begin
     casave:=pc; code3(36,0); fixup(pop);
-    push(casave); scan; statmnt
+    push(casave); scan; statement
   end;
   testto('en'); for k2:=1 to i2 do fixup(pop);
   code3(35,-2); scan
@@ -2185,10 +2185,25 @@ var i: integer;
 begin
   for i := 1 to 8 do ident[i] := nm[i-1];
   for i := 9 to 16 do ident[i] := ' ';
-
   idpnt := findid;
   if (idpnt=0) or (s_typ[idpnt]<>'pr') then
     error(25);
+end;
+
+{###########################}
+{ label_debug of statement #}
+{###########################}
+proc label_debug;
+var i: integer;
+begin
+  code1(50);
+  code1(ord(' '));
+  if token='id' then begin
+    for i:= 1 to 16 do
+      if ident[i]<>' ' then
+        code1(ord(ident[i]) and $7f);
+  end;
+  code1(ord('=') or $80);
 end;
 
 {###################}
@@ -2203,17 +2218,17 @@ begin {body of statement }
     'if': begin {if}
             scan; express; testtype('b');
             testto('th'); scan;  savpc:=pc;
-            code3(37,0); statmnt;
+            code3(37,0); statement;
             if token='el' then begin {else}
               k2:=pc; code3(36,0);
-              fixup(savpc); scan; statmnt;
+              fixup(savpc); scan; statement;
               fixup(k2)
             end else fixup(savpc)
           end; {if}
 
     'be':  begin {begin}
             repeat
-              scan; statmnt
+              scan; statement
             until token<>(' ;');
             testto('en'); scan
           end; {begin}
@@ -2221,7 +2236,7 @@ begin {body of statement }
     'rp': begin {repeat}
             savpc:=pc;
             repeat
-              scan; statmnt
+              scan; statement
             until token='un';
             scan; express; testtype('b');
             code3(37,savpc)
@@ -2262,6 +2277,7 @@ begin {body of statement }
 
       'wr','wl','db':
           begin {write,writeln,debug}
+            debugstmt := token='db';
             makecode := true;
             if token='db' then begin
               wln := true;
@@ -2299,7 +2315,7 @@ begin {body of statement }
                       or 128);
                   scan
                 end else begin
-
+                  if debugstmt then label_debug;
                   {start of expression }
                   mainexp('n',wrsize);
                   vtype1 := restype;
@@ -2391,7 +2407,7 @@ begin {body of statement }
             scan; savpc:=pc; express;
             testtype('b');
             k2:=pc; code3(37,0);
-            testto('do'); scan; statmnt;
+            testto('do'); scan; statement;
             code3(36,savpc); fixup(k2)
           end {while};
 
@@ -2409,7 +2425,7 @@ begin {body of statement }
             gpval(idpnt,false,vartyp2);
             code1(13-k2-k2);
             savpc:=pc; code3(37,0);
-            testto('do'); scan; statmnt;
+            testto('do'); scan; statement;
             gpval(idpnt,false,vartyp2);
             code1(21-k2);
             gpval(idpnt,true,vartyp2);
@@ -2629,7 +2645,7 @@ begin
   scan;
   code3(35,2*dpnt);
   repeat
-    statmnt
+    statement
   until token='en';
   scan;
   if level>0 then code1(1) else code1(0);
@@ -2737,13 +2753,16 @@ begin {main}
     RUNERR:=$87; {no loader file}
 
   { write statistics }
-  writeln(@lpr);
-  {if makeoutput then write(PRTON);}
-  writeln('Code length:           ',pc);
-  writeln('Compiler stack size:   ',stackmax);
-  writeln('Ident stack size:      ',spntmax,
+  if not chaincheckb then begin
+    writeln(@lpr);
+    if makeoutput then
+      write(PRTON);
+    writeln('Code length:           ',pc);
+    writeln('Compiler stack size:   ',stackmax);
+    writeln('Ident stack size:      ',spntmax,
           '/',SYMBSIZE);
-  write(PRTOFF);
+    write(PRTOFF);
+  end;
 
   { clean up }
   if makeoutput then

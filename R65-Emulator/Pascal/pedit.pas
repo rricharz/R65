@@ -30,7 +30,7 @@ mem curlin  = $ed: integer&;
     topc    = $400: array[xmax] of char&;
 
 
-var line,nlines,topline,ig,dummy,debug: integer;
+var line,nlines,topline,ig,dummy: integer;
     name: array[15] of char;
     fno: file;
     chi : char;
@@ -650,7 +650,7 @@ end;
 begin {main}
   write(PRTOFF);
   for ig:=0 to maxlines-1 do linepnt[ig]:=nil;
-  stemp:=_new; stemp2:=_new; fs:=_new; debug:=0;
+  stemp:=_new; stemp2:=_new; fs:=_new;
   setnumlin($0f,$37); write(HOM,clrscr);
   putontop('Line xxx of xxx',0,true);
   relpnt:=maxlines-1; mark:=0; savecx:=1;

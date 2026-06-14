@@ -7,9 +7,6 @@
 program cd;
 uses syslib, arglib, striolib, strlib;
 
-const
-    DEBUG = false;
-
 var arg0: cpnt;
     cyclus, drive : integer;
     default: boolean;
@@ -21,7 +18,7 @@ begin {main}
   if default then
     _strcpy('WORK', arg0);
 
-  if DEBUG then writeln('Setting disk 1 to ', arg0);
+  debug('Setting disk 1 to ', arg0);
   _change_disk(arg0, 1);
 
   _release(arg0);

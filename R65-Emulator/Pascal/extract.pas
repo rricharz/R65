@@ -23,8 +23,6 @@ const TOK_OTHER = 0;
       SDONE    = 7;
       SHEAD    = 8;
 
-      DEBUG1   = false;
-      DEBUG2   = false;
       INDENT   = '      ';
       IPINDENT = ' 10';
 
@@ -434,12 +432,6 @@ begin
   _asetfile(name, cyclus, drive, ' ');
   openw(f_out);
 
-  if DEBUG1 then
-  begin
-    write(@f_out,'program EXTRACT version ');
-    writehex(f_out,vcyclus);
-    writeln(@f_out);
-  end;
 end;
 
 proc close_files;
@@ -623,36 +615,6 @@ begin
     writeln(@f_out, line);
 end;
 
-proc debugline;
-{**************}
-begin
-  if DEBUG1 then
-  begin
-    write('line ');
-    write(lineno);
-    write(': state=');
-    printstate(state);
-    write(' tok=');
-    printtok(tok);
-    write(' text="');
-    write(line);
-    writeln('"');
-    write(' blocklevel=',blocklevel);
-    writeln;
-  end;
-end;
-
-proc debugstate;
-{***************}
-begin
-  if DEBUG1 then
-  begin
-    write('     newstate=');
-    printstate(state);
-    writeln;
-  end;
-end;
-
 proc runpass(passno: integer);
 {***************************}
 var islib: boolean;
@@ -679,7 +641,6 @@ begin
     if llen>0 then
     begin
       gettok(tok);
-      debugline;
       matchtok('library', line, islib);
 
       case state of
@@ -873,8 +834,8 @@ begin
               if ininner then
               begin
                 updblockline(dlevel);
-                if (dlevel<>0) and DEBUG1 then
-                  writeln(' dlevel=',dlevel);
+                if (dlevel<>0) then
+                  debug(dlevel);
 
                 blocklevel:=blocklevel+dlevel;
                 if blocklevel=0 then
@@ -906,8 +867,8 @@ begin
             else
             begin
               updblockline(dlevel);
-                if (dlevel<>0) and DEBUG1 then
-                  writeln(' dlevel=',dlevel);
+                if (dlevel<>0) then
+                  debug(dlevel);
 
               blocklevel:=blocklevel+dlevel;
               if blocklevel=0 then
@@ -918,8 +879,8 @@ begin
         SBODY:
           begin
             updblockline(dlevel);
-                if (dlevel<>0) and DEBUG1 then
-                  writeln(' dlevel=',dlevel);
+                if (dlevel<>0) then
+                  debug(dlevel);
 
             blocklevel:=blocklevel+dlevel;
             if blocklevel=0 then
@@ -927,7 +888,6 @@ begin
           end
       end;
 
-      debugstate;
     end;
 
   until ateof or (state=SDONE);

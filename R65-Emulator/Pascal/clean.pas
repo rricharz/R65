@@ -20,7 +20,6 @@ uses syslib,arglib, filelib;
 
 {R65 disk eprom calls and params: }
 const
-      DEBUG = false;
       aprepdo =$f4a7;
       agetentx=$f63a;
       aenddo  =$f625;
@@ -119,7 +118,7 @@ begin { mani }
     if filtyp<>chr(0) then begin
       { check for deleted flag }
       if (fillnk and 255)<128 then begin
-        if DEBUG then writeln('ii=', ti);
+        debug(ti);
         for i:=0 to 15 do
           nametab[16*ti+i]:=FILNAM[i];
         i:=16;

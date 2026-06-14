@@ -10,8 +10,7 @@ uses syslib, arglib, strlib, striolib;
 
 {$U+}
 
-const
-    DEBUG = false;
+const MAXLINES = 38;
 
 var name :          cpnt;
     f:              file;
@@ -34,10 +33,7 @@ begin
   _agetval(cyclus,    default);
   _agetval(drive,     default);
   _agetval(firstline, default);
-  if DEBUG then
-    writeln('cyclus=',cyclus,
-            ' drive=', drive,
-            ' firstline=', firstline)
+  debug(cyclus, drive, firstline)
   _ssetsubtype(name,'P', false);
   _strfio(name, cyclus, drive);
   openr(f);
@@ -54,7 +50,7 @@ begin
 
   { show max 40 lines }
   line := 0;
-  while (ch <> EOF) and (line < 39) do begin
+  while (ch <> EOF) and (line < MAXLINES) do begin
     if (ch = CR) then begin
       writeln;
       line := line + 1;
@@ -63,6 +59,9 @@ begin
     read(@f, ch);
   end;
   close(f);
+  if line = MAXLINES then
+  write(INVVID,' Additional lines not shown;',
+        ' use SHOW filename', NORVID);
   writeln;
   _release(name);
 end.

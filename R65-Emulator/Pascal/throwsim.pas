@@ -2,7 +2,7 @@
 
 { trajectory simulation }
 
-program shrowsim;
+program throwsim;
 uses syslib,mathlib,plotlib;
 
 var angle,speed,xspeed,yspeed: real;
