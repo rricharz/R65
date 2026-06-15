@@ -16,154 +16,143 @@
   16     4 [  0] {$U+}
   17     4 [  0] 
   18     4 [  0] program clean;
-  19     4 [  0] uses syslib,arglib, filelib;
-  20  2087 [ 80] 
-  21  2087 [ 80] {R65 disk eprom calls and params: }
-  22  2087 [ 80] const
-  23  2087 [ 80]       aprepdo =$f4a7;
-  24  2090 [ 81]       agetentx=$f63a;
-  25  2090 [ 82]       aenddo  =$f625;
-  26  2090 [ 83]       adelete =$c80c;
-  27  2090 [ 84] mem   filtyp  =$0300: char&;
-  28  2090 [ 85]       filcyc  =$0311: integer&;
-  29  2090 [ 86]       filstp  =$0312: char&;
-  30  2090 [ 87]       filloc  =$0313: integer;
-  31  2090 [ 88]       filsiz  =$0315: integer;
-  32  2090 [ 89]       fillnk  =$031e: integer;
-  33  2090 [ 90]       scyfc   =$037c: integer&;
-  34  2090 [ 91] 
-  35  2090 [ 91] var default, quiet: boolean;
-  36  2090 [ 93]     drive,index,i,ti,maxlen,nument,sfree,
-  37  2090 [100]     sdel,sfound : integer;
-  38  2090 [102]     { array size = 16 * 256 }
-  39  2090 [102]     nametab     : array[4096] of char;
-  40  2090 [103]     filstptab   : array[255] of char;
-  41  2090 [104]     cyctab      : array[255] of integer;
-  42  2090 [105]     foundtab    : array[255] of boolean;
-  43  2090 [106]     sizetab     : array[255] of integer;
-  44  2090 [107]     name        : array[15] of char;
-  45  2090 [108] 
-  46  2090 [108] proc bcderror(e:integer);
-  47  2090 [110] begin
-  48  2090 [110]   writeln;
-  49  2095 [110]   write(INVVID,'ERROR ');
-  50  2111 [110]   write((e shr 4) and 15);
-  51  2122 [110]   writeln(e and 15,NORVID);
-  52  2139 [110] end;
-  53  2139 [110] 
-  54  2140 [109] func hex(d:integer):char;
-  55  2140 [112] { convert hex digit to hex char }
-  56  2140 [112] begin
-  57  2140 [112]   if (d>=0) and (d<10) then
-  58  2159 [112]     hex:=chr(d+ord('0'))
-  59  2169 [112]   else if (d>=10) and (d<16) then
-  60  2192 [112]     hex:=chr(d+ord('A')-10)
-  61  2205 [112]   else hex:='?';
-  62  2216 [112] end;
-  63  2220 [112] 
-  64  2221 [111] proc mark(i3: integer);
-  65  2221 [113] {mark entry for delete}
-  66  2221 [113] var j: integer;
-  67  2224 [114] begin
-  68  2224 [114]   if not quiet then begin
-  69  2231 [114]     write('Deleting ');
-  70  2244 [114]     for j:=0 to maxlen do
-  71  2250 [114]       write(nametab[16*i3+j]);
-  72  2280 [114]     write('.');
-  73  2296 [114]     writeln(hex(cyctab[i3] shr 4),
-  74  2315 [114]             hex(cyctab[i3] and 15));
-  75  2342 [114]   end;
-  76  2342 [114]   foundtab[i3]:=true
-  77  2346 [114] end;
-  78  2352 [114] 
-  79  2353 [112] proc check(i1,i2: integer);
-  80  2353 [115] {check and mark entries for delete}
-  81  2353 [115] var j: integer;
-  82  2356 [116] begin
-  83  2356 [116]   if filstptab[i2]='Q' then mark(i2)
-  84  2372 [116]   else begin
-  85  2385 [116]     j:=-1;
-  86  2387 [116]     repeat
-  87  2392 [116]      j:=j+1;
-  88  2398 [116]       until (j>maxlen) or
-  89  2412 [116]            (nametab[16*i1+j]<>
-  90  2424 [116]           nametab[16*i2+j]);
-  91  2445 [116]     if j>maxlen then mark(i1)
-  92  2461 [116]   end
-  93  2471 [116] end;
-  94  2471 [116] 
-  95  2472 [113] begin { mani }
-  96  2472 [113]   drive := 1; {default drive}
-  97  2481 [113]   if ARGTYPE[_carg] = 'i' then
-  98  2491 [113]     _agetval(drive,default);
-  99  2515 [113]   if (drive<0) or (drive>1) then begin
- 100  2530 [113]     writeln('Drive must be 0 or 1');
- 101  2560 [113]     _abort
- 102  2560 [113]   end;
- 103  2564 [113]   if ARGTYPE[_carg] = 's' then
- 104  2574 [113]     quiet := option('Q');
- 105  2588 [113] 
- 106  2592 [113]   FILDRV:=drive;
- 107  2592 [113]   call(aprepdo);
- 108  2604 [113] 
- 109  2604 [113]   scyfc:=255; { write disk name }
- 110  2611 [113]   call(agetentx);
- 111  2615 [113] 
- 112  2615 [113]   index:=0; ti:=0; maxlen:=0;
- 113  2629 [113]   sdel:=0; sfound:=0;
- 114  2641 [113]   repeat
- 115  2645 [113]     scyfc:=index;
- 116  2645 [113]     call(agetentx);
- 117  2658 [113]     { check for end mark }
- 118  2658 [113]     if filtyp<>chr(0) then begin
- 119  2666 [113]       { check for deleted flag }
- 120  2669 [113]       if (fillnk and 255)<128 then begin
- 121  2679 [113]         debug(ti);
- 122  2682 [113]         for i:=0 to 15 do
- 123  2690 [113]           nametab[16*ti+i]:=FILNAM[i];
- 124  2718 [113]         i:=16;
- 125  2740 [113]         repeat
- 126  2744 [113]           i:=i-1;
- 127  2750 [113]         until (i=0) or
- 128  2762 [113]           (nametab[16*ti+i]<>' ');
- 129  2781 [113]         if maxlen<i then maxlen:=i;
- 130  2797 [113]         filstptab[ti]:=filstp;
- 131  2813 [113]         cyctab[ti]:=filcyc;
- 132  2825 [113]         foundtab[ti]:=false;
- 133  2835 [113]         sizetab[ti]:=filsiz shr 8;
- 134  2849 [113]         for i:=0 to ti-1 do
- 135  2866 [113]           if (foundtab[i]=false) and
- 136  2887 [113]                (foundtab[ti]=false) then
- 137  2898 [113]             check(i,ti);
- 138  2916 [113]         ti:=ti+1
- 139  2934 [113]       end else {deleted}
- 140  2944 [113]         sdel:=sdel+(filsiz shr 8);
- 141  2955 [113]     end else {end mark}
- 142  2963 [113]       sfree:=2560-filloc;
- 143  2970 [113]     index:=index+1
- 144  2979 [113]   until (index>=255) or (filtyp=chr(0));
- 145  3001 [113]   call(aenddo);
- 146  3009 [113]   nument:=ti;
- 147  3009 [113] 
- 148  3017 [113]   for ti:=0 to nument-1 do begin
- 149  3039 [113]     if foundtab[ti] then begin
- 150  3047 [113]       for i:=0 to 15 do
- 151  3058 [113]          name[i]:=nametab[16*ti+i];
- 152  3083 [113]          _asetfile(name,cyctab[ti],drive,
- 153  3119 [113]                ' ');
- 154  3131 [113]       FILERR:=0;
- 155  3133 [113]       call(adelete);
- 156  3141 [113]       if FILERR<>0 then bcderror(FILERR);
- 157  3159 [113]       sfound:=sfound+sizetab[ti];
- 158  3167 [113]     end
- 159  3176 [113]   end;
- 160  3176 [113] 
- 161  3190 [113]   if not quiet then
- 162  3190 [113]     writeln('Free: ',sfree,', found: ',sfound,
- 163  3220 [113]       ', now deleted: ',sdel+sfound);
- 164  3257 [113] 
- 165  3257 [113] end.
- 166  3257 [113] 
-Code length:           3256
-Compiler stack size:   72
-Ident stack size:      116/300
+  19     4 [  0] uses syslib,arglib,filelib,hexlib;
+  20  2253 [ 86] 
+  21  2253 [ 86] {R65 disk eprom calls and params: }
+  22  2253 [ 86] const
+  23  2253 [ 86]       aprepdo =$f4a7;
+  24  2256 [ 87]       agetentx=$f63a;
+  25  2256 [ 88]       aenddo  =$f625;
+  26  2256 [ 89]       adelete =$c80c;
+  27  2256 [ 90] mem   filtyp  =$0300: char&;
+  28  2256 [ 91]       filcyc  =$0311: integer&;
+  29  2256 [ 92]       filstp  =$0312: char&;
+  30  2256 [ 93]       filloc  =$0313: integer;
+  31  2256 [ 94]       filsiz  =$0315: integer;
+  32  2256 [ 95]       fillnk  =$031e: integer;
+  33  2256 [ 96]       scyfc   =$037c: integer&;
+  34  2256 [ 97] 
+  35  2256 [ 97] var default, quiet: boolean;
+  36  2256 [ 99]     drive,index,i,ti,maxlen,nument,sfree,
+  37  2256 [106]     sdel,sfound : integer;
+  38  2256 [108]     { array size = 16 * 256 }
+  39  2256 [108]     nametab     : array[4096] of char;
+  40  2256 [109]     filstptab   : array[255] of char;
+  41  2256 [110]     cyctab      : array[255] of integer;
+  42  2256 [111]     foundtab    : array[255] of boolean;
+  43  2256 [112]     sizetab     : array[255] of integer;
+  44  2256 [113]     name        : array[15] of char;
+  45  2256 [114] 
+  46  2256 [114] proc bcderror(e:integer);
+  47  2256 [116] begin
+  48  2256 [116]   writeln;
+  49  2261 [116]   write(INVVID,'ERROR ');
+  50  2277 [116]   write((e shr 4) and 15);
+  51  2288 [116]   writeln(e and 15,NORVID);
+  52  2305 [116] end;
+  53  2305 [116] 
+  54  2306 [115] proc mark(i3: integer);
+  55  2306 [117] {mark entry for delete}
+  56  2306 [117] var j: integer;
+  57  2309 [118] begin
+  58  2309 [118]   debug('mark',i3,quiet);
+  59  2311 [118]   if not quiet then begin
+  60  2316 [118]     write('Deleting ');
+  61  2329 [118]     for j:=0 to maxlen-1 do
+  62  2341 [118]       write(nametab[16*i3+j]);
+  63  2368 [118]     writeln('.',hexlow(cyctab[i3] shr 4));
+  64  2414 [118]   end;
+  65  2414 [118]   foundtab[i3]:=true
+  66  2418 [118] end;
+  67  2424 [118] 
+  68  2425 [116] proc check(i1,i2: integer);
+  69  2425 [119] {check and mark entries for delete}
+  70  2425 [119] var j: integer;
+  71  2428 [120] begin
+  72  2428 [120]   if filstptab[i2]='Q' then mark(i2)
+  73  2444 [120]   else begin
+  74  2457 [120]     j:=-1;
+  75  2459 [120]     repeat
+  76  2464 [120]      j:=j+1;
+  77  2470 [120]       until (j>maxlen) or
+  78  2484 [120]            (nametab[16*i1+j]<>
+  79  2496 [120]           nametab[16*i2+j]);
+  80  2517 [120]     if j>maxlen then mark(i1)
+  81  2533 [120]   end
+  82  2543 [120] end;
+  83  2543 [120] 
+  84  2544 [117] begin { main }
+  85  2544 [117]   drive := 1; {default drive}
+  86  2553 [117]   if ARGTYPE[_carg] = 'i' then
+  87  2563 [117]     _agetval(drive,default);
+  88  2587 [117]   if (drive<0) or (drive>1) then begin
+  89  2602 [117]     writeln('Drive must be 0 or 1');
+  90  2632 [117]     _abort
+  91  2632 [117]   end;
+  92  2636 [117]   if ARGTYPE[_carg] = 's' then
+  93  2646 [117]     quiet := option('Q');
+  94  2660 [117] 
+  95  2664 [117]   FILDRV:=drive;
+  96  2664 [117]   call(aprepdo);
+  97  2676 [117] 
+  98  2676 [117]   scyfc:=255; { write disk name }
+  99  2683 [117]   call(agetentx);
+ 100  2687 [117] 
+ 101  2687 [117]   index:=0; ti:=0; maxlen:=0;
+ 102  2701 [117]   sdel:=0; sfound:=0;
+ 103  2713 [117]   repeat
+ 104  2717 [117]     scyfc:=index;
+ 105  2717 [117]     call(agetentx);
+ 106  2730 [117]     { check for end mark }
+ 107  2730 [117]     if filtyp<>chr(0) then begin
+ 108  2738 [117]       { check for deleted flag }
+ 109  2741 [117]       if (fillnk and 255)<128 then begin
+ 110  2751 [117]         debug(ti);
+ 111  2754 [117]         for i:=0 to 15 do
+ 112  2762 [117]           nametab[16*ti+i]:=FILNAM[i];
+ 113  2790 [117]         i:=16;
+ 114  2812 [117]         repeat
+ 115  2816 [117]           i:=i-1;
+ 116  2822 [117]         until (i=0) or
+ 117  2834 [117]           (nametab[16*ti+i]<>' ');
+ 118  2853 [117]         if maxlen<i then maxlen:=i;
+ 119  2869 [117]         filstptab[ti]:=filstp;
+ 120  2885 [117]         cyctab[ti]:=filcyc;
+ 121  2897 [117]         foundtab[ti]:=false;
+ 122  2907 [117]         sizetab[ti]:=filsiz shr 8;
+ 123  2921 [117]         for i:=0 to ti-1 do
+ 124  2938 [117]           if (foundtab[i]=false) and
+ 125  2959 [117]                (foundtab[ti]=false) then
+ 126  2970 [117]             check(i,ti);
+ 127  2988 [117]         ti:=ti+1
+ 128  3006 [117]       end else {deleted}
+ 129  3016 [117]         sdel:=sdel+(filsiz shr 8);
+ 130  3027 [117]     end else {end mark}
+ 131  3035 [117]       sfree:=2560-filloc;
+ 132  3042 [117]     index:=index+1
+ 133  3051 [117]   until (index>=255) or (filtyp=chr(0));
+ 134  3073 [117]   call(aenddo);
+ 135  3081 [117]   nument:=ti;
+ 136  3081 [117] 
+ 137  3089 [117]   for ti:=0 to nument-1 do begin
+ 138  3111 [117]     if foundtab[ti] then begin
+ 139  3119 [117]       for i:=0 to 15 do
+ 140  3130 [117]          name[i]:=nametab[16*ti+i];
+ 141  3155 [117]          _asetfile(name,cyctab[ti],drive,
+ 142  3191 [117]                ' ');
+ 143  3203 [117]       FILERR:=0;
+ 144  3205 [117]       call(adelete);
+ 145  3213 [117]       if FILERR<>0 then bcderror(FILERR);
+ 146  3231 [117]       sfound:=sfound+sizetab[ti];
+ 147  3239 [117]     end
+ 148  3248 [117]   end;
+ 149  3248 [117] 
+ 150  3262 [117]   if not quiet then
+ 151  3262 [117]     writeln('Free: ',sfree,', found: ',sfound,
+ 152  3292 [117]       ', now deleted: ',sdel+sfound);
+ 153  3329 [117] 
+ 154  3329 [117] end.
+ 155  3329 [117] 
+Code length:           3328
+Compiler stack size:   76
+Ident stack size:      120/300

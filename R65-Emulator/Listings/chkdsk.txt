@@ -1,141 +1,129 @@
    1     4 {  ***************************************         }
-   2     4 {  * chkdsk: check and fix a floppy disk *         }
-   3     4 {  ***************************************         }
-   4     4 
-   5     4 {  usage: chkdsk [d]      check drive d            }
-   6     4 {         chkdsk [d] /F   check and fix drive d    }
-   7     4 
-   8     4 {         Default for d is disk 1                  }
-   9     4 
-  10     4 {  2024   rricharz                                 }
-  11     4 
-  12     4 {  The directory table has 256 entries of 32 bytes }
-  13     4 {  The disk name is stored in the last entry (255) }
-  14     4 {  The last currently used entry has filtyp=TEND.  }
-  15     4 
-  16     4 {$U+}
-  17     4 
-  18     4 program chkdsk;
-  19     4 uses syslib,arglib,filelib;
-  20  2092 
-  21  2092 const aprepdo  = $f4a7;
-  22  2095       aenddo   = $f625;
-  23  2095       agetentx = $f63a;
-  24  2095       MAXENT   = 255;    {number of entries in table}
-  25  2095       TSECTORS = 2560;   {number of sectors on disk }
-  26  2095       TEND     = chr(0); {end mark last used entry  }
-  27  2095 
-  28  2095 mem
-  29  2095       filtyp   = $0300:char&;
-  30  2095       filloc   = $0313:integer;
-  31  2095       filsiz   = $0315:integer;
-  32  2095       fillnk   = $031e:integer;
-  33  2095       scyfc    = $037c:integer&;
-  34  2095 
-  35  2095 var entry, sector,drive: integer;
-  36  2095     done,default,notok: boolean;
-  37  2095 
-  38  2095 proc checkfilerr;
-  39  2095 {***************}
-  40  2095 begin
-  41  2095   if FILERR<>0 then begin
-  42  2106     call(aenddo);
-  43  2113     writeln(INVVID,'Cannot read directory',NORVID);
-  44  2147     _abort;
-  45  2151   end;
-  46  2151 end;
-  47  2151 
-  48  2152 func hex(d:integer):char;
-  49  2152 {***********************}
-  50  2152 { convert hex digit to hex char }
-  51  2152 begin
-  52  2152   if (d>=0) and (d<10) then
-  53  2171     hex:=chr(d+ord('0'))
-  54  2181   else if (d>=10) and (d<16) then
-  55  2204     hex:=chr(d+ord('A')-10)
-  56  2217   else hex:='?';
-  57  2228 end;
-  58  2232 
-  59  2233 proc getdrive;
-  60  2233 {************}
-  61  2233 var i:integer;
-  62  2236 { get drive number, default drive 1 }
-  63  2236 begin
-  64  2236   drive:=1; {default drive}
-  65  2244   FILERR:=0;
-  66  2246   if ARGTYPE[_carg]='i' then _agetval(drive,default);
-  67  2284   if (drive<0) or (drive>1) then begin
-  68  2299     writeln(INVVID,'Drive must be 0 or 1',NORVID);
-  69  2335     _abort
-  70  2335   end;
-  71  2339   FILDRV:=drive;
-  72  2339   write('Checking drive ',drive,': ');
-  73  2371   call(aprepdo);
-  74  2375   checkfilerr;
-  75  2379   scyfc:=255; { disk name }
-  76  2386   call(agetentx);
-  77  2390   checkfilerr;
-  78  2394   for i:=0 to 15 do
-  79  2402     write(FILNAM[i]);
-  80  2421   writeln;
-  81  2435 end;
-  82  2441 
-  83  2442 proc check;
-  84  2442 {*********}
-  85  2442 { check one entry }
-  86  2442 var i:integer;
-  87  2445     ok:boolean;
-  88  2445 begin
-  89  2445   write(entry+1:3,' ');
-  90  2464   if (fillnk and 255) >= 128 then
-  91  2473     write('DELETED SPACE       ')
-  92  2498   else begin
-  93  2501     for i:=0 to 15 do
-  94  2509       write(FILNAM[i]);
-  95  2528     write('.',hex(FILCYC shr 4),
-  96  2559       hex(FILCYC and 15),' ');
-  97  2578   end;
-  98  2578   ok:=(sector=filloc);
-  99  2587   write(sector:3,'-',
- 100  2605     sector+((filsiz+1) shr 8):3,'   ');
- 101  2632   sector:=sector+((filsiz+1) shr 8);
- 102  2646   if sector>TSECTORS then begin
- 103  2659     writeln(INVVID,'END OF DISK SPACE',NORVID);
- 104  2692     notok:=true;
- 105  2694   end else if (ok) then writeln('OK')
- 106  2711   else begin
- 107  2720     writeln(INVVID,'SECTOR START',NORVID);
- 108  2745     notok:=true;
- 109  2747   end;
- 110  2751 end;
- 111  2751 
- 112  2752 begin {main}
- 113  2752 {***3******}
- 114  2752   done:=false;
- 115  2756   sector:=0;
- 116  2762   entry:=0;
- 117  2768   getdrive;
- 118  2776 
- 119  2776   notok:=false;
- 120  2778   scyfc:=entry;
- 121  2782   call(agetentx);
- 122  2795   checkfilerr;
- 123  2799   repeat
- 124  2799     check;
- 125  2803     entry:=entry+1;
- 126  2809     scyfc:=entry;
- 127  2814     call(agetentx);
- 128  2827     checkfilerr;
- 129  2831     until (filtyp=TEND) or (entry>=MAXENT);
- 130  2845   writeln('Last sector used ', sector,' of ',TSECTORS)
- 131  2880 ;
- 132  2887   writeln('Last entry used ', entry,' of ',MAXENT);
- 133  2923   if (entry >= MAXENT) then
- 134  2930     writeln(INVVID,'FILE TABLE ON DISK FULL',NORVID);
- 135  2969   if notok then
- 136  2969     writeln(INVVID,'INCONSISTENCY FOUND',NORVID);
- 137  3008   call(aenddo);
- 138  3012 end.
-Code length:           3011
-Compiler stack size:   65
-Ident stack size:      102/256
+   2     4 [  0] {  * chkdsk: check and fix a floppy disk *         }
+   3     4 [  0] {  ***************************************         }
+   4     4 [  0] 
+   5     4 [  0] {  usage: chkdsk [d]      check drive d            }
+   6     4 [  0] {         chkdsk [d] /F   check and fix drive d    }
+   7     4 [  0] 
+   8     4 [  0] {         Default for d is disk 1                  }
+   9     4 [  0] 
+  10     4 [  0] {  2024   rricharz                                 }
+  11     4 [  0] 
+  12     4 [  0] {  The directory table has 256 entries of 32 bytes }
+  13     4 [  0] {  The disk name is stored in the last entry (255) }
+  14     4 [  0] {  The last currently used entry has filtyp=TEND.  }
+  15     4 [  0] 
+  16     4 [  0] {$U+}
+  17     4 [  0] 
+  18     4 [  0] program chkdsk;
+  19     4 [  0] uses syslib,arglib,filelib,hexlib;
+  20  2253 [ 86] 
+  21  2253 [ 86] const aprepdo  = $f4a7;
+  22  2256 [ 87]       aenddo   = $f625;
+  23  2256 [ 88]       agetentx = $f63a;
+  24  2256 [ 89]       MAXENT   = 255;    {number of entries in table}
+  25  2256 [ 90]       TSECTORS = 2560;   {number of sectors on disk }
+  26  2256 [ 91]       TEND     = chr(0); {end mark last used entry  }
+  27  2256 [ 92] 
+  28  2256 [ 92] mem
+  29  2256 [ 92]       filtyp   = $0300:char&;
+  30  2256 [ 93]       filloc   = $0313:integer;
+  31  2256 [ 94]       filsiz   = $0315:integer;
+  32  2256 [ 95]       fillnk   = $031e:integer;
+  33  2256 [ 96]       scyfc    = $037c:integer&;
+  34  2256 [ 97] 
+  35  2256 [ 97] var entry, sector,drive: integer;
+  36  2256 [100]     done,default,notok: boolean;
+  37  2256 [103] 
+  38  2256 [103] proc checkfilerr;
+  39  2256 [104] {***************}
+  40  2256 [104] begin
+  41  2256 [104]   if FILERR<>0 then begin
+  42  2267 [104]     call(aenddo);
+  43  2274 [104]     writeln(INVVID,'Cannot read directory',NORVID);
+  44  2308 [104]     _abort;
+  45  2312 [104]   end;
+  46  2312 [104] end;
+  47  2312 [104] 
+  48  2313 [104] proc getdrive;
+  49  2313 [105] {************}
+  50  2313 [105] var i:integer;
+  51  2316 [106] { get drive number, default drive 1 }
+  52  2316 [106] begin
+  53  2316 [106]   drive:=1; {default drive}
+  54  2324 [106]   FILERR:=0;
+  55  2326 [106]   if ARGTYPE[_carg]='i' then _agetval(drive,default);
+  56  2364 [106]   if (drive<0) or (drive>1) then begin
+  57  2379 [106]     writeln(INVVID,'Drive must be 0 or 1',NORVID);
+  58  2415 [106]     _abort
+  59  2415 [106]   end;
+  60  2419 [106]   FILDRV:=drive;
+  61  2419 [106]   write('Checking drive ',drive,': ');
+  62  2451 [106]   call(aprepdo);
+  63  2455 [106]   checkfilerr;
+  64  2459 [106]   scyfc:=255; { disk name }
+  65  2466 [106]   call(agetentx);
+  66  2470 [106]   checkfilerr;
+  67  2474 [106]   for i:=0 to 15 do
+  68  2482 [106]     write(FILNAM[i]);
+  69  2501 [106]   writeln;
+  70  2515 [106] end;
+  71  2521 [106] 
+  72  2522 [105] proc check;
+  73  2522 [106] {*********}
+  74  2522 [106] { check one entry }
+  75  2522 [106] var i:integer;
+  76  2525 [107]     ok:boolean;
+  77  2525 [108] begin
+  78  2525 [108]   write(entry+1:3,' ');
+  79  2544 [108]   if (fillnk and 255) >= 128 then
+  80  2553 [108]     write('DELETED SPACE       ')
+  81  2578 [108]   else begin
+  82  2581 [108]     for i:=0 to 15 do
+  83  2589 [108]       write(FILNAM[i]);
+  84  2608 [108]     write('.',hexlow(FILCYC),' ');
+  85  2643 [108]   end;
+  86  2643 [108]   ok:=(sector=filloc);
+  87  2652 [108]   write(sector:3,'-',
+  88  2670 [108]     (sector+((filsiz+1) shr 8)-1):3,'   ');
+  89  2700 [108]   sector:=sector+((filsiz+1) shr 8);
+  90  2714 [108]   if sector>TSECTORS then begin
+  91  2727 [108]     writeln(INVVID,'END OF DISK SPACE',NORVID);
+  92  2760 [108]     notok:=true;
+  93  2762 [108]   end else if (ok) then writeln('OK')
+  94  2779 [108]   else begin
+  95  2788 [108]     writeln(INVVID,'SECTOR START',NORVID);
+  96  2813 [108]     notok:=true;
+  97  2815 [108]   end;
+  98  2819 [108] end;
+  99  2819 [108] 
+ 100  2820 [106] begin {main}
+ 101  2820 [106] {***3******}
+ 102  2820 [106]   done:=false;
+ 103  2824 [106]   sector:=0;
+ 104  2830 [106]   entry:=0;
+ 105  2836 [106]   getdrive;
+ 106  2844 [106] 
+ 107  2844 [106]   notok:=false;
+ 108  2846 [106]   scyfc:=entry;
+ 109  2850 [106]   call(agetentx);
+ 110  2863 [106]   checkfilerr;
+ 111  2867 [106]   repeat
+ 112  2867 [106]     check;
+ 113  2871 [106]     entry:=entry+1;
+ 114  2877 [106]     scyfc:=entry;
+ 115  2882 [106]     call(agetentx);
+ 116  2895 [106]     checkfilerr;
+ 117  2899 [106]     until (filtyp=TEND) or (entry>=MAXENT);
+ 118  2913 [106]   writeln('Last sector used ', sector,' of ',TSECTORS)
+ 119  2948 [106] ;
+ 120  2955 [106]   writeln('Last entry used ', entry,' of ',MAXENT);
+ 121  2991 [106]   if (entry >= MAXENT) then
+ 122  2998 [106]     writeln(INVVID,'FILE TABLE ON DISK FULL',NORVID);
+ 123  3037 [106]   if notok then
+ 124  3037 [106]     writeln(INVVID,'INCONSISTENCY FOUND',NORVID);
+ 125  3076 [106]   call(aenddo);
+ 126  3080 [106] end.
+Code length:           3079
+Compiler stack size:   69
+Ident stack size:      108/300

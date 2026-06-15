@@ -16,7 +16,7 @@
 {$U+}
 
 program clean;
-uses syslib,arglib, filelib;
+uses syslib,arglib,filelib,hexlib;
 
 {R65 disk eprom calls and params: }
 const
@@ -51,27 +51,16 @@ begin
   writeln(e and 15,NORVID);
 end;
 
-func hex(d:integer):char;
-{ convert hex digit to hex char }
-begin
-  if (d>=0) and (d<10) then
-    hex:=chr(d+ord('0'))
-  else if (d>=10) and (d<16) then
-    hex:=chr(d+ord('A')-10)
-  else hex:='?';
-end;
-
 proc mark(i3: integer);
 {mark entry for delete}
 var j: integer;
 begin
+  debug('mark',i3,quiet);
   if not quiet then begin
     write('Deleting ');
-    for j:=0 to maxlen do
+    for j:=0 to maxlen-1 do
       write(nametab[16*i3+j]);
-    write('.');
-    writeln(hex(cyctab[i3] shr 4),
-            hex(cyctab[i3] and 15));
+    writeln('.',hexlow(cyctab[i3] shr 4));
   end;
   foundtab[i3]:=true
 end;
@@ -92,7 +81,7 @@ begin
   end
 end;
 
-begin { mani }
+begin { main }
   drive := 1; {default drive}
   if ARGTYPE[_carg] = 'i' then
     _agetval(drive,default);

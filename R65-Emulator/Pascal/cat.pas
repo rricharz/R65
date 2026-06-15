@@ -2,8 +2,8 @@
 {* cat - show text file *}
 {************************}
 
-{ maximal 39 lines are shown      }
-{ usage: cat filename [firstline] }
+{ maximal MAXLINES lines are shown }
+{ usage: cat filename [firstline]  }
 
 program cat;
 uses syslib, arglib, strlib, striolib;
@@ -61,7 +61,7 @@ begin
   close(f);
   if line = MAXLINES then
   write(INVVID,' Additional lines not shown;',
-        ' use SHOW filename', NORVID);
+        ' use VIEW filename', NORVID);
   writeln;
   _release(name);
 end.

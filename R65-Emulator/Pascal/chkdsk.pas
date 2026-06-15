@@ -16,7 +16,7 @@
 {$U+}
 
 program chkdsk;
-uses syslib,arglib,filelib;
+uses syslib,arglib,filelib,hexlib;
 
 const aprepdo  = $f4a7;
       aenddo   = $f625;
@@ -43,17 +43,6 @@ begin
     writeln(INVVID,'Cannot read directory',NORVID);
     _abort;
   end;
-end;
-
-func hex(d:integer):char;
-{***********************}
-{ convert hex digit to hex char }
-begin
-  if (d>=0) and (d<10) then
-    hex:=chr(d+ord('0'))
-  else if (d>=10) and (d<16) then
-    hex:=chr(d+ord('A')-10)
-  else hex:='?';
 end;
 
 proc getdrive;
@@ -92,12 +81,11 @@ begin
   else begin
     for i:=0 to 15 do
       write(FILNAM[i]);
-    write('.',hex(FILCYC shr 4),
-      hex(FILCYC and 15),' ');
+    write('.',hexlow(FILCYC),' ');
   end;
   ok:=(sector=filloc);
   write(sector:3,'-',
-    sector+((filsiz+1) shr 8):3,'   ');
+    (sector+((filsiz+1) shr 8)-1):3,'   ');
   sector:=sector+((filsiz+1) shr 8);
   if sector>TSECTORS then begin
     writeln(INVVID,'END OF DISK SPACE',NORVID);

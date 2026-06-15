@@ -48,13 +48,19 @@ begin
   filtyp:='I';
   FILERR:=0;
   call(rdfile);
-  if FILERR<>0 then
-    writeln(INVVID,'File error ',FILERR shr 4,
-      FILERR and 15,NORVID);
+  if FILERR<>0 then begin
+    writeln(INVVID,
+      'Cannot load canvas; error ',FILERR shr 4,
+      FILERR and 15);
+    writeln('Use VIEW to display text files',
+      NORVID);
+    RUNERR:=FILERR
+  end;
 end;
 
 begin
   cyclus:=0; drive:=1;
+  default:=false;
   _agetstring(name,default,cyclus,drive);
   if default then begin
     writeln(INVVID,'Usage: SHOW filename',NORVID);
@@ -64,8 +70,6 @@ begin
     writeln(INVVID,'Wild cards not allowed',NORVID);
     exit;
   end;
-
   _grinit; _fullview; _cleargr;
   loadcanvas;
-
 end.

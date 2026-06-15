@@ -33,31 +33,6 @@ var
   done, deleted:        boolean;
   name:                 array[15] of char;
 
-func hex(i8: integer): packed char;
-{*********************************}
-var hi, lo: integer;
-    c1, c2: char;
-begin
-  hi := (i8 shr 4) and $0f;
-  lo := i8 and $0f;
-  if hi < 10 then c1 := chr(ord('0') + hi)
-             else c1 := chr(ord('A') + hi - 10);
-  if lo < 10 then c2 := chr(ord('0') + lo)
-             else c2 := chr(ord('A') + lo - 10);
-  hex := packed(c1, c2);
-end;
-
-proc runprog(name0: array[15] of char;
-             cyc: integer; drv: integer);
-{***************************************}
-var ii: integer;
-begin
-  RUNERR:=0;
-  for ii:=0 to 15 do FILNM1[ii]:=name0[ii];
-  FILCY1:=cyc; FILDRV:=drv; FILFLG:=$40;
-  run
-end;
-
 proc chainprog(name0: array[15] of char;
                cyc: integer; drv: integer);
 {*****************************************}

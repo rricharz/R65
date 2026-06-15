@@ -11,9 +11,6 @@
 program help;
 uses syslib,arglib,filelib,strlib,wildlib,striolib;
 
-const
-    DEBUG = false;
-
 var
     fname, diskname: cpnt;
     drive,  entry: integer;
@@ -61,8 +58,7 @@ begin
     _sfindentry(fname, drive, entry, found, last);
   end;
 
-  if DEBUG then writeln('fname=', fname,
-    ' found=', found);
+  debug(fname,found);
 
   if found then begin
     copyback;
