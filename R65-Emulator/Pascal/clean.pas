@@ -16,7 +16,7 @@
 {$U+}
 
 program clean;
-uses syslib,arglib,filelib,hexlib;
+uses syslib,arglib,filelib,writelib;
 
 {R65 disk eprom calls and params: }
 const
@@ -60,7 +60,7 @@ begin
     write('Deleting ');
     for j:=0 to maxlen-1 do
       write(nametab[16*i3+j]);
-    writeln('.',hexlow(cyctab[i3] shr 4));
+    writeln('.',hexb(cyctab[i3]));
   end;
   foundtab[i3]:=true
 end;

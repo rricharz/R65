@@ -1721,13 +1721,27 @@ STXI    JSR FETCH
         LDA ABASE+1
         ADC ARG2+1
         STA ABASE+1
-        CMP EOPROG+1    DO NOT ALLOW WRITING
-        BCC PRGERR      INTO PROGRAM SPACE
-        BEQ PRGERR      CHECK ONLY HIGH BYTE
-        LDY =0          MUST BE LARGER
+*
+        CMP EOPROG+1
+        BCC CHK17
+        BEQ CHK17
+*
+WRITOK  LDY =0
         LDA ACCU
-        STA (ABASE),Y   ONLY ONE BYTE
+        STA (ABASE),Y
         JMP GETS2
+*
+CHK17   CMP =$17
+        BNE PRGERR
+*
+        LDA ABASE
+        CMP =$D8
+        BCC PRGERR
+*
+        CMP =$E9
+        BCS PRGERR
+*
+        JMP WRITOK
 *
 PRGERR  LDX =$90
         JMP PERROR

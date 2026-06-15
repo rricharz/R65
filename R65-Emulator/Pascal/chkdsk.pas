@@ -16,7 +16,7 @@
 {$U+}
 
 program chkdsk;
-uses syslib,arglib,filelib,hexlib;
+uses syslib,arglib,filelib,writelib;
 
 const aprepdo  = $f4a7;
       aenddo   = $f625;
@@ -81,7 +81,7 @@ begin
   else begin
     for i:=0 to 15 do
       write(FILNAM[i]);
-    write('.',hexlow(FILCYC),' ');
+    write('.',hexb(FILCYC),' ');
   end;
   ok:=(sector=filloc);
   write(sector:3,'-',
