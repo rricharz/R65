@@ -12,7 +12,7 @@
    Written 2019-2023 by rricharz  }
 
 program calc;
-uses syslib,mathlib,strlib,ledlib;
+uses syslib,mathlib,strlib,ledlib,writelib;
 
 mem vidpnt=$00e9:integer;
     BUFFPN   = $0015: integer&;

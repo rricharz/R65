@@ -8,7 +8,7 @@
 
 program ladders;
 uses  syslib,plotlib,ledlib,arglib,strlib,
-      spritelib, striolib;
+      spritelib, striolib, writelib;
 
 const ERASE         = 0;
       BALL          = $6ff6;

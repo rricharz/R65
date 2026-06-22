@@ -1,358 +1,359 @@
    1     4 { ***********************************
-   2     4   * SPRITES - view and edit sprites *
-   3     4   ***********************************
-   4     4 
-   5     4   SPRITETABLE:B is stored on disk 0 and is
-   6     4   used there by the sprite library SPRITELIB
-   7     4 
-   8     4   SPRITES allows to view the sprites in
-   9     4   SPRITETABLE:B, to show animations of sprites
-  10     4   and to copy and edit sprites.
-  11     4 
-  12     4   If sprites are edited, a new copy of
-  13     4   SPRITETABLE:B is made on disk 0
-  14     4                                               }
-  15     4 
-  16     4 
-  17     4 program sprites;
-  18     4 uses syslib,strlib,striolib,plotlib,filelib,spritelib;
-  19  5855 
-  20  5855 {$R+}
-  21  5855 {$U+}
-  22  5855 
-  23  5855 const NX        = 12;
-  24  5858       NPIXELS   = 8;
-  25  5858       LARGEPIX  = 12;
-  26  5858       CLEFT     = chr($03);
-  27  5858       CRIGHT    = chr($16);
-  28  5858       CDOWN     = chr($18);
-  29  5858       ESC       = chr(0);
-  30  5858       TOGGLE    = chr($0c);
-  31  5858       NBLINKS   = 10;  {no of loops until bink}
-  32  5858       LOOPS     = 10;  {no of loops until next frame}
-  33  5858       STATUSLN  = 36;
-  34  5858       DISK      = 0;
-  35  5858 
-  36  5858 mem sflag=$1781: integer&;
-  37  5858 
-  38  5858 var selected, lastselected: integer;
-  39  5858     frames, framecounter:   integer;
-  40  5858     in, editbit:            integer;
-  41  5858     isedited, editflag:     boolean;
-  42  5858     ch:                     char;
-  43  5858     blink, elapsed:         integer;
-  44  5858     copied_sprites:         array[3] of integer;
-  45  5858 
-  46  5858 proc writetable;
-  47  5858 var i, j, cyclus, drive, index: integer;
-  48  5861     f: file;
-  49  5861 begin
-  50  5861   cyclus := 0;
-  51  5865   drive  := DISK;
-  52  5871   _strfio('SPRITETABLE:B', cyclus, drive);
-  53  5905   openw(f);
-  54  5911   index := 0;
-  55  5913 
-  56  5917   for j:= 0 to NSPRITES - 1 do begin
-  57  5937     for i:= 0 to 2 do begin
-  58  5954       write(@f,sprites[index],',');
-  59  5976       index := index + 1;
-  60  5982     end;
-  61  5987     writeln(@f,sprites[index]);
-  62  6027     index := index + 1;
-  63  6033   end;
-  64  6038 
-  65  6052   close(f);
-  66  6058 end;
-  67  6058 
-  68  6059 proc spritetable(last, current: integer);
-  69  6059 var j, xoff, yoff: integer;
-  70  6062 
-  71  6062   proc coordinates(i);
-  72  6062   var xi, yi: integer;
-  73  6065   begin
-  74  6065     yi := i div NX;
-  75  6073     xi := i - (yi * NX);
-  76  6089     yoff := YSIZE - (NPIXELS * (yi + 1) + 10);
-  77  6109     xoff := NPIXELS * xi + 10;
-  78  6123   end;
-  79  6128 
-  80  6129 begin
-  81  6129   _move(5,10);
-  82  6141   write(@PLOTDEV, 'Sprite # ', selected:2);
-  83  6167   for j := 0 to NSPRITES - 1 do begin
-  84  6187     coordinates(j);
-  85  6197     _showsprite(xoff, yoff, j);
-  86  6215   end;
-  87  6215   coordinates(last);
-  88  6239   _rectangle(xoff - 1, yoff - 1,
-  89  6252                 NPIXELS + 1, NPIXELS + 1, BLACK);
-  90  6271   coordinates(current);
-  91  6281   _rectangle(xoff - 1, yoff - 1,
-  92  6294                 NPIXELS + 1, NPIXELS + 1, WHITE);
-  93  6313 end;
-  94  6313 
-  95  6314 proc filled_rectangle(x, y, xs, ys, color: integer);
-  96  6314 var v,h: integer;
-  97  6317 begin
-  98  6317     for v := y to y + ys do begin
-  99  6345       _move(x, v);
- 100  6359       _draw(x + xs, v, color);
- 101  6382     end;
- 102  6382 end;
- 103  6396 
- 104  6397 func getbit(index, bx, by: integer): integer;
- 105  6397 var base, part, bitno, mask: integer;
- 106  6400 begin
- 107  6400   base := 4 * index;
- 108  6404 
- 109  6413   if by < 4 then
- 110  6419     part := 2
- 111  6423   else
- 112  6425     part := 0;
- 113  6434 
- 114  6438   if bx >= 4 then
- 115  6444     part := part + 1;
- 116  6454 
- 117  6459   bitno := _mod(7 - by, 4) * 4 + _mod(bx, 4);
- 118  6493   mask := $8000 shr bitno;
- 119  6501 
- 120  6510   if (sprites[base + part] and mask) <> 0 then
- 121  6535     getbit := 1
- 122  6539   else
- 123  6541     getbit := 0;
- 124  6550 end;
- 125  6554 
- 126  6555 proc toggle(index: integer);
- 127  6555 var base, part, bitno, mask, bx, by: integer;
- 128  6558 begin
- 129  6558   base := 4 * index;
- 130  6562   by := editbit div 8;
- 131  6577   bx := editbit - by * 8;
- 132  6592 
- 133  6598   if by < 4 then
- 134  6604     part := 2
- 135  6608   else
- 136  6610     part := 0;
- 137  6619   if bx >= 4 then
- 138  6629     part := part + 1;
- 139  6639 
- 140  6644   bitno := _mod(7 - by, 4) * 4 + _mod(bx, 4);
- 141  6678   mask := $8000 shr bitno;
- 142  6686 
- 143  6695   sprites[base + part] :=
- 144  6709     sprites[base + part] xor mask;
- 145  6727 
- 146  6736   isedited := true;
- 147  6738 
- 148  6742 end;
- 149  6742 
- 150  6743 proc showlarge(index: integer);
- 151  6743 var x, y, bx, by, color, margin, size: integer;
- 152  6746 begin
- 153  6746   size := 8 * LARGEPIX;
- 154  6752   margin := ((YSIZE + 1) - size) div 2;
- 155  6769   x := XSIZE - size - margin;
- 156  6781   y := margin;
- 157  6790   _rectangle(x - 1, y - 1, size + 2, size + 2, WHITE);
- 158  6834 
- 159  6834   for by := 0 to 7 do
- 160  6842     for bx := 0 to 7 do begin
- 161  6868 
- 162  6868       if getbit(index, bx, by) <> 0 then
- 163  6890         color := WHITE
- 164  6894       else
- 165  6896         color := BLACK;
- 166  6905 
- 167  6909       filled_rectangle(x + LARGEPIX * bx,
- 168  6915                        y + LARGEPIX * by,
- 169  6927                        LARGEPIX, LARGEPIX, color);
- 170  6947     end;
- 171  6947 end;
- 172  6975 
- 173  6976 proc showcursor;
- 174  6976 var x, y, bx, by, color, margin, size: integer;
- 175  6979 begin
- 176  6979   if editflag then begin
- 177  6985     by := editbit div 8;
- 178  6994     bx := editbit - by * 8;
- 179  7009     size := 8 * LARGEPIX;
- 180  7019     margin := ((YSIZE + 1) - size) div 2;
- 181  7036     x := XSIZE - size - margin;
- 182  7048     y := margin;
- 183  7057     if (blink < NBLINKS) then
- 184  7072       color := BLACK
- 185  7075     else
- 186  7077       color := WHITE;
- 187  7086     _rectangle(x + LARGEPIX * bx,
- 188  7096                y + LARGEPIX * by,
- 189  7108                LARGEPIX - 1, LARGEPIX - 1, color);
- 190  7134     blink := blink + 1;
- 191  7140     if blink >= 2 * NBLINKS then blink := 0;
- 192  7160   end;
- 193  7164 end;
- 194  7164 
- 195  7165 proc showframe(index: integer);
- 196  7165 const xoff = 83;
- 197  7168 var framenumber, yoff : integer;
- 198  7168 begin
- 199  7168   yoff := STATUSLN;
- 200  7172   if framecounter = -1 then begin
- 201  7184     _move(5, 22);
- 202  7197     write(@PLOTDEV, 'Frames', frames: 5);
- 203  7220     _rectangle(xoff - 1, yoff - 1, 9, 9, WHITE);
- 204  7244     _showsprite(xoff, yoff, index);
- 205  7260     framecounter := 0;
- 206  7262   end;
- 207  7266 
- 208  7266   if frames > 0 then begin
- 209  7273     framenumber :=
- 210  7276       _mod(framecounter div LOOPS, frames);
- 211  7295     _showsprite(xoff, yoff, index + framenumber);
- 212  7320     framecounter := framecounter + 1;
- 213  7326   end;
- 214  7331 
- 215  7331   if framecounter >= (frames * LOOPS) then
- 216  7342     framecounter := 0;
- 217  7348 end;
- 218  7352 
- 219  7353 {
- 220  7353 func mirror4(v: integer): integer;
- 221  7353 begin
- 222  7353   mirror4 :=
- 223  7353       ((v and $8888) shr 3)
- 224  7353     + ((v and $4444) shr 1)
- 225  7353     + ((v and $2222) shl 1)
- 226  7353     + ((v and $1111) shl 3);
- 227  7353 end;
- 228  7353 
- 229  7353 proc hmirror(fromindex, toindex: integer);
- 230  7353 var fbase, tbase: integer;
- 231  7353 begin
- 232  7353   fbase := 4 * fromindex;
- 233  7353   tbase := 4 * toindex;
- 234  7353 
- 235  7353   sprites[tbase + 0] := mirror4(sprites[fbase + 1]);
- 236  7353   sprites[tbase + 1] := mirror4(sprites[fbase + 0]);
- 237  7353 
- 238  7353   sprites[tbase + 2] := mirror4(sprites[fbase + 3]);
- 239  7353   sprites[tbase + 3] := mirror4(sprites[fbase + 2]);
- 240  7353 end;
- 241  7353 }
- 242  7353 
- 243  7353 proc copy(fromindex: integer);
- 244  7353 var i, base: integer;
- 245  7356 begin
- 246  7356   base := 4 * fromindex;
- 247  7360   for i := 0 to 3 do
- 248  7377     copied_sprites[i] := sprites[base + i];
- 249  7409 end;
- 250  7431 
- 251  7432 proc paste(toindex: integer);
- 252  7432 var i, base: integer;
- 253  7435 begin
- 254  7435   base := 4 * toindex;
- 255  7439   for i := 0 to 3 do
- 256  7456     sprites[base + i] := copied_sprites[i];
- 257  7488 end;
- 258  7510 
- 259  7511 
- 260  7511 begin
- 261  7511   _grinit;
- 262  7517   _fullview;
- 263  7521   _cleargr;
- 264  7525   writeln(
- 265  7525 'Q:   Save and quit   K:     Quit without saving');
- 266  7579   writeln(
- 267  7579 'E:   Start Edit mode BLANK: Toggle pixel');
- 268  7626   writeln(
- 269  7626 'C:   Copy sprite     V:     Paste sprite');
- 270  7673   writeln(
- 271  7673 '1..4 Animate frames  ESC:   Leave edit mode');
- 272  7723   lastselected := 0;
- 273  7725   selected := 0;
- 274  7731   frames := 0;
- 275  7737   framecounter := -1;
- 276  7743   isedited := false;
- 277  7750   editflag := false;
- 278  7756   editbit := 0;
- 279  7762   blink := 0;
- 280  7768   spritetable(lastselected, selected);
- 281  7786   showlarge(selected);
- 282  7796   _move(5,STATUSLN); write(@PLOTDEV,'VIEW');
- 283  7815 
- 284  7815   repeat { main loop }
- 285  7815     repeat { wait for key pressed }
- 286  7815       ch := KEYPRESSED;
- 287  7819       { sflag bit 8 is escape flag. Pass it through }
- 288  7823       showframe(selected);
- 289  7833       showcursor;
- 290  7837       elapsed := _syncscreen;
- 291  7843     until (ord(ch)<>0) or ((sflag and $80)<>0);
- 292  7864     read(@KEY,ch);
- 293  7876     sflag:=sflag and $7f; { clear escape flag }
- 294  7889     case ch of
- 295  7889       TOGGLE: write(TOGGLE);
- 296  7903       '0':    frames := 0;
- 297  7915       '1':    frames := 1;
- 298  7931       '2':    frames := 2;
- 299  7947       '3':    frames := 3;
- 300  7963       '4':    frames := 4;
- 301  7979       'Q':    begin
- 302  7993                 if isedited then
- 303  7993                   writetable;
- 304  8004               end;
- 305  8004       'E':    begin
- 306  8014                 _move(5,STATUSLN);
- 307  8024                 write(@PLOTDEV,'EDIT');
- 308  8033                 editflag := true;
- 309  8035                 frames := 0;
- 310  8041               end;
- 311  8045       ' ':    toggle(selected);
- 312  8065       'C':    copy(selected);
- 313  8085       'V':    paste(selected);
- 314  8105       ESC:    if editflag then begin
- 315  8119                 _move(5,STATUSLN);
- 316  8132                 write(@PLOTDEV,'VIEW');
- 317  8141                 editflag := false;
- 318  8143                 ch := 'C'; { do not exit }
- 319  8153                 if isedited then
- 320  8153                   writetable;
- 321  8164               end;
- 322  8164       CRIGHT: if editflag then
- 323  8174                 editbit := editbit + 1
- 324  8185               else
- 325  8187                 selected := selected + 1;
- 326  8201       CLEFT:  if editflag then
- 327  8216                 editbit := editbit - 1
- 328  8227               else
- 329  8229                 selected := selected - 1;
- 330  8243       CUP:    if editflag then
- 331  8258                 editbit := editbit + 8
- 332  8269               else
- 333  8271                 selected := selected - NX;
- 334  8285       CDOWN:  if editflag then
- 335  8300                 editbit := editbit - 8
- 336  8311               else
- 337  8313                 selected := selected + NX
- 338  8325     end {case};
- 339  8334 
- 340  8334     if selected < 0 then
- 341  8340       selected := 0;
- 342  8346     if selected > NSPRITES - frames - 1 then
- 343  8363       selected := NSPRITES - frames - 1;
- 344  8377     if editbit < 0 then
- 345  8388       editbit := 0;
- 346  8394     if editbit > 63 then
- 347  8404       editbit := 63;
- 348  8410 
- 349  8414     spritetable(lastselected, selected);
- 350  8428     showlarge(selected);
- 351  8438     lastselected := selected;
- 352  8438     framecounter := -1;
- 353  8448   until (ch='Q') or (ch='K') or (ch=ESC);
- 354  8475   _grend;
- 355  8483 end.
-Code length:            8482
-Compiler stack size:     171
-Ident stack size:        175
+   2     4 [  0]   * SPRITES - view and edit sprites *
+   3     4 [  0]   ***********************************
+   4     4 [  0] 
+   5     4 [  0]   SPRITETABLE:B is stored on disk 0 and is
+   6     4 [  0]   used there by the sprite library SPRITELIB
+   7     4 [  0] 
+   8     4 [  0]   SPRITES allows to view the sprites in
+   9     4 [  0]   SPRITETABLE:B, to show animations of sprites
+  10     4 [  0]   and to copy and edit sprites.
+  11     4 [  0] 
+  12     4 [  0]   If sprites are edited, a new copy of
+  13     4 [  0]   SPRITETABLE:B is made on disk 0
+  14     4 [  0]                                               }
+  15     4 [  0] 
+  16     4 [  0] 
+  17     4 [  0] program sprites;
+  18     4 [  0] uses  syslib,strlib,striolib,plotlib,filelib,
+  19  5099 [122]       spritelib,writelib;
+  20  8157 [157] 
+  21  8157 [157] {$R+}
+  22  8157 [157] {$U+}
+  23  8157 [157] 
+  24  8157 [157] const NX        = 12;
+  25  8160 [158]       NPIXELS   = 8;
+  26  8160 [159]       LARGEPIX  = 12;
+  27  8160 [160]       CLEFT     = chr($03);
+  28  8160 [161]       CRIGHT    = chr($16);
+  29  8160 [162]       CDOWN     = chr($18);
+  30  8160 [163]       ESC       = chr(0);
+  31  8160 [164]       TOGGLE    = chr($0c);
+  32  8160 [165]       NBLINKS   = 10;  {no of loops until bink}
+  33  8160 [166]       LOOPS     = 10;  {no of loops until next frame}
+  34  8160 [167]       STATUSLN  = 36;
+  35  8160 [168]       DISK      = 0;
+  36  8160 [169] 
+  37  8160 [169] mem sflag=$1781: integer&;
+  38  8160 [170] 
+  39  8160 [170] var selected, lastselected: integer;
+  40  8160 [172]     frames, framecounter:   integer;
+  41  8160 [174]     in, editbit:            integer;
+  42  8160 [176]     isedited, editflag:     boolean;
+  43  8160 [178]     ch:                     char;
+  44  8160 [179]     blink, elapsed:         integer;
+  45  8160 [181]     copied_sprites:         array[3] of integer;
+  46  8160 [182] 
+  47  8160 [182] proc writetable;
+  48  8160 [183] var i, j, cyclus, drive, index: integer;
+  49  8163 [188]     f: file;
+  50  8163 [189] begin
+  51  8163 [189]   cyclus := 0;
+  52  8167 [189]   drive  := DISK;
+  53  8173 [189]   _strfio('SPRITETABLE:B', cyclus, drive);
+  54  8207 [189]   openw(f);
+  55  8213 [189]   index := 0;
+  56  8215 [189] 
+  57  8219 [189]   for j:= 0 to NSPRITES - 1 do begin
+  58  8239 [189]     for i:= 0 to 2 do begin
+  59  8256 [189]       write(@f,sprites[index],',');
+  60  8278 [189]       index := index + 1;
+  61  8284 [189]     end;
+  62  8289 [189]     writeln(@f,sprites[index]);
+  63  8329 [189]     index := index + 1;
+  64  8335 [189]   end;
+  65  8340 [189] 
+  66  8354 [189]   close(f);
+  67  8360 [189] end;
+  68  8360 [189] 
+  69  8361 [183] proc spritetable(last, current: integer);
+  70  8361 [186] var j, xoff, yoff: integer;
+  71  8364 [189] 
+  72  8364 [189]   proc coordinates(i);
+  73  8364 [191]   var xi, yi: integer;
+  74  8367 [193]   begin
+  75  8367 [193]     yi := i div NX;
+  76  8375 [193]     xi := i - (yi * NX);
+  77  8391 [193]     yoff := YSIZE - (NPIXELS * (yi + 1) + 10);
+  78  8411 [193]     xoff := NPIXELS * xi + 10;
+  79  8425 [193]   end;
+  80  8430 [193] 
+  81  8431 [190] begin
+  82  8431 [190]   _move(5,10);
+  83  8443 [190]   write(@PLOTDEV, 'Sprite # ', selected:2);
+  84  8469 [190]   for j := 0 to NSPRITES - 1 do begin
+  85  8489 [190]     coordinates(j);
+  86  8499 [190]     _showsprite(xoff, yoff, j);
+  87  8517 [190]   end;
+  88  8517 [190]   coordinates(last);
+  89  8541 [190]   _rectangle(xoff - 1, yoff - 1,
+  90  8554 [190]                 NPIXELS + 1, NPIXELS + 1, BLACK);
+  91  8573 [190]   coordinates(current);
+  92  8583 [190]   _rectangle(xoff - 1, yoff - 1,
+  93  8596 [190]                 NPIXELS + 1, NPIXELS + 1, WHITE);
+  94  8615 [190] end;
+  95  8615 [190] 
+  96  8616 [184] proc filled_rectangle(x, y, xs, ys, color: integer);
+  97  8616 [190] var v,h: integer;
+  98  8619 [192] begin
+  99  8619 [192]     for v := y to y + ys do begin
+ 100  8647 [192]       _move(x, v);
+ 101  8661 [192]       _draw(x + xs, v, color);
+ 102  8684 [192]     end;
+ 103  8684 [192] end;
+ 104  8698 [192] 
+ 105  8699 [185] func getbit(index, bx, by: integer): integer;
+ 106  8699 [190] var base, part, bitno, mask: integer;
+ 107  8702 [194] begin
+ 108  8702 [194]   base := 4 * index;
+ 109  8706 [194] 
+ 110  8715 [194]   if by < 4 then
+ 111  8721 [194]     part := 2
+ 112  8725 [194]   else
+ 113  8727 [194]     part := 0;
+ 114  8736 [194] 
+ 115  8740 [194]   if bx >= 4 then
+ 116  8746 [194]     part := part + 1;
+ 117  8756 [194] 
+ 118  8761 [194]   bitno := _mod(7 - by, 4) * 4 + _mod(bx, 4);
+ 119  8795 [194]   mask := $8000 shr bitno;
+ 120  8803 [194] 
+ 121  8812 [194]   if (sprites[base + part] and mask) <> 0 then
+ 122  8837 [194]     getbit := 1
+ 123  8841 [194]   else
+ 124  8843 [194]     getbit := 0;
+ 125  8852 [194] end;
+ 126  8856 [194] 
+ 127  8857 [187] proc toggle(index: integer);
+ 128  8857 [189] var base, part, bitno, mask, bx, by: integer;
+ 129  8860 [195] begin
+ 130  8860 [195]   base := 4 * index;
+ 131  8864 [195]   by := editbit div 8;
+ 132  8879 [195]   bx := editbit - by * 8;
+ 133  8894 [195] 
+ 134  8900 [195]   if by < 4 then
+ 135  8906 [195]     part := 2
+ 136  8910 [195]   else
+ 137  8912 [195]     part := 0;
+ 138  8921 [195]   if bx >= 4 then
+ 139  8931 [195]     part := part + 1;
+ 140  8941 [195] 
+ 141  8946 [195]   bitno := _mod(7 - by, 4) * 4 + _mod(bx, 4);
+ 142  8980 [195]   mask := $8000 shr bitno;
+ 143  8988 [195] 
+ 144  8997 [195]   sprites[base + part] :=
+ 145  9011 [195]     sprites[base + part] xor mask;
+ 146  9029 [195] 
+ 147  9038 [195]   isedited := true;
+ 148  9040 [195] 
+ 149  9044 [195] end;
+ 150  9044 [195] 
+ 151  9045 [188] proc showlarge(index: integer);
+ 152  9045 [190] var x, y, bx, by, color, margin, size: integer;
+ 153  9048 [197] begin
+ 154  9048 [197]   size := 8 * LARGEPIX;
+ 155  9054 [197]   margin := ((YSIZE + 1) - size) div 2;
+ 156  9071 [197]   x := XSIZE - size - margin;
+ 157  9083 [197]   y := margin;
+ 158  9092 [197]   _rectangle(x - 1, y - 1, size + 2, size + 2, WHITE);
+ 159  9136 [197] 
+ 160  9136 [197]   for by := 0 to 7 do
+ 161  9144 [197]     for bx := 0 to 7 do begin
+ 162  9170 [197] 
+ 163  9170 [197]       if getbit(index, bx, by) <> 0 then
+ 164  9192 [197]         color := WHITE
+ 165  9196 [197]       else
+ 166  9198 [197]         color := BLACK;
+ 167  9207 [197] 
+ 168  9211 [197]       filled_rectangle(x + LARGEPIX * bx,
+ 169  9217 [197]                        y + LARGEPIX * by,
+ 170  9229 [197]                        LARGEPIX, LARGEPIX, color);
+ 171  9249 [197]     end;
+ 172  9249 [197] end;
+ 173  9277 [197] 
+ 174  9278 [189] proc showcursor;
+ 175  9278 [190] var x, y, bx, by, color, margin, size: integer;
+ 176  9281 [197] begin
+ 177  9281 [197]   if editflag then begin
+ 178  9287 [197]     by := editbit div 8;
+ 179  9296 [197]     bx := editbit - by * 8;
+ 180  9311 [197]     size := 8 * LARGEPIX;
+ 181  9321 [197]     margin := ((YSIZE + 1) - size) div 2;
+ 182  9338 [197]     x := XSIZE - size - margin;
+ 183  9350 [197]     y := margin;
+ 184  9359 [197]     if (blink < NBLINKS) then
+ 185  9374 [197]       color := BLACK
+ 186  9377 [197]     else
+ 187  9379 [197]       color := WHITE;
+ 188  9388 [197]     _rectangle(x + LARGEPIX * bx,
+ 189  9398 [197]                y + LARGEPIX * by,
+ 190  9410 [197]                LARGEPIX - 1, LARGEPIX - 1, color);
+ 191  9436 [197]     blink := blink + 1;
+ 192  9442 [197]     if blink >= 2 * NBLINKS then blink := 0;
+ 193  9462 [197]   end;
+ 194  9466 [197] end;
+ 195  9466 [197] 
+ 196  9467 [190] proc showframe(index: integer);
+ 197  9467 [192] const xoff = 83;
+ 198  9470 [193] var framenumber, yoff : integer;
+ 199  9470 [195] begin
+ 200  9470 [195]   yoff := STATUSLN;
+ 201  9474 [195]   if framecounter = -1 then begin
+ 202  9486 [195]     _move(5, 22);
+ 203  9499 [195]     write(@PLOTDEV, 'Frames', frames: 5);
+ 204  9522 [195]     _rectangle(xoff - 1, yoff - 1, 9, 9, WHITE);
+ 205  9546 [195]     _showsprite(xoff, yoff, index);
+ 206  9562 [195]     framecounter := 0;
+ 207  9564 [195]   end;
+ 208  9568 [195] 
+ 209  9568 [195]   if frames > 0 then begin
+ 210  9575 [195]     framenumber :=
+ 211  9578 [195]       _mod(framecounter div LOOPS, frames);
+ 212  9597 [195]     _showsprite(xoff, yoff, index + framenumber);
+ 213  9622 [195]     framecounter := framecounter + 1;
+ 214  9628 [195]   end;
+ 215  9633 [195] 
+ 216  9633 [195]   if framecounter >= (frames * LOOPS) then
+ 217  9644 [195]     framecounter := 0;
+ 218  9650 [195] end;
+ 219  9654 [195] 
+ 220  9655 [191] {
+ 221  9655 [191] func mirror4(v: integer): integer;
+ 222  9655 [191] begin
+ 223  9655 [191]   mirror4 :=
+ 224  9655 [191]       ((v and $8888) shr 3)
+ 225  9655 [191]     + ((v and $4444) shr 1)
+ 226  9655 [191]     + ((v and $2222) shl 1)
+ 227  9655 [191]     + ((v and $1111) shl 3);
+ 228  9655 [191] end;
+ 229  9655 [191] 
+ 230  9655 [191] proc hmirror(fromindex, toindex: integer);
+ 231  9655 [191] var fbase, tbase: integer;
+ 232  9655 [191] begin
+ 233  9655 [191]   fbase := 4 * fromindex;
+ 234  9655 [191]   tbase := 4 * toindex;
+ 235  9655 [191] 
+ 236  9655 [191]   sprites[tbase + 0] := mirror4(sprites[fbase + 1]);
+ 237  9655 [191]   sprites[tbase + 1] := mirror4(sprites[fbase + 0]);
+ 238  9655 [191] 
+ 239  9655 [191]   sprites[tbase + 2] := mirror4(sprites[fbase + 3]);
+ 240  9655 [191]   sprites[tbase + 3] := mirror4(sprites[fbase + 2]);
+ 241  9655 [191] end;
+ 242  9655 [191] }
+ 243  9655 [191] 
+ 244  9655 [191] proc copy(fromindex: integer);
+ 245  9655 [193] var i, base: integer;
+ 246  9658 [195] begin
+ 247  9658 [195]   base := 4 * fromindex;
+ 248  9662 [195]   for i := 0 to 3 do
+ 249  9679 [195]     copied_sprites[i] := sprites[base + i];
+ 250  9711 [195] end;
+ 251  9733 [195] 
+ 252  9734 [192] proc paste(toindex: integer);
+ 253  9734 [194] var i, base: integer;
+ 254  9737 [196] begin
+ 255  9737 [196]   base := 4 * toindex;
+ 256  9741 [196]   for i := 0 to 3 do
+ 257  9758 [196]     sprites[base + i] := copied_sprites[i];
+ 258  9790 [196] end;
+ 259  9812 [196] 
+ 260  9813 [193] 
+ 261  9813 [193] begin
+ 262  9813 [193]   _grinit;
+ 263  9819 [193]   _fullview;
+ 264  9823 [193]   _cleargr;
+ 265  9827 [193]   writeln(
+ 266  9827 [193] 'Q:   Save and quit   K:     Quit without saving');
+ 267  9881 [193]   writeln(
+ 268  9881 [193] 'E:   Start Edit mode BLANK: Toggle pixel');
+ 269  9928 [193]   writeln(
+ 270  9928 [193] 'C:   Copy sprite     V:     Paste sprite');
+ 271  9975 [193]   writeln(
+ 272  9975 [193] '1..4 Animate frames  ESC:   Leave edit mode');
+ 273 10025 [193]   lastselected := 0;
+ 274 10027 [193]   selected := 0;
+ 275 10033 [193]   frames := 0;
+ 276 10039 [193]   framecounter := -1;
+ 277 10045 [193]   isedited := false;
+ 278 10052 [193]   editflag := false;
+ 279 10058 [193]   editbit := 0;
+ 280 10064 [193]   blink := 0;
+ 281 10070 [193]   spritetable(lastselected, selected);
+ 282 10088 [193]   showlarge(selected);
+ 283 10098 [193]   _move(5,STATUSLN); write(@PLOTDEV,'VIEW');
+ 284 10117 [193] 
+ 285 10117 [193]   repeat { main loop }
+ 286 10117 [193]     repeat { wait for key pressed }
+ 287 10117 [193]       ch := KEYPRESSED;
+ 288 10121 [193]       { sflag bit 8 is escape flag. Pass it through }
+ 289 10125 [193]       showframe(selected);
+ 290 10135 [193]       showcursor;
+ 291 10139 [193]       elapsed := _syncscreen;
+ 292 10145 [193]     until (ord(ch)<>0) or ((sflag and $80)<>0);
+ 293 10166 [193]     read(@KEY,ch);
+ 294 10178 [193]     sflag:=sflag and $7f; { clear escape flag }
+ 295 10191 [193]     case ch of
+ 296 10191 [193]       TOGGLE: write(TOGGLE);
+ 297 10205 [193]       '0':    frames := 0;
+ 298 10217 [193]       '1':    frames := 1;
+ 299 10233 [193]       '2':    frames := 2;
+ 300 10249 [193]       '3':    frames := 3;
+ 301 10265 [193]       '4':    frames := 4;
+ 302 10281 [193]       'Q':    begin
+ 303 10295 [193]                 if isedited then
+ 304 10295 [193]                   writetable;
+ 305 10306 [193]               end;
+ 306 10306 [193]       'E':    begin
+ 307 10316 [193]                 _move(5,STATUSLN);
+ 308 10326 [193]                 write(@PLOTDEV,'EDIT');
+ 309 10335 [193]                 editflag := true;
+ 310 10337 [193]                 frames := 0;
+ 311 10343 [193]               end;
+ 312 10347 [193]       ' ':    toggle(selected);
+ 313 10367 [193]       'C':    copy(selected);
+ 314 10387 [193]       'V':    paste(selected);
+ 315 10407 [193]       ESC:    if editflag then begin
+ 316 10421 [193]                 _move(5,STATUSLN);
+ 317 10434 [193]                 write(@PLOTDEV,'VIEW');
+ 318 10443 [193]                 editflag := false;
+ 319 10445 [193]                 ch := 'C'; { do not exit }
+ 320 10455 [193]                 if isedited then
+ 321 10455 [193]                   writetable;
+ 322 10466 [193]               end;
+ 323 10466 [193]       CRIGHT: if editflag then
+ 324 10476 [193]                 editbit := editbit + 1
+ 325 10487 [193]               else
+ 326 10489 [193]                 selected := selected + 1;
+ 327 10503 [193]       CLEFT:  if editflag then
+ 328 10518 [193]                 editbit := editbit - 1
+ 329 10529 [193]               else
+ 330 10531 [193]                 selected := selected - 1;
+ 331 10545 [193]       CUP:    if editflag then
+ 332 10560 [193]                 editbit := editbit + 8
+ 333 10571 [193]               else
+ 334 10573 [193]                 selected := selected - NX;
+ 335 10587 [193]       CDOWN:  if editflag then
+ 336 10602 [193]                 editbit := editbit - 8
+ 337 10613 [193]               else
+ 338 10615 [193]                 selected := selected + NX
+ 339 10627 [193]     end {case};
+ 340 10636 [193] 
+ 341 10636 [193]     if selected < 0 then
+ 342 10642 [193]       selected := 0;
+ 343 10648 [193]     if selected > NSPRITES - frames - 1 then
+ 344 10665 [193]       selected := NSPRITES - frames - 1;
+ 345 10679 [193]     if editbit < 0 then
+ 346 10690 [193]       editbit := 0;
+ 347 10696 [193]     if editbit > 63 then
+ 348 10706 [193]       editbit := 63;
+ 349 10712 [193] 
+ 350 10716 [193]     spritetable(lastselected, selected);
+ 351 10730 [193]     showlarge(selected);
+ 352 10740 [193]     lastselected := selected;
+ 353 10740 [193]     framecounter := -1;
+ 354 10750 [193]   until (ch='Q') or (ch='K') or (ch=ESC);
+ 355 10777 [193]   _grend;
+ 356 10785 [193] end.
+Code length:           10784
+Compiler stack size:   207
+Ident stack size:      197/300

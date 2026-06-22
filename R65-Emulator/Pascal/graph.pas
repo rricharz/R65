@@ -6,7 +6,7 @@
 {   rricharz 2019                    }
 
 program graph;
-uses syslib,ralib,mathlib,plotlib;
+uses syslib,ralib,mathlib,plotlib,writelib;
 
 var f:file;
     i,size:integer;

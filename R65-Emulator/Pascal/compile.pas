@@ -135,6 +135,66 @@ begin
   tpos := 0;
 end {crlf};
 
+{*******************}
+{ __writef (global) }
+{*******************}
+{ This procedure is copied here from writelib
+  because writelib is too big to be used in compile }
+
+
+proc __wrintf(value, width: integer);
+{ Write value right justified in a field of width.
+  This procedure is a helper for the compiler. I is
+  used in the write and writeln commands for
+  justified numbers. Do not change the format.     }
+var
+  buf: array [5] of char;
+  { 0..5, enough for -32768..32767 }
+  i, len, n, w, q, r: integer;
+  neg: boolean;
+begin
+  w := width;
+  { Special case, because -(-32768) would overflow
+    on a 16-bit machine, -32768 cannot be entered }
+  if value = $8000 then begin
+    len := 6;
+    while w > len do begin
+      write(' ');
+      w := w - 1
+    end;
+    write('-32768');
+    exit
+  end;
+  neg := value < 0;
+  if neg then
+    n := -value
+  else
+    n := value;
+  i := 5;
+  { Generate digits backwards into buf }
+  repeat
+    q := n div 10;
+    r := n - q*10;
+    buf[i] := chr(ord('0') + r);
+    n := q;
+    i := i - 1
+  until n = 0;
+  if neg then begin
+    buf[i] := '-';
+    i := i - 1
+  end;
+  { Characters are now in buf[i+1..5] }
+  len := 5 - i;
+  while w > len do begin
+    write(' ');
+    w := w - 1
+  end;
+  while i < 5 do begin
+    i := i + 1;
+    write(buf[i])
+  end
+end;
+
 {#################################}
 { merror and error: error message }
 {#################################}
@@ -169,7 +229,7 @@ begin
     22: write('Unexpected EOF');
     23: write('End mark comment/string');
     24: write('Identifier already defined');
-    25: write('Formatted write');
+    25: write('Formatted write: writelib missing');
     26: write('Wrong library version');
     27: write('Identifier too long');
     28: write('Unsupported type');

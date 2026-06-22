@@ -15,7 +15,8 @@
 
 
 program sprites;
-uses syslib,strlib,striolib,plotlib,filelib,spritelib;
+uses  syslib,strlib,striolib,plotlib,filelib,
+      spritelib,writelib;
 
 {$R+}
 {$U+}

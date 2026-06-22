@@ -9,7 +9,7 @@
   rewritten rricharz 2019                  }
 
 program starship;
-uses syslib,mathlib,teklib;
+uses syslib,mathlib,teklib,writelib;
 
 const
     maxships=8;

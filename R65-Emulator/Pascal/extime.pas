@@ -4,7 +4,7 @@
 {$U+}
 
 program extime;
-uses syslib, arglib, timelib, mathlib, filelib;
+uses syslib,arglib,timelib,mathlib,filelib,writelib;
 
 var cyclus,drive,i: integer;
     etime: real;
@@ -30,7 +30,7 @@ begin
   run;
   etime:=timediff;
   writeln;
-  write('extime stop - ');;
+  write('extime stop - ');
   prttime(OUTPUT); writeln;
   writeln('Execution time: ',etime:2,' s');
 end.

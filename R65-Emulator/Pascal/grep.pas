@@ -1,7 +1,5 @@
 program grep;
-uses syslib,arglib,strlib,filelib,wildlib;
-
-const DEBUG = false;
+uses syslib,arglib,strlib,filelib,wildlib,writelib;
 
 var pattern, fullname, line: cpnt;
     filespec:                array[15] of char;
@@ -78,7 +76,7 @@ var nchar, linecount, stop,
     end;
 
 begin
-  if DEBUG then writeln(name);
+  debug(name);
   pattern_length := _strlen(pattern);
   linecount := 1;
   repeat
@@ -115,8 +113,7 @@ begin { main }
     else
       pattern[i] := ARGLISTS[2 * _carg + i];
 
-  if DEBUG then
-    writeln('pattern=', pattern);
+  debug(pattern);
 
   { get filespec from arglist, with defaults }
   cyclus := 0;
@@ -124,11 +121,7 @@ begin { main }
   _carg  := secondarg;
   _agetstring(filespec, default, cyclus, drive);
 
-  if DEBUG then begin
-    writeln('filespec=');
-    _prtext16(OUTPUT, filespec);
-    writeln;
-  end;
+  debug('filespec: ',trim16(filespec),cyclus,drive);
 
   { loop through directory entries }
   last := false;
@@ -139,10 +132,7 @@ begin { main }
       writeln('Error while reading directory');
       last:=true;
     end;
-    if DEBUG then
-      writeln('entry=', entry,
-             ' found=', found,
-             ' last=', last);
+    debug(entry, found, last);
     if found and (FILTYP='S') and not last then begin
       fullname[0] := ENDMARK;
       for i := 0 to 15 do

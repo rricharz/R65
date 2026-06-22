@@ -4,7 +4,7 @@
 {$U+}
 
 program ARGLIST;
-uses syslib, arglib;
+uses syslib, arglib, writelib;
 
 var string: array[15] of char;
     i, val: integer;
@@ -22,7 +22,7 @@ begin
                 for i:=0 to 15 do
                   string[i]:=ARGLISTS[2*_carg+i];
                 _carg:=_carg+8;
-                _prtext16(OUTPUT,string);
+                write(trim16(string));
               end;
     'i','d':  begin
                 val:=ARGLIST[_carg];

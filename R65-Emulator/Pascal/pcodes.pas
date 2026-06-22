@@ -1,5 +1,6 @@
 program pcodes;
-uses syslib,arglib,strlib,ralib,mathlib,filelib;
+uses  syslib,arglib,strlib,ralib,mathlib,filelib,
+      writelib;
 
 const npcodes=$5a;
 

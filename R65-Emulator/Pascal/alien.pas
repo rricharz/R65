@@ -19,7 +19,7 @@ system.
 {$U+}
 
 program alien;
-uses syslib,plotlib;
+uses syslib,plotlib,writelib;
 
 const erase=0;
 

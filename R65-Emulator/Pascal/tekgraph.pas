@@ -8,7 +8,7 @@
 {   rricharz 2019                     }
 
 program tekgraph;
-uses syslib,ralib,mathlib,teklib;
+uses syslib,ralib,mathlib,teklib,writelib;
 
 const border=25;
       leftborder=140;
