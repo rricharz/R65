@@ -42,22 +42,6 @@ begin
   nm[i+1]:=subtype;
 end;
 
-proc writehex(a:integer);
-{#######################}
-var h:integer;
-  func hexdigit(c:char):char;
-  var d:integer;
-  begin
-    d:=ord(c) and 15;
-    if d>9 then hexdigit:=chr(d-10+ord('A'))
-    else hexdigit:=chr(d+ord('0'));
-  end;
-begin
-  h:=a and 255;
-  write(hexdigit(chr(h shr 4)));
-  write(hexdigit(chr(h and 15)));
-end;
-
 proc writeui(n:integer);
 {######################}
 var limit:integer;
@@ -101,7 +85,7 @@ begin
     end;
     if not silent then begin
       write('  '); writeui(pc);
-      write(' '); writehex(code);
+      write(' ', hexb(code));
       write(' ',codebytes[code],' ');
     end;
     if (code<=npcodes) and (code>=0) then begin
@@ -176,7 +160,7 @@ begin
                     write(chr(m))
                   else begin
                     write('<');
-                    writehex(a);
+                    write(hexb(a));
                     write('>');
                   end;
                 end;

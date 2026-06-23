@@ -1,237 +1,220 @@
    1     4 {    ************************************    }
-   2     4 {    *  strlib: handling cpnt pointers  *    }
-   3     4 {    ************************************    }
-   4     4 
-   5     4 { Type cpnt are pointers to 0 delimided      }
-   6     4 { strings of up to STRSIZE (64) characters.  }
-   7     4 { Following the definition of arrays in R65  }
-   8     4 { Pascal the first character is s[0.         }
-   9     4 { s[STRSIZE] can be used to set ENDMARK for  }
-  10     4 { a string of STRSIZE characters. Range      }
-  11     4 { checking is turned on for safety.          }
-  12     4 { Strings need to be released in reverse     }
-  13     4 { order. There is no garbage collection.     }
-  14     4 
-  15     4 {$R+}
-  16     4 {$U+}
-  17     4 
-  18     4 library strlib;
-  19     4 
-  20     4 const STRSIZE=64;
-  21     7       ENDMARK=chr(0);
-  22     7 
-  23     7 proc _runerr(e:integer);
-  24     7 {**********************}
-  25     7 { set runerr to e and stop execution of app }
-  26     7 const stopcode = $2010;
-  27    10 mem   _mrunerr = $000c: integer&;
-  28    10 begin
-  29    10   _mrunerr:=e;
-  30    12   call(stopcode);
-  31    24 end;
-  32    24 
-  33    25 func _new: cpnt;
-  34    25 {**************}
-  35    25 { alocate memory on heap for string }
-  36    25 mem  sp     = $0008: integer;
-  37    28      endstk = $000e: integer;
-  38    28 var  freewords,i:integer;
-  39    28      str:cpnt;
-  40    28 begin
-  41    28   { Pascal has no type unsigned integer. }
-  42    28   { But the free space can be larger than 32767 }
-  43    28   { We work therefore with free words here }
-  44    28   freewords:=(endstk-sp) shr 1;
-  45    39   if freewords < (STRSIZE + 256) then begin
-  46    55     { 255 words are left for the growing stack }
-  47    58     _runerr($88);
-  48    66   end;
-  49    66   { allocate heap memory }
-  50    66   endstk := endstk - STRSIZE - 1;
-  51    74   str := cpnt(endstk);
-  52    81   { initialize the string }
-  53    85   str[0] := ENDMARK;
-  54    94   _new := str;
-  55    98 end;
-  56   106 
-  57   107 proc _release(s: cpnt);
-  58   107 {*********************}
-  59   107 { release memory on heap }
-  60   107 { Only the last allocated string can be _released }
-  61   107 { This is suitable for recursive functions }
-  62   107 mem endstk=$000e: integer;
-  63   110 begin
-  64   110   if cpnt(endstk)=s then endstk:=endstk+STRSIZE+1
-  65   129   else _runerr($92);
-  66   146 end;
-  67   146 
-  68   147 func _strlen(strin:cpnt):integer;
-  69   147 {*******************************}
-  70   147 { length of sring }
-  71   147 var i: integer;
-  72   150 begin
-  73   150   i:=0;
-  74   154   while i<STRSIZE do begin
-  75   168     if strin[i]=ENDMARK then begin
-  76   186       _strlen:=i;
-  77   189       exit;
-  78   198     end;
-  79   198     i:=i+1;
-  80   204   end;
-  81   209   _strlen:=STRSIZE;
-  82   214 end;
-  83   218 
-  84   219 proc _strcpy(strin, strout:cpnt);
-  85   219 {*******************************}
-  86   219 { make copy of string }
-  87   219 var i: integer;
-  88   222 begin
-  89   222   strout[0] := ENDMARK;
-  90   233   write(@strout, strin);
-  91   248 end;
-  92   248 
-  93   249 proc _stradd(strin,strinout:cpnt);
-  94   249 {********************************}
-  95   249 { add string to string }
-  96   249 var i,j: integer;
-  97   252 begin
-  98   252   write(@strinout, strin);
-  99   265 end;
- 100   265 
- 101   266 func _strcmp(s1,s2:cpnt):integer;
- 102   266 {*******************************}
- 103   266 { compare 2 strings }
- 104   266 { returns -1  if s1<s2                   }
- 105   266 {          0  if s1=s2                   }
- 106   266 {          1  if s1>s2                   }
- 107   266 var i:integer;
- 108   269 begin
- 109   269   i:=0;
- 110   273   while i<STRSIZE do begin
- 111   287     if s1[i]<>s2[i] then begin
- 112   318       if s1[i]>s2[i] then _strcmp:=1
- 113   355       else _strcmp:=-1;
- 114   366       exit;
- 115   372     end;
- 116   372     if s1[i]=ENDMARK then begin
- 117   390       _strcmp:=0;
- 118   395       exit;
- 119   400     end;
- 120   400     i:=i+1;
- 121   406   end;
- 122   411   _strcmp:=0;
- 123   416 end;
- 124   420 
- 125   421 func _strpos(ch:char; s1:cpnt;
- 126   421           start:integer): integer;
- 127   421 {********************************}
- 128   421 { get first position of character in string }
- 129   421 
- 130   421 var i,len: integer;
- 131   424 begin
- 132   424   len:=_strlen(s1);
- 133   438   if start>=len then _strpos:=-1
- 134   454   else  begin
- 135   464     i:=start;
- 136   464     while (i<len) and (s1[i]<>ch) do i :=i + 1;
- 137   511     if s1[i]=ch then _strpos := i
- 138   542     else _strpos := -1;
- 139   555   end;
- 140   560 end;
- 141   560 
- 142   561 func _strread(f:file; s:cpnt;
- 143   561           var ateof0:boolean):integer;
- 144   561 {************************************}
- 145   561 { read string from file }
- 146   561 var ch  : char;
- 147   564     i   : integer;
- 148   564     done: boolean;
- 149   564 begin
- 150   564   ateof0 := false;
- 151   568   i := 0;
- 152   574   done := false;
- 153   580   while not done do begin
- 154   592     read(@f, ch);
- 155   602     if (ch = chr($7f)) or (ch = chr($1f))
- 156   617       then begin { EOF, also for old files }
- 157   623       ateof0 := true;
- 158   625       done := true;
- 159   631     end;
- 160   635     if (ch = chr($0d)) or (ch = chr($0a)) then
- 161   651       done := true;
- 162   657     if not done then
- 163   661       if i < STRSIZE-1 then
- 164   677       begin
- 165   679         s[i] := ch;
- 166   691         i := i + 1;
- 167   705       end;
- 168   710   end;
- 169   710   s[i] := ENDMARK;
- 170   724   _strread := i;
- 171   728 end;
- 172   736 
- 173   737 proc _hexstr(d:integer; s:cpnt);
- 174   737 {******************************}
- 175   737 { convert hex byte to hex string }
- 176   737 { returns -1 if char not found }
- 177   737 
- 178   737   func hchar(h:integer):char;
- 179   740   begin
- 180   740     if h<10 then hchar := chr(h+ord('0'))
- 181   761     else hchar := chr(h-10+ord('A'));
- 182   780   end;
- 183   785 
- 184   786 begin
- 185   786   s[0] := hchar((d shr 4) and 15);
- 186   813   s[1] := hchar(d and 15);
- 187   839   s[2] := chr(0);
- 188   852 end;
- 189   857 
- 190   858 proc _strdelc(pos:integer; s:cpnt);
- 191   858 {*********************************}
- 192   858 { delete char in string at position }
- 193   858 var i,l:integer;
- 194   861 begin
- 195   861   l:=_strlen(s);
- 196   875   if pos<0 then _runerr($91);
- 197   897   if pos>l then _runerr($91);
- 198   917   for i:=pos to l-1 do
- 199   931       { move includes ENDMARK }
- 200   941       s[i]:=s[i+1];
- 201   966 end;
- 202   986 
- 203   987 proc _strinsc(ch:char;pos:integer;s:cpnt);
- 204   987 {****************************************}
- 205   987 { inserts char if string is short enough }
- 206   987 var i,l:integer;
- 207   990 begin
- 208   990   l:=_strlen(s);
- 209  1004   if (l<STRSIZE-1) and (pos>=0)
- 210  1024     and (pos<STRSIZE-1) then begin
- 211  1037     for i:=l downto pos do
- 212  1048       { move includes end mark }
- 213  1061       s[i+1]:=s[i];
- 214  1086     if pos > l then begin
- 215  1115       for i:=l to pos-1 do s[i]:=' ';
- 216  1153       s[pos+1]:=chr(0);
- 217  1185     end;
- 218  1190     s[pos]:=ch;
- 219  1199   end
- 220  1207   else _runerr($91);
- 221  1218 end;
- 222  1218 
- 223  1219 proc _intstr(n:integer;s:cpnt;fsize:integer);
- 224  1219 {*******************************************}
- 225  1219 { convert integer to right justified  string }
- 226  1219 begin
- 227  1219   s[0]:=ENDMARK;
- 228  1233   write(@s,n);
- 229  1248   while _strlen(s)<fsize do _strinsc(' ',0,s);
- 230  1282 end;
- 231  1285 
- 232  1286 begin
- 233  1286 end.
- 234  1288 
-Code length:            1287
-Compiler stack size:      37
-Ident stack size:         24
+   2     4 [  0] {    *  strlib: handling cpnt pointers  *    }
+   3     4 [  0] {    ************************************    }
+   4     4 [  0] 
+   5     4 [  0] { Type cpnt are pointers to 0 delimided      }
+   6     4 [  0] { strings of up to STRSIZE (64) characters.  }
+   7     4 [  0] { Following the definition of arrays in R65  }
+   8     4 [  0] { Pascal the first character is s[0.         }
+   9     4 [  0] { s[STRSIZE] can be used to set ENDMARK for  }
+  10     4 [  0] { a string of STRSIZE characters. Range      }
+  11     4 [  0] { checking is turned on for safety.          }
+  12     4 [  0] { Strings need to be released in reverse     }
+  13     4 [  0] { order. There is no garbage collection.     }
+  14     4 [  0] 
+  15     4 [  0] {$R+}
+  16     4 [  0] {$U+}
+  17     4 [  0] 
+  18     4 [  0] library strlib;
+  19     4 [  0] 
+  20     4 [  0] const STRSIZE=64;
+  21     7 [  1]       ENDMARK=chr(0);
+  22     7 [  2] 
+  23     7 [  2] proc _runerr(e:integer);
+  24     7 [  4] {**********************}
+  25     7 [  4] { set runerr to e and stop execution of app }
+  26     7 [  4] const stopcode = $2010;
+  27    10 [  5] mem   _mrunerr = $000c: integer&;
+  28    10 [  6] begin
+  29    10 [  6]   _mrunerr:=e;
+  30    12 [  6]   call(stopcode);
+  31    24 [  6] end;
+  32    24 [  6] 
+  33    25 [  3] func _new: cpnt;
+  34    25 [  5] {**************}
+  35    25 [  5] { alocate memory on heap for string }
+  36    25 [  5] mem  sp     = $0008: integer;
+  37    28 [  6]      endstk = $000e: integer;
+  38    28 [  7] var  freewords,i:integer;
+  39    28 [  9]      str:cpnt;
+  40    28 [ 10] begin
+  41    28 [ 10]   { Pascal has no type unsigned integer. }
+  42    28 [ 10]   { But the free space can be larger than 32767 }
+  43    28 [ 10]   { We work therefore with free words here }
+  44    28 [ 10]   freewords:=(endstk-sp) shr 1;
+  45    39 [ 10]   if freewords < (STRSIZE + 256) then begin
+  46    55 [ 10]     { 255 words are left for the growing stack }
+  47    58 [ 10]     _runerr($88);
+  48    66 [ 10]   end;
+  49    66 [ 10]   { allocate heap memory }
+  50    66 [ 10]   endstk := endstk - STRSIZE - 1;
+  51    74 [ 10]   str := cpnt(endstk);
+  52    81 [ 10]   { initialize the string }
+  53    85 [ 10]   str[0] := ENDMARK;
+  54    94 [ 10]   _new := str;
+  55    98 [ 10] end;
+  56   106 [ 10] 
+  57   107 [  5] proc _release(s: cpnt);
+  58   107 [  7] {*********************}
+  59   107 [  7] { release memory on heap }
+  60   107 [  7] { Only the last allocated string can be _released }
+  61   107 [  7] { This is suitable for recursive functions }
+  62   107 [  7] mem endstk=$000e: integer;
+  63   110 [  8] begin
+  64   110 [  8]   if cpnt(endstk)=s then endstk:=endstk+STRSIZE+1
+  65   129 [  8]   else _runerr($92);
+  66   146 [  8] end;
+  67   146 [  8] 
+  68   147 [  6] func _strlen(strin:cpnt):integer;
+  69   147 [  9] {*******************************}
+  70   147 [  9] { length of sring }
+  71   147 [  9] var i: integer;
+  72   150 [ 10] begin
+  73   150 [ 10]   i:=0;
+  74   154 [ 10]   while i<STRSIZE do begin
+  75   168 [ 10]     if strin[i]=ENDMARK then begin
+  76   186 [ 10]       _strlen:=i;
+  77   189 [ 10]       exit;
+  78   198 [ 10]     end;
+  79   198 [ 10]     i:=i+1;
+  80   204 [ 10]   end;
+  81   209 [ 10]   _strlen:=STRSIZE;
+  82   214 [ 10] end;
+  83   218 [ 10] 
+  84   219 [  8] proc _strcpy(strin, strout:cpnt);
+  85   219 [ 11] {*******************************}
+  86   219 [ 11] { make copy of string }
+  87   219 [ 11] var i: integer;
+  88   222 [ 12] begin
+  89   222 [ 12]   strout[0] := ENDMARK;
+  90   233 [ 12]   write(@strout, strin);
+  91   248 [ 12] end;
+  92   248 [ 12] 
+  93   249 [  9] proc _stradd(strin,strinout:cpnt);
+  94   249 [ 12] {********************************}
+  95   249 [ 12] { add string to string }
+  96   249 [ 12] var i,j: integer;
+  97   252 [ 14] begin
+  98   252 [ 14]   write(@strinout, strin);
+  99   265 [ 14] end;
+ 100   265 [ 14] 
+ 101   266 [ 10] func _strcmp(s1,s2:cpnt):integer;
+ 102   266 [ 14] {*******************************}
+ 103   266 [ 14] { compare 2 strings }
+ 104   266 [ 14] { returns -1  if s1<s2                   }
+ 105   266 [ 14] {          0  if s1=s2                   }
+ 106   266 [ 14] {          1  if s1>s2                   }
+ 107   266 [ 14] var i:integer;
+ 108   269 [ 15] begin
+ 109   269 [ 15]   i:=0;
+ 110   273 [ 15]   while i<STRSIZE do begin
+ 111   287 [ 15]     if s1[i]<>s2[i] then begin
+ 112   318 [ 15]       if s1[i]>s2[i] then _strcmp:=1
+ 113   355 [ 15]       else _strcmp:=-1;
+ 114   366 [ 15]       exit;
+ 115   372 [ 15]     end;
+ 116   372 [ 15]     if s1[i]=ENDMARK then begin
+ 117   390 [ 15]       _strcmp:=0;
+ 118   395 [ 15]       exit;
+ 119   400 [ 15]     end;
+ 120   400 [ 15]     i:=i+1;
+ 121   406 [ 15]   end;
+ 122   411 [ 15]   _strcmp:=0;
+ 123   416 [ 15] end;
+ 124   420 [ 15] 
+ 125   421 [ 12] func _strpos(ch:char; s1:cpnt;
+ 126   421 [ 16]           start:integer): integer;
+ 127   421 [ 17] {********************************}
+ 128   421 [ 17] { get first position of character in string }
+ 129   421 [ 17] 
+ 130   421 [ 17] var i,len: integer;
+ 131   424 [ 19] begin
+ 132   424 [ 19]   len:=_strlen(s1);
+ 133   438 [ 19]   if start>=len then _strpos:=-1
+ 134   454 [ 19]   else  begin
+ 135   464 [ 19]     i:=start;
+ 136   464 [ 19]     while (i<len) and (s1[i]<>ch) do i :=i + 1;
+ 137   511 [ 19]     if s1[i]=ch then _strpos := i
+ 138   542 [ 19]     else _strpos := -1;
+ 139   555 [ 19]   end;
+ 140   560 [ 19] end;
+ 141   560 [ 19] 
+ 142   561 [ 14] func _strread(f:file; s:cpnt;
+ 143   561 [ 18]           var ateof0:boolean):integer;
+ 144   561 [ 19] {************************************}
+ 145   561 [ 19] { read string from file }
+ 146   561 [ 19] var ch  : char;
+ 147   564 [ 20]     i   : integer;
+ 148   564 [ 21]     done: boolean;
+ 149   564 [ 22] begin
+ 150   564 [ 22]   ateof0 := false;
+ 151   568 [ 22]   i := 0;
+ 152   574 [ 22]   done := false;
+ 153   580 [ 22]   while not done do begin
+ 154   592 [ 22]     read(@f, ch);
+ 155   602 [ 22]     if (ch = chr($7f)) or (ch = chr($1f))
+ 156   617 [ 22]       then begin { EOF, also for old files }
+ 157   623 [ 22]       ateof0 := true;
+ 158   625 [ 22]       done := true;
+ 159   631 [ 22]     end;
+ 160   635 [ 22]     if (ch = chr($0d)) or (ch = chr($0a)) then
+ 161   651 [ 22]       done := true;
+ 162   657 [ 22]     if not done then
+ 163   661 [ 22]       if i < STRSIZE-1 then
+ 164   677 [ 22]       begin
+ 165   679 [ 22]         s[i] := ch;
+ 166   691 [ 22]         i := i + 1;
+ 167   705 [ 22]       end;
+ 168   710 [ 22]   end;
+ 169   710 [ 22]   s[i] := ENDMARK;
+ 170   724 [ 22]   _strread := i;
+ 171   728 [ 22] end;
+ 172   736 [ 22] 
+ 173   737 [ 16] proc _strdelc(pos:integer; s:cpnt);
+ 174   737 [ 19] {*********************************}
+ 175   737 [ 19] { delete char in string at position }
+ 176   737 [ 19] var i,l:integer;
+ 177   740 [ 21] begin
+ 178   740 [ 21]   l:=_strlen(s);
+ 179   754 [ 21]   if pos<0 then _runerr($91);
+ 180   776 [ 21]   if pos>l then _runerr($91);
+ 181   796 [ 21]   for i:=pos to l-1 do
+ 182   810 [ 21]       { move includes ENDMARK }
+ 183   820 [ 21]       s[i]:=s[i+1];
+ 184   845 [ 21] end;
+ 185   865 [ 21] 
+ 186   866 [ 17] proc _strinsc(ch:char;pos:integer;s:cpnt);
+ 187   866 [ 21] {****************************************}
+ 188   866 [ 21] { inserts char if string is short enough }
+ 189   866 [ 21] var i,l:integer;
+ 190   869 [ 23] begin
+ 191   869 [ 23]   l:=_strlen(s);
+ 192   883 [ 23]   if (l<STRSIZE-1) and (pos>=0)
+ 193   903 [ 23]     and (pos<STRSIZE-1) then begin
+ 194   916 [ 23]     for i:=l downto pos do
+ 195   927 [ 23]       { move includes end mark }
+ 196   940 [ 23]       s[i+1]:=s[i];
+ 197   965 [ 23]     if pos > l then begin
+ 198   994 [ 23]       for i:=l to pos-1 do s[i]:=' ';
+ 199  1032 [ 23]       s[pos+1]:=chr(0);
+ 200  1064 [ 23]     end;
+ 201  1069 [ 23]     s[pos]:=ch;
+ 202  1078 [ 23]   end
+ 203  1086 [ 23]   else _runerr($91);
+ 204  1097 [ 23] end;
+ 205  1097 [ 23] 
+ 206  1098 [ 18] proc _intstr(n:integer;s:cpnt;fsize:integer);
+ 207  1098 [ 22] {*******************************************}
+ 208  1098 [ 22] { convert integer to right justified  string }
+ 209  1098 [ 22] begin
+ 210  1098 [ 22]   s[0]:=ENDMARK;
+ 211  1112 [ 22]   write(@s,n);
+ 212  1127 [ 22]   while _strlen(s)<fsize do _strinsc(' ',0,s);
+ 213  1161 [ 22] end;
+ 214  1164 [ 22] 
+ 215  1165 [ 19] begin
+ 216  1165 [ 19] end.
+ 217  1167 [ 19] 
+Code length:           1166
+Compiler stack size:   34
+Ident stack size:      23/300

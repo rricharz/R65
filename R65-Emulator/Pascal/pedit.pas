@@ -6,11 +6,11 @@ program pedit;
 {$U+}
 {$R-}
 
-uses syslib, arglib, strlib, filelib;
+uses syslib, arglib, strlib, filelib, writelib;
 
 const title='R65 PEDIT 2.2'; {max 20 chars}
 
-    maxlines= 400;      xmax   = 56;
+    maxlines= 310;      xmax   = 56;
     scrlins = 16;       mlenght= 19;
     inpx    = 37;       marked = 58;
     eol     = chr($00); esc    = chr($00);
@@ -345,7 +345,7 @@ begin
 end;
 
 proc readinput;
-var i,pend,maxl1,n:integer;
+var maxl1,n:integer;
 begin
   cyclus:=0; drive:=1;
   goto(1,1); write(clrscr); goto(1,0);
@@ -354,12 +354,8 @@ begin
   _asetfile(name,cyclus,drive,' ');
   openr(fno);
   nlines := 1; line:=1; topline:=1;
-  pend:=15; while name[pend]=' ' do pend:=pend-1;
-  for i:=0 to pend do stemp[i]:=name[i];
-  stemp[pend+1]:=ENDMARK;
-  _stradd('.',stemp);
-  _hexstr(filcyc,stemp2);
-  _stradd(stemp2,stemp);
+  stemp[0]:=ENDMARK;
+  write(@stemp,trim16(name),'.',hexb(filcyc));
   while _strlen(stemp)<17 do _stradd(' ',stemp);
   putontop(stemp,17,true);
   putontop('Reading',36,true);

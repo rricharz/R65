@@ -1,5 +1,5 @@
 program view;
-uses syslib, arglib, filelib;
+uses syslib, arglib, filelib, writelib;
 
 { written 2026 by rricharz and ChatGPT }
 
@@ -222,21 +222,6 @@ begin
 
 end;
 
-{ ***** hex ***** }
-
-func hex(i8: integer): packed char;
-var hi, lo: integer;
-    c1, c2: char;
-begin
-  hi := (i8 shr 4) and $0f;
-  lo := i8 and $0f;
-  if hi < 10 then c1 := chr(ord('0') + hi)
-             else c1 := chr(ord('A') + hi - 10);
-  if lo < 10 then c2 := chr(ord('0') + lo)
-             else c2 := chr(ord('A') + lo - 10);
-  hex := packed(c1, c2);
-end;
-
 { ***** openinput ***** }
 
 proc openinput;
@@ -271,8 +256,7 @@ begin
     else
       filename[i] := FILNAM[i];
   filename[16] := ENDMARK;
-
-  write(@filename,'.',hex(FILCYC));
+  write(@filename,'.',hexb(FILCYC));
 end;
 
 { ***** readinput ***** }

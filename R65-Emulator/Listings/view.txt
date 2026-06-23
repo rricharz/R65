@@ -1,752 +1,736 @@
    1     4 program view;
-   2     4 [  0] uses syslib, arglib, filelib;
-   3  2087 [ 80] 
-   4  2087 [ 80] { written 2026 by rricharz and ChatGPT }
-   5  2087 [ 80] 
-   6  2087 [ 80] {$U+} { do not allow shadowing or duplicates }
-   7  2087 [ 80] 
-   8  2087 [ 80] const
-   9  2087 [ 80]       MAXLINES = 1024;
-  10  2090 [ 81]       MINFREE  = 512;
-  11  2090 [ 82]       PAGELEN  = 15;
-  12  2090 [ 83]       LINEMAX  = 56;
-  13  2090 [ 84]       FINDCOL  = 28;
-  14  2090 [ 85]       FINDMAX  = 27;
-  15  2090 [ 86] 
-  16  2090 [ 86]       { control characters }
-  17  2090 [ 86]       CLRSCR   = chr($11);
-  18  2090 [ 87]       ENDMARK  = chr($00);
-  19  2090 [ 88] 
-  20  2090 [ 88]       { key codes }
-  21  2090 [ 88]       KESC     = chr(00); { read(@KEY) gives this }
-  22  2090 [ 89]       KUP      = chr(26);
-  23  2090 [ 90]       KDOWN    = chr(24);
-  24  2090 [ 91]       KLEFT    = chr(03);
-  25  2090 [ 92]       KRIGHT   = chr(22);
-  26  2090 [ 93]       KENTER   = chr(13);
-  27  2090 [ 94]       KBS      = chr(127);
-  28  2090 [ 95] 
-  29  2090 [ 95] var  lineptr: array[MAXLINES] of cpnt;
-  30  2090 [ 96]      nlines: integer;
-  31  2090 [ 97]      topline: integer;
-  32  2090 [ 98]      findline: integer;
-  33  2090 [ 99]      findpos: integer;
-  34  2090 [100]      findactive: boolean;
-  35  2090 [101]      filename: cpnt;
-  36  2090 [102]      findstr, findsav: cpnt;
-  37  2090 [104]      key: char;
-  38  2090 [105]      stop: boolean;
-  39  2090 [106]      f_in: file;
-  40  2090 [107]      line: cpnt;
-  41  2090 [108] 
-  42  2090 [108] { ***** freemem ***** }
-  43  2090 [108] 
-  44  2090 [108] func freemem: integer;
-  45  2090 [110] mem  sp     = $0008: integer;
-  46  2093 [111]      endstk = $000e: integer;
-  47  2093 [112] begin
-  48  2093 [112]   freemem := endstk - sp;
-  49  2101 [112] end;
-  50  2106 [112] 
-  51  2107 [110] { ***** strlen: length of 0-ended string ***** }
-  52  2107 [110] 
-  53  2107 [110] func strlen(s: cpnt): integer;
-  54  2107 [113] var i: integer;
-  55  2110 [114] begin
-  56  2110 [114]   i:=0;
-  57  2114 [114]   while s[i]<>ENDMARK do i:=i+1;
-  58  2140 [114]   strlen:=i;
-  59  2148 [114] end;
-  60  2156 [114] 
-  61  2157 [112] { ***** findat: find pat in s from start ***** }
-  62  2157 [112] { returns 0 if not found, else 1-based pos }
-  63  2157 [112] 
-  64  2157 [112] func findat(s,pat: cpnt;
-  65  2157 [116]     start,patlen: integer): integer;
-  66  2157 [118] var i,j: integer;
-  67  2160 [120] begin
-  68  2160 [120]   if patlen=0 then begin
-  69  2169 [120]     findat:=start;
-  70  2172 [120]     exit
-  71  2180 [120]   end;
-  72  2181 [120] 
-  73  2181 [120]   if start<1 then begin
-  74  2188 [120]     _abort;
-  75  2195 [120]   end;
-  76  2195 [120] 
-  77  2195 [120]   i:=start-1;
-  78  2201 [120]   while s[i]<>ENDMARK do begin
-  79  2222 [120]     if s[i]=pat[0] then begin
-  80  2241 [120]       j:=1;
-  81  2246 [120]       while (j<patlen) and
-  82  2259 [120]           (s[i+j]=pat[j]) do j:=j+1;
-  83  2295 [120]       if j=patlen then begin
-  84  2312 [120]         findat:=i+1;
-  85  2321 [120]         exit
-  86  2326 [120]       end;
-  87  2327 [120]     end;
-  88  2327 [120]     i:=i+1;
-  89  2333 [120]   end;
-  90  2338 [120] 
-  91  2341 [120]   findat:=0;
-  92  2343 [120] end;
-  93  2347 [120] 
-  94  2348 [114] { ***** findtext: search through file ***** }
-  95  2348 [114] 
-  96  2348 [114] func findtext(startline,startpos: integer;
-  97  2348 [118]           pat: cpnt; patlen: integer;
-  98  2348 [120]           wrap: boolean;
-  99  2348 [121]           var foundline,foundpos: integer): boolean;
- 100  2348 [123] var i,p: integer;
- 101  2351 [125]     line0: cpnt;
- 102  2351 [126] begin
- 103  2351 [126]   if patlen=0 then begin
- 104  2360 [126]     foundline:=startline;
- 105  2363 [126]     foundpos:=startpos;
- 106  2371 [126]     findtext:=true;
- 107  2381 [126]     exit
- 108  2385 [126]   end;
- 109  2386 [126] 
- 110  2386 [126]   i:=startline;
- 111  2386 [126]   while i<=nlines do begin
- 112  2406 [126]     line0:=lineptr[i-1];
- 113  2413 [126] 
- 114  2421 [126]     if line0[0]<>ENDMARK then begin
- 115  2432 [126]       if i=startline then
- 116  2439 [126]         p:=findat(line0,pat,startpos,patlen)
- 117  2461 [126]       else
- 118  2471 [126]         p:=findat(line0,pat,1,patlen);
- 119  2500 [126] 
- 120  2504 [126]       if p<>0 then begin
- 121  2511 [126]         foundline:=i;
- 122  2514 [126]         foundpos:=p;
- 123  2522 [126]         findtext:=true;
- 124  2532 [126]         exit
- 125  2536 [126]       end;
- 126  2537 [126]     end;
- 127  2537 [126] 
- 128  2537 [126]     i:=i+1;
- 129  2543 [126]   end;
- 130  2548 [126] 
- 131  2551 [126]   if wrap then begin
- 132  2555 [126]     i:=1;
- 133  2560 [126]     while i<startline do begin
- 134  2576 [126]       line0:=lineptr[i-1];
- 135  2583 [126] 
- 136  2591 [126]       if line0[0]<>ENDMARK then begin
- 137  2602 [126]         p:=findat(line0,pat,1,patlen);
- 138  2627 [126] 
- 139  2631 [126]         if p<>0 then begin
- 140  2638 [126]           foundline:=i;
- 141  2641 [126]           foundpos:=p;
- 142  2649 [126]           findtext:=true;
- 143  2659 [126]           exit
- 144  2663 [126]         end;
- 145  2664 [126]       end;
- 146  2664 [126] 
- 147  2664 [126]       i:=i+1;
- 148  2670 [126]     end;
- 149  2675 [126]   end;
- 150  2678 [126] 
- 151  2678 [126]   findtext:=false;
- 152  2680 [126] end;
- 153  2684 [126] 
- 154  2685 [116] { ***** allocate: exact-length heap alloc ***** }
- 155  2685 [116] 
- 156  2685 [116] func allocate(size: integer): cpnt;
- 157  2685 [119] mem  endstk = $000e: integer;
- 158  2688 [120] var  str:cpnt;
- 159  2688 [121] begin
- 160  2688 [121]   endstk := endstk - (size + 1);
- 161  2700 [121]   str := cpnt(endstk);
- 162  2707 [121]   str[0] := ENDMARK;
- 163  2715 [121]   allocate := str;
- 164  2719 [121] end;
- 165  2727 [121] 
- 166  2728 [118] { ***** copy: copy cpnt string ***** }
- 167  2728 [118] 
- 168  2728 [118] proc copy(strin, strout:cpnt);
- 169  2728 [121] var i: integer;
- 170  2731 [122] begin
- 171  2731 [122]   i := 0;
- 172  2735 [122]   while strin[i] <> ENDMARK do begin
- 173  2755 [122]     strout[i] := strin[i];
- 174  2767 [122]     i := i + 1;
- 175  2779 [122]   end;
- 176  2784 [122]   strout[i] := ENDMARK;
- 177  2793 [122] end;
- 178  2797 [122] 
- 179  2798 [119] { ***** readline: read line from file ***** }
- 180  2798 [119] 
- 181  2798 [119] func readline(f:file; s:cpnt;
- 182  2798 [123]           var ateof_here:boolean):integer;
- 183  2798 [124] var ch: char;
- 184  2801 [125]     i: integer;
- 185  2801 [126]     done: boolean;
- 186  2801 [127] begin
- 187  2801 [127]   ateof_here := false;
- 188  2805 [127]   i := 0;
- 189  2811 [127]   done := false;
- 190  2817 [127]   while not done do begin
- 191  2829 [127]     read(@f, ch);
- 192  2839 [127]     if ch = EOF then begin
- 193  2847 [127]       ateof_here := true;
- 194  2852 [127]       done := true;
- 195  2858 [127]     end;
- 196  2862 [127]     if (not done) and (ch = CR) then
- 197  2874 [127]       done := true;
- 198  2880 [127]     if not done then
- 199  2884 [127]       if i < LINEMAX then begin
- 200  2899 [127]         s[i] := ch;
- 201  2906 [127]         i := i + 1;
- 202  2920 [127]       end;
- 203  2925 [127]   end;
- 204  2925 [127]   s[i] := ENDMARK;
- 205  2934 [127]   readline := i;
- 206  2938 [127] end;
- 207  2946 [127] 
- 208  2947 [121] { ***** init ***** }
- 209  2947 [121] 
- 210  2947 [121] proc init;
- 211  2947 [122] begin
- 212  2947 [122]   nlines:=0;
- 213  2954 [122]   topline:=1;
- 214  2960 [122]   findline:=0;
- 215  2966 [122]   findpos:=0;
- 216  2972 [122]   findactive:=false;
- 217  2978 [122] 
- 218  2982 [122]   filename := allocate(16);
- 219  2992 [122]   findstr  := allocate(FINDMAX);
- 220  3006 [122]   findsav  := allocate(FINDMAX);
- 221  3020 [122]   line     := allocate(LINEMAX);
- 222  3034 [122] 
- 223  3038 [122] end;
- 224  3038 [122] 
- 225  3039 [122] { ***** hex ***** }
- 226  3039 [122] 
- 227  3039 [122] func hex(i8: integer): packed char;
- 228  3039 [125] var hi, lo: integer;
- 229  3042 [127]     c1, c2: char;
- 230  3042 [129] begin
- 231  3042 [129]   hi := (i8 shr 4) and $0f;
- 232  3053 [129]   lo := i8 and $0f;
- 233  3064 [129]   if hi < 10 then c1 := chr(ord('0') + hi)
- 234  3081 [129]              else c1 := chr(ord('A') + hi - 10);
- 235  3104 [129]   if lo < 10 then c2 := chr(ord('0') + lo)
- 236  3121 [129]              else c2 := chr(ord('A') + lo - 10);
- 237  3144 [129]   hex := packed(c1, c2);
- 238  3158 [129] end;
- 239  3162 [129] 
- 240  3163 [124] { ***** openinput ***** }
- 241  3163 [124] 
- 242  3163 [124] proc openinput;
- 243  3163 [125] var aname: array[15] of char;
- 244  3166 [126]     cyclus, drive: integer;
- 245  3166 [128]     default: boolean;
- 246  3166 [129]     i: integer;
- 247  3166 [130] 
- 248  3166 [130]   proc setsubtype(subtype:char);
- 249  3166 [132]   begin
- 250  3166 [132]     i:=0;
- 251  3173 [132]     repeat
- 252  3177 [132]       i:=i+1;
- 253  3183 [132]     until (aname[i]=':') or
- 254  3199 [132]       (aname[i]=' ') or (i>=14);
- 255  3218 [132]     if aname[i]<>':' then begin
- 256  3233 [132]       aname[i]:=':';
- 257  3242 [132]       aname[i+1]:=subtype;
- 258  3253 [132]     end;
- 259  3261 [132]   end;
- 260  3261 [132] 
- 261  3262 [131] begin
- 262  3262 [131]   cyclus:=0; drive:=1;
- 263  3272 [131]   _agetstring(aname,default,cyclus,drive);
- 264  3316 [131]   setsubtype('P');
- 265  3324 [131]   _asetfile(aname,cyclus,drive,' ');
- 266  3346 [131]   openr(f_in);
- 267  3352 [131] 
- 268  3352 [131]   for i:=0 to 15 do
- 269  3360 [131]     if FILNAM[i] = ' ' then
- 270  3380 [131]       filename[i] := ENDMARK
- 271  3388 [131]     else
- 272  3390 [131]       filename[i] := FILNAM[i];
- 273  3408 [131]   filename[16] := ENDMARK;
- 274  3432 [131] 
- 275  3436 [131]   write(@filename,'.',hex(FILCYC));
- 276  3461 [131] end;
- 277  3461 [131] 
- 278  3462 [125] { ***** readinput ***** }
- 279  3462 [125] 
- 280  3462 [125] proc readinput;
- 281  3462 [126] var len: integer;
- 282  3465 [127]     ateof: boolean;
- 283  3465 [128] begin
- 284  3465 [128]   openinput;
- 285  3471 [128]   ateof := false;
- 286  3473 [128]   while not ateof do begin
- 287  3485 [128]     len := readline(f_in, line, ateof);
- 288  3509 [128] 
- 289  3513 [128]     if (freemem < MINFREE + LINEMAX + 16) or
- 290  3529 [128]        (nlines >= MAXLINES) then begin
- 291  3538 [128]       writeln('Cannot read more than ',
- 292  3564 [128]         MAXLINES,' lines.');
- 293  3582 [128]       close(f_in);
- 294  3588 [128]       _abort;
- 295  3592 [128]     end;
- 296  3592 [128] 
- 297  3592 [128]     lineptr[nlines] := allocate(len);
- 298  3608 [128]     copy(line, lineptr[nlines]);
- 299  3630 [128]     nlines := nlines + 1;
- 300  3636 [128]   end;
- 301  3641 [128]   close(f_in);
- 302  3650 [128] end;
- 303  3650 [128] 
- 304  3651 [126] { ***** setnumlin ***** }
- 305  3651 [126] 
- 306  3651 [126] proc setnumlin(l,c:integer);
- 307  3651 [129] mem numlin=$1789: integer&;
- 308  3654 [130]     numchr=$178a: integer&;
- 309  3654 [131] begin
- 310  3654 [131]   numlin:=l; numchr:=c;
- 311  3665 [131] end;
- 312  3674 [131] 
- 313  3675 [127] { ***** enter56mode ***** }
- 314  3675 [127] 
- 315  3675 [127] proc enter56mode;
- 316  3675 [128] begin
- 317  3675 [128]   setnumlin($10,$37);
- 318  3690 [128]   write(HOM,CLRSCR);
- 319  3696 [128] end;
- 320  3696 [128] 
- 321  3697 [128] { ***** exit56mode ***** }
- 322  3697 [128] 
- 323  3697 [128] proc exit56mode;
- 324  3697 [129] begin
- 325  3697 [129]   setnumlin($29,$2f);
- 326  3712 [129]   write(HOM,CLRSCR);
- 327  3718 [129] end;
- 328  3718 [129] 
- 329  3719 [129] { ***** movecursor ***** }
- 330  3719 [129] 
- 331  3719 [129] proc movecursor(x, y: integer);
- 332  3719 [132] const asetcur = $e2e2;
- 333  3722 [133] mem curlin  = $ed: integer&;
- 334  3722 [134]     curpos  = $ee: integer&;
- 335  3722 [135] begin
- 336  3722 [135]   curpos := x;
- 337  3724 [135]   curlin := y;
- 338  3732 [135]   call(asetcur);
- 339  3744 [135] end;
- 340  3744 [135] 
- 341  3745 [130] { ***** hidecursor ***** }
- 342  3745 [130] 
- 343  3745 [130] proc hidecursor;
- 344  3745 [131] begin
- 345  3745 [131]   movecursor(0, PAGELEN + 1);
- 346  3763 [131] end;
- 347  3763 [131] 
- 348  3764 [131] { ***** drawstatus ***** }
- 349  3764 [131] 
- 350  3764 [131] proc drawstatus;
- 351  3764 [132] var i,len: integer;
- 352  3767 [134] begin
- 353  3767 [134]   movecursor(0,0);
- 354  3779 [134]   write(INVVID);
- 355  3782 [134] 
- 356  3782 [134]   for i:=1 to 7 do write('        ');
- 357  3808 [134] 
- 358  3822 [134]   movecursor(0,0);
- 359  3832 [134]   write(topline,'/',nlines);
- 360  3844 [134] 
- 361  3844 [134]   movecursor(8,0);
- 362  3854 [134]   write(filename);
- 363  3859 [134] 
- 364  3859 [134]   movecursor(FINDCOL-1,0);
- 365  3872 [134]   write('/');
- 366  3874 [134] 
- 367  3874 [134]   len:=strlen(findstr);
- 368  3886 [134]   if len>0 then begin
- 369  3897 [134]     movecursor(FINDCOL,0);
- 370  3910 [134]     write(findstr);
- 371  3915 [134]   end;
- 372  3915 [134] 
- 373  3915 [134]   write(NORVID);
- 374  3918 [134] end;
- 375  3918 [134] 
- 376  3919 [132] { ***** drawpage ***** }
- 377  3919 [132] 
- 378  3919 [132] proc drawpage;
- 379  3919 [133] var i, lastline, scrline: integer;
- 380  3922 [136] begin
- 381  3922 [136]   lastline := topline + (PAGELEN - 1);
- 382  3933 [136]   if lastline > nlines then
- 383  3942 [136]     lastline := nlines;
- 384  3950 [136] 
- 385  3958 [136]   scrline := 1;
- 386  3960 [136]   for i := topline - 1 to lastline - 1 do begin
- 387  3991 [136]     movecursor(0,scrline);
- 388  4003 [136]     write(CLRLIN,lineptr[i]);
- 389  4015 [136] 
- 390  4015 [136]     if findactive and (i+1 = findline) then begin
- 391  4032 [136]       movecursor(findpos-1,scrline);
- 392  4052 [136]       write(INVVID,findstr,NORVID);
- 393  4063 [136]     end;
- 394  4063 [136] 
- 395  4063 [136]     scrline := scrline + 1;
- 396  4069 [136]   end;
- 397  4074 [136] 
- 398  4088 [136]   while scrline <= PAGELEN do begin
- 399  4098 [136]     movecursor(0,scrline);
- 400  4110 [136]     write(CLRLIN);
- 401  4113 [136]     scrline := scrline + 1;
- 402  4119 [136]   end;
- 403  4124 [136] 
- 404  4127 [136]   hidecursor;
- 405  4131 [136] end;
- 406  4131 [136] 
- 407  4132 [133] { ***** updatescreen ***** }
- 408  4132 [133] 
- 409  4132 [133] proc updatescreen;
- 410  4132 [134] begin
- 411  4132 [134]   drawstatus;
- 412  4141 [134]   drawpage;
- 413  4145 [134] end;
- 414  4145 [134] 
- 415  4146 [134] { ***** startview ***** }
- 416  4146 [134] 
- 417  4146 [134] proc startview;
- 418  4146 [135] begin
- 419  4146 [135]   enter56mode;
- 420  4155 [135]   hidecursor;
- 421  4159 [135]   updatescreen;
- 422  4163 [135] end;
- 423  4163 [135] 
- 424  4164 [135] { ***** stopview ***** }
- 425  4164 [135] 
- 426  4164 [135] proc stopview;
- 427  4164 [136] begin
- 428  4164 [136]   exit56mode;
- 429  4173 [136] end;
- 430  4173 [136] 
- 431  4174 [136] { ***** moveline ***** }
- 432  4174 [136] 
- 433  4174 [136] proc moveline(delta: integer);
- 434  4174 [138] var lasttop: integer;
- 435  4177 [139] begin
- 436  4177 [139]   topline := topline + delta;
- 437  4183 [139] 
- 438  4192 [139]   lasttop := nlines - PAGELEN + 1;
- 439  4201 [139]   if lasttop < 1 then lasttop := 1;
- 440  4218 [139]   if topline > lasttop then topline := lasttop;
- 441  4234 [139]   if topline < 1 then topline := 1;
- 442  4254 [139] 
- 443  4258 [139]   updatescreen;
- 444  4262 [139] end;
- 445  4262 [139] 
- 446  4263 [137] { ***** drawfindfield ***** }
- 447  4263 [137] 
- 448  4263 [137] proc drawfindfield(pos: integer);
- 449  4263 [139] var len,i: integer;
- 450  4266 [141] begin
- 451  4266 [141]   len := strlen(findstr);
- 452  4280 [141] 
- 453  4284 [141]   movecursor(FINDCOL,0);
- 454  4294 [141]   write(NORVID);
- 455  4297 [141] 
- 456  4297 [141]   i := 0;
- 457  4299 [141]   while i < len do begin
- 458  4315 [141]     write(findstr[i]);
- 459  4326 [141]     i := i + 1;
- 460  4332 [141]   end;
- 461  4337 [141] 
- 462  4340 [141]   while i < FINDMAX do begin
- 463  4350 [141]     write(' ');
- 464  4352 [141]     i := i + 1;
- 465  4358 [141]   end;
- 466  4363 [141] 
- 467  4366 [141]   write(INVVID,' ');
- 468  4371 [141]   movecursor(FINDCOL + pos,0);
- 469  4386 [141] end;
- 470  4386 [141] 
- 471  4387 [138] { ***** appendfindchar ***** }
- 472  4387 [138] 
- 473  4387 [138] proc appendfindchar(ch: char; var len,pos: integer);
- 474  4387 [142] begin
- 475  4387 [142]   if len < FINDMAX then begin
- 476  4399 [142]     findstr[len] := ch;
- 477  4406 [142]     len := len + 1;
- 478  4420 [142]     pos := len;
- 479  4425 [142]     findstr[len] := ENDMARK;
- 480  4439 [142]   end;
- 481  4443 [142] end;
- 482  4443 [142] 
- 483  4444 [139] { ***** backspacefind ***** }
- 484  4444 [139] 
- 485  4444 [139] proc backspacefind(var len,pos: integer);
- 486  4444 [142] begin
- 487  4444 [142]   if len > 0 then begin
- 488  4456 [142]     len := len - 1;
- 489  4465 [142]     pos := len;
- 490  4470 [142]     findstr[len] := ENDMARK;
- 491  4484 [142]   end;
- 492  4488 [142] end;
- 493  4488 [142] 
- 494  4489 [140] { ***** editfindfield ***** }
- 495  4489 [140] 
- 496  4489 [140] func editfindfield: boolean;
- 497  4489 [142] var key0: char;
- 498  4492 [143]     len,pos: integer;
- 499  4492 [145]     accept, done: boolean;
- 500  4492 [147] begin
- 501  4492 [147]   copy(findstr,findsav);
- 502  4508 [147] 
- 503  4508 [147]   len := strlen(findstr);
- 504  4520 [147]   pos := len;
- 505  4524 [147]   done := false;
- 506  4534 [147]   accept := false;
- 507  4540 [147] 
- 508  4544 [147]   drawfindfield(pos);
- 509  4554 [147] 
- 510  4554 [147]   while not done do begin
- 511  4562 [147]     read(@KEY, key0);
- 512  4570 [147] 
- 513  4571 [147]     case key0 of
- 514  4571 [147] 
- 515  4575 [147]     KENTER:
- 516  4579 [147]       begin
- 517  4582 [147]         accept := true;
- 518  4584 [147]         done := true;
- 519  4590 [147]       end;
- 520  4594 [147] 
- 521  4597 [147]     KESC:
- 522  4601 [147]       begin
- 523  4604 [147]         copy(findsav,findstr);
- 524  4618 [147]         accept := false;
- 525  4620 [147]         done := true;
- 526  4626 [147]       end;
- 527  4630 [147] 
- 528  4633 [147]     KBS:
- 529  4637 [147]       begin
- 530  4640 [147]         backspacefind(len,pos);
- 531  4660 [147]         drawfindfield(pos);
- 532  4670 [147]       end
- 533  4670 [147] 
- 534  4670 [147]     else
- 535  4670 [147]       begin
- 536  4673 [147]         if (key0 >= ' ') and (key0 <> chr($7f)) then
- 537  4688 [147]         begin
- 538  4689 [147]           appendfindchar(key0,len,pos);
- 539  4718 [147]           drawfindfield(pos);
- 540  4728 [147]         end;
- 541  4728 [147]       end
- 542  4728 [147] 
- 543  4728 [147]     end;
- 544  4730 [147]   end;
- 545  4730 [147] 
- 546  4733 [147]   drawstatus;
- 547  4737 [147]   editfindfield := accept;
- 548  4737 [147] end;
- 549  4745 [147] 
- 550  4746 [142] { ***** searchfirst ***** }
- 551  4746 [142] 
- 552  4746 [142] func searchfirst: boolean;
- 553  4746 [144] var patlen: integer;
- 554  4749 [145]     foundline,foundpos: integer;
- 555  4749 [147]     startline,startpos: integer;
- 556  4749 [149]     lasttop: integer;
- 557  4749 [150] begin
- 558  4749 [150]   patlen := strlen(findstr);
- 559  4763 [150]   if patlen = 0 then begin
- 560  4774 [150]     searchfirst := false;
- 561  4779 [150]     exit
- 562  4783 [150]   end;
- 563  4784 [150] 
- 564  4784 [150]   if findactive then begin
- 565  4788 [150]     startline := findline;
- 566  4791 [150]     startpos  := findpos;
- 567  4799 [150]   end
- 568  4807 [150]   else begin
- 569  4810 [150]     startline := 1;
- 570  4812 [150]     startpos  := 1;
- 571  4818 [150]   end;
- 572  4822 [150] 
- 573  4822 [150]   if findtext(startline,startpos,findstr,patlen,
- 574  4836 [150]       true, foundline,foundpos) then begin
- 575  4864 [150]     findline := foundline;
- 576  4867 [150]     findpos  := foundpos;
- 577  4875 [150]     findactive := true;
- 578  4885 [150] 
- 579  4889 [150]     topline := findline - (PAGELEN div 2);
- 580  4898 [150]     lasttop := nlines - PAGELEN + 1;
- 581  4912 [150]     if lasttop < 1 then lasttop := 1;
- 582  4929 [150]     if topline < 1 then topline := 1;
- 583  4945 [150]     if topline > lasttop then topline := lasttop;
- 584  4961 [150] 
- 585  4969 [150]     searchfirst := true;
- 586  4971 [150]   end
- 587  4975 [150]   else
- 588  4975 [150]     searchfirst := false;
- 589  4980 [150] end;
- 590  4984 [150] 
- 591  4985 [144] { ***** searchnext ***** }
- 592  4985 [144] 
- 593  4985 [144] func searchnext: boolean;
- 594  4985 [146] var patlen: integer;
- 595  4988 [147]     foundline,foundpos: integer;
- 596  4988 [149]     startline,startpos: integer;
- 597  4988 [151]     lasttop: integer;
- 598  4988 [152] begin
- 599  4988 [152]   if not findactive then begin
- 600  4995 [152]     searchnext := false;
- 601  5000 [152]     exit
- 602  5004 [152]   end;
- 603  5005 [152] 
- 604  5005 [152]   patlen := strlen(findstr);
- 605  5017 [152]   if patlen = 0 then begin
- 606  5028 [152]     searchnext := false;
- 607  5033 [152]     exit
- 608  5037 [152]   end;
- 609  5038 [152] 
- 610  5038 [152]   startline := findline;
- 611  5038 [152]   startpos  := findpos + 1;
- 612  5052 [152] 
- 613  5057 [152]   if findtext(startline,startpos,findstr,patlen,
- 614  5071 [152]       true, foundline,foundpos) then begin
- 615  5099 [152]     findline := foundline;
- 616  5102 [152]     findpos  := foundpos;
- 617  5110 [152]     findactive := true;
- 618  5120 [152] 
- 619  5124 [152]     topline := findline - (PAGELEN div 2);
- 620  5133 [152]     lasttop := nlines - PAGELEN + 1;
- 621  5147 [152]     if lasttop < 1 then lasttop := 1;
- 622  5164 [152]     if topline < 1 then topline := 1;
- 623  5180 [152]     if topline > lasttop then topline := lasttop;
- 624  5196 [152] 
- 625  5204 [152]     searchnext := true;
- 626  5206 [152]   end
- 627  5210 [152]   else
- 628  5210 [152]     searchnext := false;
- 629  5215 [152] end;
- 630  5219 [152] 
- 631  5220 [146] { ***** shownotfound ***** }
- 632  5220 [146] 
- 633  5220 [146] proc shownotfound;
- 634  5220 [147] begin
- 635  5220 [147]   { placeholder }
- 636  5223 [147] end;
- 637  5225 [147] 
- 638  5226 [147] { ***** dofind ***** }
- 639  5226 [147] 
- 640  5226 [147] proc dofind;
- 641  5226 [148] begin
- 642  5226 [148]   if editfindfield then begin
- 643  5237 [148]     if searchfirst then updatescreen
- 644  5246 [148]     else shownotfound;
- 645  5260 [148]   end;
- 646  5260 [148]   hidecursor;
- 647  5264 [148] end;
- 648  5264 [148] 
- 649  5265 [148] { ***** donextfind ***** }
- 650  5265 [148] 
- 651  5265 [148] proc donextfind;
- 652  5265 [149] begin
- 653  5265 [149]   if findactive then begin
- 654  5274 [149]     if searchnext then updatescreen
- 655  5283 [149]     else shownotfound;
- 656  5297 [149]   end;
- 657  5297 [149] end;
- 658  5297 [149] 
- 659  5298 [149] { ***** dohelp ***** }
- 660  5298 [149] 
- 661  5298 [149] proc dohelp;
- 662  5298 [150] var ch: char;
- 663  5301 [151] begin
- 664  5301 [151]   movecursor(0,1);
- 665  5313 [151]   write(CLRLIN,'VIEW keys');
- 666  5326 [151] 
- 667  5326 [151]   movecursor(0,2); write(CLRLIN);
- 668  5339 [151] 
- 669  5339 [151]   movecursor(0,3);
- 670  5349 [151]   write(CLRLIN,'q  ESC        quit');
- 671  5371 [151] 
- 672  5371 [151]   movecursor(0,4);
- 673  5381 [151]   write(CLRLIN,'UP  DOWN      move line');
- 674  5408 [151] 
- 675  5408 [151]   movecursor(0,5);
- 676  5418 [151]   write(CLRLIN,'LEFT RIGHT    page with overlap');
- 677  5453 [151] 
- 678  5453 [151]   movecursor(0,6);
- 679  5463 [151]   write(CLRLIN,'/  f          find string');
- 680  5492 [151] 
- 681  5492 [151]   movecursor(0,7);
- 682  5502 [151]   write(CLRLIN,'n             next hit');
- 683  5528 [151] 
- 684  5528 [151]   movecursor(0,8);
- 685  5538 [151]   write(CLRLIN,'h  ?          help');
- 686  5560 [151] 
- 687  5560 [151]   movecursor(0,9); write(CLRLIN);
- 688  5573 [151] 
- 689  5573 [151]   movecursor(0,10);
- 690  5583 [151]   write(CLRLIN,'Find field keys');
- 691  5602 [151]   movecursor(0,11); write(CLRLIN);
- 692  5615 [151] 
- 693  5615 [151]   movecursor(0,12);
- 694  5625 [151]   write(CLRLIN,'type chars    append');
- 695  5649 [151] 
- 696  5649 [151]   movecursor(0,13);
- 697  5659 [151]   write(CLRLIN,'BS            delete last char');
- 698  5693 [151] 
- 699  5693 [151]   movecursor(0,14);
- 700  5703 [151]   write(CLRLIN,'ENTER         accept');
- 701  5727 [151] 
- 702  5727 [151]   movecursor(0,15);
- 703  5737 [151]   write(CLRLIN,'ESC           cancel');
- 704  5761 [151] 
- 705  5761 [151]   hidecursor;
- 706  5765 [151]   read(@KEY,ch);
- 707  5773 [151]   updatescreen;
- 708  5778 [151] end;
- 709  5778 [151] 
- 710  5779 [150] { ***** handlekey ***** }
- 711  5779 [150] 
- 712  5779 [150] proc handlekey;
- 713  5779 [151] begin
- 714  5779 [151]   case key of
- 715  5784 [151]   KESC,'q':  stop:=true;
- 716  5804 [151]   KUP:       moveline(-1);
- 717  5827 [151]   KDOWN:     moveline(+1);
- 718  5845 [151]   KLEFT:     moveline(-(2 * PAGELEN) div 3);
- 719  5870 [151]   KRIGHT:    moveline(+(2 * PAGELEN) div 3);
- 720  5894 [151]   '/','f':   dofind;
- 721  5915 [151]   'n':       donextfind;
- 722  5929 [151]   'h','?':   dohelp
- 723  5946 [151]   else
- 724  5950 [151]     { ignore }
- 725  5953 [151]   end {case};
- 726  5955 [151] end;
- 727  5955 [151] 
- 728  5956 [151] { ***** mainloop ***** }
- 729  5956 [151] 
- 730  5956 [151] proc mainloop;
- 731  5956 [152] begin
- 732  5956 [152]   stop  := false;
- 733  5963 [152]   while not stop do begin
- 734  5975 [152]     read(@KEY, key);
- 735  5983 [152]     handlekey;
- 736  5988 [152]   end;
- 737  5988 [152] end;
- 738  5991 [152] 
- 739  5992 [152] { ***** main program ***** }
- 740  5992 [152] 
- 741  5992 [152] begin
- 742  5992 [152]   write(PRTOFF);
- 743  5998 [152]   init;
- 744  6002 [152]   readinput;
- 745  6006 [152]   startview;
- 746  6010 [152]   mainloop;
- 747  6014 [152]   stopview;
- 748  6018 [152] end.
- 749  6018 [152] 
-Code length:           6017
-Compiler stack size:   112
-Ident stack size:      152/300
+   2     4 [  0] uses syslib, arglib, filelib, writelib;
+   3  4160 [ 92] 
+   4  4160 [ 92] { written 2026 by rricharz and ChatGPT }
+   5  4160 [ 92] 
+   6  4160 [ 92] {$U+} { do not allow shadowing or duplicates }
+   7  4160 [ 92] 
+   8  4160 [ 92] const
+   9  4160 [ 92]       MAXLINES = 1024;
+  10  4163 [ 93]       MINFREE  = 512;
+  11  4163 [ 94]       PAGELEN  = 15;
+  12  4163 [ 95]       LINEMAX  = 56;
+  13  4163 [ 96]       FINDCOL  = 28;
+  14  4163 [ 97]       FINDMAX  = 27;
+  15  4163 [ 98] 
+  16  4163 [ 98]       { control characters }
+  17  4163 [ 98]       CLRSCR   = chr($11);
+  18  4163 [ 99]       ENDMARK  = chr($00);
+  19  4163 [100] 
+  20  4163 [100]       { key codes }
+  21  4163 [100]       KESC     = chr(00); { read(@KEY) gives this }
+  22  4163 [101]       KUP      = chr(26);
+  23  4163 [102]       KDOWN    = chr(24);
+  24  4163 [103]       KLEFT    = chr(03);
+  25  4163 [104]       KRIGHT   = chr(22);
+  26  4163 [105]       KENTER   = chr(13);
+  27  4163 [106]       KBS      = chr(127);
+  28  4163 [107] 
+  29  4163 [107] var  lineptr: array[MAXLINES] of cpnt;
+  30  4163 [108]      nlines: integer;
+  31  4163 [109]      topline: integer;
+  32  4163 [110]      findline: integer;
+  33  4163 [111]      findpos: integer;
+  34  4163 [112]      findactive: boolean;
+  35  4163 [113]      filename: cpnt;
+  36  4163 [114]      findstr, findsav: cpnt;
+  37  4163 [116]      key: char;
+  38  4163 [117]      stop: boolean;
+  39  4163 [118]      f_in: file;
+  40  4163 [119]      line: cpnt;
+  41  4163 [120] 
+  42  4163 [120] { ***** freemem ***** }
+  43  4163 [120] 
+  44  4163 [120] func freemem: integer;
+  45  4163 [122] mem  sp     = $0008: integer;
+  46  4166 [123]      endstk = $000e: integer;
+  47  4166 [124] begin
+  48  4166 [124]   freemem := endstk - sp;
+  49  4174 [124] end;
+  50  4179 [124] 
+  51  4180 [122] { ***** strlen: length of 0-ended string ***** }
+  52  4180 [122] 
+  53  4180 [122] func strlen(s: cpnt): integer;
+  54  4180 [125] var i: integer;
+  55  4183 [126] begin
+  56  4183 [126]   i:=0;
+  57  4187 [126]   while s[i]<>ENDMARK do i:=i+1;
+  58  4213 [126]   strlen:=i;
+  59  4221 [126] end;
+  60  4229 [126] 
+  61  4230 [124] { ***** findat: find pat in s from start ***** }
+  62  4230 [124] { returns 0 if not found, else 1-based pos }
+  63  4230 [124] 
+  64  4230 [124] func findat(s,pat: cpnt;
+  65  4230 [128]     start,patlen: integer): integer;
+  66  4230 [130] var i,j: integer;
+  67  4233 [132] begin
+  68  4233 [132]   if patlen=0 then begin
+  69  4242 [132]     findat:=start;
+  70  4245 [132]     exit
+  71  4253 [132]   end;
+  72  4254 [132] 
+  73  4254 [132]   if start<1 then begin
+  74  4261 [132]     _abort;
+  75  4268 [132]   end;
+  76  4268 [132] 
+  77  4268 [132]   i:=start-1;
+  78  4274 [132]   while s[i]<>ENDMARK do begin
+  79  4295 [132]     if s[i]=pat[0] then begin
+  80  4314 [132]       j:=1;
+  81  4319 [132]       while (j<patlen) and
+  82  4332 [132]           (s[i+j]=pat[j]) do j:=j+1;
+  83  4368 [132]       if j=patlen then begin
+  84  4385 [132]         findat:=i+1;
+  85  4394 [132]         exit
+  86  4399 [132]       end;
+  87  4400 [132]     end;
+  88  4400 [132]     i:=i+1;
+  89  4406 [132]   end;
+  90  4411 [132] 
+  91  4414 [132]   findat:=0;
+  92  4416 [132] end;
+  93  4420 [132] 
+  94  4421 [126] { ***** findtext: search through file ***** }
+  95  4421 [126] 
+  96  4421 [126] func findtext(startline,startpos: integer;
+  97  4421 [130]           pat: cpnt; patlen: integer;
+  98  4421 [132]           wrap: boolean;
+  99  4421 [133]           var foundline,foundpos: integer): boolean;
+ 100  4421 [135] var i,p: integer;
+ 101  4424 [137]     line0: cpnt;
+ 102  4424 [138] begin
+ 103  4424 [138]   if patlen=0 then begin
+ 104  4433 [138]     foundline:=startline;
+ 105  4436 [138]     foundpos:=startpos;
+ 106  4444 [138]     findtext:=true;
+ 107  4454 [138]     exit
+ 108  4458 [138]   end;
+ 109  4459 [138] 
+ 110  4459 [138]   i:=startline;
+ 111  4459 [138]   while i<=nlines do begin
+ 112  4479 [138]     line0:=lineptr[i-1];
+ 113  4486 [138] 
+ 114  4494 [138]     if line0[0]<>ENDMARK then begin
+ 115  4505 [138]       if i=startline then
+ 116  4512 [138]         p:=findat(line0,pat,startpos,patlen)
+ 117  4534 [138]       else
+ 118  4544 [138]         p:=findat(line0,pat,1,patlen);
+ 119  4573 [138] 
+ 120  4577 [138]       if p<>0 then begin
+ 121  4584 [138]         foundline:=i;
+ 122  4587 [138]         foundpos:=p;
+ 123  4595 [138]         findtext:=true;
+ 124  4605 [138]         exit
+ 125  4609 [138]       end;
+ 126  4610 [138]     end;
+ 127  4610 [138] 
+ 128  4610 [138]     i:=i+1;
+ 129  4616 [138]   end;
+ 130  4621 [138] 
+ 131  4624 [138]   if wrap then begin
+ 132  4628 [138]     i:=1;
+ 133  4633 [138]     while i<startline do begin
+ 134  4649 [138]       line0:=lineptr[i-1];
+ 135  4656 [138] 
+ 136  4664 [138]       if line0[0]<>ENDMARK then begin
+ 137  4675 [138]         p:=findat(line0,pat,1,patlen);
+ 138  4700 [138] 
+ 139  4704 [138]         if p<>0 then begin
+ 140  4711 [138]           foundline:=i;
+ 141  4714 [138]           foundpos:=p;
+ 142  4722 [138]           findtext:=true;
+ 143  4732 [138]           exit
+ 144  4736 [138]         end;
+ 145  4737 [138]       end;
+ 146  4737 [138] 
+ 147  4737 [138]       i:=i+1;
+ 148  4743 [138]     end;
+ 149  4748 [138]   end;
+ 150  4751 [138] 
+ 151  4751 [138]   findtext:=false;
+ 152  4753 [138] end;
+ 153  4757 [138] 
+ 154  4758 [128] { ***** allocate: exact-length heap alloc ***** }
+ 155  4758 [128] 
+ 156  4758 [128] func allocate(size: integer): cpnt;
+ 157  4758 [131] mem  endstk = $000e: integer;
+ 158  4761 [132] var  str:cpnt;
+ 159  4761 [133] begin
+ 160  4761 [133]   endstk := endstk - (size + 1);
+ 161  4773 [133]   str := cpnt(endstk);
+ 162  4780 [133]   str[0] := ENDMARK;
+ 163  4788 [133]   allocate := str;
+ 164  4792 [133] end;
+ 165  4800 [133] 
+ 166  4801 [130] { ***** copy: copy cpnt string ***** }
+ 167  4801 [130] 
+ 168  4801 [130] proc copy(strin, strout:cpnt);
+ 169  4801 [133] var i: integer;
+ 170  4804 [134] begin
+ 171  4804 [134]   i := 0;
+ 172  4808 [134]   while strin[i] <> ENDMARK do begin
+ 173  4828 [134]     strout[i] := strin[i];
+ 174  4840 [134]     i := i + 1;
+ 175  4852 [134]   end;
+ 176  4857 [134]   strout[i] := ENDMARK;
+ 177  4866 [134] end;
+ 178  4870 [134] 
+ 179  4871 [131] { ***** readline: read line from file ***** }
+ 180  4871 [131] 
+ 181  4871 [131] func readline(f:file; s:cpnt;
+ 182  4871 [135]           var ateof_here:boolean):integer;
+ 183  4871 [136] var ch: char;
+ 184  4874 [137]     i: integer;
+ 185  4874 [138]     done: boolean;
+ 186  4874 [139] begin
+ 187  4874 [139]   ateof_here := false;
+ 188  4878 [139]   i := 0;
+ 189  4884 [139]   done := false;
+ 190  4890 [139]   while not done do begin
+ 191  4902 [139]     read(@f, ch);
+ 192  4912 [139]     if ch = EOF then begin
+ 193  4920 [139]       ateof_here := true;
+ 194  4925 [139]       done := true;
+ 195  4931 [139]     end;
+ 196  4935 [139]     if (not done) and (ch = CR) then
+ 197  4947 [139]       done := true;
+ 198  4953 [139]     if not done then
+ 199  4957 [139]       if i < LINEMAX then begin
+ 200  4972 [139]         s[i] := ch;
+ 201  4979 [139]         i := i + 1;
+ 202  4993 [139]       end;
+ 203  4998 [139]   end;
+ 204  4998 [139]   s[i] := ENDMARK;
+ 205  5007 [139]   readline := i;
+ 206  5011 [139] end;
+ 207  5019 [139] 
+ 208  5020 [133] { ***** init ***** }
+ 209  5020 [133] 
+ 210  5020 [133] proc init;
+ 211  5020 [134] begin
+ 212  5020 [134]   nlines:=0;
+ 213  5027 [134]   topline:=1;
+ 214  5033 [134]   findline:=0;
+ 215  5039 [134]   findpos:=0;
+ 216  5045 [134]   findactive:=false;
+ 217  5051 [134] 
+ 218  5055 [134]   filename := allocate(16);
+ 219  5065 [134]   findstr  := allocate(FINDMAX);
+ 220  5079 [134]   findsav  := allocate(FINDMAX);
+ 221  5093 [134]   line     := allocate(LINEMAX);
+ 222  5107 [134] 
+ 223  5111 [134] end;
+ 224  5111 [134] 
+ 225  5112 [134] { ***** openinput ***** }
+ 226  5112 [134] 
+ 227  5112 [134] proc openinput;
+ 228  5112 [135] var aname: array[15] of char;
+ 229  5115 [136]     cyclus, drive: integer;
+ 230  5115 [138]     default: boolean;
+ 231  5115 [139]     i: integer;
+ 232  5115 [140] 
+ 233  5115 [140]   proc setsubtype(subtype:char);
+ 234  5115 [142]   begin
+ 235  5115 [142]     i:=0;
+ 236  5122 [142]     repeat
+ 237  5126 [142]       i:=i+1;
+ 238  5132 [142]     until (aname[i]=':') or
+ 239  5148 [142]       (aname[i]=' ') or (i>=14);
+ 240  5167 [142]     if aname[i]<>':' then begin
+ 241  5182 [142]       aname[i]:=':';
+ 242  5191 [142]       aname[i+1]:=subtype;
+ 243  5202 [142]     end;
+ 244  5210 [142]   end;
+ 245  5210 [142] 
+ 246  5211 [141] begin
+ 247  5211 [141]   cyclus:=0; drive:=1;
+ 248  5221 [141]   _agetstring(aname,default,cyclus,drive);
+ 249  5265 [141]   setsubtype('P');
+ 250  5273 [141]   _asetfile(aname,cyclus,drive,' ');
+ 251  5295 [141]   openr(f_in);
+ 252  5301 [141] 
+ 253  5301 [141]   for i:=0 to 15 do
+ 254  5309 [141]     if FILNAM[i] = ' ' then
+ 255  5329 [141]       filename[i] := ENDMARK
+ 256  5337 [141]     else
+ 257  5339 [141]       filename[i] := FILNAM[i];
+ 258  5357 [141]   filename[16] := ENDMARK;
+ 259  5381 [141]   write(@filename,'.',hexb(FILCYC));
+ 260  5406 [141] end;
+ 261  5406 [141] 
+ 262  5407 [135] { ***** readinput ***** }
+ 263  5407 [135] 
+ 264  5407 [135] proc readinput;
+ 265  5407 [136] var len: integer;
+ 266  5410 [137]     ateof: boolean;
+ 267  5410 [138] begin
+ 268  5410 [138]   openinput;
+ 269  5416 [138]   ateof := false;
+ 270  5418 [138]   while not ateof do begin
+ 271  5430 [138]     len := readline(f_in, line, ateof);
+ 272  5454 [138] 
+ 273  5458 [138]     if (freemem < MINFREE + LINEMAX + 16) or
+ 274  5474 [138]        (nlines >= MAXLINES) then begin
+ 275  5483 [138]       writeln('Cannot read more than ',
+ 276  5509 [138]         MAXLINES,' lines.');
+ 277  5527 [138]       close(f_in);
+ 278  5533 [138]       _abort;
+ 279  5537 [138]     end;
+ 280  5537 [138] 
+ 281  5537 [138]     lineptr[nlines] := allocate(len);
+ 282  5553 [138]     copy(line, lineptr[nlines]);
+ 283  5575 [138]     nlines := nlines + 1;
+ 284  5581 [138]   end;
+ 285  5586 [138]   close(f_in);
+ 286  5595 [138] end;
+ 287  5595 [138] 
+ 288  5596 [136] { ***** setnumlin ***** }
+ 289  5596 [136] 
+ 290  5596 [136] proc setnumlin(l,c:integer);
+ 291  5596 [139] mem numlin=$1789: integer&;
+ 292  5599 [140]     numchr=$178a: integer&;
+ 293  5599 [141] begin
+ 294  5599 [141]   numlin:=l; numchr:=c;
+ 295  5610 [141] end;
+ 296  5619 [141] 
+ 297  5620 [137] { ***** enter56mode ***** }
+ 298  5620 [137] 
+ 299  5620 [137] proc enter56mode;
+ 300  5620 [138] begin
+ 301  5620 [138]   setnumlin($10,$37);
+ 302  5635 [138]   write(HOM,CLRSCR);
+ 303  5641 [138] end;
+ 304  5641 [138] 
+ 305  5642 [138] { ***** exit56mode ***** }
+ 306  5642 [138] 
+ 307  5642 [138] proc exit56mode;
+ 308  5642 [139] begin
+ 309  5642 [139]   setnumlin($29,$2f);
+ 310  5657 [139]   write(HOM,CLRSCR);
+ 311  5663 [139] end;
+ 312  5663 [139] 
+ 313  5664 [139] { ***** movecursor ***** }
+ 314  5664 [139] 
+ 315  5664 [139] proc movecursor(x, y: integer);
+ 316  5664 [142] const asetcur = $e2e2;
+ 317  5667 [143] mem curlin  = $ed: integer&;
+ 318  5667 [144]     curpos  = $ee: integer&;
+ 319  5667 [145] begin
+ 320  5667 [145]   curpos := x;
+ 321  5669 [145]   curlin := y;
+ 322  5677 [145]   call(asetcur);
+ 323  5689 [145] end;
+ 324  5689 [145] 
+ 325  5690 [140] { ***** hidecursor ***** }
+ 326  5690 [140] 
+ 327  5690 [140] proc hidecursor;
+ 328  5690 [141] begin
+ 329  5690 [141]   movecursor(0, PAGELEN + 1);
+ 330  5708 [141] end;
+ 331  5708 [141] 
+ 332  5709 [141] { ***** drawstatus ***** }
+ 333  5709 [141] 
+ 334  5709 [141] proc drawstatus;
+ 335  5709 [142] var i,len: integer;
+ 336  5712 [144] begin
+ 337  5712 [144]   movecursor(0,0);
+ 338  5724 [144]   write(INVVID);
+ 339  5727 [144] 
+ 340  5727 [144]   for i:=1 to 7 do write('        ');
+ 341  5753 [144] 
+ 342  5767 [144]   movecursor(0,0);
+ 343  5777 [144]   write(topline,'/',nlines);
+ 344  5789 [144] 
+ 345  5789 [144]   movecursor(8,0);
+ 346  5799 [144]   write(filename);
+ 347  5804 [144] 
+ 348  5804 [144]   movecursor(FINDCOL-1,0);
+ 349  5817 [144]   write('/');
+ 350  5819 [144] 
+ 351  5819 [144]   len:=strlen(findstr);
+ 352  5831 [144]   if len>0 then begin
+ 353  5842 [144]     movecursor(FINDCOL,0);
+ 354  5855 [144]     write(findstr);
+ 355  5860 [144]   end;
+ 356  5860 [144] 
+ 357  5860 [144]   write(NORVID);
+ 358  5863 [144] end;
+ 359  5863 [144] 
+ 360  5864 [142] { ***** drawpage ***** }
+ 361  5864 [142] 
+ 362  5864 [142] proc drawpage;
+ 363  5864 [143] var i, lastline, scrline: integer;
+ 364  5867 [146] begin
+ 365  5867 [146]   lastline := topline + (PAGELEN - 1);
+ 366  5878 [146]   if lastline > nlines then
+ 367  5887 [146]     lastline := nlines;
+ 368  5895 [146] 
+ 369  5903 [146]   scrline := 1;
+ 370  5905 [146]   for i := topline - 1 to lastline - 1 do begin
+ 371  5936 [146]     movecursor(0,scrline);
+ 372  5948 [146]     write(CLRLIN,lineptr[i]);
+ 373  5960 [146] 
+ 374  5960 [146]     if findactive and (i+1 = findline) then begin
+ 375  5977 [146]       movecursor(findpos-1,scrline);
+ 376  5997 [146]       write(INVVID,findstr,NORVID);
+ 377  6008 [146]     end;
+ 378  6008 [146] 
+ 379  6008 [146]     scrline := scrline + 1;
+ 380  6014 [146]   end;
+ 381  6019 [146] 
+ 382  6033 [146]   while scrline <= PAGELEN do begin
+ 383  6043 [146]     movecursor(0,scrline);
+ 384  6055 [146]     write(CLRLIN);
+ 385  6058 [146]     scrline := scrline + 1;
+ 386  6064 [146]   end;
+ 387  6069 [146] 
+ 388  6072 [146]   hidecursor;
+ 389  6076 [146] end;
+ 390  6076 [146] 
+ 391  6077 [143] { ***** updatescreen ***** }
+ 392  6077 [143] 
+ 393  6077 [143] proc updatescreen;
+ 394  6077 [144] begin
+ 395  6077 [144]   drawstatus;
+ 396  6086 [144]   drawpage;
+ 397  6090 [144] end;
+ 398  6090 [144] 
+ 399  6091 [144] { ***** startview ***** }
+ 400  6091 [144] 
+ 401  6091 [144] proc startview;
+ 402  6091 [145] begin
+ 403  6091 [145]   enter56mode;
+ 404  6100 [145]   hidecursor;
+ 405  6104 [145]   updatescreen;
+ 406  6108 [145] end;
+ 407  6108 [145] 
+ 408  6109 [145] { ***** stopview ***** }
+ 409  6109 [145] 
+ 410  6109 [145] proc stopview;
+ 411  6109 [146] begin
+ 412  6109 [146]   exit56mode;
+ 413  6118 [146] end;
+ 414  6118 [146] 
+ 415  6119 [146] { ***** moveline ***** }
+ 416  6119 [146] 
+ 417  6119 [146] proc moveline(delta: integer);
+ 418  6119 [148] var lasttop: integer;
+ 419  6122 [149] begin
+ 420  6122 [149]   topline := topline + delta;
+ 421  6128 [149] 
+ 422  6137 [149]   lasttop := nlines - PAGELEN + 1;
+ 423  6146 [149]   if lasttop < 1 then lasttop := 1;
+ 424  6163 [149]   if topline > lasttop then topline := lasttop;
+ 425  6179 [149]   if topline < 1 then topline := 1;
+ 426  6199 [149] 
+ 427  6203 [149]   updatescreen;
+ 428  6207 [149] end;
+ 429  6207 [149] 
+ 430  6208 [147] { ***** drawfindfield ***** }
+ 431  6208 [147] 
+ 432  6208 [147] proc drawfindfield(pos: integer);
+ 433  6208 [149] var len,i: integer;
+ 434  6211 [151] begin
+ 435  6211 [151]   len := strlen(findstr);
+ 436  6225 [151] 
+ 437  6229 [151]   movecursor(FINDCOL,0);
+ 438  6239 [151]   write(NORVID);
+ 439  6242 [151] 
+ 440  6242 [151]   i := 0;
+ 441  6244 [151]   while i < len do begin
+ 442  6260 [151]     write(findstr[i]);
+ 443  6271 [151]     i := i + 1;
+ 444  6277 [151]   end;
+ 445  6282 [151] 
+ 446  6285 [151]   while i < FINDMAX do begin
+ 447  6295 [151]     write(' ');
+ 448  6297 [151]     i := i + 1;
+ 449  6303 [151]   end;
+ 450  6308 [151] 
+ 451  6311 [151]   write(INVVID,' ');
+ 452  6316 [151]   movecursor(FINDCOL + pos,0);
+ 453  6331 [151] end;
+ 454  6331 [151] 
+ 455  6332 [148] { ***** appendfindchar ***** }
+ 456  6332 [148] 
+ 457  6332 [148] proc appendfindchar(ch: char; var len,pos: integer);
+ 458  6332 [152] begin
+ 459  6332 [152]   if len < FINDMAX then begin
+ 460  6344 [152]     findstr[len] := ch;
+ 461  6351 [152]     len := len + 1;
+ 462  6365 [152]     pos := len;
+ 463  6370 [152]     findstr[len] := ENDMARK;
+ 464  6384 [152]   end;
+ 465  6388 [152] end;
+ 466  6388 [152] 
+ 467  6389 [149] { ***** backspacefind ***** }
+ 468  6389 [149] 
+ 469  6389 [149] proc backspacefind(var len,pos: integer);
+ 470  6389 [152] begin
+ 471  6389 [152]   if len > 0 then begin
+ 472  6401 [152]     len := len - 1;
+ 473  6410 [152]     pos := len;
+ 474  6415 [152]     findstr[len] := ENDMARK;
+ 475  6429 [152]   end;
+ 476  6433 [152] end;
+ 477  6433 [152] 
+ 478  6434 [150] { ***** editfindfield ***** }
+ 479  6434 [150] 
+ 480  6434 [150] func editfindfield: boolean;
+ 481  6434 [152] var key0: char;
+ 482  6437 [153]     len,pos: integer;
+ 483  6437 [155]     accept, done: boolean;
+ 484  6437 [157] begin
+ 485  6437 [157]   copy(findstr,findsav);
+ 486  6453 [157] 
+ 487  6453 [157]   len := strlen(findstr);
+ 488  6465 [157]   pos := len;
+ 489  6469 [157]   done := false;
+ 490  6479 [157]   accept := false;
+ 491  6485 [157] 
+ 492  6489 [157]   drawfindfield(pos);
+ 493  6499 [157] 
+ 494  6499 [157]   while not done do begin
+ 495  6507 [157]     read(@KEY, key0);
+ 496  6515 [157] 
+ 497  6516 [157]     case key0 of
+ 498  6516 [157] 
+ 499  6520 [157]     KENTER:
+ 500  6524 [157]       begin
+ 501  6527 [157]         accept := true;
+ 502  6529 [157]         done := true;
+ 503  6535 [157]       end;
+ 504  6539 [157] 
+ 505  6542 [157]     KESC:
+ 506  6546 [157]       begin
+ 507  6549 [157]         copy(findsav,findstr);
+ 508  6563 [157]         accept := false;
+ 509  6565 [157]         done := true;
+ 510  6571 [157]       end;
+ 511  6575 [157] 
+ 512  6578 [157]     KBS:
+ 513  6582 [157]       begin
+ 514  6585 [157]         backspacefind(len,pos);
+ 515  6605 [157]         drawfindfield(pos);
+ 516  6615 [157]       end
+ 517  6615 [157] 
+ 518  6615 [157]     else
+ 519  6615 [157]       begin
+ 520  6618 [157]         if (key0 >= ' ') and (key0 <> chr($7f)) then
+ 521  6633 [157]         begin
+ 522  6634 [157]           appendfindchar(key0,len,pos);
+ 523  6663 [157]           drawfindfield(pos);
+ 524  6673 [157]         end;
+ 525  6673 [157]       end
+ 526  6673 [157] 
+ 527  6673 [157]     end;
+ 528  6675 [157]   end;
+ 529  6675 [157] 
+ 530  6678 [157]   drawstatus;
+ 531  6682 [157]   editfindfield := accept;
+ 532  6682 [157] end;
+ 533  6690 [157] 
+ 534  6691 [152] { ***** searchfirst ***** }
+ 535  6691 [152] 
+ 536  6691 [152] func searchfirst: boolean;
+ 537  6691 [154] var patlen: integer;
+ 538  6694 [155]     foundline,foundpos: integer;
+ 539  6694 [157]     startline,startpos: integer;
+ 540  6694 [159]     lasttop: integer;
+ 541  6694 [160] begin
+ 542  6694 [160]   patlen := strlen(findstr);
+ 543  6708 [160]   if patlen = 0 then begin
+ 544  6719 [160]     searchfirst := false;
+ 545  6724 [160]     exit
+ 546  6728 [160]   end;
+ 547  6729 [160] 
+ 548  6729 [160]   if findactive then begin
+ 549  6733 [160]     startline := findline;
+ 550  6736 [160]     startpos  := findpos;
+ 551  6744 [160]   end
+ 552  6752 [160]   else begin
+ 553  6755 [160]     startline := 1;
+ 554  6757 [160]     startpos  := 1;
+ 555  6763 [160]   end;
+ 556  6767 [160] 
+ 557  6767 [160]   if findtext(startline,startpos,findstr,patlen,
+ 558  6781 [160]       true, foundline,foundpos) then begin
+ 559  6809 [160]     findline := foundline;
+ 560  6812 [160]     findpos  := foundpos;
+ 561  6820 [160]     findactive := true;
+ 562  6830 [160] 
+ 563  6834 [160]     topline := findline - (PAGELEN div 2);
+ 564  6843 [160]     lasttop := nlines - PAGELEN + 1;
+ 565  6857 [160]     if lasttop < 1 then lasttop := 1;
+ 566  6874 [160]     if topline < 1 then topline := 1;
+ 567  6890 [160]     if topline > lasttop then topline := lasttop;
+ 568  6906 [160] 
+ 569  6914 [160]     searchfirst := true;
+ 570  6916 [160]   end
+ 571  6920 [160]   else
+ 572  6920 [160]     searchfirst := false;
+ 573  6925 [160] end;
+ 574  6929 [160] 
+ 575  6930 [154] { ***** searchnext ***** }
+ 576  6930 [154] 
+ 577  6930 [154] func searchnext: boolean;
+ 578  6930 [156] var patlen: integer;
+ 579  6933 [157]     foundline,foundpos: integer;
+ 580  6933 [159]     startline,startpos: integer;
+ 581  6933 [161]     lasttop: integer;
+ 582  6933 [162] begin
+ 583  6933 [162]   if not findactive then begin
+ 584  6940 [162]     searchnext := false;
+ 585  6945 [162]     exit
+ 586  6949 [162]   end;
+ 587  6950 [162] 
+ 588  6950 [162]   patlen := strlen(findstr);
+ 589  6962 [162]   if patlen = 0 then begin
+ 590  6973 [162]     searchnext := false;
+ 591  6978 [162]     exit
+ 592  6982 [162]   end;
+ 593  6983 [162] 
+ 594  6983 [162]   startline := findline;
+ 595  6983 [162]   startpos  := findpos + 1;
+ 596  6997 [162] 
+ 597  7002 [162]   if findtext(startline,startpos,findstr,patlen,
+ 598  7016 [162]       true, foundline,foundpos) then begin
+ 599  7044 [162]     findline := foundline;
+ 600  7047 [162]     findpos  := foundpos;
+ 601  7055 [162]     findactive := true;
+ 602  7065 [162] 
+ 603  7069 [162]     topline := findline - (PAGELEN div 2);
+ 604  7078 [162]     lasttop := nlines - PAGELEN + 1;
+ 605  7092 [162]     if lasttop < 1 then lasttop := 1;
+ 606  7109 [162]     if topline < 1 then topline := 1;
+ 607  7125 [162]     if topline > lasttop then topline := lasttop;
+ 608  7141 [162] 
+ 609  7149 [162]     searchnext := true;
+ 610  7151 [162]   end
+ 611  7155 [162]   else
+ 612  7155 [162]     searchnext := false;
+ 613  7160 [162] end;
+ 614  7164 [162] 
+ 615  7165 [156] { ***** shownotfound ***** }
+ 616  7165 [156] 
+ 617  7165 [156] proc shownotfound;
+ 618  7165 [157] begin
+ 619  7165 [157]   { placeholder }
+ 620  7168 [157] end;
+ 621  7170 [157] 
+ 622  7171 [157] { ***** dofind ***** }
+ 623  7171 [157] 
+ 624  7171 [157] proc dofind;
+ 625  7171 [158] begin
+ 626  7171 [158]   if editfindfield then begin
+ 627  7182 [158]     if searchfirst then updatescreen
+ 628  7191 [158]     else shownotfound;
+ 629  7205 [158]   end;
+ 630  7205 [158]   hidecursor;
+ 631  7209 [158] end;
+ 632  7209 [158] 
+ 633  7210 [158] { ***** donextfind ***** }
+ 634  7210 [158] 
+ 635  7210 [158] proc donextfind;
+ 636  7210 [159] begin
+ 637  7210 [159]   if findactive then begin
+ 638  7219 [159]     if searchnext then updatescreen
+ 639  7228 [159]     else shownotfound;
+ 640  7242 [159]   end;
+ 641  7242 [159] end;
+ 642  7242 [159] 
+ 643  7243 [159] { ***** dohelp ***** }
+ 644  7243 [159] 
+ 645  7243 [159] proc dohelp;
+ 646  7243 [160] var ch: char;
+ 647  7246 [161] begin
+ 648  7246 [161]   movecursor(0,1);
+ 649  7258 [161]   write(CLRLIN,'VIEW keys');
+ 650  7271 [161] 
+ 651  7271 [161]   movecursor(0,2); write(CLRLIN);
+ 652  7284 [161] 
+ 653  7284 [161]   movecursor(0,3);
+ 654  7294 [161]   write(CLRLIN,'q  ESC        quit');
+ 655  7316 [161] 
+ 656  7316 [161]   movecursor(0,4);
+ 657  7326 [161]   write(CLRLIN,'UP  DOWN      move line');
+ 658  7353 [161] 
+ 659  7353 [161]   movecursor(0,5);
+ 660  7363 [161]   write(CLRLIN,'LEFT RIGHT    page with overlap');
+ 661  7398 [161] 
+ 662  7398 [161]   movecursor(0,6);
+ 663  7408 [161]   write(CLRLIN,'/  f          find string');
+ 664  7437 [161] 
+ 665  7437 [161]   movecursor(0,7);
+ 666  7447 [161]   write(CLRLIN,'n             next hit');
+ 667  7473 [161] 
+ 668  7473 [161]   movecursor(0,8);
+ 669  7483 [161]   write(CLRLIN,'h  ?          help');
+ 670  7505 [161] 
+ 671  7505 [161]   movecursor(0,9); write(CLRLIN);
+ 672  7518 [161] 
+ 673  7518 [161]   movecursor(0,10);
+ 674  7528 [161]   write(CLRLIN,'Find field keys');
+ 675  7547 [161]   movecursor(0,11); write(CLRLIN);
+ 676  7560 [161] 
+ 677  7560 [161]   movecursor(0,12);
+ 678  7570 [161]   write(CLRLIN,'type chars    append');
+ 679  7594 [161] 
+ 680  7594 [161]   movecursor(0,13);
+ 681  7604 [161]   write(CLRLIN,'BS            delete last char');
+ 682  7638 [161] 
+ 683  7638 [161]   movecursor(0,14);
+ 684  7648 [161]   write(CLRLIN,'ENTER         accept');
+ 685  7672 [161] 
+ 686  7672 [161]   movecursor(0,15);
+ 687  7682 [161]   write(CLRLIN,'ESC           cancel');
+ 688  7706 [161] 
+ 689  7706 [161]   hidecursor;
+ 690  7710 [161]   read(@KEY,ch);
+ 691  7718 [161]   updatescreen;
+ 692  7723 [161] end;
+ 693  7723 [161] 
+ 694  7724 [160] { ***** handlekey ***** }
+ 695  7724 [160] 
+ 696  7724 [160] proc handlekey;
+ 697  7724 [161] begin
+ 698  7724 [161]   case key of
+ 699  7729 [161]   KESC,'q':  stop:=true;
+ 700  7749 [161]   KUP:       moveline(-1);
+ 701  7772 [161]   KDOWN:     moveline(+1);
+ 702  7790 [161]   KLEFT:     moveline(-(2 * PAGELEN) div 3);
+ 703  7815 [161]   KRIGHT:    moveline(+(2 * PAGELEN) div 3);
+ 704  7839 [161]   '/','f':   dofind;
+ 705  7860 [161]   'n':       donextfind;
+ 706  7874 [161]   'h','?':   dohelp
+ 707  7891 [161]   else
+ 708  7895 [161]     { ignore }
+ 709  7898 [161]   end {case};
+ 710  7900 [161] end;
+ 711  7900 [161] 
+ 712  7901 [161] { ***** mainloop ***** }
+ 713  7901 [161] 
+ 714  7901 [161] proc mainloop;
+ 715  7901 [162] begin
+ 716  7901 [162]   stop  := false;
+ 717  7908 [162]   while not stop do begin
+ 718  7920 [162]     read(@KEY, key);
+ 719  7928 [162]     handlekey;
+ 720  7933 [162]   end;
+ 721  7933 [162] end;
+ 722  7936 [162] 
+ 723  7937 [162] { ***** main program ***** }
+ 724  7937 [162] 
+ 725  7937 [162] begin
+ 726  7937 [162]   write(PRTOFF);
+ 727  7943 [162]   init;
+ 728  7947 [162]   readinput;
+ 729  7951 [162]   startview;
+ 730  7955 [162]   mainloop;
+ 731  7959 [162]   stopview;
+ 732  7963 [162] end.
+ 733  7963 [162] 
+Code length:           7962
+Compiler stack size:   129
+Ident stack size:      162/300

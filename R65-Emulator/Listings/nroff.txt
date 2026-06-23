@@ -1,1047 +1,163 @@
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 1
-
-
-   1 (    4) program nroff;
-   2 (    4) 
-   3 (    4) { mini nroff }
-   4 (    4) { Written March 2026 for the R65 system }
-   5 (    4) { R. Richarz / ChatGPT }
-   6 (    4) 
-   7 (    4) uses syslib, arglib, filelib;
-   8 ( 1783) 
-   9 ( 1783) const
-  10 ( 1783)   LINEMAX = 132; { max chars per printer output line }
-  11 ( 1786)   LINEDEF = 55;  { default line width for A5 output }
-  12 ( 1786)   PAGEMAX = 200; { max lines per page in program }
-  13 ( 1786)   PAGEDEF = 65;  { default lines per page for A5}
-  14 ( 1786)   MAXSRC  = 56;  { max source chars per input line }
-  15 ( 1786)   MAXOUT  = 200; { max chars in formatted output }
-  16 ( 1786)   LMARGIN = 12;  { left margint }
-  17 ( 1786)   TMARGIN = 0;   { top margin }
-  18 ( 1786)   INDSTEP = 4;   { indent step for .RS / .RE }
-  19 ( 1786)   MAXTABS = 16;  { max number of explicit tab stops }
-  20 ( 1786)   IPINDENT= 5;  { default IP indent }
-  21 ( 1786) 
-  22 ( 1786)   ERR_MISS  = 1;  { missing argument }
-  23 ( 1786)   ERR_NUM   = 2;  { invalid number }
-  24 ( 1786)   ERR_EXTRA = 3;  { extra text }
-  25 ( 1786)   ERR_RANGE = 4;  { value out of range }
-  26 ( 1786)   ERR_REQ   = 5;  { invalid request }
-  27 ( 1786)   ERRMAX    = 4;  { max number of errors on screen }
-  28 ( 1786) 
-  29 ( 1786)   QUOTE     = chr($27);
-  30 ( 1786) 
-  31 ( 1786)   DEBUG1  = false;
-  32 ( 1786)   DEBUG2  = false;
-  33 ( 1786) 
-  34 ( 1786) var
-  35 ( 1786)   src      : file;
-  36 ( 1786)   name     : array[15] of char;
-  37 ( 1786)   default  : boolean;
-  38 ( 1786)   cyclus   : integer;
-  39 ( 1786)   drive    : integer;
-  40 ( 1786) 
-  41 ( 1786)   ch       : char;
-  42 ( 1786) 
-  43 ( 1786)   linelen  : integer; { active output line width }
-  44 ( 1786)   pagelen  : integer; { active page length }
-  45 ( 1786)   line     : array[MAXSRC] of char;
-  46 ( 1786)         { current input line buffer }
-  47 ( 1786)   llen     : integer; { current input line length }
-  48 ( 1786) 
-  49 ( 1786)   outbuf   : array[MAXOUT] of char;
-  50 ( 1786)         { formatted output line }
-  51 ( 1786)   outlen   : integer;
-  52 ( 1786)         { current formatted output length }
-  53 ( 1786) 
-  54 ( 1786)   fillmode : boolean;
-  55 ( 1786)         { true = fill mode, false = no-fill }
-  56 ( 1786)   indent   : integer; { current left indent }
-  57 ( 1786)   titlemod : boolean;
-  58 ( 1786)   linecnt  : integer;
-  59 ( 1786) 
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 2
-
-  60 ( 1786)   tabstops : array[MAXTABS] of integer;
-  61 ( 1786)   ntab     : integer;
-  62 ( 1786)   ipmode   : boolean;
-  63 ( 1786)   ipindent : integer;
-  64 ( 1786)   iphang   : integer;
-  65 ( 1786)   ipcur    : integer;
-  66 ( 1786)   preind   : boolean;
-  67 ( 1786)   errcount : integer;
-  68 ( 1786)   srcline  : integer;
-  69 ( 1786) 
-  70 ( 1786)   pagepos  : integer; { current line number on page }
-  71 ( 1786)   pageno   : integer; { current page number }
-  72 ( 1786)   headeron : boolean; { true after .TH }
-  73 ( 1786)   textseen : boolean;
-  74 ( 1786)         { true after first real text output }
-  75 ( 1786) 
-  76 ( 1786)   thname   : array[LINEMAX] of char; { title from .TH
-  77 ( 1786) }
-  78 ( 1786)   thlen    : integer; { length of title text }
-  79 ( 1786) 
-  80 ( 1786) proc errec(pos,code:integer);
-  81 ( 1786) {***************************}
-  82 ( 1786) var i: integer;
-  83 ( 1789) begin
-  84 ( 1789)   errcount := succ(errcount);
-  85 ( 1795)   write('Error in line ',srcline ,': ');
-  86 ( 1823)   case code of
-  87 ( 1823)     ERR_MISS : writeln('missing argument');
-  88 ( 1857)     ERR_NUM  : writeln('invalid number');
-  89 ( 1888)     ERR_EXTRA: writeln('extra text');
-  90 ( 1915)     ERR_RANGE: writeln('value out of range');
-  91 ( 1950)     ERR_REQ  : writeln('invalid request')
-  92 ( 1976)   else
-  93 ( 1982)     writeln('bad request to errec')
-  94 ( 2006)   end;
-  95 ( 2014)   for i:=0 to llen-1 do
-  96 ( 2026)     write(line[i]);
-  97 ( 2045)   writeln;
-  98 ( 2059)   for i:=1 to pos do
-  99 ( 2071)     write(' ');
- 100 ( 2086)   writeln('^');
- 101 ( 2108)   if errcount>=ERRMAX then begin
- 102 ( 2115)     write('Too many errors');
- 103 ( 2134)     _abort;
- 104 ( 2138)   end;
- 105 ( 2138) end;
- 106 ( 2138) 
- 107 ( 2139) func checkeol(pos:integer):boolean;
- 108 ( 2139) {*********************************}
- 109 ( 2139) var pos0:integer;
- 110 ( 2142) begin
- 111 ( 2142)   pos0 := pos;
- 112 ( 2144)   while (pos0<llen) and (line[pos0]=' ') do
- 113 ( 2172)     pos0 := succ(pos0);
- 114 ( 2180)   if pos0<llen then begin
- 115 ( 2197)     errec(pos0,ERR_EXTRA);
- 116 ( 2212)     checkeol := false;
- 117 ( 2214)   end
- 118 ( 2218)   else
- 119 ( 2218)     checkeol := true;
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 3
-
- 120 ( 2223) end;
- 121 ( 2227) 
- 122 ( 2228) func findarg(pos:integer):integer;
- 123 ( 2228) {********************************}
- 124 ( 2228) var pos0: integer;
- 125 ( 2231) begin
- 126 ( 2231)   pos0 := pos;
- 127 ( 2233)   while (pos0<llen) and (line[pos0]=' ') do
- 128 ( 2261)     pos0 := pos0+1;
- 129 ( 2271)   if pos0>=llen then begin
- 130 ( 2288)     errec(pos0,ERR_MISS);
- 131 ( 2303)     findarg := -1;
- 132 ( 2305)   end
- 133 ( 2310)   else
- 134 ( 2310)     findarg := pos0;
- 135 ( 2313) end;
- 136 ( 2321) 
- 137 ( 2322) proc printernewline;
- 138 ( 2322) {******************}
- 139 ( 2322) begin
- 140 ( 2322)   write(@PRINTER, CR);
- 141 ( 2334)   write(@PRINTER, LF);
- 142 ( 2341) end;
- 143 ( 2341) 
- 144 ( 2342) proc startline;
- 145 ( 2342) {*************}
- 146 ( 2342) var i: integer;
- 147 ( 2345) begin
- 148 ( 2345) 
- 149 ( 2345)   if DEBUG1 then
- 150 ( 2349)     writeln('< startline: pageno=',pageno,
- 151 ( 2373)           ' pagepos=',pagepos,' >');
- 152 ( 2402) 
- 153 ( 2402)   { printer margin only on printer output }
- 154 ( 2402)   for i := 1 to LMARGIN do
- 155 ( 2410)     write(@PRINTER, ' ');
- 156 ( 2425) 
- 157 ( 2439)   { optional debug line number }
- 158 ( 2439)   if DEBUG2 then begin
- 159 ( 2441)     if pagepos <= 9 then write(' ');
- 160 ( 2456)     write(pagepos, ' ');
- 161 ( 2463)   end;
- 162 ( 2463) end;
- 163 ( 2463) 
- 164 ( 2464) proc printheader;
- 165 ( 2464) {***************}
- 166 ( 2464) var i, spaces, n: integer;
- 167 ( 2467) begin
- 168 ( 2467)   if DEBUG1 then begin
- 169 ( 2471)     writeln('< printheader: before, pageno=', pageno,
- 170 ( 2505)             ' textseen=', textseen,
- 171 ( 2521)             ' pagepos=', pagepos, ' >');
- 172 ( 2566)   end;
- 173 ( 2566) 
- 174 ( 2566)   { top margin }
- 175 ( 2566)   for i := 1 to 3 do begin
- 176 ( 2583)     printernewline;
- 177 ( 2587)   end;
- 178 ( 2587) 
- 179 ( 2601)   { left margin }
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 4
-
- 180 ( 2601)   for i := 1 to LMARGIN do
- 181 ( 2609)     write(@PRINTER, ' ');
- 182 ( 2624) 
- 183 ( 2638)   { title left }
- 184 ( 2638)   for i := 0 to thlen - 1 do
- 185 ( 2650)     write(@PRINTER, thname[i]);
- 186 ( 2673) 
- 187 ( 2687)   { width of page number }
- 188 ( 2687)   n := pageno;
- 189 ( 2687)   if n < 10 then
- 190 ( 2701)     spaces := linelen - thlen - 6
- 191 ( 2714)   else if n < 100 then
- 192 ( 2730)     spaces := linelen - thlen - 7
- 193 ( 2743)   else
- 194 ( 2745)     spaces := linelen - thlen - 8;
- 195 ( 2764) 
- 196 ( 2769)   if spaces < 1 then spaces := 1;
- 197 ( 2781) 
- 198 ( 2785)   while spaces > 0 do begin
- 199 ( 2795)     write(@PRINTER, ' ');
- 200 ( 2801)     spaces := prec(spaces);
- 201 ( 2805)   end;
- 202 ( 2810) 
- 203 ( 2813)   write(@PRINTER, 'Page ', pageno);
- 204 ( 2828)   printernewline;
- 205 ( 2832)   printernewline;
- 206 ( 2836) end;
- 207 ( 2836) 
- 208 ( 2837) proc newpage;
- 209 ( 2837) {***********}
- 210 ( 2837) begin
- 211 ( 2837)   if pageno>0 then
- 212 ( 2848)     write(@PRINTER, FF);
- 213 ( 2859) 
- 214 ( 2859)   pageno := succ(pageno);
- 215 ( 2863) 
- 216 ( 2868)   if headeron then begin
- 217 ( 2872)     printheader;
- 218 ( 2879)     pagepos := TMARGIN + 3;
- 219 ( 2883)         { line after margin, header, blank }
- 220 ( 2888)   end
- 221 ( 2888)   else
- 222 ( 2888)     pagepos := 1;
- 223 ( 2893) 
- 224 ( 2897)   startline;
- 225 ( 2901) end;
- 226 ( 2901) 
- 227 ( 2902) proc clearprintout;
- 228 ( 2902) {*****************}
- 229 ( 2902) var dummy: integer;
- 230 ( 2905) begin
- 231 ( 2905)   { erase the current printout.txt file }
- 232 ( 2905)   { this is a command to the emulator }
- 233 ( 2905)   dummy := _emulator(9);
- 234 ( 2917) end;
- 235 ( 2921) 
- 236 ( 2922) func nexttab(col: integer): integer;
- 237 ( 2922) {**********************************}
- 238 ( 2922) var i: integer;
- 239 ( 2925) begin
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 5
-
- 240 ( 2925)   if ntab > 0 then begin
- 241 ( 2934)     for i := 0 to ntab - 1 do
- 242 ( 2949)       if tabstops[i] > col then begin
- 243 ( 2972)         nexttab := tabstops[i];
- 244 ( 2979)         exit;
- 245 ( 2988)       end;
- 246 ( 2988) 
- 247 ( 3002)     { right of last tab }
- 248 ( 3002)     nexttab := col + 8;
- 249 ( 3008)   end
- 250 ( 3013)   else begin
- 251 ( 3016)     { default unix style }
- 252 ( 3016)     nexttab := ((col div 8) + 1) * 8;
- 253 ( 3028)   end;
- 254 ( 3033) end;
- 255 ( 3033) 
- 256 ( 3034) proc putspaces(n: integer);
- 257 ( 3034) {*************************}
- 258 ( 3034) var i: integer;
- 259 ( 3037) begin
- 260 ( 3037)   for i := 1 to n do
- 261 ( 3045)     write(@PRINTER,' ');
- 262 ( 3064) end;
- 263 ( 3078) 
- 264 ( 3079) proc writewithtabs;
- 265 ( 3079) {*****************}
- 266 ( 3079) var i, col, target: integer;
- 267 ( 3082) begin
- 268 ( 3082)   col := indent;
- 269 ( 3084) 
- 270 ( 3092)   for i := 0 to outlen - 1 do begin
- 271 ( 3114)     if outbuf[i] = TAB8 then begin
- 272 ( 3125)       target := nexttab(col);
- 273 ( 3140)       while col < target do begin
- 274 ( 3156)         write(@PRINTER,' ');
- 275 ( 3162)         col := succ(col);
- 276 ( 3166)       end;
- 277 ( 3171)     end
- 278 ( 3174)     else begin
- 279 ( 3177)       write(@PRINTER,outbuf[i]);
- 280 ( 3190)       col := succ(col);
- 281 ( 3194)     end;
- 282 ( 3199)   end;
- 283 ( 3199) end;
- 284 ( 3213) 
- 285 ( 3214) proc newline;
- 286 ( 3214) {***********}
- 287 ( 3214) begin
- 288 ( 3214)   writeln(@PRINTER);
- 289 ( 3229)   pagepos := succ(pagepos);
- 290 ( 3233) 
- 291 ( 3238)   if pagepos > pagelen then
- 292 ( 3242)     newpage
- 293 ( 3247)   else
- 294 ( 3254)     startline;
- 295 ( 3261) end;
- 296 ( 3261) 
- 297 ( 3262) proc doquotedline;
- 298 ( 3262) {****************}
- 299 ( 3262) var i: integer;
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 6
-
- 300 ( 3265) begin
- 301 ( 3265)   startline;
- 302 ( 3271)   i := 1;
- 303 ( 3273)   while (i<llen) and (line[i]<>QUOTE) do begin
- 304 ( 3301)     write(@PRINTER,line[i]);
- 305 ( 3314)     i := i+1;
- 306 ( 3320)   end;
- 307 ( 3325)   newline;
- 308 ( 3332) end;
- 309 ( 3332) 
- 310 ( 3333) proc underline(n: integer; c: char);
- 311 ( 3333) {**********************************}
- 312 ( 3333) var m, i: integer;
- 313 ( 3336) begin
- 314 ( 3336)   m := n;
- 315 ( 3338)   if m > linelen then m := linelen;
- 316 ( 3358)   for i := 1 to m do
- 317 ( 3372)     write(@PRINTER,c);
- 318 ( 3394)   newline;
- 319 ( 3412) end;
- 320 ( 3412) 
- 321 ( 3413) proc flushline;
- 322 ( 3413) {*************}
- 323 ( 3413) begin
- 324 ( 3413)   if outlen > 0 then begin
- 325 ( 3425)     textseen := true;
- 326 ( 3430)     if not preind then
- 327 ( 3434)       putspaces(indent);
- 328 ( 3452)     writewithtabs;
- 329 ( 3456)     newline;
- 330 ( 3460)     outlen := 0;
- 331 ( 3462)     preind := false;
- 332 ( 3468)   end;
- 333 ( 3472) end;
- 334 ( 3472) 
- 335 ( 3473) proc emitblank;
- 336 ( 3473) {*************}
- 337 ( 3473) begin
- 338 ( 3473)   flushline;
- 339 ( 3482)   newline;
- 340 ( 3486) end;
- 341 ( 3486) 
- 342 ( 3487) proc needspace(n: integer);
- 343 ( 3487) {*************************}
- 344 ( 3487) begin
- 345 ( 3487)   if pagepos > pagelen - n then begin
- 346 ( 3506)     pagepos := pagelen;
- 347 ( 3509)     newline;
- 348 ( 3521)   end;
- 349 ( 3521) end;
- 350 ( 3521) 
- 351 ( 3522) proc emittextnofill;
- 352 ( 3522) {******************}
- 353 ( 3522) var i: integer;
- 354 ( 3525) begin
- 355 ( 3525)   flushline;
- 356 ( 3531)   textseen := true;
- 357 ( 3533)   putspaces(indent);
- 358 ( 3547)   for i := 0 to llen - 1 do
- 359 ( 3559)     write(@PRINTER, line[i]);
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 7
-
- 360 ( 3582)   newline;
- 361 ( 3600) end;
- 362 ( 3600) 
- 363 ( 3601) func isspace(c: char): boolean;
- 364 ( 3601) {*****************************}
- 365 ( 3601) begin
- 366 ( 3601)   isspace := (c = ' ') or (c = TAB8);
- 367 ( 3620) end;
- 368 ( 3625) 
- 369 ( 3626) proc addchartoline(c: char);
- 370 ( 3626) {**************************}
- 371 ( 3626) begin
- 372 ( 3626)   if llen >= MAXSRC then exit;
- 373 ( 3642)   line[llen] := c;
- 374 ( 3646)   llen := succ(llen);
- 375 ( 3658) end;
- 376 ( 3663) 
- 377 ( 3664) func parseintfrom(p: integer): integer;
- 378 ( 3664) {*************************************}
- 379 ( 3664) var v, pos: integer;
- 380 ( 3667) begin
- 381 ( 3667)   v := 0;
- 382 ( 3671)   pos := p;
- 383 ( 3675)   while (pos < llen) and (line[pos] >= '0')
- 384 ( 3702)     and (line[pos] <= '9') do begin
- 385 ( 3719)     v := v * 10 + (ord(line[pos]) - ord('0'));
- 386 ( 3737)     pos := succ(pos);
- 387 ( 3746)   end;
- 388 ( 3751)   parseintfrom := v;
- 389 ( 3754) end;
- 390 ( 3762) 
- 391 ( 3763) proc getnumarg(pos: integer; var n,npos: integer);
- 392 ( 3763) {************************************************}
- 393 ( 3763) var i: integer;
- 394 ( 3766) begin
- 395 ( 3766)   i := pos;
- 396 ( 3768)   while (i<llen) and (line[i]=' ') do
- 397 ( 3796)     i := i+1;
- 398 ( 3806)   if i>=llen then begin
- 399 ( 3823)     n := -1;
- 400 ( 3828)     npos := i;
- 401 ( 3833)     exit;
- 402 ( 3842)   end;
- 403 ( 3842)   if (line[i]<'0') or (line[i]>'9') then begin
- 404 ( 3865)     errec(i,ERR_NUM);
- 405 ( 3880)     n := -2;
- 406 ( 3882)     npos := i;
- 407 ( 3887)     exit;
- 408 ( 3896)   end;
- 409 ( 3896)   npos := i;
- 410 ( 3896)   n := 0;
- 411 ( 3906)   while (i<llen) and (line[i]>='0')
- 412 ( 3929)                   and (line[i]<='9') do begin
- 413 ( 3946)     n := n*10 + ord(line[i]) - ord('0');
- 414 ( 3964)     i := i+1;
- 415 ( 3975)   end;
- 416 ( 3980)   while (i<llen) and (line[i]=' ') do
- 417 ( 4003)     i := i+1;
- 418 ( 4013)   if i<llen then begin
- 419 ( 4030)     errec(i,ERR_EXTRA);
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 8
-
- 420 ( 4045)     n := -2;
- 421 ( 4047)     exit;
- 422 ( 4053)   end;
- 423 ( 4053) end;
- 424 ( 4053) 
- 425 ( 4054) proc addword(start, wlen: integer);
- 426 ( 4054) {*********************************}
- 427 ( 4054) var need, i: integer;
- 428 ( 4057) begin
- 429 ( 4057)   { space before word if not first }
- 430 ( 4057)   need := wlen;
- 431 ( 4059)   if outlen > 0 then need := need + 1;
- 432 ( 4083) 
- 433 ( 4088)   if (indent + outlen + need) > linelen then
- 434 ( 4102)     flushline;
- 435 ( 4114) 
- 436 ( 4114)   if outlen > 0 then begin
- 437 ( 4121)     outbuf[outlen] := ' ';
- 438 ( 4130)     outlen := succ(outlen);
- 439 ( 4138)   end;
- 440 ( 4143) 
- 441 ( 4143)   for i := 0 to wlen - 1 do begin
- 442 ( 4165)     if outlen < MAXOUT then begin
- 443 ( 4172)       outbuf[outlen] := line[start + i];
- 444 ( 4188)       outlen := succ(outlen);
- 445 ( 4200)     end;
- 446 ( 4205)   end;
- 447 ( 4205) end;
- 448 ( 4219) 
- 449 ( 4220) proc ffillfromline;
- 450 ( 4220) {**********************}
- 451 ( 4220) var i, wstart, wlen: integer;
- 452 ( 4223) begin
- 453 ( 4223)   i := 0;
- 454 ( 4227) 
- 455 ( 4231)   { ignore leading whitespace }
- 456 ( 4231)   while (i < llen) and isspace(line[i]) do
- 457 ( 4256)     i := succ(i);
- 458 ( 4264) 
- 459 ( 4272)   while i < llen do begin
- 460 ( 4284)     while (i < llen) and isspace(line[i]) do
- 461 ( 4309)       i := succ(i);
- 462 ( 4317) 
- 463 ( 4325)     if i >= llen then exit;
- 464 ( 4338)     wstart := i;
- 465 ( 4338)     wlen := 0;
- 466 ( 4348)     while (i < llen) and (not isspace(line[i])) do
- 467 ( 4378)     begin
- 468 ( 4382)       i := succ(i);
- 469 ( 4386)       wlen := succ(wlen);
- 470 ( 4395)     end;
- 471 ( 4400)     addword(wstart, wlen);
- 472 ( 4417)   end;
- 473 ( 4417) end;
- 474 ( 4420) 
- 475 ( 4421) proc saveth(startpos: integer);
- 476 ( 4421) {*****************************}
- 477 ( 4421) var pos: integer;
- 478 ( 4424) begin
- 479 ( 4424)   pos := startpos;
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 9
-
- 480 ( 4426)   thlen := 0;
- 481 ( 4436) 
- 482 ( 4440)   while (pos < llen) and (line[pos] = ' ') do
- 483 ( 4460)     pos := succ(pos);
- 484 ( 4468) 
- 485 ( 4476)   while (pos < llen) and (line[pos] <> ' ') do begin
- 486 ( 4500)     thname[thlen] := line[pos];
- 487 ( 4508)     thlen := succ(thlen);
- 488 ( 4520)     pos := succ(pos);
- 489 ( 4529)   end;
- 490 ( 4534) 
- 491 ( 4537)   { append section "(x)" if present }
- 492 ( 4537)   while (pos < llen) and (line[pos] = ' ') do
- 493 ( 4557)     pos := succ(pos);
- 494 ( 4565) 
- 495 ( 4573)   if pos < llen then begin
- 496 ( 4582)     thname[thlen] := '(';
- 497 ( 4591)     thlen := succ(thlen);
- 498 ( 4599)     thname[thlen] := line[pos];
- 499 ( 4612)     thlen := succ(thlen);
- 500 ( 4624)     pos := succ(pos);
- 501 ( 4633)     thname[thlen] := ')';
- 502 ( 4644)     thlen := succ(thlen);
- 503 ( 4652)   end;
- 504 ( 4657) end;
- 505 ( 4657) 
- 506 ( 4658) proc endip;
- 507 ( 4658) {*********}
- 508 ( 4658) begin
- 509 ( 4658)   if ipmode then begin
- 510 ( 4667)     indent := indent - ipcur;
- 511 ( 4674)     ipmode := false;
- 512 ( 4685)     preind := false;
- 513 ( 4691)     ipcur := 0;
- 514 ( 4697)   end;
- 515 ( 4701) end;
- 516 ( 4701) 
- 517 ( 4702) proc closeip;
- 518 ( 4702) {***********}
- 519 ( 4702) begin
- 520 ( 4702)   flushline;
- 521 ( 4711)   endip;
- 522 ( 4715) end;
- 523 ( 4715) 
- 524 ( 4716) proc getwordend(i: integer; var j: integer);
- 525 ( 4716) {******************************************}
- 526 ( 4716) begin
- 527 ( 4716)   j := i;
- 528 ( 4721)   while (j<llen) and (line[j]<>' ') do
- 529 ( 4749)     j := j+1;
- 530 ( 4759) end;
- 531 ( 4767) 
- 532 ( 4768) proc printth;
- 533 ( 4768) {***********}
- 534 ( 4768) var i, spaces: integer;
- 535 ( 4771) begin
- 536 ( 4771)   flushline;
- 537 ( 4777)   needspace(4);
- 538 ( 4785) 
- 539 ( 4785)   newline;
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 10
-
- 540 ( 4789)   putspaces(indent);
- 541 ( 4799) 
- 542 ( 4799)   for i := 0 to thlen - 1 do
- 543 ( 4811)     write(@PRINTER,thname[i]);
- 544 ( 4834) 
- 545 ( 4848)   if linelen > 47 then begin
- 546 ( 4855)     spaces := linelen - (2 * thlen) - indent;
- 547 ( 4870)     if spaces < 1 then spaces := 1;
- 548 ( 4891)     while spaces > 0 do begin
- 549 ( 4905)       write(@PRINTER,' ');
- 550 ( 4911)       spaces := prec(spaces);
- 551 ( 4915)     end;
- 552 ( 4920) 
- 553 ( 4923)     for i := 0 to thlen - 1 do
- 554 ( 4935)       write(@PRINTER,thname[i]);
- 555 ( 4958)   end;
- 556 ( 4972) 
- 557 ( 4972)   newline;
- 558 ( 4976)   newline;
- 559 ( 4980) end;
- 560 ( 4980) 
- 561 ( 4981) proc doB;
- 562 ( 4981) {*******}
- 563 ( 4981) var i: integer;
- 564 ( 4984) begin
- 565 ( 4984)   i := findarg(3);
- 566 ( 4996)   if i<0 then
- 567 ( 5006)     exit;
- 568 ( 5011)   flushline;
- 569 ( 5015)   textseen := true;
- 570 ( 5017)   putspaces(indent);
- 571 ( 5031)   while i < llen do begin
- 572 ( 5043)     write(@PRINTER,line[i]);
- 573 ( 5056)     i := succ(i);
- 574 ( 5060)   end;
- 575 ( 5065)   newline;
- 576 ( 5072) end;
- 577 ( 5072) 
- 578 ( 5073) proc doI;
- 579 ( 5073) {*******}
- 580 ( 5073) var i: integer;
- 581 ( 5076) begin
- 582 ( 5076)   i := findarg(3);
- 583 ( 5088)   if i<0 then
- 584 ( 5098)     exit;
- 585 ( 5103)   flushline;
- 586 ( 5107)   textseen := true;
- 587 ( 5109)   putspaces(indent);
- 588 ( 5123)   while i < llen do begin
- 589 ( 5135)     write(@PRINTER,line[i]);
- 590 ( 5148)     i := succ(i);
- 591 ( 5152)   end;
- 592 ( 5157) 
- 593 ( 5160)   newline;
- 594 ( 5164) end;
- 595 ( 5164) 
- 596 ( 5165) proc doIP;
- 597 ( 5165) {********}
- 598 ( 5165) var i,j,n,npos,col: integer;
- 599 ( 5168) begin
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 11
-
- 600 ( 5168)   closeip;
- 601 ( 5174)   i := findarg(3);
- 602 ( 5184)   if i<0 then
- 603 ( 5194)     exit;
- 604 ( 5199) 
- 605 ( 5199)   getwordend(i,j);
- 606 ( 5217)   getnumarg(j,n,npos);
- 607 ( 5243)   if n=-2 then
- 608 ( 5249)     exit;
- 609 ( 5255)   if n=-1 then
- 610 ( 5261)     n := IPINDENT;
- 611 ( 5268) 
- 612 ( 5272)   textseen := true;
- 613 ( 5274)   putspaces(indent);
- 614 ( 5288)   col := indent;
- 615 ( 5288) 
- 616 ( 5296)   while i<j do begin
- 617 ( 5308)     write(@PRINTER,line[i]);
- 618 ( 5321)     i := i+1;
- 619 ( 5327)     col := col+1;
- 620 ( 5338)   end;
- 621 ( 5343) 
- 622 ( 5346)   if col < (indent + n) then begin
- 623 ( 5360)     while col < (indent + n) do begin
- 624 ( 5380)       write(@PRINTER,' ');
- 625 ( 5386)       col := col+1;
- 626 ( 5392)     end;
- 627 ( 5397)     ipcur := n;
- 628 ( 5400)     preind := true;
- 629 ( 5410)   end
- 630 ( 5414)   else begin
- 631 ( 5417)     newline;
- 632 ( 5421)     putspaces(indent + n);
- 633 ( 5436)     ipcur := n;
- 634 ( 5436)     preind := true;
- 635 ( 5446)   end;
- 636 ( 5450) 
- 637 ( 5450)   indent := indent + ipcur;
- 638 ( 5454)   ipmode := true;
- 639 ( 5465) end;
- 640 ( 5469) 
- 641 ( 5470) proc doTH;
- 642 ( 5470) {********}
- 643 ( 5470) var i: integer;
- 644 ( 5473) begin
- 645 ( 5473)   closeip;
- 646 ( 5479) 
- 647 ( 5479)   i := 3;
- 648 ( 5481)   while (i<llen) and (line[i]=' ') do
- 649 ( 5505)     i := i+1
- 650 ( 5513) 
- 651 ( 5515)   if i>=llen then begin
- 652 ( 5532)     headeron := false;
- 653 ( 5537)     thlen := 0;
- 654 ( 5543)   end
- 655 ( 5547)   else begin
- 656 ( 5550)     saveth(i);
- 657 ( 5560)     headeron := true;
- 658 ( 5562)   end;
- 659 ( 5566) 
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 12
-
- 660 ( 5566)   if DEBUG1 then
- 661 ( 5568)     writeln('< doTH: pageno=', pageno,
- 662 ( 5587)             ' pagepos=', pagepos,
- 663 ( 5602)             ' headeron=', headeron,
- 664 ( 5618)             ' thlen=', thlen, ' >');
- 665 ( 5661) 
- 666 ( 5661)   newpage;
- 667 ( 5665) end;
- 668 ( 5665) 
- 669 ( 5666) proc doTA;
- 670 ( 5666) {********}
- 671 ( 5666) var p, v: integer;
- 672 ( 5669) begin
- 673 ( 5669)   if DEBUG2 then writeln('< doing ta >');
- 674 ( 5695)   ntab := 0;
- 675 ( 5697)   p := 3;
- 676 ( 5703) 
- 677 ( 5707)   while p < llen do begin
- 678 ( 5719)     while (p < llen) and (line[p] = ' ') do
- 679 ( 5739)       p := succ(p);
- 680 ( 5747) 
- 681 ( 5755)     if p >= llen then exit;
- 682 ( 5768) 
- 683 ( 5768)     v := parseintfrom(p);
- 684 ( 5780) 
- 685 ( 5784)     if (v > 0) and (ntab < MAXTABS) then begin
- 686 ( 5799)       if DEBUG2 then
- 687 ( 5804)         writeln('< setting tabstop ', ntab, ' at ',
- 688 ( 5836)               v, ' >');
- 689 ( 5850)       tabstops[ntab] := v;
- 690 ( 5854)       ntab := succ(ntab);
- 691 ( 5866)     end;
- 692 ( 5871) 
- 693 ( 5871)     while (p < llen) and (line[p] <> ' ') do
- 694 ( 5891)       p := succ(p);
- 695 ( 5899)   end;
- 696 ( 5907) end;
- 697 ( 5910) 
- 698 ( 5911) proc doSS;
- 699 ( 5911) {********}
- 700 ( 5911) var i, n: integer;
- 701 ( 5914) begin
- 702 ( 5914)   i := findarg(3);
- 703 ( 5926)   if i<0 then
- 704 ( 5936)     exit;
- 705 ( 5941)   n := llen - i;
- 706 ( 5945)   closeip;
- 707 ( 5958)   needspace(4);
- 708 ( 5966)   newline;
- 709 ( 5970)   putspaces(indent);
- 710 ( 5980)   while i < llen do begin
- 711 ( 5992)     write(@PRINTER, _uppercase(line[i]));
- 712 ( 6013)     i := succ(i);
- 713 ( 6017)   end;
- 714 ( 6022)   newline;
- 715 ( 6029)   putspaces(indent);
- 716 ( 6039)   underline(n, '-');
- 717 ( 6051) end;
- 718 ( 6051) 
- 719 ( 6052) proc doSH;
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 13
-
- 720 ( 6052) {********}
- 721 ( 6052) var i, n: integer;
- 722 ( 6055) begin
- 723 ( 6055)   i := findarg(3);
- 724 ( 6067)   if i<0 then
- 725 ( 6077)     exit;
- 726 ( 6082)   n := llen - i;
- 727 ( 6086)   closeip;
- 728 ( 6099)   needspace(6);
- 729 ( 6107)   newline;
- 730 ( 6111)   putspaces(indent);
- 731 ( 6121)   while i < llen do begin
- 732 ( 6133)     write(@PRINTER, _uppercase(line[i]));
- 733 ( 6154)     i := succ(i);
- 734 ( 6158)   end;
- 735 ( 6163)   newline;
- 736 ( 6170)   putspaces(indent);
- 737 ( 6180)   underline(n, '=');
- 738 ( 6192) end;
- 739 ( 6192) 
- 740 ( 6193) proc doPP;
- 741 ( 6193) {********}
- 742 ( 6193) begin
- 743 ( 6193)   if not checkeol(3) then
- 744 ( 6208)     exit;
- 745 ( 6213)   closeip;
- 746 ( 6217)   emitblank;
- 747 ( 6221) end;
- 748 ( 6221) 
- 749 ( 6222) proc doBR;
- 750 ( 6222) {********}
- 751 ( 6222) begin
- 752 ( 6222)   if not checkeol(3) then
- 753 ( 6237)     exit;
- 754 ( 6242)   flushline;
- 755 ( 6246) end;
- 756 ( 6246) 
- 757 ( 6247) proc doNF;
- 758 ( 6247) {********}
- 759 ( 6247) begin
- 760 ( 6247)   closeip;
- 761 ( 6256)   flushline;
- 762 ( 6260)   needspace(5);
- 763 ( 6268)   fillmode := false;
- 764 ( 6270) end;
- 765 ( 6274) 
- 766 ( 6275) proc doFI;
- 767 ( 6275) {********}
- 768 ( 6275) begin
- 769 ( 6275)   if not checkeol(3) then
- 770 ( 6290)     exit;
- 771 ( 6295)   closeip;
- 772 ( 6299)   flushline;
- 773 ( 6303)   fillmode := true;
- 774 ( 6305) end;
- 775 ( 6309) 
- 776 ( 6310) proc doRS;
- 777 ( 6310) {********}
- 778 ( 6310) begin
- 779 ( 6310)   if not checkeol(3) then
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 14
-
- 780 ( 6325)     exit;
- 781 ( 6330)   closeip;
- 782 ( 6334)   flushline;
- 783 ( 6338)   indent := indent + INDSTEP;
- 784 ( 6344) end;
- 785 ( 6349) 
- 786 ( 6350) proc doRE;
- 787 ( 6350) {********}
- 788 ( 6350) begin
- 789 ( 6350)   closeip;
- 790 ( 6359)   flushline;
- 791 ( 6363)   if indent >= INDSTEP then
- 792 ( 6369)     indent := indent - INDSTEP;
- 793 ( 6379) end;
- 794 ( 6384) 
- 795 ( 6385) proc doSP;
- 796 ( 6385) {********}
- 797 ( 6385) var i, j, n: integer;
- 798 ( 6388) begin
- 799 ( 6388)   closeip;
- 800 ( 6394)   i := 3;
- 801 ( 6396)   while (i<llen) and (line[i]=' ') do
- 802 ( 6420)     i := succ(i);
- 803 ( 6428)   if i>=llen then
- 804 ( 6440)     n := 1
- 805 ( 6448)   else begin
- 806 ( 6457)     if (line[i]<'0') or (line[i]>'9') then begin
- 807 ( 6480)       errec(i,ERR_NUM);
- 808 ( 6495)       exit;
- 809 ( 6496)     end;
- 810 ( 6496)     n := 0;
- 811 ( 6498)     while (i<llen) and (line[i]>='0')
- 812 ( 6521)                     and (line[i]<='9') do begin
- 813 ( 6538)       n := n*10 + ord(line[i]) - ord('0');
- 814 ( 6556)       i := succ(i);
- 815 ( 6565)     end;
- 816 ( 6570)     while (i<llen) and (line[i]=' ') do
- 817 ( 6593)       i := succ(i);
- 818 ( 6601)     if i<llen then begin
- 819 ( 6618)       errec(i,ERR_EXTRA);
- 820 ( 6633)       exit;
- 821 ( 6634)     end;
- 822 ( 6634)   end;
- 823 ( 6634)   for j := 1 to n do
- 824 ( 6640)     newline;
- 825 ( 6657) end;
- 826 ( 6671) 
- 827 ( 6672) proc doLL;
- 828 ( 6672) {********}
- 829 ( 6672) var n,npos: integer;
- 830 ( 6675) begin
- 831 ( 6675)   flushline;                  { end current line }
- 832 ( 6681)   getnumarg(3,n,npos);
- 833 ( 6705) 
- 834 ( 6705)   if n=-2 then
- 835 ( 6711)     exit;
- 836 ( 6717) 
- 837 ( 6717)   if n=-1 then begin
- 838 ( 6725)     linelen := LINEDEF;
- 839 ( 6730)     exit;
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 15
-
- 840 ( 6735)   end;
- 841 ( 6735) 
- 842 ( 6735)   if (n<1) or (n>LINEMAX) then begin
- 843 ( 6750)     errec(npos,ERR_RANGE);
- 844 ( 6765)     exit;
- 845 ( 6766)   end;
- 846 ( 6766) 
- 847 ( 6766)   linelen := n;
- 848 ( 6766) end;
- 849 ( 6774) 
- 850 ( 6775) func readline: boolean;
- 851 ( 6775) {*********************}
- 852 ( 6775) begin
- 853 ( 6775)   srcline := succ(srcline);
- 854 ( 6784)   llen := 0;
- 855 ( 6791) 
- 856 ( 6795)   repeat
- 857 ( 6795)     read(@src, ch);
- 858 ( 6805) 
- 859 ( 6806)     if ch = EOF then begin
- 860 ( 6813)       if llen > 0 then
- 861 ( 6822)         readline := true
- 862 ( 6826)       else
- 863 ( 6828)         readline := false;
- 864 ( 6837)       exit;
- 865 ( 6842)     end;
- 866 ( 6842) 
- 867 ( 6842)     if ch = LF then begin
- 868 ( 6849)     end
- 869 ( 6852)     else if ch = CR then begin
- 870 ( 6862)       readline := true;
- 871 ( 6867)       exit;
- 872 ( 6872)     end
- 873 ( 6872)     else begin
- 874 ( 6875)       addchartoline(ch);
- 875 ( 6885)     end;
- 876 ( 6885)   until false;
- 877 ( 6887) end;
- 878 ( 6890) 
- 879 ( 6891) proc emitquotedline;
- 880 ( 6891) {********************}
- 881 ( 6891) var i: integer;
- 882 ( 6894) begin
- 883 ( 6894)   i := 1; { skip opening quote }
- 884 ( 6902)   while (i<llen) and (line[i]<>QUOTE) do begin
- 885 ( 6926)     write(@PRINTER,line[i]);
- 886 ( 6939)     i := i+1;
- 887 ( 6945)   end;
- 888 ( 6950)   newline;
- 889 ( 6957) end;
- 890 ( 6957) 
- 891 ( 6958) proc handleline;
- 892 ( 6958) {**************}
- 893 ( 6958) var cmd: packed char;
- 894 ( 6961) begin
- 895 ( 6961)   if (llen >= 2) and (line[0] = '.') then begin
- 896 ( 6980)     if llen>=3 then
- 897 ( 6989)       cmd := packed(_uppercase(line[1]),
- 898 ( 7007)                               _uppercase(line[2]))
- 899 ( 7021)     else
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 16
-
- 900 ( 7022)       cmd := packed(_uppercase(line[1]), ' ');
- 901 ( 7046) 
- 902 ( 7050)     case cmd of
- 903 ( 7050)       'SS': doSS;  { subsection }
- 904 ( 7069)       'SH': doSH;  { section }
- 905 ( 7084)       'PP': doPP;  { paragraph }
- 906 ( 7099)       'BR': doBR;  { break line }
- 907 ( 7114)       'NF': doNF;  { no fill }
- 908 ( 7129)       'FI': doFI;  { fill }
- 909 ( 7144)       'RS': doRS;  { indent start }
- 910 ( 7159)       'RE': doRE;  { indent end }
- 911 ( 7174)       'SP': doSP;  { space lines }
- 912 ( 7189)       'TA': doTA;  { tabs }
- 913 ( 7204)       'IP': doIP;  { indented para }
- 914 ( 7219)       'TH': doTH;  { title header }
- 915 ( 7234)       'LL': doLL;  { line len (todo) }
- 916 ( 7249)       'B ': doB;   { bold }
- 917 ( 7264)       'I ': doI    { italic }
- 918 ( 7276)     else
- 919 ( 7276)       errec(1,ERR_REQ)
- 920 ( 7283)     end { case }
- 921 ( 7291)   end
- 922 ( 7291)   else begin
- 923 ( 7294)     if line[0]=QUOTE then begin
- 924 ( 7303)       flushline;
- 925 ( 7310)       emitquotedline;
- 926 ( 7314)       exit;
- 927 ( 7315)     end;
- 928 ( 7315)     if fillmode then ffillfromline
- 929 ( 7319)     else emittextnofill;
- 930 ( 7333)   end;
- 931 ( 7333) end;
- 932 ( 7333) 
- 933 ( 7334) { main }
- 934 ( 7334) {******}
- 935 ( 7334) begin
- 936 ( 7334)   clearprintout;
- 937 ( 7341) 
- 938 ( 7341)   { defaults }
- 939 ( 7341)   linelen  := LINEDEF;
- 940 ( 7343)   pagelen  := PAGEDEF;
- 941 ( 7349)   llen     := 0;
- 942 ( 7355)   outlen   := 0;
- 943 ( 7361)   fillmode := true;
- 944 ( 7367)   indent   := 0;
- 945 ( 7373)   ntab     := 0;
- 946 ( 7379)   ipmode   := false;
- 947 ( 7385)   ipindent := 0;
- 948 ( 7391)   iphang   := 5;
- 949 ( 7397)   ipcur    := 0;
- 950 ( 7403)   preind   := false;
- 951 ( 7409)   pagepos  := 1;
- 952 ( 7415)   pageno   := 0;
- 953 ( 7421)   headeron := false;
- 954 ( 7427)   textseen := false;
- 955 ( 7433)   titlemod := false;
- 956 ( 7439)   linecnt  := 0;
- 957 ( 7445)   errcount := 0;
- 958 ( 7451)   srcline  := 0;
- 959 ( 7457) 
-
-R65 COMPILE 4.8: program NROFF            28/4/26 page 17
-
- 960 ( 7461)   { get filename from arguments }
- 961 ( 7461)   cyclus := 0;
- 962 ( 7463)   drive := 1;
- 963 ( 7469)   _agetstring(name, default, cyclus, drive);
- 964 ( 7513)   if default then begin
- 965 ( 7517)     writeln(
- 966 ( 7520)          'usage: nroff name[.cyc][,drv] [linewidth]');
- 967 ( 7568)     _abort;
- 968 ( 7572)   end;
- 969 ( 7572) 
- 970 ( 7572)   _asetfile(name, cyclus, drive, 'N');
- 971 ( 7594)   openr(src);
- 972 ( 7600)   writeln;
- 973 ( 7600) 
- 974 ( 7606)   _agetval(linelen, default);
- 975 ( 7626)   if default then linelen := LINEDEF;
- 976 ( 7635) 
- 977 ( 7639)   if linelen < 20 then linelen := 36;
- 978 ( 7651)   if linelen > LINEMAX then linelen := LINEMAX;
- 979 ( 7667) 
- 980 ( 7671)   startline;
- 981 ( 7675) 
- 982 ( 7675)   while readline do
- 983 ( 7681)     handleline;
- 984 ( 7688)   closeip;
- 985 ( 7695)   flushline;
- 986 ( 7699) 
- 987 ( 7699) end.
- 988 ( 7699) 
-
-End compile
-
-Code lenght:          7698
-Compiler stack size:  97
-Ident stack size:     187
-Pascal errors:        0
+   1     4 program nroff;
+   2     4 [  0] 
+   3     4 [  0] { mini nroff }
+   4     4 [  0] { Written March 2026 for the R65 system }
+   5     4 [  0] { R. Richarz / ChatGPT }
+   6     4 [  0] 
+   7     4 [  0] uses syslib, arglib, filelib, writelib;
+   8  4160 [ 92] 
+   9  4160 [ 92] const
+  10  4160 [ 92]   LINEMAX = 132; { max chars per printer output line }
+  11  4163 [ 93]   LINEDEF = 55;  { default line width for A5 output }
+  12  4163 [ 94]   PAGEMAX = 200; { max lines per page in program }
+  13  4163 [ 95]   PAGEDEF = 65;  { default lines per page for A5}
+  14  4163 [ 96]   MAXSRC  = 56;  { max source chars per input line }
+  15  4163 [ 97]   MAXOUT  = 200; { max chars in formatted output }
+  16  4163 [ 98]   LMARGIN = 12;  { left margint }
+  17  4163 [ 99]   TMARGIN = 0;   { top margin }
+  18  4163 [100]   INDSTEP = 4;   { indent step for .RS / .RE }
+  19  4163 [101]   MAXTABS = 16;  { max number of explicit tab stops }
+  20  4163 [102]   IPINDENT= 5;  { default IP indent }
+  21  4163 [103] 
+  22  4163 [103]   ERR_MISS  = 1;  { missing argument }
+  23  4163 [104]   ERR_NUM   = 2;  { invalid number }
+  24  4163 [105]   ERR_EXTRA = 3;  { extra text }
+  25  4163 [106]   ERR_RANGE = 4;  { value out of range }
+  26  4163 [107]   ERR_REQ   = 5;  { invalid request }
+  27  4163 [108]   ERRMAX    = 4;  { max number of errors on screen }
+  28  4163 [109] 
+  29  4163 [109]   QUOTE     = chr($27);
+  30  4163 [110] 
+  31  4163 [110] var
+  32  4163 [110]   src      : file;
+  33  4163 [111]   name     : array[15] of char;
+  34  4163 [112]   default  : boolean;
+  35  4163 [113]   cyclus   : integer;
+  36  4163 [114]   drive    : integer;
+  37  4163 [115] 
+  38  4163 [115]   ch       : char;
+  39  4163 [116] 
+  40  4163 [116]   linelen  : integer; { active output line width }
+  41  4163 [117]   pagelen  : integer; { active page length }
+  42  4163 [118]   line     : array[MAXSRC] of char;
+  43  4163 [119]         { current input line buffer }
+  44  4163 [119]   llen     : integer; { current input line length }
+  45  4163 [120] 
+  46  4163 [120]   outbuf   : array[MAXOUT] of char;
+  47  4163 [121]         { formatted output line }
+  48  4163 [121]   outlen   : integer;
+  49  4163 [122]         { current formatted output length }
+  50  4163 [122] 
+  51  4163 [122]   fillmode : boolean;
+  52  4163 [123]         { true = fill mode, false = no-fill }
+  53  4163 [123]   indent   : integer; { current left indent }
+  54  4163 [124]   titlemod : boolean;
+  55  4163 [125]   linecnt  : integer;
+  56  4163 [126] 
+  57  4163 [126]   tabstops : array[MAXTABS] of integer;
+  58  4163 [127]   ntab     : integer;
+  59  4163 [128]   ipmode   : boolean;
+  60  4163 [129]   ipindent : integer;
+  61  4163 [130]   iphang   : integer;
+  62  4163 [131]   ipcur    : integer;
+  63  4163 [132]   preind   : boolean;
+  64  4163 [133]   errcount : integer;
+  65  4163 [134]   srcline  : integer;
+  66  4163 [135] 
+  67  4163 [135]   pagepos  : integer; { current line number on page }
+  68  4163 [136]   pageno   : integer; { current page number }
+  69  4163 [137]   headeron : boolean; { true after .TH }
+  70  4163 [138]   textseen : boolean;
+  71  4163 [139]         { true after first real text output }
+  72  4163 [139] 
+  73  4163 [139]   thname   : array[LINEMAX] of char; { title from .TH
+  74  4163 [140] }
+  75  4163 [140]   thlen    : integer; { length of title text }
+  76  4163 [141] 
+  77  4163 [141] proc errec(pos,code:integer);
+  78  4163 [144] {***************************}
+  79  4163 [144] var i: integer;
+  80  4166 [145] begin
+  81  4166 [145]   errcount := succ(errcount);
+  82  4172 [145]   write('Error in line ',srcline ,': ');
+  83  4200 [145]   case code of
+  84  4200 [145]     ERR_MISS : writeln('missing argument');
+  85  4234 [145]     ERR_NUM  : writeln('invalid number');
+  86  4265 [145]     ERR_EXTRA: writeln('extra text');
+  87  4292 [145]     ERR_RANGE: writeln('value out of range');
+  88  4327 [145]     ERR_REQ  : writeln('invalid request')
+  89  4353 [145]   else
+  90  4359 [145]     writeln('bad request to errec')
+  91  4383 [145]   end;
+  92  4391 [145]   for i:=0 to llen-1 do
+  93  4403 [145]     write(line[i]);
+  94  4422 [145]   writeln;
+  95  4436 [145]   for i:=1 to pos do
+  96  4448 [145]     write(' ');
+  97  4463 [145]   writeln('^');
+  98  4485 [145]   if errcount>=ERRMAX then begin
+  99  4492 [145]     write('Too many errors');
+ 100  4511 [145]     _abort;
+ 101  4515 [145]   end;
+ 102  4515 [145] end;
+ 103  4515 [145] 
+ 104  4516 [142] func checkeol(pos:integer):boolean;
+ 105  4516 [145] {*********************************}
+ 106  4516 [145] var pos0:integer;
+ 107  4519 [146] begin
+ 108  4519 [146]   pos0 := pos;
+ 109  4521 [146]   while (pos0<llen) and (line[pos0]=' ') do
+ 110  4549 [146]     pos0 := succ(pos0);
+ 111  4557 [146]   if pos0<llen then begin
+ 112  4574 [146]     errec(pos0,ERR_EXTRA);
+ 113  4589 [146]     checkeol := false;
+ 114  4591 [146]   end
+ 115  4595 [146]   else
+ 116  4595 [146]     checkeol := true;
+ 117  4600 [146] end;
+ 118  4604 [146] 
+ 119  4605 [144] func findarg(pos:integer):integer;
+ 120  4605 [147] {********************************}
+ 121  4605 [147] var pos0: integer;
+ 122  4608 [148] begin
+ 123  4608 [148]   pos0 := pos;
+ 124  4610 [148]   while (pos0<llen) and (line[pos0]=' ') do
+ 125  4638 [148]     pos0 := pos0+1;
+ 126  4648 [148]   if pos0>=llen then begin
+ 127  4665 [148]     errec(pos0,ERR_MISS);
+ 128  4680 [148]     findarg := -1;
+ 129  4682 [148]   end
+ 130  4687 [148]   else
+ 131  4687 [148]     findarg := pos0;
+ 132  4690 [148] end;
+ 133  4698 [148] 
+ 134  4699 [146] proc printernewline;
+ 135  4699 [147] {******************}
+ 136  4699 [147] begin
+ 137  4699 [147]   write(@PRINTER, CR);
+ 138  4711 [147]   write(@PRINTER, LF);
+ 139  4718 [147] end;
+ 140  4718 [147] 
+ 141  4719 [147] proc startline;
+ 142  4719 [148] {*************}
+ 143  4719 [148] var i: integer;
+ 144  4722 [149] begin
+ 145  4722 [149] 
+ 146  4722 [149]   debug('<startline:',pageno,pagepos,' >');
+ 147  4724 [149] 
+ 148  4724 [149]   { printer margin only on printer output }
+ 149  4724 [149]   for i := 1 to LMARGIN do
+ 150  4732 [149]     write(@PRINTER, ' ');
+ 151  4747 [149]   debug(pagepos:3, ' ');
+ 152  4761 [149] end;
+ 153  4761 [149] 
+ 154  4762 [148] proc printheader;
+ 155  4762 [149] {***************}
+ 156  4762 [149] var i, spaces, n: integer;
+ 157  4765 [152] begin
+ 158  4765 [152]   debug('< printheader: before', pageno,textseen,
+ 159  4767 [152]         pagepos, ' >');
+ 160  4767 [152]   end;
+ 161  4767 [152] 
+ 162  4768 [149]   { top margin }
+ 163  4768 [149]   for 

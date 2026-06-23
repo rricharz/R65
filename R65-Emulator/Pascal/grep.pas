@@ -8,15 +8,6 @@ var pattern, fullname, line: cpnt;
     default, found, last:    boolean;
     f0:                      file;
 
-func hexdigit(d0: integer):char;
-{*****************************}
-var d:integer;
-begin
-  d := d0 and 15;
-  if d > 9 then hexdigit := chr(d - 10 + ord('A'))
-  else hexdigit := chr(d + ord('0'));
-end;
-
 func upper(ch1: char): char;
 {***************************}
 begin
@@ -83,10 +74,29 @@ begin
     line_length := _strread(f, line, ateof);
     if find_pattern then begin
       while line[0]=' ' do _strdelc(0, line);
-      writeln(name,':',linecount,' ', line);
+      writeln(name,'/',linecount,' ', line);
       end;
     linecount := linecount + 1;
   until ateof;
+end;
+
+proc default_subtype(var name: array[15] of char;
+                                      subtype:char);
+{**************************************************}
+{ only set subtype if not already there }
+var i:integer;
+begin
+  i:=0;
+  repeat
+    i:=i+1;
+  until (name[i]=':') or
+    (name[i]=' ') or (i>=14);
+  if name[i]<>':' then begin
+    name[i]:=':';
+    name[i+1]:=subtype;
+    FILSTP:=subtype;
+  end else
+    FILSTP:=name[i+1];
 end;
 
 begin { main }
@@ -120,6 +130,7 @@ begin { main }
   drive  := 1;
   _carg  := secondarg;
   _agetstring(filespec, default, cyclus, drive);
+  default_subtype(filespec, 'P');
 
   debug('filespec: ',trim16(filespec),cyclus,drive);
 
@@ -138,9 +149,7 @@ begin { main }
       for i := 0 to 15 do
         if FILNAM[i] <> ' ' then
           write(@fullname,FILNAM[i]);
-        write(@fullname, '.',
-                       hexdigit(FILCYC shr 4),
-                       hexdigit(FILCYC and 15));
+        write(@fullname, '.', hexb(FILCYC));
       for i := 0 to 15 do
         FILNM1[i] := FILNAM[i];
       FILCY1 := FILCYC;

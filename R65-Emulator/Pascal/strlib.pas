@@ -170,23 +170,6 @@ begin
   _strread := i;
 end;
 
-proc _hexstr(d:integer; s:cpnt);
-{******************************}
-{ convert hex byte to hex string }
-{ returns -1 if char not found }
-
-  func hchar(h:integer):char;
-  begin
-    if h<10 then hchar := chr(h+ord('0'))
-    else hchar := chr(h-10+ord('A'));
-  end;
-
-begin
-  s[0] := hchar((d shr 4) and 15);
-  s[1] := hchar(d and 15);
-  s[2] := chr(0);
-end;
-
 proc _strdelc(pos:integer; s:cpnt);
 {*********************************}
 { delete char in string at position }
