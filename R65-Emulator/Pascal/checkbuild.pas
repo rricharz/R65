@@ -10,19 +10,9 @@
 {$U+}
 
 program checkbuild;
-uses syslib;
-{ minimized library calls to save memory }
+uses syslib, filelib, writelib;
 
 mem
-  FILFLG  = $00da: integer&;
-  FILDRV  = $00dc: integer&;
-  FILTYP  = $0300:char&;
-  FILNAM  = $0301: array[15] of char&;
-  FILCYC  = $0311: integer&;
-  FILSTP  = $0312: char&;
-  FILNM1  = $0320: array[15] of char&;
-  FILCY1  = $0330: integer&;
-
   ARGLIST  = $0060: array[10] of integer;
   ARGLISTS = $0060: array[63] of char&;
   ARGTYPE  = $00a0: array[31] of char&;
@@ -99,6 +89,68 @@ begin
   getentry := true;
 end;
 
+proc forcesubtype(subtype:char);
+{****************************}
+begin
+  i:=0;
+  repeat
+    i:=i+1;
+  until (FILNAM[i]=':') or
+    (FILNAM[i]=' ') or (i>=14);
+  if FILNAM[i]<>':' then
+    FILNAM[i]:=':';
+  FILNAM[i+1]:=subtype;
+  FILSTP:=subtype;
+end;
+
+func match: boolean;
+{******************}
+{find the best (highers cyclus) entry in directory}
+const
+  preprd = $f62c;
+begin
+  FILERR := 0;
+  call(preprd); { find entry with system subroutine }
+  match := (FILERR = 0);
+end;
+
+func islib: boolean;
+{******************}
+begin
+  i := 15;
+  while (i >= 5) and (FILNAM[i] <> ':') do
+    i := i - 1;
+  islib := (FILNAM[i - 3] = 'L') and
+    (FILNAM[i - 2] = 'I') and (FILNAM[i -1 ] = 'B')
+end;
+
+func checkobject: boolean;
+{************************}
+var notfound: boolean;
+  last: integer;
+begin
+  if islib then
+    forcesubtype('T')
+  else
+    forcesubtype('R');
+  for i:=0 to 15 do
+    FILNM1[i] := FILNAM[i];
+  FILCY1 := FILCYC;
+  FILDRV := 0;
+  notfound := not match;
+  if notfound then begin
+    last := 15;
+    while (last > 0) and (FILNAM[last] = ' ') do
+      last := last - 1;
+    write(INVVID,'Object file ');
+    for i:=0 to last do
+      write((FILNAM[i]));
+    write('.',hexb(FILCYC));
+    writeln(' not found',NORVID)
+  end;
+  checkobject := notfound;
+end;
+
 begin {main}
 {*********}
   entry  := 0;
@@ -116,6 +168,7 @@ begin {main}
     debug('checkbuild get back',entry,files,errors);
   end;
   repeat
+    drive := 1;
     done := not getentry(drive, entry, deleted);
     debug(entry,files,deleted,done);
     if (not (deleted or done)) and
@@ -129,6 +182,8 @@ begin {main}
         name[i] := FILNAM[i];
         i := i + 1;
       end;
+      if checkobject then errors:=errors+1;
+      drive := 1;
       cyclus := FILCYC;
       setargs(name,0, cyclus, 1);
       setargs('/N@             ', 10, 0, 1);
