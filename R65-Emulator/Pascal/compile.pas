@@ -233,7 +233,8 @@ begin
     26: write('Wrong library version');
     27: write('Identifier too long');
     28: write('Unsupported type');
-    29: write('Program name <> file name')
+    29: write('Program name <> file name');
+    30: write('Integer out of range')
   end {case};
   writeln(' at line ', line, ', pos ', tpos, NORVID);
   if ofno<>NOTOPEN then close(ofno);
@@ -542,8 +543,11 @@ begin
     getchr;
   until (ch<'0') or (ch>'9');
   if ch<>'.' then begin {numeric integer}
-    token:='nu';
-    value[0]:=trunc(r+0.5);
+    token := 'nu';
+    r := r + 0.5;
+    if r > 32767.0 then
+      error(30);
+    value[0] := trunc(r);
   end
   else begin {numeric real}
     n:=0; getchr;
@@ -1417,7 +1421,7 @@ begin
       begin
         if token=' [' then begin
           scan; express; relad:=1;
-          if vartyp2='r' then begin
+          if vartype='r' then begin
             relad:=3;
             code3($22,1); code1($12)
           end;

@@ -11,7 +11,7 @@
 program maketable;
 uses syslib,ralib,mathlib;
 
-const fsize=509;
+const fsize=256;
 
 var f:file;
     i,bsize:integer;
