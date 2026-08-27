@@ -1685,12 +1685,10 @@ SWA3    LDA (SP),Y
         STA (SP),Y
         RTS
 *
-* P-CODE 54: LDXI       PREPARE LOAD CPNT
+* P-CODE 54: LDXI       LOAD CPNT INDEXED
 *****************
 *
 LDXI    LDY =0          INDIRECTION
-        LDA ACCU+1
-        BEQ NILERR
         LDA (ACCU),Y
         STA ACCU
         STY ACCU+1
@@ -1731,16 +1729,22 @@ WRITOK  LDY =0
         STA (ABASE),Y
         JMP GETS2
 *
-CHK17   CMP =$17
+CHK17   CMP =$00
+        BEQ CHK18
+        CMP =$17
         BNE PRGERR
-*
         LDA ABASE
         CMP =$D8
         BCC PRGERR
-*
         CMP =$E9
         BCS PRGERR
+        JMP WRITOK
 *
+CHK18   LDA ABASE
+        CMP =$60
+        BCC PRGERR
+        CMP =$A0
+        BCS PRGERR
         JMP WRITOK
 *
 PRGERR  LDX =$90
@@ -1751,7 +1755,6 @@ NILERR  LDX =$89        CPNT IS NIL
 *
 INDI    LDY =129        INDIRECTION
         LDA (ABASE),Y
-        BEQ NILERR      NIL STRING
         TAX
         DEY
         LDA (ABASE),Y   POINTER IS IN A,X

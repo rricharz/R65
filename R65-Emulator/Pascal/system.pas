@@ -323,9 +323,12 @@ begin
   repeat
     name[i]:=ch; i:=succ(i);
     next
-    until (i>12) or (ch=' ') or (ch=CR) or
-      (ch=',') or (ch=':') or (ch='.');
+    until (i>12) or
+          not (((ch>='A') and (ch<='Z')) or
+               ((ch>='0') and (ch<='9')) or
+               (ch='*') or (ch='?'));
   for j:=i to 15 do name[j]:=' ';
+  if ch='=' then exit;
   if ch=':' then begin
     next;
     name[i]:=':';
@@ -340,7 +343,7 @@ begin
     cyc:=nexthexdigit*16+nexthexdigit;
     next;
   end
-  if (ch=',') then begin
+  else if (ch=',') then begin
     next;
     getnum(drv);
     if (drv<0) or (drv>1) then
@@ -391,6 +394,47 @@ begin
   ENDSTK:=TOPMEM-144;
   IOCHECK:=true;
   RUNERR:=0;
+end;
+
+proc getargline;
+{**************}
+var i, j: integer;
+    s: cpnt;
+begin
+  i := 0;
+  j := 0;
+  s := cpnt($60);
+
+  { copy parameter name }
+  while (i <= 15) and (aname[i] <> ' ') do begin
+    if (aname[i] = '/') or
+       (aname[i] = '*') or
+       (aname[i] = '?') then begin
+      argerr := 106;
+      exit;
+    end;
+    s[j] := aname[i];
+    i := i + 1;
+    j := j + 1;
+  end;
+
+  s[j] := '=';
+  j := j + 1;
+
+  next; { skip '=' }
+
+  while ch <> CR do begin
+    if j >= 63 then begin
+      argerr := 106;
+      ch := CR;
+    end else begin
+      s[j] := ch;
+      j := j + 1;
+      next;
+    end;
+  end;
+  s[j] := ENDMARK;
+  ARGTYPE[0] := 'l';
 end;
 
 begin {main}
@@ -475,25 +519,28 @@ begin {main}
           drive2:=255; cyclus2:=0;
           getfname(aname,' ',ok,drive2,cyclus2);
           if not ok then argerr:=106;
-          ARGTYPE[n]:='s';
-          if n>22 then argerr:=107
+          if ch='=' then getargline
           else begin
-            for k:=0 to 7 do
+            ARGTYPE[n]:='s';
+            if n>22 then argerr:=107
+            else begin
+              for k:=0 to 7 do
               ARGLIST[n+k]:=
                     ord(packed(aname[2*k+1],
                     aname[2*k]));
-            n:=n+7;
+              n:=n+7;
+              end;
+            ARGLIST[n+1]:=cyclus2;
+            ARGTYPE[n+1]:='i';
+            if drive2=255 then begin {default}
+              ARGLIST[n+2]:=1;
+              ARGTYPE[n+2]:='d';
+            end else begin
+              ARGLIST[n+2]:=drive2;
+              ARGTYPE[n+2]:='i';
+            end;
+            n:=n+2;
           end;
-          ARGLIST[n+1]:=cyclus2;
-          ARGTYPE[n+1]:='i';
-          if drive2=255 then begin {default}
-            ARGLIST[n+2]:=1;
-            ARGTYPE[n+2]:='d';
-          end else begin
-            ARGLIST[n+2]:=drive2;
-            ARGTYPE[n+2]:='i';
-          end;
-          n:=n+2;
         end
 
         { default drive number }

@@ -8,6 +8,7 @@ uses syslib, arglib, writelib;
 
 var string: array[15] of char;
     i, val: integer;
+    line: cpnt;
 
 begin
   if ARGTYPE[_carg]=chr(0) then begin
@@ -28,6 +29,11 @@ begin
                 val:=ARGLIST[_carg];
                 _carg:=succ(_carg);
                 write(val);
+              end;
+    'l':      begin
+                line := cpnt($60);
+                _carg := succ(_carg);
+                write(line);
               end
     end {case};
     writeln;
