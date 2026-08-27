@@ -23,7 +23,7 @@ func fu1(i:integer):real;
 var x:real;
 begin
   x:=xsize*conv(i)/conv(fsize)+xmin;
-  fu1:=sin(x)*fading;
+  fu1:=cos(x)*fading;
   fading:=0.995*fading;
 end;
 
@@ -45,7 +45,7 @@ func fu4(i:integer):real;
 var x:real;
 begin
   x:=xsize*conv(i)/conv(fsize)+xmin;
-  fu4:=exp(-x*x);
+  fu4:=exp(-32.0*x*x);
 end;
 
 func fu5(i:integer):real;
@@ -71,12 +71,12 @@ begin
   f:=_attach('TABLE:X         ',0,1,FNEW,
     4*(fsize+3),0,'X');
   bsize:=_getsize;
-  writeln('Table opened, bsize=',
+  writeln('Table opened, Table size = ',
     bsize,' bytes');
 
   repeat
     writeln('Select a function:');
-    writeln('1: fading sine wave');
+    writeln('1: fading cosine wave');
     writeln('2: exponential exp(x)');
     writeln('3: natural logarithm');
     writeln('4: gaussian function');

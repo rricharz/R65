@@ -127,7 +127,7 @@ begin
   _startdraw(xs,ys+y);
   for i:=1 to size-1 do begin
     _getreal(f,i+3,v);
-    x:=trunc(conv(xw)/conv(size-1)*conv(i)+0.5);
+    x:=trunc(conv(xw)/conv(size)*conv(i)+0.5);
     y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
     _draw(xs+x,ys+y);
   end;
