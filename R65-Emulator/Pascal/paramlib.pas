@@ -38,27 +38,29 @@ end;
 
 proc _nextparam(name, value: cpnt; var done: boolean);
 {****************************************************}
+mem
+    ARGTYPE  = $00a0: array[31] of char&;
 var s: cpnt;
     i: integer;
     ch: char;
 begin
+  if (ARGTYPE[0] <> 'l') then begin
+    done := true;
+    exit;
+  end;
   s := cpnt($60);
-
   { initialize returned strings }
   name[0] := chr(0);
   value[0] := chr(0);
-
   { skip blanks before next parameter }
   while s[_parampos] = ' ' do
     _parampos := _parampos + 1;
-
   { end of parameter line }
   if s[_parampos] = chr(0) then begin
     done := true;
     exit;
   end;
   done := false;
-
   { get parameter name }
   i := 0;
   ch := s[_parampos];
@@ -76,10 +78,8 @@ begin
     ch := s[_parampos];
   end;
   name[i] := chr(0);
-
   { skip '=' }
   _parampos := _parampos + 1;
-
   { get parameter value }
   i := 0;
   ch := s[_parampos];

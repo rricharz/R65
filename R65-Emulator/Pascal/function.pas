@@ -1,5 +1,5 @@
 program function;
-uses syslib,paramlib,strlib;
+uses syslib,paramlib,strlib,writelib;
 
 const
 
@@ -44,35 +44,75 @@ begin
   dest[i]:=chr(0);
 end;
 
-func field(text: cpnt; width0: integer): cpnt;
-{********************************************}
-var i: integer;
-    cp: cpnt;
-    width: integer;
-begin
-  width := width0;
-  cp := cpnt($17d8);
-  if width>25 then width:=25;
-  if width<0 then width:=0;
-  i:=0;
-  while (i<width) and (text[i]<>chr(0)) do begin
-    cp[i]:=text[i];
-    i:=i+1
-  end;
-  while i<width do begin
-    cp[i]:=' ';
-    i:=i+1
-  end;
-  cp[width]:=chr(0);
-  field:=cp
-end;
-
 proc displayparams;
 {*****************}
-var i: integer;
+const
+  columns   = 2;
+  namefield = 7;
+  valfield  = 9;
+var i,col,row,rows,k,padding: integer;
 begin
-for i := 0 to MAXPAR do
-  writeln(field(pname[i], 10), '=');
+  rows := (MAXPAR + columns) div columns;
+  padding := (48 div columns) - namefield - valfield;
+  for row := 0 to rows - 1 do begin
+    for col := 0 to columns - 1 do begin
+      i := row + col * rows;
+      if i <= MAXPAR then begin
+        if col > 0 then
+          for k := 1 to padding do write(' ');
+        write(field(pname[i], namefield));
+        case ptype[i] of
+          'i':  write(pival[i]:valfield);
+          'r':  write(prval[i]:valfield:2);
+          's':  write(field(psval[i],valfield))
+          else write('undefined')
+        end {case};
+      end {if};
+    end {column};
+    writeln;
+  end {row};
+end;
+
+proc setparam(p: integer; value: cpnt);
+{*************************************}
+begin
+end;
+
+func findparam(name: cpnt): integer;
+{**********************************}
+var p: integer;
+    found: boolean;
+begin
+  p := 0;
+  repeat
+    found := _strcmp(pname[p], name) = 0;
+    p := p + 1;
+  until found or (p > MAXPAR);
+  if found then
+    findparam := p - 1
+  else
+    findparam := -1;
+  writeln('findparam ', name, ': p=', p);
+end;
+
+proc readparams;
+{**************}
+var name, value: cpnt;
+    done: boolean;
+    p: integer;
+begin
+  name  := _allocate(9);
+  value := _allocate(17);
+  repeat
+    _nextparam(name, value, done);
+    if not done then begin
+      p := findparam(name);
+      if p < 0 then
+        writeln('Unknown parameter ',name)
+      else
+        setparam(p,value);
+    end;
+  until done;
 end;
 
 proc initparams;
@@ -86,7 +126,7 @@ begin
   ptype[P_TYPE] := 'i';
   pival[P_TYPE] := 0;
 
-  pname[P_N] := 'N';
+  pname[P_N] := cpnt('N');
   ptype[P_N] := 'i';
   pival[P_N] := 256;
 
@@ -98,23 +138,23 @@ begin
   ptype[P_XMAX] := 'r';
   prval[P_XMAX] := 1.0;
 
-  pname[P_A] := 'A';
+  pname[P_A] := cpnt('A');
   ptype[P_A] := 'r';
   prval[P_A] := 1.0;
 
-  pname[P_A1] := 'A1';
+  pname[P_A1] := cpnt('A1');
   ptype[P_A1] := 'r';
   prval[P_A1] := 1.0;
 
-  pname[P_A2] := 'A2';
+  pname[P_A2] := cpnt('A2');
   ptype[P_A2] := 'r';
   prval[P_A2] := 1.0;
 
-  pname[P_F1] := 'F1';
+  pname[P_F1] := cpnt('F1');
   ptype[P_F1] := 'r';
   prval[P_F1] := 8.0;
 
-  pname[P_F2] := 'F2';
+  pname[P_F2] := cpnt('F2');
   ptype[P_F2] := 'r';
   prval[P_F2] := 16.0;
 
@@ -146,5 +186,6 @@ end;
 
 begin
   initparams;
+  readparams;
   displayparams;
 end. 

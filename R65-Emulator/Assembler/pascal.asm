@@ -1733,10 +1733,10 @@ CHK17   CMP =$00
         BEQ CHK18
         CMP =$17
         BNE PRGERR
-        LDA ABASE
+        LDA ABASE       STRING WRITE BUFFER
         CMP =$D8
         BCC PRGERR
-        CMP =$E9
+        CMP =$F1
         BCS PRGERR
         JMP WRITOK
 *

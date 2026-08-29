@@ -1787,9 +1787,7 @@ begin
             arsize3:=1
           end;
     'st': begin
-            if (reqtype='n') and
-                (vartype<>'q') and
-                (value[0]<3)
+            if (reqtype='n') and (value[0]<3)
             then begin
               if value[0]<2 then begin
                 code3(34,ord(ident[1]));
@@ -1873,7 +1871,26 @@ begin
             argument('u'); code1($15)
           end;
     'cp': begin
-            argument('i'); restype:='q';
+            parse(' (');
+            scan;
+            if token='st' then begin
+              { quoted constant -> inline CPNT string
+}
+              arsize3:=0;
+              restype:='q';
+              code2($56,value[0]);
+              for i:=1 to value[0] do
+                code1(ord(ident[i]));
+              code1(0);
+              scan;
+            end else begin
+              { normal cpnt(integer expression) }
+              express;
+              testtype('i');
+              restype:='q';
+            end;
+            testto(' )');
+            scan;
           end;
     'ni': begin
             code3(34,0); scan; restype:='q';

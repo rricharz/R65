@@ -13,6 +13,7 @@
     writeln(string(name));  array[15] of char
     write(d:5);             formatted integer
     write(r:12:3);          fixed point real
+    writeln(field,s,20);    right pad a string
 
   All WRITELIB functions return a pointer to a shared
 temporary
@@ -97,6 +98,29 @@ begin
     cp[i] := text[i];
   cp[last+1] := chr(0);
   trim16 := cp;
+end;
+
+func field(text: cpnt; width0: integer): cpnt;
+{********************************************}
+var i: integer;
+    cp: cpnt;
+    width: integer;
+begin
+  width := width0;
+  cp := cpnt($17d8);
+  if width>25 then width:=25;
+  if width<0 then width:=0;
+  i:=0;
+  while (i<width) and (text[i]<>chr(0)) do begin
+    cp[i]:=text[i];
+    i:=i+1
+  end;
+  while i<width do begin
+    cp[i]:=' ';
+    i:=i+1
+  end;
+  cp[width]:=chr(0);
+  field:=cp
 end;
 
 proc __wrintf(value, width: integer);
