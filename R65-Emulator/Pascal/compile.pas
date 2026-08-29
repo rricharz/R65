@@ -5,7 +5,7 @@
 {   *                              *            }
 {   ********************************            }
 
-{ First version 1978 by rricharz                }
+{ First version  1978 by rricharz                }
 { Version 3.7 (20K)  01/08/82 rricharz          }
 { Recovered 2018 by rricharz (r77@bluewin.ch)   }
 { Improved 2018-2026 by rricharz                }
@@ -234,7 +234,8 @@ begin
     27: write('Identifier too long');
     28: write('Unsupported type');
     29: write('Program name <> file name');
-    30: write('Integer out of range')
+    30: write('Integer out of range');
+    31: write('Indexed VAR not allowed')
   end {case};
   writeln(' at line ', line, ', pos ', tpos, NORVID);
   if ofno<>NOTOPEN then close(ofno);
@@ -713,9 +714,10 @@ begin
              end; {hex constant}
         chr(39): begin {string}
                token:='st';
-               repeat
-                 setid; if ch=CR then error(23);
-               until ch=chr(39);
+               if ch<>chr(39) then
+                 repeat
+                   setid; if ch=CR then error(23);
+                  until ch=chr(39);
                value[0]:=prec(count); getchr
               end
       end {case of token}
@@ -1485,7 +1487,7 @@ begin {prcall1}
           end;
     'w':  begin
             prcall3;
-            if relad<>0 then merror(14,'02');
+            if relad<>0 then error(31);
             gpval(idpnt,false,vartyp2);
           end;
     'x':  begin
@@ -1785,7 +1787,9 @@ begin
             arsize3:=1
           end;
     'st': begin
-          if (reqtype='n') and (value[0]<3)
+            if (reqtype='n') and
+                (vartype<>'q') and
+                (value[0]<3)
             then begin
               if value[0]<2 then begin
                 code3(34,ord(ident[1]));

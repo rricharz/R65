@@ -4,11 +4,28 @@
 {$U+}
 
 program ARGLIST;
-uses syslib, arglib, writelib;
+uses syslib, arglib, writelib, paramlib;
 
 var string: array[15] of char;
     i, val: integer;
     line: cpnt;
+
+proc decompose;
+var name, value: cpnt;
+    count: integer;
+    done: boolean;
+begin
+  count := 0;
+  name := _allocate(9);
+  value := _allocate(17);
+  repeat
+    _nextparam(name, value, done);
+    if not done then begin
+      count := count + 1;
+      writeln(count, ' ', name, ' ', value);
+    end;
+  until done;
+end;
 
 begin
   if ARGTYPE[_carg]=chr(0) then begin
@@ -33,7 +50,8 @@ begin
     'l':      begin
                 line := cpnt($60);
                 _carg := succ(_carg);
-                write(line);
+                writeln(line);
+                decompose;
               end
     end {case};
     writeln;
