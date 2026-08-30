@@ -94,6 +94,72 @@ begin
   value[i] := chr(0);
 end;
 
+proc strcpyn(source, dest: cpnt; maxlen: integer);
+{************************************************}
+var i: integer;
+begin
+  if dest=nil then
+    _runerr($89);
+  i:=0;
+  while (source[i]<>chr(0)) and (i<maxlen-1) do begin
+    dest[i]:=source[i];
+    i:=i+1;
+  end;
+  if source[i]<>chr(0) then
+    _runerr(91);
+  dest[i]:=chr(0);
+  i:=i+1;
+  while i<maxlen do begin
+    dest[i]:=chr(0);
+    i:=i+1;
+  end;
+end;
+
+func str_real(s: cpnt): real;
+{***************************}
+var i, sign: integer;
+    val, frac, scale: real;
+begin
+  i := 0;
+  sign := 1;
+  if s[0] = '-' then begin
+    sign := -1;
+    i := 1;
+  end;
+  if s[i] = chr(0) then
+    _runerr(106);
+  val := 0.0;
+  { integer part }
+  while (s[i] >= '0') and (s[i] <= '9') do begin
+    val := val * 10.0 + conv(ord(s[i]) - ord('0'));
+    i := i + 1;
+  end;
+  { fractional part }
+  if s[i] = '.' then begin
+    i := i + 1;
+    frac := 0.0;
+    scale := 1.0;
+    while (s[i] >= '0') and (s[i] <= '9') do begin
+      frac := frac * 10.0 + conv(ord(s[i])-ord('0'));
+      scale := scale * 10.0;
+      i := i + 1;
+    end;
+    val := val + frac / scale;
+  end;
+  if s[i] <> chr(0) then
+    _runerr(106);
+  str_real := conv(sign) * val;
+end;
+
+func round(r: real): integer;
+{**************************}
+begin
+  if r >= 0.0 then
+    round := trunc(r + 0.5)
+  else
+    round := trunc(r - 0.5);
+end;
+
 begin  { initialize library }
   _parampos := 0;
 end. 

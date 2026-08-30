@@ -1,5 +1,5 @@
 program function;
-uses syslib,paramlib,strlib,writelib;
+uses syslib,paramlib,strlib,writelib,mathlib,ralib;
 
 const
 
@@ -20,28 +20,110 @@ const
   P_DATA   = 14;
   MAXPAR   = 14;
 
+  NAMESIZE = 15;
+
+  PARVERSION = 1;
+  PARSIZE    = 256;
+  STRSIZE    = 9;   { 8 chars + chr(0) }
+
 var
+  nparams: integer;
+
+  ibase: integer;   { word address of integer values }
+  rbase: integer;   { real address of real values }
+  sbase: integer;   { byte address of string values }
+
   pname: array[MAXPAR] of cpnt;
   ptype: array[MAXPAR] of char;
   pival: array[MAXPAR] of integer;
   prval: array[MAXPAR] of real;
   psval: array[MAXPAR] of cpnt;
 
-proc strcpyn(source, dest: cpnt; maxlen: integer);
-{************************************************}
-var i: integer;
+  parfileexists: boolean;
+
+proc initparfile;
+{***************}
 begin
-  if dest=nil then
-    _runerr($89);
-  i:=0;
-  while (source[i]<>chr(0)) and (i<maxlen-1) do begin
-    dest[i]:=source[i];
-    i:=i+1;
-  end;
-  debug(source,i);
-  if source[i]<>chr(0) then
-    _runerr(91);
-  dest[i]:=chr(0);
+  nparams := MAXPAR + 1;
+
+  { Parameter file layout:
+      word 0 : version
+      word 1 : number of parameters
+
+      integer values:
+        nparams words, starting at ibase
+
+      real values:
+        nparams reals, starting at rbase
+
+      string values:
+        nparams slots of STRSIZE bytes,
+        each containing up to 8 chars + chr(0)
+
+      complete file size is fixed at 256 bytes
+  }
+
+  ibase := 2;
+
+  { rbase is expressed in real addresses.
+    Round integer section up to next real boundary. }
+  rbase := (ibase + nparams + 1) shr 1;
+
+  { sbase is expressed in byte addresses }
+  sbase := 4 * (rbase + nparams);
+  debug(ibase, rbase, sbase);
+end;
+
+func fileexists(nm: array[NAMESIZE] of char;
+                           drv: integer): boolean;
+{************************************************}
+const aprepdo  = $f4a7;
+      agetentx = $f63a;
+      aenddo   = $f625;
+
+      NUMENTRIES = 255;
+
+mem   filtyp = $0300: char&;
+      fillnk = $031e: integer&;
+      scyfc  = $037c: integer&;
+      fildrv = $00dc: integer&;
+      FILNAM = $0301: array[NAMESIZE] of char&;
+
+var ent,i: integer;
+    found,last: boolean;
+
+    func same: boolean;
+    var k: integer;
+        equal: boolean;
+    begin
+      equal:=true;
+      k:=0;
+      while equal and (k<=NAMESIZE) do begin
+        equal:=nm[k]=FILNAM[k];
+        k:=k+1;
+      end;
+      same:=equal;
+    end;
+
+begin
+  fildrv:=drv;
+  call(aprepdo);
+  ent:=0;
+  found:=false;
+  last:=false;
+  repeat
+    scyfc:=ent;
+    call(agetentx);
+    last:=filtyp=chr(0);
+    if not last then begin
+      found:=same;
+      if (fillnk and $80)<>0 then
+        found:=false;
+    end;
+    ent:=ent+1;
+  until found or last or (ent>=NUMENTRIES);
+  call(aenddo);
+  fileexists:=found;
 end;
 
 proc displayparams;
@@ -76,6 +158,17 @@ end;
 proc setparam(p: integer; value: cpnt);
 {*************************************}
 begin
+  case ptype[p] of
+  'i':  begin
+          pival[p] := round(str_real(value));
+        end;
+  'r':  begin
+          prval[p] := str_real(value);
+        end;
+  's':  begin
+          strcpyn(value, psval[p],8);
+        end
+  end {case }
 end;
 
 func findparam(name: cpnt): integer;
@@ -92,7 +185,7 @@ begin
     findparam := p - 1
   else
     findparam := -1;
-  writeln('findparam ', name, ': p=', p);
+  writeln('findparam ', name, ': return value=', p-1);
 end;
 
 proc readparams;
@@ -184,8 +277,119 @@ begin
   strcpyn('REAL',psval[P_DATA],9);
 end;
 
+proc abortwith(s: cpnt);
+{**********************}
 begin
+  write(INVVID,s,NORVID);
+  _abort;
+end;
+
+proc loadparams;
+{**************}
+var
+  f: file;
+  p,i,addr,version,np,ii: integer;
+  ir: real;
+  s: cpnt;
+begin
+  f:=_attach('FUNCPARS:X      ',0,1,FREAD+FSILENT,
+                                    PARSIZE,0,'X');
+
+  if _getsize<>PARSIZE then
+    abortwith('Wrong parameter file size');
+
+  _getword(f,0,version);
+  if version<>PARVERSION then
+    abortwith('Wrong parameter file version');
+
+  _getword(f,1,np);
+  if np<>nparams then
+    abortwith('Wrong number of parameters');
+
+  for p:=0 to MAXPAR do begin
+    _getword(f,ibase+p,ii);
+    pival[p]:=ii;
+  end;
+
+  for p:=0 to MAXPAR do begin
+    _getreal(f,rbase+p,ir);
+    prval[p]:=ir;
+  end;
+
+  for p:=0 to MAXPAR do begin
+    if psval[p]<>nil then begin
+      s:=psval[p];
+      addr:=sbase+STRSIZE*p;
+      for i:=0 to STRSIZE-1 do begin
+        getbyte(f,addr+i,ii);
+        s[i]:=chr(ii);
+      end;
+    end;
+  end;
+
+  close(f);
+end;
+
+proc storeparams;
+{***************}
+const size = 256;
+var f: file;
+    p, i, addr: integer;
+    s: cpnt;
+begin
+  if parfileexists then
+    f := _attach('FUNCPARS:X      ',0,1,
+                  FWRITE+FSILENT,size,0,'X')
+  else begin
+    f := _attach('FUNCPARS:X      ',0,1,
+                  FNEW+FSILENT,size,0,'X');
+    parfileexists := true;
+  end;
+
+  if _getsize <> size then
+    abortwith('Wrong parameter file size');
+
+  { header }
+  _putword(f,0,PARVERSION);
+  _putword(f,1,nparams);
+
+  { integer values }
+  for p:=0 to MAXPAR do
+    _putword(f,ibase+p,pival[p]);
+
+  { real values }
+  for p:=0 to MAXPAR do
+    _putreal(f,rbase+p,prval[p]);
+
+    { string values: fixed 9-byte slots }
+    for p:=0 to MAXPAR do begin
+      addr:=sbase+STRSIZE*p;
+      if psval[p]=nil then begin
+        for i:=0 to STRSIZE-1 do
+          putbyte(f,addr+i,0);
+      end else begin
+        s:=psval[p];
+        for i:=0 to STRSIZE-1 do
+          putbyte(f,addr+i,ord(s[i]));
+      end;
+    end;
+
+  close(f);
+end;
+
+proc makefunction;
+begin
+end;
+
+begin { main }
+
+  parfileexists := fileexists('FUNCPARS:X      ', 1);
+  debug(parfileexists);
   initparams;
+  initparfile;
+  if parfileexists then loadparams;
   readparams;
   displayparams;
+  makefunction;
+  storeparams;
 end. 
