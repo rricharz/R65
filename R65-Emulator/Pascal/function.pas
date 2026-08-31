@@ -5,8 +5,8 @@ const
 
   P_TYPE   = 0;
   P_N      = 1;
-  P_XMIN   = 2;
-  P_XMAX   = 3;
+  P_TMIN   = 2;
+  P_TMAX   = 3;
   P_A      = 4;
   P_A1     = 5;
   P_A2     = 6;
@@ -242,13 +242,13 @@ begin
   ptype[P_N] := 'i';
   pival[P_N] := 256;
 
-  pname[P_XMIN] := 'XMIN';
-  ptype[P_XMIN] := 'r';
-  prval[P_XMIN] := 0.0;
+  pname[P_TMIN] := 'TMIN';
+  ptype[P_TMIN] := 'r';
+  prval[P_TMIN] := 0.0;
 
-  pname[P_XMAX] := 'XMAX';
-  ptype[P_XMAX] := 'r';
-  prval[P_XMAX] := 1.0;
+  pname[P_TMAX] := 'TMAX';
+  ptype[P_TMAX] := 'r';
+  prval[P_TMAX] := 1.0;
 
   pname[P_A] := cpnt('A');
   ptype[P_A] := 'r';
@@ -315,7 +315,7 @@ begin
     'A*exp(-((x-CENTER)/WIDTH)^2)';
 
   ftitle[FT_EXP]   := 'EXPONENTIAL';
-  fformula[FT_EXP] := 'A*exp(-(x-XMIN)/TAU)';
+  fformula[FT_EXP] := 'A*exp(-(x-TMIN)/TAU)';
 
   ftitle[FT_PULSE]   := 'RECTANGULAR PULSE';
   fformula[FT_PULSE] := 'A within WIDTH, otherwise 0';
@@ -331,13 +331,6 @@ begin
   fformula[FT_SINC] := 'A*sin(360*F1*x)/(360*F1*x)';
 end;
 
-proc abortwith(s: cpnt);
-{**********************}
-begin
-  write(INVVID,s,NORVID);
-  _abort;
-end;
-
 proc loadparams;
 {**************}
 var
@@ -350,15 +343,15 @@ begin
                                     PARSIZE,0,'X');
 
   if _getsize<>PARSIZE then
-    abortwith('Wrong parameter file size');
+    _abortwith('Wrong parameter file size');
 
   _getword(f,0,version);
   if version<>PARVERSION then
-    abortwith('Wrong parameter file version');
+    _abortwith('Wrong parameter file version');
 
   _getword(f,1,np);
   if np<>nparams then
-    abortwith('Wrong number of parameters');
+    _abortwith('Wrong number of parameters');
 
   for p:=0 to MAXPAR do begin
     _getword(f,ibase+p,ii);
@@ -401,7 +394,7 @@ begin
   end;
 
   if _getsize <> size then
-    abortwith('Wrong parameter file size');
+    _abortwith('Wrong parameter file size');
 
   { header }
   _putword(f,0,PARVERSION);
@@ -447,7 +440,75 @@ end;
 
 proc makefunction;
 {****************}
+var f: file;
+    t, deltat, val, a, f1, phase, phaseval: real;
+    k: integer;
 begin
+  { validate common parameters }
+  _n := pival[P_N];
+  if not ((_n=128) or (_n=256) or
+          (_n=512) or (_n=1024)) then begin
+    _abortwith('N must be 128, 256, 512 or 1024');
+  end;
+  _min := prval[P_TMIN];
+  _max := prval[P_TMAX];
+  if (_max <= _min) then
+    _abortwith('TMAX must be > TMIN');
+  if (_strcmp(psval[P_DATA],'REAL') = 0) then
+    _datatype := 0
+  else if (_strcmp(psval[P_DATA],'COMPLEX') = 0) then
+    _datatype := 1
+  else
+    _abortwith('DATA must be REAL or COMPLEX');
+  _domain := 0;
+
+  { attach data file and check size }
+  if fileexists('FUNCDATA:X      ', 1) then
+    f := _attach('FUNCDATA:X      ', 0, 1,
+      FWRITE + FSILENT, DATAFILESIZE + 256, 0, 'X')
+  else
+    f := _attach('FUNCDATA:X      ', 0, 1,
+      FNEW + FSILENT, DATAFILESIZE + 256, 0, 'X');
+  if _getsize <> DATAFILESIZE + 256 then
+    _abortwith('Wrong data file size');
+
+  { put data header in file }
+  _putdataheader(f);
+
+  { compute and store function }
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a  := prval[P_A];
+  f1 := prval[P_F1];
+  phase := prval[P_PHASE];
+
+  writeln('Computing function');
+
+  case pival[P_TYPE] of
+    1: begin
+         for k := 0 to _n - 1 do begin
+           phaseval := 360.0 * f1 * t + phase;
+
+           { real part }
+           val := a * cos(phaseval);
+           _putreal(f,REALBASE+k,val);
+
+           { imaginary part }
+           if _datatype = DATA_COMPLEX then
+             val := a * sin(phaseval)
+          else
+             val := 0.0;
+          _putreal(f,COMPLEXBASE+k,val);
+
+          t := t + deltat;
+         end;
+       end
+    else _abortwith(
+          'Function TYPE not yet implemented')
+    end {case};
+
+  close(f);
 end;
 
 begin { main }

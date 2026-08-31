@@ -2,16 +2,17 @@
 { display a table of real numbers     }
 { on attached Tektronix 4010 terminal }
 {                                     }
-{ the first 3   entries in the table  }
-{ are fsize,  xmin and xmax           }
-{                                     }
-{   rricharz 2019                     }
 
 program tekgraph;
-uses syslib,ralib,mathlib,teklib,writelib;
+uses syslib,ralib,mathlib,teklib,writelib,strlib,ftlib
+;
 
-const border=25;
-      leftborder=140;
+const border = 50;
+      leftborder = 120;
+
+      LEFT = 0;     { to justify in _plotstr }
+      CENTER = 1;
+      RIGHT = 2;
 
 var f:file;
     i,size:integer;
@@ -19,25 +20,51 @@ var f:file;
     min,max,nmax,v:real;
     xmin,xmax,xaxis,xsaxis:real;
     axis,daxis,daxis0:real;
+    labelstr : cpnt;
+
+proc _plotstr(s: cpnt; x, y: integer;
+                              justify: integer);
+{**********************************************}
+const
+  CHARWIDTH = 12.642;   { _setchsize(2) }
+  XOFFSET   = 2.0;
+  YOFFSET   = -4.0;
+var
+  xpos: real;
+  width: real;
+begin
+  width := conv(_strlen(s)) * CHARWIDTH;
+
+  xpos := conv(x);
+
+  case justify of
+    CENTER: xpos := xpos - width/2.0;
+    RIGHT:  xpos := xpos - width
+  end;
+
+  _moveto(trunc(xpos + XOFFSET + 0.5),
+          trunc(conv(y) + YOFFSET + 0.5));
+  write(@PLOTTER,s);
+end;
 
 begin
+  labelstr := _new;
 
-  write('Displaying values stored in TABLE:X');
-  f:=_attach('TABLE:X         ',0,1,FREAD,
-    0,0,'X');
-  _getword(f,0,size);
-  writeln;
-  writeln('Points: ', size);
-  _getreal(f,1,xmin);
-  _getreal(f,2,xmax);
+  writeln('Displaying values stored in FUNCDATA:X');
+  f:=_attach('FUNCDATA:X      ', 0, 1,
+    FREAD + FSILENT, 0, 0, 'X');
+  if _getsize <> DATAFILESIZE + 256 then
+    _abortwith('Wrong data file size');
+  _getdataheader(f);
 
-  min:=1.0e10;
-  max:=-1.0e10;
-  for i:=0 to size - 1 do begin
-    _getreal(f,i+3,v);
-    if v>max then max:=v;
-    if v<min then min:=v;
-  end;
+  size := _n;
+  xmin := _min;
+  xmax := _max;
+
+  min := -0.6;
+  max := 0.6;
+
+  writeln('N:      ',size);
   writeln('Ymin:   ',min);
   writeln('Ymax:   ',max);
   writeln('Xmin:   ',xmin);
@@ -88,45 +115,51 @@ begin
   _setlinemode(DOTTED);
   _setchsize(2);
   repeat
+    labelstr[0] := chr(0);
     y:=trunc((axis-min)/(max-min)*conv(yw)+0.5);
     if (y>0) and (y<yw) then
       _drawvector(xs,ys+y,xs+xw,ys+y);
     _moveto(5,ys+y-5);
     if daxis<0.001 then
-      write(@PLOTTER,axis:10:4)
+      write(@labelstr,axis:1:4)
     else if daxis<0.01 then
-      write(@PLOTTER,axis:10:3)
+      write(@labelstr,axis:1:3)
     else if daxis<0.1 then
-      write(@PLOTTER,axis:10:2)
+      write(@labelstr,axis:1:2)
     else
-      write(@PLOTTER,axis:10:1);
+      write(@labelstr,axis:1:1);
+    _plotstr(labelstr,xs,
+      ys + y, RIGHT);
     axis:=axis+daxis;
-    until axis>max;
+  until axis>max;
 
   repeat
+    labelstr[0] := chr(0);
     x:=trunc((xsaxis-xmin)/
                  (xmax-xmin)*conv(xw)+0.5);
     if (x>0) and (x<xw) then
       _drawvector(xs+x,ys,xs+x,ys+yw);
-    _moveto(xs+x-80,6);
     if xaxis<0.001 then
-      write(@PLOTTER,xsaxis:10:4)
+      write(@labelstr,xsaxis:1:4)
     else if xaxis<0.01 then
-      write(@PLOTTER,xsaxis:10:3)
+      write(@labelstr,xsaxis:1:3)
     else if xaxis<0.1 then
-      write(@PLOTTER,xsaxis:10:2)
+      write(@labelstr,xsaxis:1:2)
     else
-      write(@PLOTTER,xsaxis:10:1);
+      write(@labelstr,xsaxis:1:1);
+    _plotstr(labelstr,xs + x,
+      ys - trunc(0.6 * conv(border)), CENTER);
     xsaxis:=xsaxis+xaxis;
-    until xsaxis>xmax;
+  until xsaxis>xmax;
+
   _setlinemode(SOLID);
   _setchsize(1);
 
-  _getreal(f,3,v);
+  _getreal(f,REALBASE,v);
   y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
   _startdraw(xs,ys+y);
   for i:=1 to size-1 do begin
-    _getreal(f,i+3,v);
+    _getreal(f,REALBASE+i,v);
     x:=trunc(conv(xw)/conv(size)*conv(i)+0.5);
     y:=trunc((v-min)/(max-min)*conv(yw)+0.5);
     _draw(xs+x,ys+y);

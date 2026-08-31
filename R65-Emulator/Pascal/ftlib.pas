@@ -1,8 +1,23 @@
 library ftlib;
 
-{ sahred library for FUNCTION, FT and GRAPH }
+{ shared library for FUNCTION, FT and GRAPH }
 
-var _parampos: integer;
+const
+  DATA_REAL    = 0;
+  DATA_COMPLEX = 1;
+
+  DOMAIN_TIME  = 0;
+  DOMAIN_FREQ  = 1;
+
+  DATAVERSION  = 1;
+  DATAFILESIZE = 8192;  { + 256 for header section }
+  REALBASE     = 64;    { 256 div 4 }
+  COMPLEXBASE  = 1088;  { REALBASE + 1024 }
+
+var
+  _parampos: integer;
+  _n, _datatype, _domain: integer;
+  _min, _max: real;
 
 proc _runerr(e:integer);
 {**********************}
@@ -12,6 +27,14 @@ mem   _mrunerr = $000c: integer&;
 begin
   _mrunerr:=e;
   call(stopcode);
+end;
+
+proc _abortwith(s: cpnt);
+{**********************}
+const stopcode = $2010;
+begin
+  write(chr($0e),s,chr($0b));
+  _runerr(54);
 end;
 
 func _allocate(b: integer): cpnt;
@@ -160,6 +183,77 @@ begin
     round := trunc(r + 0.5)
   else
     round := trunc(r - 0.5);
+end;
+
+proc _getdataheader(f: file);
+{***************************}
+{ Header (words)
+
+  0  version
+  1  n
+  2  datatype
+  3  domain
+  4-5  min
+  6-7  max
+
+  Data starts at byte 256.
+}
+var version: integer;
+
+  proc getword(device:file; address:integer;
+                                var word:integer);
+  var h,l:integer;
+  begin
+    getbyte(device,2*address,l);
+    getbyte(device,2*address+1,h);
+    word:=(h shl 8) + l;
+  end;
+
+  proc getreal(device:file; address:integer;
+    var rvalue:array[1] of %integer);
+  var i1,i2:integer;
+  begin
+    getword(device,2*address,i1);
+    getword(device,2*address+1,i2);
+    rvalue[0]:=i1;
+    rvalue[1]:=i2;
+  end;
+
+begin
+  getword(f, 0, version);
+  if version <> DATAVERSION then
+    _abortwith('Wrong data file version');
+  getword(f, 1, _n);
+  getword(f, 2, _datatype);
+  getword(f, 3, _domain);
+  getreal(f, 2, _min);  { real has 4 bytes }
+  getreal(f, 3, _max);
+end;
+
+proc _putdataheader(f: file);
+{***************************}
+
+  proc putword(device:file; address:integer;
+    word:integer);
+  begin
+    putbyte(device,2*address, word and 255);
+    putbyte(device,2*address+1, word shr 8);
+  end;
+
+  proc putreal(device:file; address:integer;
+    rvalue:array[1] of %integer);
+  begin
+    putword(device,2*address, rvalue[0]);
+    putword(device,2*address+1, rvalue[1]);
+  end;
+
+begin
+  putword(f, 0, DATAVERSION);
+  putword(f, 1, _n);
+  putword(f, 2, _datatype);
+  putword(f, 3, _domain);
+  putreal(f, 2, _min);  { real has 4 bytes }
+  putreal(f, 3, _max);
 end;
 
 begin  { initialize library }
