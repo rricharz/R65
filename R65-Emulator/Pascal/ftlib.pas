@@ -1,4 +1,6 @@
-library paramlib;
+library ftlib;
+
+{ sahred library for FUNCTION, FT and GRAPH }
 
 var _parampos: integer;
 

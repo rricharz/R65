@@ -1,5 +1,5 @@
 program function;
-uses syslib,paramlib,strlib,writelib,mathlib,ralib;
+uses syslib,strlib,writelib,mathlib,ralib,ftlib;
 
 const
 
@@ -19,6 +19,17 @@ const
   P_RISE   = 13;
   P_DATA   = 14;
   MAXPAR   = 14;
+
+  FT_COSINE    = 1;
+  FT_SUM       = 2;
+  FT_PRODUCT   = 3;
+  FT_GAUSSIAN  = 4;
+  FT_EXP       = 5;
+  FT_PULSE     = 6;
+  FT_TRAPEZOID = 7;
+  FT_TRIANGLE  = 8;
+  FT_SINC      = 9;
+  MAXTYPE      = 9;
 
   NAMESIZE = 15;
 
@@ -40,6 +51,9 @@ var
   psval: array[MAXPAR] of cpnt;
 
   parfileexists: boolean;
+
+  ftitle: array[MAXTYPE] of cpnt;
+  fformula: array[MAXTYPE] of cpnt;
 
 proc initparfile;
 {***************}
@@ -132,8 +146,13 @@ const
   columns   = 2;
   namefield = 7;
   valfield  = 9;
-var i,col,row,rows,k,padding: integer;
+var i,col,row,rows,k,padding,type: integer;
 begin
+  type := pival[P_TYPE];
+  if type=0 then exit;
+  writeln('FUNCTION: ',ftitle[type]);
+  writeln('FORMULA:  ',fformula[type]);
+  writeln
   rows := (MAXPAR + columns) div columns;
   padding := (48 div columns) - namefield - valfield;
   for row := 0 to rows - 1 do begin
@@ -153,6 +172,7 @@ begin
     end {column};
     writeln;
   end {row};
+  writeln;
 end;
 
 proc setparam(p: integer; value: cpnt);
@@ -185,7 +205,6 @@ begin
     findparam := p - 1
   else
     findparam := -1;
-  writeln('findparam ', name, ': return value=', p-1);
 end;
 
 proc readparams;
@@ -275,6 +294,41 @@ begin
   ptype[P_DATA] := 's';
   psval[P_DATA] := _allocate(9);
   strcpyn('REAL',psval[P_DATA],9);
+end;
+
+proc initfunctions;
+{*****************}
+begin
+  ftitle[FT_COSINE]   := 'COSINE';
+  fformula[FT_COSINE] := 'A*cos(360*F1*x+PHASE)';
+
+  ftitle[FT_SUM]   := 'SUM OF TWO COSINES';
+  fformula[FT_SUM] :=
+    'A1*cos(360*F1*x)+A2*cos(360*F2*x)';
+
+  ftitle[FT_PRODUCT]   := 'PRODUCT OF TWO COSINES';
+  fformula[FT_PRODUCT] :=
+    'A*cos(360*F1*x)*cos(360*F2*x)';
+
+  ftitle[FT_GAUSSIAN]   := 'GAUSSIAN';
+  fformula[FT_GAUSSIAN] :=
+    'A*exp(-((x-CENTER)/WIDTH)^2)';
+
+  ftitle[FT_EXP]   := 'EXPONENTIAL';
+  fformula[FT_EXP] := 'A*exp(-(x-XMIN)/TAU)';
+
+  ftitle[FT_PULSE]   := 'RECTANGULAR PULSE';
+  fformula[FT_PULSE] := 'A within WIDTH, otherwise 0';
+
+  ftitle[FT_TRAPEZOID]   := 'TRAPEZOID';
+  fformula[FT_TRAPEZOID] := 'Pulse with RISE time';
+
+  ftitle[FT_TRIANGLE]   := 'TRIANGLE';
+  fformula[FT_TRIANGLE] :=
+    'Triangle with CENTER and WIDTH';
+
+  ftitle[FT_SINC]   := 'SINC';
+  fformula[FT_SINC] := 'A*sin(360*F1*x)/(360*F1*x)';
 end;
 
 proc abortwith(s: cpnt);
@@ -377,19 +431,37 @@ begin
   close(f);
 end;
 
+proc displayfunctions;
+{********************}
+var i: integer;
+begin
+  writeln('FUNCTION GENERATOR');
+  writeln;
+  for i:=1 to MAXTYPE do
+    writeln(i:2, '  ', ftitle[i]);
+  writeln;
+  writeln('Select: FUNCTION TYPE=n');
+  writeln('Help:   FUNCTION TYPE=0');
+  writeln;
+end;
+
 proc makefunction;
+{****************}
 begin
 end;
 
 begin { main }
-
-  parfileexists := fileexists('FUNCPARS:X      ', 1);
-  debug(parfileexists);
-  initparams;
+  initfunctions;
   initparfile;
+  parfileexists := fileexists('FUNCPARS:X      ', 1);
+  initparams;
   if parfileexists then loadparams;
   readparams;
-  displayparams;
-  makefunction;
+  if pival[P_TYPE] = 0 then
+    displayfunctions
+  else begin
+    displayparams;
+    makefunction;
+  end;
   storeparams;
 end. 
