@@ -186,7 +186,7 @@ begin
           prval[p] := str_real(value);
         end;
   's':  begin
-          strcpyn(value, psval[p],8);
+          strcpyn(value, psval[p],9);
         end
   end {case }
 end;
@@ -482,8 +482,6 @@ begin
   a  := prval[P_A];
   f1 := prval[P_F1];
   phase := prval[P_PHASE];
-
-  writeln('Computing function');
 
   case pival[P_TYPE] of
     1: begin

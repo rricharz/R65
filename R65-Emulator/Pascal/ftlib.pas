@@ -33,7 +33,7 @@ proc _abortwith(s: cpnt);
 {**********************}
 const stopcode = $2010;
 begin
-  write(chr($0e),s,chr($0b));
+  writeln(chr($0e),s,chr($0b));
   _runerr(54);
 end;
 
@@ -131,7 +131,7 @@ begin
     i:=i+1;
   end;
   if source[i]<>chr(0) then
-    _runerr(91);
+    _runerr($91);
   dest[i]:=chr(0);
   i:=i+1;
   while i<maxlen do begin
