@@ -1,54 +1,61 @@
 program ft;
-uses syslib,ralib,mathlib,writelib;
+uses syslib,ralib,mathlib,writelib,ftlib;
 
 const maxsize     = 1024;
       tabsize     = 2048; { 2 * maxsize }
       sintabsize  = 512; { maxsize div 2 }
 
 var f: file;
-    i, size: integer;
-    xmin, xmax, fmin, fmax, v: real;
+    i: integer;
+    v: real;
 
     data:   array[tabsize] of real;
     sintab: array[sintabsize] of real;
 
 proc getdata;
 begin
-  f:=_attach('TABLE:X         ',0,1,FREAD,0,0,'X');
-  _getword(f,0,size);
-  if size > maxsize then begin
-    writeln(INVVID, 'Max data size of ', maxsize,
-                    ' exceeded', NORVID);
-    _abort;
+  f:=_attach('FUNCDATA:X      ',0,1,
+                            FWRITE+FSILENT,0,0,'X');
+  _getdataheader(f);
+  if _n > maxsize then begin
+    _abortwith('Max data size exceeded');
   end;
-  if not ((size=128) or (size=256) or
-          (size=512) or (size=1024)) then begin
-    writeln(INVVID,'Invalid FFT size ',size,NORVID);
-    _abort;
+  if not ((_n=128) or (_n=256) or
+          (_n=512) or (_n=1024)) then begin
+    _abortwith('Invalid FFT data size ');
   end;
   writeln;
-  writeln('Elements: ', size);
-  _getreal(f,1,xmin);
-  _getreal(f,2,xmax);
-  writeln('Xmin:   ',xmin);
-  writeln('Xmax:   ',xmax);
-  for i:=0 to size - 1 do begin
-    _getreal(f, i + 3, v);
+  writeln('N:      ', _n:10);
+  if _domain <> DOMAIN_TIME then
+  _abortwith(
+    'Domain of data must be TIME, use FUNCTION again')
+;
+  writeln('Tmin:   ',_min:10);
+  writeln('Tmax:   ',_max:10);
+  for i:=0 to _n - 1 do begin
+    _getreal(f, REALBASE + i, v);
     data[i] := v;
-    data[size + i] := 0.0; { set imaginary data to 0 }
   end;
-  close(f);
+  for i:=0 to _n - 1 do begin
+    _getreal(f, COMPLEXBASE + i, v);
+    data[_n + i] := v;
+  end;
 end;
 
 proc putdata;
 begin
-  f:=_attach('TABLE:X         ',0,1,FNEW,
-                              8*size+12,0,'X');
-  _putword(f,0,size);
-  _putreal(f,1,fmin);
-  _putreal(f,2,fmax);
-  for i:= 0 to 2 * size - 1 do
-    _putreal(f, i+3, data[i]);
+  for i:=0 to _n-1 do
+    _putreal(f,REALBASE+i,data[i]);
+
+  for i:=0 to _n-1 do
+    _putreal(f,COMPLEXBASE+i,data[_n+i]);
+
+  _datatype := DATA_COMPLEX;
+  _domain := DOMAIN_FREQ;
+
+  { later set _min and _max to frequency limits }
+
+  _putdataheader(f);
   close(f);
 end;
 
@@ -87,9 +94,9 @@ var
   var i,j,bits: integer;
       t: real;
   begin
-    bits := trunc(log(conv(size))/log(2.0)+0.5);
+    bits := trunc(log(conv(_n))/log(2.0)+0.5);
 
-    for i := 0 to size - 1 do begin
+    for i := 0 to _n - 1 do begin
       j := bitreverse(i, bits);
 
       if j > i then begin
@@ -98,9 +105,9 @@ var
         data[i] := data[j];
         data[j] := t;
 
-        t := data[size+i];
-        data[size+i] := data[size+j];
-        data[size+j] := t;
+        t := data[_n+i];
+        data[_n+i] := data[_n+j];
+        data[_n+j] := t;
 
       end;
     end;
@@ -111,18 +118,18 @@ var
   var ar,ai,br,bi,tr,ti: real;
   begin
     ar:=data[i];
-    ai:=data[size+i];
+    ai:=data[_n+i];
     br:=data[j];
-    bi:=data[size+j];
+    bi:=data[_n+j];
 
     tr:=br*cosine+bi*sine;
     ti:=bi*cosine-br*sine;
 
     data[i]:=ar+tr;
-    data[size+i]:=ai+ti;
+    data[_n+i]:=ai+ti;
 
     data[j]:=ar-tr;
-    data[size+j]:=ai-ti;
+    data[_n+j]:=ai-ti;
   end;
 
 begin
@@ -132,10 +139,10 @@ begin
   halfgroup := 1;
   tabstep := sintabsize;
 
-  while groupsize <= size do begin
+  while groupsize <= _n do begin
 
     group := 0;
-    while group < size do begin
+    while group < _n do begin
 
       sinindex := 0;
 
@@ -163,8 +170,11 @@ begin
     tabstep := tabstep shr 1;
   end;
 
-  fmin := 0.0;  { minimum and maximum frequency }
-  fmax := conv(size) / (2.0 * (xmax - xmin));
+  _min := 0.0;  { minimum and maximum frequency }
+  _max := conv(_n) / (2.0 * (_max - _min));
+  writeln('Fmin:   ',_min:10);
+  writeln('Fmax:   ',_max:10);
+  writeln;
 end;
 
 begin

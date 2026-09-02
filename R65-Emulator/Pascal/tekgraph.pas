@@ -82,7 +82,6 @@ begin
   { sbase is expressed in byte addresses }
   sbase := 4 * (rbase + nparams);
 
-  debug(ibase,rbase,sbase);
 end;
 
 func fileexists(nm: array[NAMESIZE] of char;
@@ -459,17 +458,32 @@ end;
 proc normalize;
 {*************}
 { normalize vertical axis }
+var minbin, maxbin: integer;
 begin
   min := 1.0e10;
   max := -1.0e10;
+  minbin := 0;
+  maxbin := 0;
   for i:=0 to _n-1 do begin
     _getreal(f,REALBASE+i,v);
-    if v<min then min:=v;
-    if v>max then max:=v;
+    if v<min then begin
+      min:=v;
+      minbin := i;
+    end;
+    if v>max then begin
+      max:=v;
+      maxbin := i;
+    end;
     if _datatype=DATA_COMPLEX then begin
       _getreal(f,COMPLEXBASE+i,v);
-      if v<min then min:=v;
-      if v>max then max:=v;
+      if v<min then begin
+        min:=v;
+        minbin := i;
+      end;
+      if v>max then begin
+        max:=v;
+        maxbin := i;
+      end;
     end;
   end;
 end;
@@ -592,7 +606,7 @@ begin
   if realmode then
     _getreal(f, REALBASE+i, v)
   else
-    _getreal(f, COMPLEXBASE+i, v)
+    _getreal(f, COMPLEXBASE+i, v);
   if (v < min) then
     ypos := 0
   else if (v > max) then
