@@ -6,651 +6,657 @@
    6     4 [  0] program tekgraph;
    7     4 [  0] uses syslib,ralib,mathlib,tek4Klib,writelib,
    8  7669 [127]       strlib,ftlib;
-   9 10541 [172] 
-  10 10541 [172] const
-  11 10541 [172]   border = 200;
-  12 10544 [173]   leftborder = 480;
-  13 10544 [174] 
-  14 10544 [174]   LEFT = 0;     { to justify in _plotstr }
-  15 10544 [175]   CENTER = 1;
-  16 10544 [176]   RIGHT = 2;
-  17 10544 [177] 
-  18 10544 [177]   P_MODE   = 0;
-  19 10544 [178]   P_YSCALE = 1;
-  20 10544 [179]   P_YMIN   = 2;
-  21 10544 [180]   P_YMAX   = 3;
-  22 10544 [181] 
-  23 10544 [181]   MAXPAR   = 3;
-  24 10544 [182]   NAMESIZE = 15;
-  25 10544 [183] 
-  26 10544 [183]   PARVERSION = 1;
-  27 10544 [184]   PARSIZE    = 256;
-  28 10544 [185]   STRSIZE    = 9;   { 8 chars + chr(0) }
-  29 10544 [186] 
-  30 10544 [186] var
-  31 10544 [186]   pname: array[MAXPAR] of cpnt;
-  32 10544 [187]   ptype: array[MAXPAR] of char;
-  33 10544 [188]   pchanged: array[MAXPAR] of boolean;
-  34 10544 [189] 
-  35 10544 [189]   pival: array[MAXPAR] of integer;
-  36 10544 [190]   prval: array[MAXPAR] of real;
-  37 10544 [191]   psval: array[MAXPAR] of cpnt;
-  38 10544 [192] 
-  39 10544 [192]   parfileexists: boolean;
-  40 10544 [193] 
-  41 10544 [193]   nparams: integer;
-  42 10544 [194]   ibase: integer;    { word address }
-  43 10544 [195]   rbase: integer;    { real address }
-  44 10544 [196]   sbase: integer;    { byte address }
-  45 10544 [197] 
-  46 10544 [197]   f:file;
-  47 10544 [198]   i:integer;
-  48 10544 [199]   xaxis, xsaxis:real;
-  49 10544 [201]   axis, daxis, daxis0:real;
-  50 10544 [204]   xs, xw, ys, yw, x:integer;
-  51 10544 [209]   min, max, nmax, v:real;
-  52 10544 [213]   realmode, autoscale: boolean;
-  53 10544 [215] 
-  54 10544 [215] proc initparfile;
-  55 10544 [216] {***************}
-  56 10544 [216] begin
-  57 10544 [216]   nparams := MAXPAR + 1;
-  58 10553 [216] 
-  59 10558 [216]   { Parameter file layout:
-  60 10558 [216]       word 0 : version
-  61 10558 [216]       word 1 : number of parameters
-  62 10558 [216] 
-  63 10558 [216]       integer values:
-  64 10558 [216]         nparams words, starting at ibase
-  65 10558 [216] 
-  66 10558 [216]       real values:
-  67 10558 [216]         nparams reals, starting at rbase
-  68 10558 [216] 
-  69 10558 [216]       string values:
-  70 10558 [216]         nparams slots of STRSIZE bytes,
-  71 10558 [216]         each containing up to 8 chars + chr(0)
-  72 10558 [216] 
-  73 10558 [216]       complete file size is fixed at 256 bytes
-  74 10558 [216]   }
-  75 10558 [216] 
-  76 10558 [216]   ibase := 2;
-  77 10560 [216] 
-  78 10564 [216]   { rbase is expressed in real addresses.
-  79 10564 [216]     Round integer section up to next real boundary. }
-  80 10564 [216]   rbase := (ibase + nparams + 1) shr 1;
-  81 10578 [216] 
-  82 10583 [216]   { sbase is expressed in byte addresses }
-  83 10583 [216]   sbase := 4 * (rbase + nparams);
-  84 10594 [216] 
-  85 10599 [216] end;
-  86 10599 [216] 
-  87 10600 [216] func fileexists(nm: array[NAMESIZE] of char;
-  88 10600 [219]                            drv: integer): boolean;
-  89 10600 [220] {************************************************}
-  90 10600 [220] const aprepdo  = $f4a7;
-  91 10603 [221]       agetentx = $f63a;
-  92 10603 [222]       aenddo   = $f625;
-  93 10603 [223] 
-  94 10603 [223]       NUMENTRIES = 255;
-  95 10603 [224] 
-  96 10603 [224] mem   filtyp = $0300: char&;
-  97 10603 [225]       fillnk = $031e: integer&;
-  98 10603 [226]       scyfc  = $037c: integer&;
-  99 10603 [227]       fildrv = $00dc: integer&;
- 100 10603 [228]       FILNAM = $0301: array[NAMESIZE] of char&;
- 101 10603 [229] 
- 102 10603 [229] var ent,i: integer;
- 103 10603 [231]     found,last: boolean;
- 104 10603 [233] 
- 105 10603 [233]     func same: boolean;
- 106 10603 [235]     var k: integer;
- 107 10606 [236]         equal: boolean;
- 108 10606 [237]     begin
- 109 10606 [237]       equal:=true;
- 110 10610 [237]       k:=0;
- 111 10616 [237]       while equal and (k<=NAMESIZE) do begin
- 112 10635 [237]         equal:=nm[k]=FILNAM[k];
- 113 10650 [237]         k:=k+1;
- 114 10663 [237]       end;
- 115 10668 [237]       same:=equal;
- 116 10671 [237]     end;
- 117 10679 [237] 
- 118 10680 [235] begin
- 119 10680 [235]   fildrv:=drv;
- 120 10682 [235]   call(aprepdo);
- 121 10694 [235]   ent:=0;
- 122 10696 [235]   found:=false;
- 123 10702 [235]   last:=false;
- 124 10708 [235]   repeat
- 125 10712 [235]     scyfc:=ent;
- 126 10712 [235]     call(agetentx);
- 127 10725 [235]     last:=filtyp=chr(0);
- 128 10731 [235]     if not last then begin
- 129 10742 [235]       found:=same;
- 130 10751 [235]       if (fillnk and $80)<>0 then
- 131 10764 [235]         found:=false;
- 132 10770 [235]     end;
- 133 10774 [235]     ent:=ent+1;
- 134 10780 [235]   until found or last or (ent>=NUMENTRIES);
- 135 10801 [235]   call(aenddo);
- 136 10809 [235]   fileexists:=found;
- 137 10809 [235] end;
- 138 10817 [235] 
- 139 10818 [218] proc displayparams;
- 140 10818 [219] {*****************}
- 141 10818 [219] const
- 142 10818 [219]   columns   = 2;
- 143 10821 [220]   namefield = 7;
- 144 10821 [221]   valfield  = 9;
- 145 10821 [222] var i,col,row,rows,k,padding: integer;
- 146 10821 [228] begin
- 147 10821 [228]   writeln
- 148 10821 [228]     ('DISPLAY PARAMETERS (change with TEKGRAPH)');
- 149 10871 [228] 
- 150 10871 [228]   rows := (MAXPAR + columns) div columns;
- 151 10878 [228]   padding := (48 div columns) - namefield - valfield;
- 152 10893 [228] 
- 153 10898 [228]   for row := 0 to rows - 1 do begin
- 154 10920 [228]     for col := 0 to columns - 1 do begin
- 155 10940 [228]       i := row + col * rows;
- 156 10948 [228]       if i <= MAXPAR then begin
- 157 10965 [228]         if col > 0 then
- 158 10974 [228]           for k := 1 to padding do write(' ');
- 159 10999 [228]         write(field(pname[i],namefield));
- 160 11032 [228]         case ptype[i] of
- 161 11036 [228]           'i': write(pival[i]:valfield);
- 162 11063 [228]           'r': write(prval[i]:valfield:2);
- 163 11096 [228]           's': write(field(psval[i],valfield))
- 164 11124 [228]           else write('undefined')
- 165 11138 [228]         end {case};
- 166 11140 [228]       end {if};
- 167 11140 [228]     end {column};
- 168 11140 [228]     writeln;
- 169 11154 [228]   end {row};
- 170 11160 [228] end;
- 171 11174 [228] 
- 172 11175 [219] proc setparam(p: integer; value: cpnt);
- 173 11175 [222] {*************************************}
- 174 11175 [222] begin
- 175 11175 [222]   pchanged[p] := true;
- 176 11186 [222]   case ptype[p] of
- 177 11194 [222]   'i':  begin
- 178 11205 [222]           pival[p] := round(str_real(value));
- 179 11229 [222]         end;
- 180 11233 [222]   'r':  begin
- 181 11243 [222]           prval[p] := str_real(value);
- 182 11262 [222]         end;
- 183 11269 [222]   's':  begin
- 184 11279 [222]           strcpyn(value, psval[p],9);
- 185 11299 [222]         end
- 186 11299 [222]   end {case }
- 187 11301 [222] end;
- 188 11301 [222] 
- 189 11302 [220] func findparam(name: cpnt): integer;
- 190 11302 [223] {**********************************}
- 191 11302 [223] var p: integer;
- 192 11305 [224]     found: boolean;
- 193 11305 [225] begin
- 194 11305 [225]   p := 0;
- 195 11309 [225]   repeat
- 196 11313 [225]     found := _strcmp(pname[p], name) = 0;
- 197 11335 [225]     p := p + 1;
- 198 11346 [225]   until found or (p > MAXPAR);
- 199 11362 [225] 
- 200 11366 [225]   if found then
- 201 11366 [225]     findparam := p - 1
- 202 11377 [225]   else
- 203 11379 [225]     findparam := -1;
- 204 11389 [225] end;
- 205 11394 [225] 
- 206 11395 [222] proc readparams;
- 207 11395 [223] {**************}
- 208 11395 [223] var name, value: cpnt;
- 209 11398 [225]     done: boolean;
- 210 11398 [226]     p: integer;
- 211 11398 [227] begin
- 212 11398 [227]   name  := _allocate(9);
- 213 11410 [227]   value := _allocate(17);
- 214 11424 [227]   repeat
- 215 11428 [227]     _nextparam(name, value, done);
- 216 11450 [227]     if not done then begin
- 217 11455 [227]       p := findparam(name);
- 218 11470 [227]       if p < 0 then
- 219 11480 [227]         _abortwith('Unknown parameter')
- 220 11504 [227]       else
- 221 11510 [227]         setparam(p,value);
- 222 11527 [227]     end;
- 223 11527 [227]   until done;
- 224 11527 [227] end;
- 225 11534 [227] 
- 226 11535 [223] proc initparams;
- 227 11535 [224] {**************}
- 228 11535 [224] var i: integer;
- 229 11538 [225] begin
- 230 11538 [225]   for i:=0 to MAXPAR do begin
- 231 11557 [225]     psval[i]    := nil;
- 232 11563 [225]     pchanged[i] := false;
- 233 11573 [225]   end;
- 234 11577 [225] 
- 235 11591 [225]   pname[P_MODE] := 'MODE';
- 236 11600 [225]   ptype[P_MODE] := 's';
- 237 11608 [225]   psval[P_MODE] := _allocate(9);
- 238 11624 [225]   strcpyn('REAL',psval[P_MODE],9);
- 239 11649 [225] 
- 240 11649 [225]   pname[P_YSCALE] := 'YSCALE';
- 241 11660 [225]   ptype[P_YSCALE] := 's';
- 242 11668 [225]   psval[P_YSCALE] := _allocate(9);
- 243 11684 [225]   strcpyn('AUTO',psval[P_YSCALE],9);
- 244 11709 [225] 
- 245 11709 [225]   pname[P_YMIN] := 'YMIN';
- 246 11718 [225]   ptype[P_YMIN] := 'r';
- 247 11726 [225]   prval[P_YMIN] := -1.0;
- 248 11741 [225] 
- 249 11749 [225]   pname[P_YMAX] := 'YMAX';
- 250 11758 [225]   ptype[P_YMAX] := 'r';
- 251 11766 [225]   prval[P_YMAX] := 1.0;
- 252 11781 [225] end;
- 253 11788 [225] 
- 254 11789 [224] proc loadparams;
- 255 11789 [225] {**************}
- 256 11789 [225] var
- 257 11789 [225]   f: file;
- 258 11792 [226]   p,i,addr,version,np,ii: integer;
- 259 11792 [232]   ir: real;
- 260 11792 [233]   s: cpnt;
- 261 11792 [234] begin
- 262 11792 [234]   f:=_attach('GRAPHPARS:X     ',0,1,FREAD+FSILENT,
- 263 11822 [234]                                     PARSIZE,0,'X');
- 264 11836 [234] 
- 265 11840 [234]   if _getsize<>PARSIZE then
- 266 11849 [234]     _abortwith('Wrong parameter file size');
- 267 11887 [234] 
- 268 11887 [234]   _getword(f,0,version);
- 269 11907 [234]   if version<>PARVERSION then
- 270 11913 [234]     _abortwith('Wrong parameter file version');
- 271 11954 [234] 
- 272 11954 [234]   _getword(f,1,np);
- 273 11974 [234]   if np<>nparams then
- 274 11978 [234]     _abortwith('Wrong number of parameters');
- 275 12021 [234] 
- 276 12021 [234]   for p:=0 to MAXPAR do begin
- 277 12038 [234]     _getword(f,ibase+p,ii);
- 278 12065 [234]     pival[p]:=ii;
- 279 12069 [234]   end;
- 280 12077 [234] 
- 281 12091 [234]   for p:=0 to MAXPAR do begin
- 282 12108 [234]     _getreal(f,rbase+p,ir);
- 283 12139 [234]     prval[p]:=ir;
- 284 12146 [234]   end;
- 285 12159 [234] 
- 286 12173 [234]   for p:=0 to MAXPAR do begin
- 287 12190 [234]     if psval[p]<>nil then begin
- 288 12201 [234]       s:=psval[p];
- 289 12208 [234]       addr:=sbase+STRSIZE*p;
- 290 12222 [234]       for i:=0 to STRSIZE-1 do begin
- 291 12252 [234]         getbyte(f,addr+i,ii);
- 292 12271 [234]         s[i]:=chr(ii);
- 293 12279 [234]       end;
- 294 12284 [234]     end;
- 295 12298 [234]   end;
- 296 12298 [234] 
- 297 12312 [234]   close(f);
- 298 12318 [234] end;
- 299 12318 [234] 
- 300 12319 [225] proc storeparams;
- 301 12319 [226] {***************}
- 302 12319 [226] const size = 256;
- 303 12322 [227] var f: file;
- 304 12322 [228]     p, i, addr: integer;
- 305 12322 [231]     s: cpnt;
- 306 12322 [232] begin
- 307 12322 [232]   if parfileexists then
- 308 12324 [232]     f := _attach('GRAPHPARS:X     ',0,1,
- 309 12355 [232]                   FWRITE+FSILENT,size,0,'X')
- 310 12367 [232]   else begin
- 311 12380 [232]     f := _attach('GRAPHPARS:X     ',0,1,
- 312 12404 [232]                   FNEW+FSILENT,size,0,'X');
- 313 12422 [232]     parfileexists := true;
- 314 12428 [232]   end;
- 315 12432 [232] 
- 316 12432 [232]   if _getsize <> size then
- 317 12441 [232]     _abortwith('Wrong parameter file size');
- 318 12479 [232] 
- 319 12479 [232]   { header }
- 320 12479 [232]   _putword(f,0,PARVERSION);
- 321 12493 [232]   _putword(f,1,nparams);
- 322 12509 [232] 
- 323 12509 [232]   { integer values }
- 324 12509 [232]   for p:=0 to MAXPAR do
- 325 12517 [232]     _putword(f,ibase+p,pival[p]);
- 326 12553 [232] 
- 327 12567 [232]   { real values }
- 328 12567 [232]   for p:=0 to MAXPAR do
- 329 12575 [232]     _putreal(f,rbase+p,prval[p]);
- 330 12616 [232] 
- 331 12630 [232]     { string values: fixed 9-byte slots }
- 332 12630 [232]     for p:=0 to MAXPAR do begin
- 333 12647 [232]       addr:=sbase+STRSIZE*p;
- 334 12653 [232]       if psval[p]=nil then begin
- 335 12674 [232]         for i:=0 to STRSIZE-1 do
- 336 12687 [232]           putbyte(f,addr+i,0);
- 337 12714 [232]       end else begin
- 338 12731 [232]         s:=psval[p];
- 339 12735 [232]         for i:=0 to STRSIZE-1 do
- 340 12753 [232]           putbyte(f,addr+i,ord(s[i]));
- 341 12788 [232]       end;
- 342 12802 [232]     end;
- 343 12802 [232] 
- 344 12816 [232]   close(f);
- 345 12822 [232] end;
- 346 12822 [232] 
- 347 12823 [226] proc _plotstr(s: cpnt; x, y: integer;
- 348 12823 [230]                               justify: integer);
- 349 12823 [231] {**********************************************}
- 350 12823 [231] const
- 351 12823 [231]   CHARWIDTH = 50.568;   { _setchsize(2) }
- 352 12826 [232]   XOFFSET   = 8.0;
- 353 12826 [233]   YOFFSET   = -16.0;
- 354 12826 [234] var
- 355 12826 [234]   xpos: real;
- 356 12826 [235]   width: real;
- 357 12826 [236] begin
- 358 12826 [236]   width := conv(_strlen(s)) * CHARWIDTH;
- 359 12847 [236] 
- 360 12854 [236]   xpos := conv(x);
- 361 12858 [236] 
- 362 12865 [236]   case justify of
- 363 12865 [236]     CENTER: xpos := xpos - width/2.0;
- 364 12894 [236]     RIGHT:  xpos := xpos - width
- 365 12918 [236]   end;
- 366 12933 [236] 
- 367 12933 [236]   { do not output partial strings }
- 368 12933 [236] 
- 369 12933 [236]   if (xpos<0.0) or
- 370 12946 [236]       (xpos+width>conv(MAXX)) then
- 371 12964 [236]     exit;
- 372 12969 [236] 
- 373 12969 [236]   _moveto(trunc(xpos + XOFFSET + 0.5),
- 374 12989 [236]           trunc(conv(y) + YOFFSET + 0.5));
- 375 13016 [236]   write(@PLOTTER,s);
- 376 13025 [236] end;
- 377 13025 [236] 
- 378 13026 [227] proc tics;
- 379 13026 [228] {********}
- 380 13026 [228] const eps = 0.001;
- 381 13029 [229] var r, base, frac: real;
- 382 13029 [232] begin
- 383 13029 [232] { ---------- Y axis ---------- }
- 384 13029 [232] 
- 385 13029 [232] daxis0 := (max-min)/2.0;
- 386 13050 [232] daxis := 1.0;
- 387 13063 [232] 
- 388 13069 [232] while daxis>daxis0 do
- 389 13075 [232]   daxis:=daxis*0.1;
- 390 13097 [232] 
- 391 13107 [232] while daxis<0.1*daxis0 do
- 392 13119 [232]   daxis:=daxis*10.0;
- 393 13142 [232] 
- 394 13152 [232] { round lower limit down to a tick }
- 395 13152 [232] r:=min/daxis;
- 396 13158 [232] if (r<=32767.0) and (r>=-32768.0) then begin
- 397 13199 [232]   axis:=daxis*conv(trunc(r));
- 398 13215 [232]   if axis>min+eps*daxis then
- 399 13241 [232]     axis:=axis-daxis;
- 400 13259 [232] end
- 401 13272 [232] else
- 402 13272 [232]   axis:=min;
- 403 13275 [232] min:=axis;
- 404 13287 [232] 
- 405 13299 [232] { round upper limit up to a tick }
- 406 13299 [232] r:=max/daxis;
- 407 13305 [232] if (r<=32767.0) and (r>=-32768.0) then begin
- 408 13346 [232]   nmax:=daxis*conv(trunc(r));
- 409 13362 [232]   if nmax<max-eps*daxis then
- 410 13388 [232]     nmax:=nmax+daxis;
- 411 13406 [232]   max:=nmax;
- 412 13419 [232] end;
- 413 13431 [232] 
- 414 13431 [232]   { ---------- X axis ---------- }
- 415 13431 [232] 
- 416 13431 [232]   daxis0 := (_max-_min)/5.0;
- 417 13450 [232] 
- 418 13457 [232]   base := 1.0;
- 419 13463 [232]   while base>daxis0 do
- 420 13475 [232]     base := base*0.1;
- 421 13497 [232]   while base*10.0<=daxis0 do
- 422 13520 [232]     base := base*10.0;
- 423 13542 [232] 
- 424 13552 [232]   frac := daxis0/base;
- 425 13558 [232]   if frac<=1.5 then
- 426 13583 [232]     xaxis := base
- 427 13587 [232]   else if frac<=3.5 then
- 428 13614 [232]     xaxis := 2.0*base
- 429 13624 [232]   else
- 430 13624 [232]     xaxis := 5.0*base;
- 431 13646 [232] 
- 432 13659 [232]   r := _min/xaxis;
- 433 13665 [232]   if (r<=32767.0) and (r>=-32768.0) then begin
- 434 13706 [232]     xsaxis := xaxis*conv(trunc(r));
- 435 13722 [232]     if xsaxis<_min-eps*xaxis then
- 436 13748 [232]       xsaxis := xsaxis+xaxis;
- 437 13766 [232]   end
- 438 13779 [232]   else
- 439 13779 [232]     xsaxis := _min;
- 440 13782 [232] end;
- 441 13794 [232] 
- 442 13795 [228] proc initialize;
- 443 13795 [229] {**************}
- 444 13795 [229] begin
- 445 13795 [229]   f:=_attach('FUNCDATA:X      ', 0, 1,
- 446 13824 [229]   FREAD + FSILENT, 0, 0, 'X');
- 447 13841 [229]   if _getsize <> DATAFILESIZE + 256 then
- 448 13857 [229]   _abortwith('Wrong data file size');
- 449 13891 [229]   _getdataheader(f);
- 450 13901 [229]   initparfile;
- 451 13905 [229]   initparams;
- 452 13909 [229]   parfileexists := fileexists('GRAPHPARS:X     ', 1);
- 453 13937 [229]   if parfileexists then loadparams;
- 454 13952 [229]   readparams;
- 455 13956 [229] end;
- 456 13956 [229] 
- 457 13957 [229] proc normalize;
- 458 13957 [230] {*************}
- 459 13957 [230] { normalize vertical axis }
- 460 13957 [230] var minbin, maxbin: integer;
- 461 13960 [232] begin
- 462 13960 [232]   min := 1.0e10;
- 463 13968 [232]   max := -1.0e10;
- 464 13980 [232]   minbin := 0;
- 465 13989 [232]   maxbin := 0;
- 466 13995 [232]   for i:=0 to _n-1 do begin
- 467 14021 [232]     _getreal(f,REALBASE+i,v);
- 468 14050 [232]     if v<min then begin
- 469 14063 [232]       min:=v;
- 470 14066 [232]       minbin := i;
- 471 14078 [232]     end;
- 472 14086 [232]     if v>max then begin
- 473 14099 [232]       max:=v;
- 474 14102 [232]       maxbin := i;
- 475 14114 [232]     end;
- 476 14122 [232]     if _datatype=DATA_COMPLEX then begin
- 477 14129 [232]       _getreal(f,COMPLEXBASE+i,v);
- 478 14162 [232]       if v<min then begin
- 479 14175 [232]         min:=v;
- 480 14178 [232]         minbin := i;
- 481 14190 [232]       end;
- 482 14198 [232]       if v>max then begin
- 483 14211 [232]         max:=v;
- 484 14214 [232]         maxbin := i;
- 485 14226 [232]       end;
- 486 14234 [232]     end;
- 487 14234 [232]   end;
- 488 14234 [232] end;
- 489 14248 [232] 
- 490 14249 [230] proc validate;
- 491 14249 [231] {************}
- 492 14249 [231] begin
- 493 14249 [231]   if (_strcmp(psval[P_MODE],'REAL') = 0) then
- 494 14278 [231]     realmode := true
- 495 14281 [231]   else if (_strcmp(psval[P_MODE],'IMAG')=0) then
- 496 14314 [231]     realmode := false
- 497 14317 [231]   else
- 498 14319 [231]     _abortwith('MODE must be REAL or IMAG');
- 499 14360 [231]   if (_strcmp(psval[P_YSCALE],'AUTO') = 0) then
- 500 14384 [231]     autoscale := true
- 501 14387 [231]   else if (_strcmp(psval[P_YSCALE],'MANUAL') = 0) then
- 502 14422 [231]     autoscale := false
- 503 14425 [231]   else
- 504 14427 [231]     _abortwith('YSCALE must be AUTO or MANUAL');
- 505 14472 [231] 
- 506 14472 [231] 
- 507 14472 [231]   if (pchanged[P_YMIN]) or (pchanged[P_YMAX]) then
- 508 14484 [231]   begin
- 509 14485 [231]     strcpyn('MANUAL', psval[P_YSCALE], 9);
- 510 14511 [231]     autoscale := false;
- 511 14513 [231]   end;
- 512 14517 [231]   if autoscale = true then
- 513 14523 [231]     normalize
- 514 14524 [231]   else begin
- 515 14534 [231]     min := prval[P_YMIN];
- 516 14539 [231]     max := prval[P_YMAX];
- 517 14556 [231]     if min >= max then
- 518 14574 [231]       _abortwith('YMIN must be smaller than YMAX');
- 519 14623 [231]   end;
- 520 14623 [231] end;
- 521 14623 [231] 
- 522 14624 [231] proc displayfuncpars;
- 523 14624 [232] {*******************}
- 524 14624 [232] begin
- 525 14624 [232]   writeln(
- 526 14629 [232]     'FUNCTION PARAMETERS (change with FUNCTION)');
- 527 14678 [232]   writeln('N      ',_n:9);
- 528 14704 [232] 
- 529 14704 [232]   write  ('Xmin   ',_min:9:2,'        ');
- 530 14737 [232]   if _domain = DOMAIN_TIME then
- 531 14743 [232]     writeln('DOMAIN ',' TIME')
- 532 14761 [232]   else
- 533 14767 [232]     writeln('DOMAIN ',' FREQUENCY');
- 534 14795 [232] 
- 535 14795 [232]   write  ('Xmax   ',_max:9:2,'        ');
- 536 14828 [232]   if _datatype = DATA_REAL then
- 537 14834 [232]     writeln('DATA   ',' REAL')
- 538 14852 [232]   else
- 539 14858 [232]     writeln('DATA   ',' COMPLEX');
- 540 14884 [232] end;
- 541 14884 [232] 
- 542 14885 [232] proc drawaxes;
- 543 14885 [233] {************}
- 544 14885 [233] var labelstr : cpnt;
- 545 14888 [234]     y: integer;
- 546 14888 [235] begin
- 547 14888 [235]   tics;
- 548 14894 [235]   labelstr := _new;
- 549 14900 [235]   _starttek(T_HALF);
- 550 14912 [235]   xs:=leftborder;
- 551 14915 [235]   xw:=MAXX-leftborder-border;
- 552 14928 [235]   ys:=border;
- 553 14935 [235]   yw:=MAXY-2*border;
- 554 14946 [235] 
- 555 14952 [235]   _drawrectangle(xs,ys,xs+xw,ys+yw);
- 556 14984 [235] 
- 557 14984 [235]   _setlinemode(DOTTED);
- 558 14992 [235]   _setchsize(2);
- 559 15000 [235] 
- 560 15000 [235]   repeat
- 561 15000 [235]     labelstr[0] := chr(0);
- 562 15004 [235]     y:=trunc((axis-min)/(max-min)*conv(yw)+0.5);
- 563 15049 [235]     if (y>0) and (y<yw) then
- 564 15070 [235]       _drawvector(xs,ys+y,xs+xw,ys+y);
- 565 15111 [235]     _moveto(5,ys+y-5);
- 566 15131 [235]     if daxis<0.001 then
- 567 15143 [235]       write(@labelstr,axis:1:4)
- 568 15162 [235]     else if daxis<0.01 then
- 569 15184 [235]       write(@labelstr,axis:1:3)
- 570 15203 [235]     else if daxis<0.1 then
- 571 15225 [235]       write(@labelstr,axis:1:2)
- 572 15244 [235]     else
- 573 15251 [235]       write(@labelstr,axis:1:1);
- 574 15276 [235]     _plotstr(labelstr,xs,
- 575 15280 [235]       ys + y, RIGHT);
- 576 15301 [235]     axis:=axis+daxis;
- 577 15307 [235]   until axis>max*1.0001;
- 578 15338 [235] 
- 579 15343 [235]   repeat
- 580 15343 [235]     labelstr[0] := chr(0);
- 581 15347 [235]     x:=trunc((xsaxis-_min)/
- 582 15365 [235]                  (_max-_min)*conv(xw)+0.5);
- 583 15392 [235]     if (x>0) and (x<xw) then
- 584 15413 [235]       _drawvector(xs+x,ys,xs+x,ys+yw);
- 585 15454 [235]     if xaxis<0.001 then
- 586 15466 [235]       write(@labelstr,xsaxis:1:4)
- 587 15485 [235]     else if xaxis<0.01 then
- 588 15507 [235]       write(@labelstr,xsaxis:1:3)
- 589 15526 [235]     else if xaxis<0.1 then
- 590 15548 [235]       write(@labelstr,xsaxis:1:2)
- 591 15567 [235]     else
- 592 15574 [235]       write(@labelstr,xsaxis:1:1);
- 593 15599 [235]     _plotstr(labelstr,xs + x,
- 594 15607 [235]       ys - trunc(0.4
- 595 15616 [235]        * conv(border)), CENTER);
- 596 15636 [235]     xsaxis:=xsaxis+xaxis;
- 597 15642 [235]   until xsaxis>_max;
- 598 15661 [235] end;
- 599 15671 [235] 
- 600 15672 [233] func ypos(i: integer): integer;
- 601 15672 [236] var j: integer;
- 602 15675 [237]     v: real;
- 603 15675 [238] begin
- 604 15675 [238]   j := i;
- 605 15677 [238]   if _domain = DOMAIN_FREQ then begin
- 606 15692 [238]     j := j + _n div 2;
- 607 15705 [238]     if j >= _n then
- 608 15715 [238]       j := j - _n;
- 609 15727 [238]   end;
- 610 15736 [238] 
- 611 15736 [238]   if realmode then
- 612 15736 [238]     _getreal(f, REALBASE+j, v)
- 613 15754 [238]   else
- 614 15772 [238]     _getreal(f, COMPLEXBASE+j, v);
- 615 15805 [238]   if (v < min) then
- 616 15818 [238]     ypos := 0
- 617 15821 [238]   else if (v > max) then
- 618 15843 [238]     ypos := yw
- 619 15846 [238]   else
- 620 15846 [238]     ypos:=trunc((v-min)/(max-min)*conv(yw)+0.5);
- 621 15897 [238] end;
- 622 15902 [238] 
- 623 15903 [235] proc drawdata;
- 624 15903 [236] {************}
- 625 15903 [236] begin
- 626 15903 [236]   _setlinemode(SOLID);
- 627 15916 [236]   _setchsize(1);
- 628 15924 [236]   _startdraw(xs,ys+ypos(0));
- 629 15949 [236]   for i:=1 to _n-1 do begin
- 630 15971 [236]     x:=trunc(conv(xw)/conv(_n)*conv(i)+0.5);
- 631 15995 [236]     _draw(xs+x,ys+ypos(i));
- 632 16032 [236]   end;
- 633 16032 [236]   _enddraw;
- 634 16050 [236] end;
- 635 16050 [236] 
- 636 16051 [236] proc cleanup;
- 637 16051 [237] {***********}
- 638 16051 [237] begin
- 639 16051 [237]   storeparams;
- 640 16060 [237]   close(f);
- 641 16066 [237]   _moveto(1,MAXY-24);
- 642 16080 [237]   _endtek;
- 643 16084 [237] end;
- 644 16084 [237] 
- 645 16085 [237] begin
- 646 16085 [237]   initialize;
- 647 16091 [237]   validate;
- 648 16095 [237]   displayfuncpars;
- 649 16099 [237]   displayparams;
- 650 16103 [237]   drawaxes;
- 651 16107 [237]   drawdata;
- 652 16111 [237]   cleanup;
- 653 16115 [237] end. 
-Code length:           16114
+   9 10773 [177] 
+  10 10773 [177] const
+  11 10773 [177]   border = 200;
+  12 10776 [178]   leftborder = 480;
+  13 10776 [179] 
+  14 10776 [179]   LEFT = 0;     { to justify in _plotstr }
+  15 10776 [180]   CENTER = 1;
+  16 10776 [181]   RIGHT = 2;
+  17 10776 [182] 
+  18 10776 [182]   P_MODE   = 0;
+  19 10776 [183]   P_YSCALE = 1;
+  20 10776 [184]   P_YMIN   = 2;
+  21 10776 [185]   P_YMAX   = 3;
+  22 10776 [186] 
+  23 10776 [186]   MAXPAR   = 3;
+  24 10776 [187]   NAMESIZE = 15;
+  25 10776 [188] 
+  26 10776 [188]   PARVERSION = 1;
+  27 10776 [189]   PARSIZE    = 256;
+  28 10776 [190]   STRSIZE    = 9;   { 8 chars + chr(0) }
+  29 10776 [191] 
+  30 10776 [191] var
+  31 10776 [191]   pname: array[MAXPAR] of cpnt;
+  32 10776 [192]   ptype: array[MAXPAR] of char;
+  33 10776 [193]   pchanged: array[MAXPAR] of boolean;
+  34 10776 [194] 
+  35 10776 [194]   pival: array[MAXPAR] of integer;
+  36 10776 [195]   prval: array[MAXPAR] of real;
+  37 10776 [196]   psval: array[MAXPAR] of cpnt;
+  38 10776 [197] 
+  39 10776 [197]   parfileexists: boolean;
+  40 10776 [198] 
+  41 10776 [198]   nparams: integer;
+  42 10776 [199]   ibase: integer;    { word address }
+  43 10776 [200]   rbase: integer;    { real address }
+  44 10776 [201]   sbase: integer;    { byte address }
+  45 10776 [202] 
+  46 10776 [202]   f:file;
+  47 10776 [203]   i:integer;
+  48 10776 [204]   xaxis, xsaxis:real;
+  49 10776 [206]   axis, daxis, daxis0:real;
+  50 10776 [209]   xs, xw, ys, yw, x:integer;
+  51 10776 [214]   min, max, nmax, v:real;
+  52 10776 [218]   realmode, autoscale: boolean;
+  53 10776 [220] 
+  54 10776 [220] proc initparfile;
+  55 10776 [221] {***************}
+  56 10776 [221] begin
+  57 10776 [221]   nparams := MAXPAR + 1;
+  58 10785 [221] 
+  59 10790 [221]   { Parameter file layout:
+  60 10790 [221]       word 0 : version
+  61 10790 [221]       word 1 : number of parameters
+  62 10790 [221] 
+  63 10790 [221]       integer values:
+  64 10790 [221]         nparams words, starting at ibase
+  65 10790 [221] 
+  66 10790 [221]       real values:
+  67 10790 [221]         nparams reals, starting at rbase
+  68 10790 [221] 
+  69 10790 [221]       string values:
+  70 10790 [221]         nparams slots of STRSIZE bytes,
+  71 10790 [221]         each containing up to 8 chars + chr(0)
+  72 10790 [221] 
+  73 10790 [221]       complete file size is fixed at 256 bytes
+  74 10790 [221]   }
+  75 10790 [221] 
+  76 10790 [221]   ibase := 2;
+  77 10792 [221] 
+  78 10796 [221]   { rbase is expressed in real addresses.
+  79 10796 [221]     Round integer section up to next real boundary. }
+  80 10796 [221]   rbase := (ibase + nparams + 1) shr 1;
+  81 10810 [221] 
+  82 10815 [221]   { sbase is expressed in byte addresses }
+  83 10815 [221]   sbase := 4 * (rbase + nparams);
+  84 10826 [221] 
+  85 10831 [221] end;
+  86 10831 [221] 
+  87 10832 [221] func fileexists(nm: array[NAMESIZE] of char;
+  88 10832 [224]                            drv: integer): boolean;
+  89 10832 [225] {************************************************}
+  90 10832 [225] const aprepdo  = $f4a7;
+  91 10835 [226]       agetentx = $f63a;
+  92 10835 [227]       aenddo   = $f625;
+  93 10835 [228] 
+  94 10835 [228]       NUMENTRIES = 255;
+  95 10835 [229] 
+  96 10835 [229] mem   filtyp = $0300: char&;
+  97 10835 [230]       fillnk = $031e: integer&;
+  98 10835 [231]       scyfc  = $037c: integer&;
+  99 10835 [232]       fildrv = $00dc: integer&;
+ 100 10835 [233]       FILNAM = $0301: array[NAMESIZE] of char&;
+ 101 10835 [234] 
+ 102 10835 [234] var ent,i: integer;
+ 103 10835 [236]     found,last: boolean;
+ 104 10835 [238] 
+ 105 10835 [238]     func same: boolean;
+ 106 10835 [240]     var k: integer;
+ 107 10838 [241]         equal: boolean;
+ 108 10838 [242]     begin
+ 109 10838 [242]       equal:=true;
+ 110 10842 [242]       k:=0;
+ 111 10848 [242]       while equal and (k<=NAMESIZE) do begin
+ 112 10867 [242]         equal:=nm[k]=FILNAM[k];
+ 113 10882 [242]         k:=k+1;
+ 114 10895 [242]       end;
+ 115 10900 [242]       same:=equal;
+ 116 10903 [242]     end;
+ 117 10911 [242] 
+ 118 10912 [240] begin
+ 119 10912 [240]   fildrv:=drv;
+ 120 10914 [240]   call(aprepdo);
+ 121 10926 [240]   ent:=0;
+ 122 10928 [240]   found:=false;
+ 123 10934 [240]   last:=false;
+ 124 10940 [240]   repeat
+ 125 10944 [240]     scyfc:=ent;
+ 126 10944 [240]     call(agetentx);
+ 127 10957 [240]     last:=filtyp=chr(0);
+ 128 10963 [240]     if not last then begin
+ 129 10974 [240]       found:=same;
+ 130 10983 [240]       if (fillnk and $80)<>0 then
+ 131 10996 [240]         found:=false;
+ 132 11002 [240]     end;
+ 133 11006 [240]     ent:=ent+1;
+ 134 11012 [240]   until found or last or (ent>=NUMENTRIES);
+ 135 11033 [240]   call(aenddo);
+ 136 11041 [240]   fileexists:=found;
+ 137 11041 [240] end;
+ 138 11049 [240] 
+ 139 11050 [223] proc displayparams;
+ 140 11050 [224] {*****************}
+ 141 11050 [224] const
+ 142 11050 [224]   columns   = 2;
+ 143 11053 [225]   namefield = 7;
+ 144 11053 [226]   valfield  = 9;
+ 145 11053 [227] var i,col,row,rows,k,padding: integer;
+ 146 11053 [233] begin
+ 147 11053 [233]   writeln
+ 148 11053 [233]     ('DISPLAY PARAMETERS (change with TEKGRAPH)');
+ 149 11103 [233] 
+ 150 11103 [233]   rows := (MAXPAR + columns) div columns;
+ 151 11110 [233]   padding := (48 div columns) - namefield - valfield;
+ 152 11125 [233] 
+ 153 11130 [233]   for row := 0 to rows - 1 do begin
+ 154 11152 [233]     for col := 0 to columns - 1 do begin
+ 155 11172 [233]       i := row + col * rows;
+ 156 11180 [233]       if i <= MAXPAR then begin
+ 157 11197 [233]         if col > 0 then
+ 158 11206 [233]           for k := 1 to padding do write(' ');
+ 159 11231 [233]         write(field(pname[i],namefield));
+ 160 11264 [233]         case ptype[i] of
+ 161 11268 [233]           'i': write(pival[i]:valfield);
+ 162 11295 [233]           'r': write(prval[i]:valfield:2);
+ 163 11328 [233]           's': write(field(psval[i],valfield))
+ 164 11356 [233]           else write('undefined')
+ 165 11370 [233]         end {case};
+ 166 11372 [233]       end {if};
+ 167 11372 [233]     end {column};
+ 168 11372 [233]     writeln;
+ 169 11386 [233]   end {row};
+ 170 11392 [233] end;
+ 171 11406 [233] 
+ 172 11407 [224] proc setparam(p: integer; value: cpnt);
+ 173 11407 [227] {*************************************}
+ 174 11407 [227] begin
+ 175 11407 [227]   pchanged[p] := true;
+ 176 11418 [227]   case ptype[p] of
+ 177 11426 [227]   'i':  begin
+ 178 11437 [227]           pival[p] := round(str_real(value));
+ 179 11461 [227]         end;
+ 180 11465 [227]   'r':  begin
+ 181 11475 [227]           prval[p] := str_real(value);
+ 182 11494 [227]         end;
+ 183 11501 [227]   's':  begin
+ 184 11511 [227]           strcpyn(value, psval[p],9);
+ 185 11531 [227]         end
+ 186 11531 [227]   end {case }
+ 187 11533 [227] end;
+ 188 11533 [227] 
+ 189 11534 [225] func findparam(name: cpnt): integer;
+ 190 11534 [228] {**********************************}
+ 191 11534 [228] var p: integer;
+ 192 11537 [229]     found: boolean;
+ 193 11537 [230] begin
+ 194 11537 [230]   p := 0;
+ 195 11541 [230]   repeat
+ 196 11545 [230]     found := _strcmp(pname[p], name) = 0;
+ 197 11567 [230]     p := p + 1;
+ 198 11578 [230]   until found or (p > MAXPAR);
+ 199 11594 [230] 
+ 200 11598 [230]   if found then
+ 201 11598 [230]     findparam := p - 1
+ 202 11609 [230]   else
+ 203 11611 [230]     findparam := -1;
+ 204 11621 [230] end;
+ 205 11626 [230] 
+ 206 11627 [227] proc readparams;
+ 207 11627 [228] {**************}
+ 208 11627 [228] var name, value: cpnt;
+ 209 11630 [230]     done: boolean;
+ 210 11630 [231]     p: integer;
+ 211 11630 [232] begin
+ 212 11630 [232]   name  := _allocate(9);
+ 213 11642 [232]   value := _allocate(17);
+ 214 11656 [232]   repeat
+ 215 11660 [232]     _nextparam(name, value, done);
+ 216 11682 [232]     if not done then begin
+ 217 11687 [232]       p := findparam(name);
+ 218 11702 [232]       if p < 0 then
+ 219 11712 [232]         _abortwith('Unknown parameter')
+ 220 11736 [232]       else
+ 221 11742 [232]         setparam(p,value);
+ 222 11759 [232]     end;
+ 223 11759 [232]   until done;
+ 224 11759 [232] end;
+ 225 11766 [232] 
+ 226 11767 [228] proc initparams;
+ 227 11767 [229] {**************}
+ 228 11767 [229] var i: integer;
+ 229 11770 [230] begin
+ 230 11770 [230]   for i:=0 to MAXPAR do begin
+ 231 11789 [230]     psval[i]    := nil;
+ 232 11795 [230]     pchanged[i] := false;
+ 233 11805 [230]   end;
+ 234 11809 [230] 
+ 235 11823 [230]   pname[P_MODE] := 'MODE';
+ 236 11832 [230]   ptype[P_MODE] := 's';
+ 237 11840 [230]   psval[P_MODE] := _allocate(9);
+ 238 11856 [230]   strcpyn('REAL',psval[P_MODE],9);
+ 239 11881 [230] 
+ 240 11881 [230]   pname[P_YSCALE] := 'YSCALE';
+ 241 11892 [230]   ptype[P_YSCALE] := 's';
+ 242 11900 [230]   psval[P_YSCALE] := _allocate(9);
+ 243 11916 [230]   strcpyn('AUTO',psval[P_YSCALE],9);
+ 244 11941 [230] 
+ 245 11941 [230]   pname[P_YMIN] := 'YMIN';
+ 246 11950 [230]   ptype[P_YMIN] := 'r';
+ 247 11958 [230]   prval[P_YMIN] := -1.0;
+ 248 11973 [230] 
+ 249 11981 [230]   pname[P_YMAX] := 'YMAX';
+ 250 11990 [230]   ptype[P_YMAX] := 'r';
+ 251 11998 [230]   prval[P_YMAX] := 1.0;
+ 252 12013 [230] end;
+ 253 12020 [230] 
+ 254 12021 [229] proc loadparams;
+ 255 12021 [230] {**************}
+ 256 12021 [230] var
+ 257 12021 [230]   f: file;
+ 258 12024 [231]   p,i,addr,version,np,ii: integer;
+ 259 12024 [237]   ir: real;
+ 260 12024 [238]   s: cpnt;
+ 261 12024 [239] begin
+ 262 12024 [239]   f:=_attach('GRAPHPARS:X     ',0,1,FREAD+FSILENT,
+ 263 12054 [239]                                     PARSIZE,0,'X');
+ 264 12068 [239] 
+ 265 12072 [239]   if _getsize<>PARSIZE then
+ 266 12081 [239]     _abortwith('Wrong parameter file size');
+ 267 12119 [239] 
+ 268 12119 [239]   _getword(f,0,version);
+ 269 12139 [239]   if version<>PARVERSION then
+ 270 12145 [239]     _abortwith('Wrong parameter file version');
+ 271 12186 [239] 
+ 272 12186 [239]   _getword(f,1,np);
+ 273 12206 [239]   if np<>nparams then
+ 274 12210 [239]     _abortwith('Wrong number of parameters');
+ 275 12253 [239] 
+ 276 12253 [239]   for p:=0 to MAXPAR do begin
+ 277 12270 [239]     _getword(f,ibase+p,ii);
+ 278 12297 [239]     pival[p]:=ii;
+ 279 12301 [239]   end;
+ 280 12309 [239] 
+ 281 12323 [239]   for p:=0 to MAXPAR do begin
+ 282 12340 [239]     _getreal(f,rbase+p,ir);
+ 283 12371 [239]     prval[p]:=ir;
+ 284 12378 [239]   end;
+ 285 12391 [239] 
+ 286 12405 [239]   for p:=0 to MAXPAR do begin
+ 287 12422 [239]     if psval[p]<>nil then begin
+ 288 12433 [239]       s:=psval[p];
+ 289 12440 [239]       addr:=sbase+STRSIZE*p;
+ 290 12454 [239]       for i:=0 to STRSIZE-1 do begin
+ 291 12484 [239]         getbyte(f,addr+i,ii);
+ 292 12503 [239]         s[i]:=chr(ii);
+ 293 12511 [239]       end;
+ 294 12516 [239]     end;
+ 295 12530 [239]   end;
+ 296 12530 [239] 
+ 297 12544 [239]   close(f);
+ 298 12550 [239] end;
+ 299 12550 [239] 
+ 300 12551 [230] proc storeparams;
+ 301 12551 [231] {***************}
+ 302 12551 [231] const size = 256;
+ 303 12554 [232] var f: file;
+ 304 12554 [233]     p, i, addr: integer;
+ 305 12554 [236]     s: cpnt;
+ 306 12554 [237] begin
+ 307 12554 [237]   if parfileexists then
+ 308 12556 [237]     f := _attach('GRAPHPARS:X     ',0,1,
+ 309 12587 [237]                   FWRITE+FSILENT,size,0,'X')
+ 310 12599 [237]   else begin
+ 311 12612 [237]     f := _attach('GRAPHPARS:X     ',0,1,
+ 312 12636 [237]                   FNEW+FSILENT,size,0,'X');
+ 313 12654 [237]     parfileexists := true;
+ 314 12660 [237]   end;
+ 315 12664 [237] 
+ 316 12664 [237]   if _getsize <> size then
+ 317 12673 [237]     _abortwith('Wrong parameter file size');
+ 318 12711 [237] 
+ 319 12711 [237]   { header }
+ 320 12711 [237]   _putword(f,0,PARVERSION);
+ 321 12725 [237]   _putword(f,1,nparams);
+ 322 12741 [237] 
+ 323 12741 [237]   { integer values }
+ 324 12741 [237]   for p:=0 to MAXPAR do
+ 325 12749 [237]     _putword(f,ibase+p,pival[p]);
+ 326 12785 [237] 
+ 327 12799 [237]   { real values }
+ 328 12799 [237]   for p:=0 to MAXPAR do
+ 329 12807 [237]     _putreal(f,rbase+p,prval[p]);
+ 330 12848 [237] 
+ 331 12862 [237]     { string values: fixed 9-byte slots }
+ 332 12862 [237]     for p:=0 to MAXPAR do begin
+ 333 12879 [237]       addr:=sbase+STRSIZE*p;
+ 334 12885 [237]       if psval[p]=nil then begin
+ 335 12906 [237]         for i:=0 to STRSIZE-1 do
+ 336 12919 [237]           putbyte(f,addr+i,0);
+ 337 12946 [237]       end else begin
+ 338 12963 [237]         s:=psval[p];
+ 339 12967 [237]         for i:=0 to STRSIZE-1 do
+ 340 12985 [237]           putbyte(f,addr+i,ord(s[i]));
+ 341 13020 [237]       end;
+ 342 13034 [237]     end;
+ 343 13034 [237] 
+ 344 13048 [237]   close(f);
+ 345 13054 [237] end;
+ 346 13054 [237] 
+ 347 13055 [231] proc _plotstr(s: cpnt; x, y: integer;
+ 348 13055 [235]                               justify: integer);
+ 349 13055 [236] {**********************************************}
+ 350 13055 [236] const
+ 351 13055 [236]   CHARWIDTH = 50.568;   { _setchsize(2) }
+ 352 13058 [237]   XOFFSET   = 8.0;
+ 353 13058 [238]   YOFFSET   = -16.0;
+ 354 13058 [239] var
+ 355 13058 [239]   xpos: real;
+ 356 13058 [240]   width: real;
+ 357 13058 [241] begin
+ 358 13058 [241]   width := conv(_strlen(s)) * CHARWIDTH;
+ 359 13079 [241] 
+ 360 13086 [241]   xpos := conv(x);
+ 361 13090 [241] 
+ 362 13097 [241]   case justify of
+ 363 13097 [241]     CENTER: xpos := xpos - width/2.0;
+ 364 13126 [241]     RIGHT:  xpos := xpos - width
+ 365 13150 [241]   end;
+ 366 13165 [241] 
+ 367 13165 [241]   { do not output partial strings }
+ 368 13165 [241] 
+ 369 13165 [241]   if (xpos<0.0) or
+ 370 13178 [241]       (xpos+width>conv(MAXX)) then
+ 371 13196 [241]     exit;
+ 372 13201 [241] 
+ 373 13201 [241]   _moveto(trunc(xpos + XOFFSET + 0.5),
+ 374 13221 [241]           trunc(conv(y) + YOFFSET + 0.5));
+ 375 13248 [241]   write(@PLOTTER,s);
+ 376 13257 [241] end;
+ 377 13257 [241] 
+ 378 13258 [232] proc tics;
+ 379 13258 [233] {********}
+ 380 13258 [233] const eps = 0.001;
+ 381 13261 [234] var r, base, frac: real;
+ 382 13261 [237] begin
+ 383 13261 [237] { ---------- Y axis ---------- }
+ 384 13261 [237] 
+ 385 13261 [237] daxis0 := (max-min)/2.0;
+ 386 13282 [237] daxis := 1.0;
+ 387 13295 [237] 
+ 388 13301 [237] while daxis>daxis0 do
+ 389 13307 [237]   daxis:=daxis*0.1;
+ 390 13329 [237] 
+ 391 13339 [237] while daxis<0.1*daxis0 do
+ 392 13351 [237]   daxis:=daxis*10.0;
+ 393 13374 [237] 
+ 394 13384 [237] { round lower limit down to a tick }
+ 395 13384 [237] r:=min/daxis;
+ 396 13390 [237] if (r<=32767.0) and (r>=-32768.0) then begin
+ 397 13431 [237]   axis:=daxis*conv(trunc(r));
+ 398 13447 [237]   if axis>min+eps*daxis then
+ 399 13473 [237]     axis:=axis-daxis;
+ 400 13491 [237] end
+ 401 13504 [237] else
+ 402 13504 [237]   axis:=min;
+ 403 13507 [237] min:=axis;
+ 404 13519 [237] 
+ 405 13531 [237] { round upper limit up to a tick }
+ 406 13531 [237] r:=max/daxis;
+ 407 13537 [237] if (r<=32767.0) and (r>=-32768.0) then begin
+ 408 13578 [237]   nmax:=daxis*conv(trunc(r));
+ 409 13594 [237]   if nmax<max-eps*daxis then
+ 410 13620 [237]     nmax:=nmax+daxis;
+ 411 13638 [237]   max:=nmax;
+ 412 13651 [237] end;
+ 413 13663 [237] 
+ 414 13663 [237]   { ---------- X axis ---------- }
+ 415 13663 [237] 
+ 416 13663 [237]   daxis0 := (_max-_min)/5.0;
+ 417 13682 [237] 
+ 418 13689 [237]   base := 1.0;
+ 419 13695 [237]   while base>daxis0 do
+ 420 13707 [237]     base := base*0.1;
+ 421 13729 [237]   while base*10.0<=daxis0 do
+ 422 13752 [237]     base := base*10.0;
+ 423 13774 [237] 
+ 424 13784 [237]   frac := daxis0/base;
+ 425 13790 [237]   if frac<=1.5 then
+ 426 13815 [237]     xaxis := base
+ 427 13819 [237]   else if frac<=3.5 then
+ 428 13846 [237]     xaxis := 2.0*base
+ 429 13856 [237]   else
+ 430 13856 [237]     xaxis := 5.0*base;
+ 431 13878 [237] 
+ 432 13891 [237]   r := _min/xaxis;
+ 433 13897 [237]   if (r<=32767.0) and (r>=-32768.0) then begin
+ 434 13938 [237]     xsaxis := xaxis*conv(trunc(r));
+ 435 13954 [237]     if xsaxis<_min-eps*xaxis then
+ 436 13980 [237]       xsaxis := xsaxis+xaxis;
+ 437 13998 [237]   end
+ 438 14011 [237]   else
+ 439 14011 [237]     xsaxis := _min;
+ 440 14014 [237] end;
+ 441 14026 [237] 
+ 442 14027 [233] proc initialize;
+ 443 14027 [234] {**************}
+ 444 14027 [234] begin
+ 445 14027 [234]   f:=_attach('FUNCDATA:X      ', 0, 1,
+ 446 14056 [234]   FREAD + FSILENT, 0, 0, 'X');
+ 447 14073 [234]   if _getsize <> DATAFILESIZE + 256 then
+ 448 14089 [234]   _abortwith('Wrong data file size');
+ 449 14123 [234]   _getdataheader(f);
+ 450 14133 [234]   initparfile;
+ 451 14137 [234]   initparams;
+ 452 14141 [234]   parfileexists := fileexists('GRAPHPARS:X     ', 1);
+ 453 14169 [234]   if parfileexists then loadparams;
+ 454 14184 [234]   readparams;
+ 455 14188 [234] end;
+ 456 14188 [234] 
+ 457 14189 [234] proc normalize;
+ 458 14189 [235] {*************}
+ 459 14189 [235] { normalize vertical axis }
+ 460 14189 [235] var minbin, maxbin: integer;
+ 461 14192 [237] begin
+ 462 14192 [237]   min := 1.0e10;
+ 463 14200 [237]   max := -1.0e10;
+ 464 14212 [237]   minbin := 0;
+ 465 14221 [237]   maxbin := 0;
+ 466 14227 [237]   for i:=0 to _n-1 do begin
+ 467 14253 [237]     _getreal(f,REALBASE+i,v);
+ 468 14282 [237]     if v<min then begin
+ 469 14295 [237]       min:=v;
+ 470 14298 [237]       minbin := i;
+ 471 14310 [237]     end;
+ 472 14318 [237]     if v>max then begin
+ 473 14331 [237]       max:=v;
+ 474 14334 [237]       maxbin := i;
+ 475 14346 [237]     end;
+ 476 14354 [237]     if _datatype=DATA_COMPLEX then begin
+ 477 14361 [237]       _getreal(f,COMPLEXBASE+i,v);
+ 478 14394 [237]       if v<min then begin
+ 479 14407 [237]         min:=v;
+ 480 14410 [237]         minbin := i;
+ 481 14422 [237]       end;
+ 482 14430 [237]       if v>max then begin
+ 483 14443 [237]         max:=v;
+ 484 14446 [237]         maxbin := i;
+ 485 14458 [237]       end;
+ 486 14466 [237]     end;
+ 487 14466 [237]   end;
+ 488 14466 [237] end;
+ 489 14480 [237] 
+ 490 14481 [235] proc validate;
+ 491 14481 [236] {************}
+ 492 14481 [236] begin
+ 493 14481 [236]   if (_strcmp(psval[P_MODE],'REAL') = 0) then
+ 494 14510 [236]     realmode := true
+ 495 14513 [236]   else if (_strcmp(psval[P_MODE],'IMAG')=0) then
+ 496 14546 [236]     realmode := false
+ 497 14549 [236]   else
+ 498 14551 [236]     _abortwith('MODE must be REAL or IMAG');
+ 499 14592 [236]   if (_strcmp(psval[P_YSCALE],'AUTO') = 0) then
+ 500 14616 [236]     autoscale := true
+ 501 14619 [236]   else if (_strcmp(psval[P_YSCALE],'MANUAL') = 0) then
+ 502 14654 [236]     autoscale := false
+ 503 14657 [236]   else
+ 504 14659 [236]     _abortwith('YSCALE must be AUTO or MANUAL');
+ 505 14704 [236] 
+ 506 14704 [236] 
+ 507 14704 [236]   if (pchanged[P_YMIN]) or (pchanged[P_YMAX]) then
+ 508 14716 [236]   begin
+ 509 14717 [236]     strcpyn('MANUAL', psval[P_YSCALE], 9);
+ 510 14743 [236]     autoscale := false;
+ 511 14745 [236]   end;
+ 512 14749 [236]   if autoscale = true then
+ 513 14755 [236]     normalize
+ 514 14756 [236]   else begin
+ 515 14766 [236]     min := prval[P_YMIN];
+ 516 14771 [236]     max := prval[P_YMAX];
+ 517 14788 [236]     if min >= max then
+ 518 14806 [236]       _abortwith('YMIN must be smaller than YMAX');
+ 519 14855 [236]   end;
+ 520 14855 [236] end;
+ 521 14855 [236] 
+ 522 14856 [236] proc displayfuncpars;
+ 523 14856 [237] {*******************}
+ 524 14856 [237] begin
+ 525 14856 [237]   writeln(
+ 526 14861 [237]     'FUNCTION PARAMETERS (change with FUNCTION)');
+ 527 14910 [237]   writeln('N      ',_n:9);
+ 528 14936 [237] 
+ 529 14936 [237]   write  ('Xmin   ',_min:9:2,'        ');
+ 530 14969 [237]   if _domain = DOMAIN_TIME then
+ 531 14975 [237]     writeln('DOMAIN ',' TIME')
+ 532 14993 [237]   else
+ 533 14999 [237]     writeln('DOMAIN ',' FREQUENCY');
+ 534 15027 [237] 
+ 535 15027 [237]   write  ('Xmax   ',_max:9:2,'        ');
+ 536 15060 [237]   if _datatype = DATA_REAL then
+ 537 15066 [237]     writeln('DATA   ',' REAL')
+ 538 15084 [237]   else
+ 539 15090 [237]     writeln('DATA   ',' COMPLEX');
+ 540 15116 [237] end;
+ 541 15116 [237] 
+ 542 15117 [237] proc drawaxes;
+ 543 15117 [238] {************}
+ 544 15117 [238] var labelstr : cpnt;
+ 545 15120 [239]     y: integer;
+ 546 15120 [240] begin
+ 547 15120 [240]   tics;
+ 548 15126 [240]   labelstr := _new;
+ 549 15132 [240]   _starttek(T_HALF);
+ 550 15144 [240]   xs:=leftborder;
+ 551 15147 [240]   xw:=MAXX-leftborder-border;
+ 552 15160 [240]   ys:=border;
+ 553 15167 [240]   yw:=MAXY-2*border;
+ 554 15178 [240] 
+ 555 15184 [240]   _drawrectangle(xs,ys,xs+xw,ys+yw);
+ 556 15216 [240] 
+ 557 15216 [240]   _setlinemode(DOTTED);
+ 558 15224 [240]   _setchsize(2);
+ 559 15232 [240]   _plotstr(_title,MAXX div 2, MAXY-50, CENTER);
+ 560 15256 [240]   _plotstr(_description,MAXX div 2, MAXY-125, CENTER);
+ 561 15280 [240]   if (_domain = DOMAIN_FREQ) then
+ 562 15287 [240]     _plotstr('FREQUENCY',MAXX div 2, 50, CENTER)
+ 563 15312 [240]   else
+ 564 15318 [240]     _plotstr('FREQUENCY',MAXX div 2, 50, CENTER)
+ 565 15343 [240]   repeat
+ 566 15349 [240]     labelstr[0] := chr(0);
+ 567 15353 [240]     y:=trunc((axis-min)/(max-min)*conv(yw)+0.5);
+ 568 15398 [240]     if (y>0) and (y<yw) then
+ 569 15419 [240]       _drawvector(xs,ys+y,xs+xw,ys+y);
+ 570 15460 [240]     _moveto(5,ys+y-5);
+ 571 15480 [240]     if daxis<0.001 then
+ 572 15492 [240]       write(@labelstr,axis:1:4)
+ 573 15511 [240]     else if daxis<0.01 then
+ 574 15533 [240]       write(@labelstr,axis:1:3)
+ 575 15552 [240]     else if daxis<0.1 then
+ 576 15574 [240]       write(@labelstr,axis:1:2)
+ 577 15593 [240]     else
+ 578 15600 [240]       write(@labelstr,axis:1:1);
+ 579 15625 [240]     _plotstr(labelstr,xs,
+ 580 15629 [240]       ys + y, RIGHT);
+ 581 15650 [240]     axis:=axis+daxis;
+ 582 15656 [240]   until axis>max*1.0001;
+ 583 15687 [240] 
+ 584 15692 [240]   repeat
+ 585 15692 [240]     labelstr[0] := chr(0);
+ 586 15696 [240]     x:=trunc((xsaxis-_min)/
+ 587 15714 [240]                  (_max-_min)*conv(xw)+0.5);
+ 588 15741 [240]     if (x>0) and (x<xw) then
+ 589 15762 [240]       _drawvector(xs+x,ys,xs+x,ys+yw);
+ 590 15803 [240]     if xaxis<0.001 then
+ 591 15815 [240]       write(@labelstr,xsaxis:1:4)
+ 592 15834 [240]     else if xaxis<0.01 then
+ 593 15856 [240]       write(@labelstr,xsaxis:1:3)
+ 594 15875 [240]     else if xaxis<0.1 then
+ 595 15897 [240]       write(@labelstr,xsaxis:1:2)
+ 596 15916 [240]     else
+ 597 15923 [240]       write(@labelstr,xsaxis:1:1);
+ 598 15948 [240]     _plotstr(labelstr,xs + x,
+ 599 15956 [240]       ys - trunc(0.4
+ 600 15965 [240]        * conv(border)), CENTER);
+ 601 15985 [240]     xsaxis:=xsaxis+xaxis;
+ 602 15991 [240]   until xsaxis>_max;
+ 603 16010 [240] end;
+ 604 16020 [240] 
+ 605 16021 [238] func ypos(i: integer): integer;
+ 606 16021 [241] {*****************************}
+ 607 16021 [241] var j: integer;
+ 608 16024 [242]     v: real;
+ 609 16024 [243] begin
+ 610 16024 [243]   j := i;
+ 611 16026 [243]   if _domain = DOMAIN_FREQ then begin
+ 612 16041 [243]     j := j + _n div 2;
+ 613 16054 [243]     if j >= _n then
+ 614 16064 [243]       j := j - _n;
+ 615 16076 [243]   end;
+ 616 16085 [243] 
+ 617 16085 [243]   if realmode then
+ 618 16085 [243]     _getreal(f, REALBASE+j, v)
+ 619 16103 [243]   else
+ 620 16121 [243]     _getreal(f, COMPLEXBASE+j, v);
+ 621 16154 [243]   if (v < min) then
+ 622 16167 [243]     ypos := 0
+ 623 16170 [243]   else if (v > max) then
+ 624 16192 [243]     ypos := yw
+ 625 16195 [243]   else
+ 626 16195 [243]     ypos:=trunc((v-min)/(max-min)*conv(yw)+0.5);
+ 627 16246 [243] end;
+ 628 16251 [243] 
+ 629 16252 [240] proc drawdata;
+ 630 16252 [241] {************}
+ 631 16252 [241] begin
+ 632 16252 [241]   _setlinemode(SOLID);
+ 633 16265 [241]   _setchsize(1);
+ 634 16273 [241]   _startdraw(xs,ys+ypos(0));
+ 635 16298 [241]   for i:=1 to _n-1 do begin
+ 636 16320 [241]     x:=trunc(conv(xw)/conv(_n)*conv(i)+0.5);
+ 637 16344 [241]     _draw(xs+x,ys+ypos(i));
+ 638 16381 [241]   end;
+ 639 16381 [241]   _enddraw;
+ 640 16399 [241] end;
+ 641 16399 [241] 
+ 642 16400 [241] proc cleanup;
+ 643 16400 [242] {***********}
+ 644 16400 [242] begin
+ 645 16400 [242]   storeparams;
+ 646 16409 [242]   close(f);
+ 647 16415 [242]   _moveto(1,MAXY-24);
+ 648 16429 [242]   _endtek;
+ 649 16433 [242] end;
+ 650 16433 [242] 
+ 651 16434 [242] begin
+ 652 16434 [242]   initialize;
+ 653 16440 [242]   validate;
+ 654 16444 [242]   displayfuncpars;
+ 655 16448 [242]   displayparams;
+ 656 16452 [242]   drawaxes;
+ 657 16456 [242]   drawdata;
+ 658 16460 [242]   cleanup;
+ 659 16464 [242] end. 
+Code length:           16463
 Compiler stack size:   205
-Ident stack size:      238/300
+Ident stack size:      243/300

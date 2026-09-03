@@ -2,263 +2,288 @@
    2     4 [  0] 
    3     4 [  0] { shared library for FUNCTION, FT and GRAPH }
    4     4 [  0] 
-   5     4 [  0] const
-   6     4 [  0]   DATA_REAL    = 0;
-   7     7 [  1]   DATA_COMPLEX = 1;
-   8     7 [  2] 
-   9     7 [  2]   DOMAIN_TIME  = 0;
-  10     7 [  3]   DOMAIN_FREQ  = 1;
-  11     7 [  4] 
-  12     7 [  4]   DATAVERSION  = 1;
-  13     7 [  5]   DATAFILESIZE = 8192;  { + 256 for header section }
-  14     7 [  6]   REALBASE     = 64;    { 256 div 4 }
-  15     7 [  7]   COMPLEXBASE  = 1088;  { REALBASE + 1024 }
-  16     7 [  8] 
-  17     7 [  8] var
-  18     7 [  8]   _parampos: integer;
-  19     7 [  9]   _n, _datatype, _domain: integer;
-  20     7 [ 12]   _min, _max: real;
-  21     7 [ 14] 
-  22     7 [ 14] proc _runerr(e:integer);
-  23     7 [ 16] {**********************}
-  24     7 [ 16] { set runerr to e and stop execution of app }
-  25     7 [ 16] const stopcode = $2010;
-  26    10 [ 17] mem   _mrunerr = $000c: integer&;
-  27    10 [ 18] begin
-  28    10 [ 18]   _mrunerr:=e;
-  29    12 [ 18]   call(stopcode);
-  30    24 [ 18] end;
-  31    24 [ 18] 
-  32    25 [ 15] proc _abortwith(s: cpnt);
-  33    25 [ 17] {**********************}
-  34    25 [ 17] const stopcode = $2010;
-  35    28 [ 18] begin
-  36    28 [ 18]   writeln(chr($0e),s,chr($0b));
-  37    49 [ 18]   _runerr(54);
-  38    57 [ 18] end;
-  39    57 [ 18] 
-  40    58 [ 16] func _allocate(b: integer): cpnt;
-  41    58 [ 19] {*******************************}
-  42    58 [ 19] { allocate memory on heap for string }
-  43    58 [ 19] mem  stackp = $0008: integer;
-  44    61 [ 20]      endstk = $000e: integer;
-  45    61 [ 21] var  freewords: integer;
-  46    61 [ 22]      str: cpnt;
-  47    61 [ 23] begin
-  48    61 [ 23]   { Pascal has no type unsigned integer. }
-  49    61 [ 23]   { But the free space can be larger than 32767 }
-  50    61 [ 23]   { We work therefore with free words here }
-  51    61 [ 23]   freewords:=(endstk-stackp) shr 1;
-  52    72 [ 23]   if freewords < (b div 2 + 256) then begin
-  53    93 [ 23]     { 256 words are left for the growing stack }
-  54    96 [ 23]     _runerr($88);
-  55   104 [ 23]   end;
-  56   104 [ 23]   { allocate heap memory }
-  57   104 [ 23]   endstk := endstk - b;
-  58   107 [ 23]   str := cpnt(endstk);
-  59   118 [ 23]   { initialize the string }
-  60   122 [ 23]   str[0] := chr(0);
-  61   126 [ 23]   _allocate := str;
-  62   131 [ 23] end;
-  63   139 [ 23] 
-  64   140 [ 18] proc _nextparam(name, value: cpnt; var done: boolean);
-  65   140 [ 22] {****************************************************}
-  66   140 [ 22] mem
-  67   140 [ 22]     ARGTYPE  = $00a0: array[31] of char&;
-  68   143 [ 23] var s: cpnt;
-  69   143 [ 24]     i: integer;
-  70   143 [ 25]     ch: char;
-  71   143 [ 26] begin
-  72   143 [ 26]   if (ARGTYPE[0] <> 'l') then begin
-  73   154 [ 26]     done := true;
-  74   159 [ 26]     exit;
-  75   164 [ 26]   end;
-  76   164 [ 26]   s := cpnt($60);
-  77   166 [ 26]   { initialize returned strings }
-  78   170 [ 26]   name[0] := chr(0);
-  79   174 [ 26]   value[0] := chr(0);
-  80   183 [ 26]   { skip blanks before next parameter }
-  81   188 [ 26]   while s[_parampos] = ' ' do
-  82   200 [ 26]     _parampos := _parampos + 1;
-  83   210 [ 26]   { end of parameter line }
-  84   218 [ 26]   if s[_parampos] = chr(0) then begin
-  85   232 [ 26]     done := true;
-  86   237 [ 26]     exit;
-  87   242 [ 26]   end;
-  88   242 [ 26]   done := false;
-  89   244 [ 26]   { get parameter name }
-  90   248 [ 26]   i := 0;
-  91   250 [ 26]   ch := s[_parampos];
-  92   262 [ 26]   while ch <> '=' do begin
-  93   278 [ 26]     if (ch = chr(0)) or (ch = ' ') then
-  94   293 [ 26]       _runerr(106);
-  95   305 [ 26]     if not (((ch >= 'A') and (ch <= 'Z')) or
-  96   320 [ 26]             ((ch >= '0') and (ch <= '9'))) then
-  97   336 [ 26]       _runerr(106);
-  98   348 [ 26]     if i >= 8 then
-  99   354 [ 26]       _runerr(106);
- 100   366 [ 26]     name[i] := ch;
- 101   370 [ 26]     i := i + 1;
- 102   384 [ 26]     _parampos := _parampos + 1;
- 103   395 [ 26]     ch := s[_parampos];
- 104   408 [ 26]   end;
- 105   414 [ 26]   name[i] := chr(0);
- 106   423 [ 26]   { skip '=' }
- 107   428 [ 26]   _parampos := _parampos + 1;
- 108   434 [ 26]   { get parameter value }
- 109   439 [ 26]   i := 0;
- 110   441 [ 26]   ch := s[_parampos];
- 111   453 [ 26]   while (ch <> ' ') and (ch <> chr(0)) do begin
- 112   478 [ 26]     if i >= 16 then
- 113   484 [ 26]       _runerr(106);
- 114   496 [ 26]     value[i] := ch;
- 115   500 [ 26]     i := i + 1;
- 116   514 [ 26]     _parampos := _parampos + 1;
- 117   525 [ 26]     ch := s[_parampos];
- 118   538 [ 26]   end;
- 119   544 [ 26]   value[i] := chr(0);
- 120   553 [ 26] end;
- 121   558 [ 26] 
- 122   559 [ 19] proc strcpyn(source, dest: cpnt; maxlen: integer);
- 123   559 [ 23] {************************************************}
- 124   559 [ 23] var i: integer;
- 125   562 [ 24] begin
- 126   562 [ 24]   if dest=nil then
- 127   570 [ 24]     _runerr($89);
- 128   582 [ 24]   i:=0;
- 129   584 [ 24]   while (source[i]<>chr(0)) and (i<maxlen-1) do begin
- 130   618 [ 24]     dest[i]:=source[i];
- 131   630 [ 24]     i:=i+1;
- 132   642 [ 24]   end;
- 133   647 [ 24]   if source[i]<>chr(0) then
- 134   662 [ 24]     _runerr($91);
- 135   675 [ 24]   dest[i]:=chr(0);
- 136   681 [ 24]   i:=i+1;
- 137   692 [ 24]   while i<maxlen do begin
- 138   709 [ 24]     dest[i]:=chr(0);
- 139   715 [ 24]     i:=i+1;
- 140   726 [ 24]   end;
- 141   731 [ 24] end;
- 142   734 [ 24] 
- 143   735 [ 20] func str_real(s: cpnt): real;
- 144   735 [ 23] {***************************}
- 145   735 [ 23] var i, sign: integer;
- 146   738 [ 25]     val, frac, scale: real;
- 147   738 [ 28] begin
- 148   738 [ 28]   i := 0;
- 149   742 [ 28]   sign := 1;
- 150   748 [ 28]   if s[0] = '-' then begin
- 151   763 [ 28]     sign := -1;
- 152   768 [ 28]     i := 1;
- 153   775 [ 28]   end;
- 154   779 [ 28]   if s[i] = chr(0) then
- 155   791 [ 28]     _runerr(106);
- 156   804 [ 28]   val := 0.0;
- 157   810 [ 28]   { integer part }
- 158   816 [ 28]   while (s[i] >= '0') and (s[i] <= '9') do begin
- 159   846 [ 28]     val := val * 10.0 + conv(ord(s[i]) - ord('0'));
- 160   872 [ 28]     i := i + 1;
- 161   886 [ 28]   end;
- 162   891 [ 28]   { fractional part }
- 163   894 [ 28]   if s[i] = '.' then begin
- 164   907 [ 28]     i := i + 1;
- 165   916 [ 28]     frac := 0.0;
- 166   927 [ 28]     scale := 1.0;
- 167   939 [ 28]     while (s[i] >= '0') and (s[i] <= '9') do begin
- 168   975 [ 28]       frac := frac * 10.0 + conv(ord(s[i])-ord('0'));
- 169  1001 [ 28]       scale := scale * 10.0;
- 170  1021 [ 28]       i := i + 1;
- 171  1034 [ 28]     end;
- 172  1039 [ 28]     val := val + frac / scale;
- 173  1054 [ 28]   end;
- 174  1068 [ 28]   if s[i] <> chr(0) then
- 175  1080 [ 28]     _runerr(106);
- 176  1093 [ 28]   str_real := conv(sign) * val;
- 177  1098 [ 28] end;
- 178  1111 [ 28] 
- 179  1112 [ 22] func round(r: real): integer;
- 180  1112 [ 25] {**************************}
- 181  1112 [ 25] begin
- 182  1112 [ 25]   if r >= 0.0 then
- 183  1129 [ 25]     round := trunc(r + 0.5)
- 184  1145 [ 25]   else
- 185  1146 [ 25]     round := trunc(r - 0.5);
- 186  1167 [ 25] end;
- 187  1172 [ 25] 
- 188  1173 [ 24] proc _getdataheader(f: file);
- 189  1173 [ 26] {***************************}
- 190  1173 [ 26] { Header (words)
- 191  1173 [ 26] 
- 192  1173 [ 26]   0  version
- 193  1173 [ 26]   1  n
- 194  1173 [ 26]   2  datatype
- 195  1173 [ 26]   3  domain
- 196  1173 [ 26]   4-5  min
- 197  1173 [ 26]   6-7  max
- 198  1173 [ 26] 
- 199  1173 [ 26]   Data starts at byte 256.
- 200  1173 [ 26] }
- 201  1173 [ 26] var version: integer;
- 202  1176 [ 27] 
- 203  1176 [ 27]   proc getword(device:file; address:integer;
- 204  1176 [ 30]                                 var word:integer);
- 205  1176 [ 31]   var h,l:integer;
- 206  1179 [ 33]   begin
- 207  1179 [ 33]     getbyte(device,2*address,l);
- 208  1198 [ 33]     getbyte(device,2*address+1,h);
- 209  1218 [ 33]     word:=(h shl 8) + l;
- 210  1225 [ 33]   end;
- 211  1234 [ 33] 
- 212  1235 [ 28]   proc getreal(device:file; address:integer;
- 213  1235 [ 31]     var rvalue:array[1] of %integer);
- 214  1235 [ 32]   var i1,i2:integer;
- 215  1238 [ 34]   begin
- 216  1238 [ 34]     getword(device,2*address,i1);
- 217  1265 [ 34]     getword(device,2*address+1,i2);
- 218  1293 [ 34]     rvalue[0]:=i1;
- 219  1295 [ 34]     rvalue[1]:=i2;
- 220  1305 [ 34]   end;
- 221  1313 [ 34] 
- 222  1314 [ 29] begin
- 223  1314 [ 29]   getword(f, 0, version);
- 224  1336 [ 29]   if version <> DATAVERSION then
- 225  1342 [ 29]     _abortwith('Wrong data file version');
- 226  1378 [ 29]   getword(f, 1, _n);
- 227  1398 [ 29]   getword(f, 2, _datatype);
- 228  1418 [ 29]   getword(f, 3, _domain);
- 229  1438 [ 29]   getreal(f, 2, _min);  { real has 4 bytes }
- 230  1462 [ 29]   getreal(f, 3, _max);
- 231  1486 [ 29] end;
- 232  1486 [ 29] 
- 233  1487 [ 25] proc _putdataheader(f: file);
- 234  1487 [ 27] {***************************}
- 235  1487 [ 27] 
- 236  1487 [ 27]   proc putword(device:file; address:integer;
- 237  1490 [ 30]     word:integer);
- 238  1490 [ 31]   begin
- 239  1490 [ 31]     putbyte(device,2*address, word and 255);
- 240  1515 [ 31]     putbyte(device,2*address+1, word shr 8);
- 241  1538 [ 31]   end;
- 242  1538 [ 31] 
- 243  1539 [ 28]   proc putreal(device:file; address:integer;
- 244  1539 [ 31]     rvalue:array[1] of %integer);
- 245  1539 [ 32]   begin
- 246  1539 [ 32]     putword(device,2*address, rvalue[0]);
- 247  1567 [ 32]     putword(device,2*address+1, rvalue[1]);
- 248  1593 [ 32]   end;
- 249  1593 [ 32] 
- 250  1594 [ 29] begin
- 251  1594 [ 29]   putword(f, 0, DATAVERSION);
- 252  1610 [ 29]   putword(f, 1, _n);
- 253  1626 [ 29]   putword(f, 2, _datatype);
- 254  1642 [ 29]   putword(f, 3, _domain);
- 255  1658 [ 29]   putreal(f, 2, _min);  { real has 4 bytes }
- 256  1676 [ 29]   putreal(f, 3, _max);
- 257  1694 [ 29] end;
- 258  1694 [ 29] 
- 259  1695 [ 26] begin  { initialize library }
- 260  1695 [ 26]   _parampos := 0;
- 261  1699 [ 26] end. 
-Code length:           1702
+   5     4 [  0] { Data file header bytes
+   6     4 [  0] 
+   7     4 [  0]   0 - 15    current binary header
+   8     4 [  0]              version, n, datatype, domain,
+   9     4 [  0]              min, max
+  10     4 [  0] 
+  11     4 [  0]  16 - 31    reserved for future binary fields
+  12     4 [  0] 
+  13     4 [  0]  32 - 96    title        64 chars + chr(0)
+  14     4 [  0]  97 -161    description  64 chars + chr(0)
+  15     4 [  0] 
+  16     4 [  0] 162 -255    reserved for future expansion
+  17     4 [  0] 
+  18     4 [  0] Data starts at byte 256. }
+  19     4 [  0] 
+  20     4 [  0] const
+  21     4 [  0]   DATA_REAL    = 0;
+  22     7 [  1]   DATA_COMPLEX = 1;
+  23     7 [  2] 
+  24     7 [  2]   DOMAIN_TIME  = 0;
+  25     7 [  3]   DOMAIN_FREQ  = 1;
+  26     7 [  4] 
+  27     7 [  4]   DATAVERSION  = 2;
+  28     7 [  5]   DATAFILESIZE = 8192;  { + 256 for header section }
+  29     7 [  6]   REALBASE     = 64;    { 256 div 4 }
+  30     7 [  7]   COMPLEXBASE  = 1088;  { REALBASE + 1024 }
+  31     7 [  8] 
+  32     7 [  8]   TEXTSIZE    = 65;
+  33     7 [  9]   TITLEPOS    = 32;
+  34     7 [ 10]   DESCRPOS    = 97;
+  35     7 [ 11] 
+  36     7 [ 11] var
+  37     7 [ 11]   _parampos: integer;
+  38     7 [ 12]   _n, _datatype, _domain: integer;
+  39     7 [ 15]   _min, _max: real;
+  40     7 [ 17]   _title, _description: cpnt;
+  41     7 [ 19] 
+  42     7 [ 19] proc _runerr(e:integer);
+  43     7 [ 21] {**********************}
+  44     7 [ 21] { set runerr to e and stop execution of app }
+  45     7 [ 21] const stopcode = $2010;
+  46    10 [ 22] mem   _mrunerr = $000c: integer&;
+  47    10 [ 23] begin
+  48    10 [ 23]   _mrunerr:=e;
+  49    12 [ 23]   call(stopcode);
+  50    24 [ 23] end;
+  51    24 [ 23] 
+  52    25 [ 20] proc _abortwith(s: cpnt);
+  53    25 [ 22] {**********************}
+  54    25 [ 22] const stopcode = $2010;
+  55    28 [ 23] begin
+  56    28 [ 23]   writeln(chr($0e),s,chr($0b));
+  57    49 [ 23]   _runerr(54);
+  58    57 [ 23] end;
+  59    57 [ 23] 
+  60    58 [ 21] func _allocate(b: integer): cpnt;
+  61    58 [ 24] {*******************************}
+  62    58 [ 24] { allocate memory on heap for string }
+  63    58 [ 24] mem  stackp = $0008: integer;
+  64    61 [ 25]      endstk = $000e: integer;
+  65    61 [ 26] var  freewords: integer;
+  66    61 [ 27]      str: cpnt;
+  67    61 [ 28] begin
+  68    61 [ 28]   { Pascal has no type unsigned integer. }
+  69    61 [ 28]   { But the free space can be larger than 32767 }
+  70    61 [ 28]   { We work therefore with free words here }
+  71    61 [ 28]   freewords:=(endstk-stackp) shr 1;
+  72    72 [ 28]   if freewords < (b div 2 + 256) then begin
+  73    93 [ 28]     { 256 words are left for the growing stack }
+  74    96 [ 28]     _runerr($88);
+  75   104 [ 28]   end;
+  76   104 [ 28]   { allocate heap memory }
+  77   104 [ 28]   endstk := endstk - b;
+  78   107 [ 28]   str := cpnt(endstk);
+  79   118 [ 28]   { initialize the string }
+  80   122 [ 28]   str[0] := chr(0);
+  81   126 [ 28]   _allocate := str;
+  82   131 [ 28] end;
+  83   139 [ 28] 
+  84   140 [ 23] proc _nextparam(name, value: cpnt; var done: boolean);
+  85   140 [ 27] {****************************************************}
+  86   140 [ 27] mem
+  87   140 [ 27]     ARGTYPE  = $00a0: array[31] of char&;
+  88   143 [ 28] var s: cpnt;
+  89   143 [ 29]     i: integer;
+  90   143 [ 30]     ch: char;
+  91   143 [ 31] begin
+  92   143 [ 31]   if (ARGTYPE[0] <> 'l') then begin
+  93   154 [ 31]     done := true;
+  94   159 [ 31]     exit;
+  95   164 [ 31]   end;
+  96   164 [ 31]   s := cpnt($60);
+  97   166 [ 31]   { initialize returned strings }
+  98   170 [ 31]   name[0] := chr(0);
+  99   174 [ 31]   value[0] := chr(0);
+ 100   183 [ 31]   { skip blanks before next parameter }
+ 101   188 [ 31]   while s[_parampos] = ' ' do
+ 102   200 [ 31]     _parampos := _parampos + 1;
+ 103   210 [ 31]   { end of parameter line }
+ 104   218 [ 31]   if s[_parampos] = chr(0) then begin
+ 105   232 [ 31]     done := true;
+ 106   237 [ 31]     exit;
+ 107   242 [ 31]   end;
+ 108   242 [ 31]   done := false;
+ 109   244 [ 31]   { get parameter name }
+ 110   248 [ 31]   i := 0;
+ 111   250 [ 31]   ch := s[_parampos];
+ 112   262 [ 31]   while ch <> '=' do begin
+ 113   278 [ 31]     if (ch = chr(0)) or (ch = ' ') then
+ 114   293 [ 31]       _runerr(106);
+ 115   305 [ 31]     if not (((ch >= 'A') and (ch <= 'Z')) or
+ 116   320 [ 31]             ((ch >= '0') and (ch <= '9'))) then
+ 117   336 [ 31]       _runerr(106);
+ 118   348 [ 31]     if i >= 8 then
+ 119   354 [ 31]       _runerr(106);
+ 120   366 [ 31]     name[i] := ch;
+ 121   370 [ 31]     i := i + 1;
+ 122   384 [ 31]     _parampos := _parampos + 1;
+ 123   395 [ 31]     ch := s[_parampos];
+ 124   408 [ 31]   end;
+ 125   414 [ 31]   name[i] := chr(0);
+ 126   423 [ 31]   { skip '=' }
+ 127   428 [ 31]   _parampos := _parampos + 1;
+ 128   434 [ 31]   { get parameter value }
+ 129   439 [ 31]   i := 0;
+ 130   441 [ 31]   ch := s[_parampos];
+ 131   453 [ 31]   while (ch <> ' ') and (ch <> chr(0)) do begin
+ 132   478 [ 31]     if i >= 16 then
+ 133   484 [ 31]       _runerr(106);
+ 134   496 [ 31]     value[i] := ch;
+ 135   500 [ 31]     i := i + 1;
+ 136   514 [ 31]     _parampos := _parampos + 1;
+ 137   525 [ 31]     ch := s[_parampos];
+ 138   538 [ 31]   end;
+ 139   544 [ 31]   value[i] := chr(0);
+ 140   553 [ 31] end;
+ 141   558 [ 31] 
+ 142   559 [ 24] proc strcpyn(source, dest: cpnt; maxlen: integer);
+ 143   559 [ 28] {************************************************}
+ 144   559 [ 28] var i: integer;
+ 145   562 [ 29] begin
+ 146   562 [ 29]   if dest=nil then
+ 147   570 [ 29]     _runerr($89);
+ 148   582 [ 29]   i:=0;
+ 149   584 [ 29]   while (source[i]<>chr(0)) and (i<maxlen-1) do begin
+ 150   618 [ 29]     dest[i]:=source[i];
+ 151   630 [ 29]     i:=i+1;
+ 152   642 [ 29]   end;
+ 153   647 [ 29]   if source[i]<>chr(0) then
+ 154   662 [ 29]     _runerr($91);
+ 155   675 [ 29]   dest[i]:=chr(0);
+ 156   681 [ 29]   i:=i+1;
+ 157   692 [ 29]   while i<maxlen do begin
+ 158   709 [ 29]     dest[i]:=chr(0);
+ 159   715 [ 29]     i:=i+1;
+ 160   726 [ 29]   end;
+ 161   731 [ 29] end;
+ 162   734 [ 29] 
+ 163   735 [ 25] func str_real(s: cpnt): real;
+ 164   735 [ 28] {***************************}
+ 165   735 [ 28] var i, sign: integer;
+ 166   738 [ 30]     val, frac, scale: real;
+ 167   738 [ 33] begin
+ 168   738 [ 33]   i := 0;
+ 169   742 [ 33]   sign := 1;
+ 170   748 [ 33]   if s[0] = '-' then begin
+ 171   763 [ 33]     sign := -1;
+ 172   768 [ 33]     i := 1;
+ 173   775 [ 33]   end;
+ 174   779 [ 33]   if s[i] = chr(0) then
+ 175   791 [ 33]     _runerr(106);
+ 176   804 [ 33]   val := 0.0;
+ 177   810 [ 33]   { integer part }
+ 178   816 [ 33]   while (s[i] >= '0') and (s[i] <= '9') do begin
+ 179   846 [ 33]     val := val * 10.0 + conv(ord(s[i]) - ord('0'));
+ 180   872 [ 33]     i := i + 1;
+ 181   886 [ 33]   end;
+ 182   891 [ 33]   { fractional part }
+ 183   894 [ 33]   if s[i] = '.' then begin
+ 184   907 [ 33]     i := i + 1;
+ 185   916 [ 33]     frac := 0.0;
+ 186   927 [ 33]     scale := 1.0;
+ 187   939 [ 33]     while (s[i] >= '0') and (s[i] <= '9') do begin
+ 188   975 [ 33]       frac := frac * 10.0 + conv(ord(s[i])-ord('0'));
+ 189  1001 [ 33]       scale := scale * 10.0;
+ 190  1021 [ 33]       i := i + 1;
+ 191  1034 [ 33]     end;
+ 192  1039 [ 33]     val := val + frac / scale;
+ 193  1054 [ 33]   end;
+ 194  1068 [ 33]   if s[i] <> chr(0) then
+ 195  1080 [ 33]     _runerr(106);
+ 196  1093 [ 33]   str_real := conv(sign) * val;
+ 197  1098 [ 33] end;
+ 198  1111 [ 33] 
+ 199  1112 [ 27] func round(r: real): integer;
+ 200  1112 [ 30] {**************************}
+ 201  1112 [ 30] begin
+ 202  1112 [ 30]   if r >= 0.0 then
+ 203  1129 [ 30]     round := trunc(r + 0.5)
+ 204  1145 [ 30]   else
+ 205  1146 [ 30]     round := trunc(r - 0.5);
+ 206  1167 [ 30] end;
+ 207  1172 [ 30] 
+ 208  1173 [ 29] proc _getdataheader(f: file);
+ 209  1173 [ 31] {***************************}
+ 210  1173 [ 31] var version: integer;
+ 211  1176 [ 32]   i, vi: integer;
+ 212  1176 [ 34] 
+ 213  1176 [ 34]   proc getword(device:file; address:integer;
+ 214  1176 [ 37]                                 var word:integer);
+ 215  1176 [ 38]   var h,l:integer;
+ 216  1179 [ 40]   begin
+ 217  1179 [ 40]     getbyte(device,2*address,l);
+ 218  1198 [ 40]     getbyte(device,2*address+1,h);
+ 219  1218 [ 40]     word:=(h shl 8) + l;
+ 220  1225 [ 40]   end;
+ 221  1234 [ 40] 
+ 222  1235 [ 35]   proc getreal(device:file; address:integer;
+ 223  1235 [ 38]     var rvalue:array[1] of %integer);
+ 224  1235 [ 39]   var i1,i2:integer;
+ 225  1238 [ 41]   begin
+ 226  1238 [ 41]     getword(device,2*address,i1);
+ 227  1265 [ 41]     getword(device,2*address+1,i2);
+ 228  1293 [ 41]     rvalue[0]:=i1;
+ 229  1295 [ 41]     rvalue[1]:=i2;
+ 230  1305 [ 41]   end;
+ 231  1313 [ 41] 
+ 232  1314 [ 36] begin
+ 233  1314 [ 36]   getword(f, 0, version);
+ 234  1336 [ 36]   if version <> DATAVERSION then
+ 235  1342 [ 36]     _abortwith('Wrong data file version');
+ 236  1378 [ 36]   getword(f, 1, _n);
+ 237  1398 [ 36]   getword(f, 2, _datatype);
+ 238  1418 [ 36]   getword(f, 3, _domain);
+ 239  1438 [ 36]   getreal(f, 2, _min);  { real has 4 bytes }
+ 240  1462 [ 36]   getreal(f, 3, _max);
+ 241  1486 [ 36]   for i:=0 to TEXTSIZE-1 do begin
+ 242  1506 [ 36]     getbyte(f,TITLEPOS+i,vi);
+ 243  1523 [ 36]     _title[i] := chr(vi);
+ 244  1531 [ 36]     getbyte(f,DESCRPOS+i,vi);
+ 245  1553 [ 36]     _description[i] := chr(vi);
+ 246  1561 [ 36]   end;
+ 247  1566 [ 36] end;
+ 248  1580 [ 36] 
+ 249  1581 [ 30] proc _putdataheader(f: file);
+ 250  1581 [ 32] {***************************}
+ 251  1581 [ 32] var i:integer;
+ 252  1584 [ 33] 
+ 253  1584 [ 33]   proc putword(device:file; address:integer;
+ 254  1584 [ 36]     word:integer);
+ 255  1584 [ 37]   begin
+ 256  1584 [ 37]     putbyte(device,2*address, word and 255);
+ 257  1609 [ 37]     putbyte(device,2*address+1, word shr 8);
+ 258  1632 [ 37]   end;
+ 259  1632 [ 37] 
+ 260  1633 [ 34]   proc putreal(device:file; address:integer;
+ 261  1633 [ 37]     rvalue:array[1] of %integer);
+ 262  1633 [ 38]   begin
+ 263  1633 [ 38]     putword(device,2*address, rvalue[0]);
+ 264  1661 [ 38]     putword(device,2*address+1, rvalue[1]);
+ 265  1687 [ 38]   end;
+ 266  1687 [ 38] 
+ 267  1688 [ 35] begin
+ 268  1688 [ 35]   putword(f, 0, DATAVERSION);
+ 269  1704 [ 35]   putword(f, 1, _n);
+ 270  1720 [ 35]   putword(f, 2, _datatype);
+ 271  1736 [ 35]   putword(f, 3, _domain);
+ 272  1752 [ 35]   putreal(f, 2, _min);  { real has 4 bytes }
+ 273  1770 [ 35]   putreal(f, 3, _max);
+ 274  1788 [ 35]   for i:=0 to TEXTSIZE-1 do begin
+ 275  1808 [ 35]     putbyte(f,TITLEPOS+i,_title[i]);
+ 276  1831 [ 35]     putbyte(f,DESCRPOS+i,_description[i]);
+ 277  1854 [ 35]   end;
+ 278  1854 [ 35] end;
+ 279  1868 [ 35] 
+ 280  1869 [ 31] begin  { initialize library }
+ 281  1869 [ 31]   _parampos := 0;
+ 282  1873 [ 31]   _title       := _allocate(TEXTSIZE);
+ 283  1887 [ 31]   _description := _allocate(TEXTSIZE);
+ 284  1901 [ 31]   strcpyn('',_title,TEXTSIZE);
+ 285  1920 [ 31]   strcpyn('',_description,TEXTSIZE);
+ 286  1935 [ 31] end. 
+Code length:           1934
 Compiler stack size:   32
-Ident stack size:      34/300
+Ident stack size:      41/300

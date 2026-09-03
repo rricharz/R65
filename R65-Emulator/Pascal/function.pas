@@ -508,6 +508,8 @@ var
   c1, s1, c2, s2: real;
   k: integer;
 begin
+  if _datatype <> DATA_REAL then
+    _abortwith('Product requires DATA=REAL');
   t := _min;
   deltat := (_max - _min) / conv(_n);
 
@@ -520,19 +522,9 @@ begin
     c1 := cos(360.0 * f1 * t);
     c2 := cos(360.0 * f2 * t);
 
-    { real part }
     val := a * c1 * c2;
     _putreal(f, REALBASE + k, val);
-
-    { imaginary part }
-    if _datatype = DATA_COMPLEX then begin
-      s1 := sin(360.0 * f1 * t);
-      s2 := sin(360.0 * f2 * t);
-      val := a * (c1 * s2 + s1 * c2);
-    end else
-      val := 0.0;
-
-    _putreal(f, COMPLEXBASE + k, val);
+    _putreal(f, COMPLEXBASE + k, 0.0);
 
     t := t + deltat;
   end;
@@ -545,8 +537,7 @@ var
   k: integer;
 begin
   if _datatype <> DATA_REAL then
-    _abortwith('Gaussian function requires DATA=REAL')
-;
+  _abortwith('Gaussian function requires DATA=REAL');
 
   t := _min;
   deltat := (_max - _min) / conv(_n);
@@ -768,6 +759,9 @@ begin
   else
     _abortwith('DATA must be REAL or COMPLEX');
   _domain := 0;
+  strcpyn(ftitle[pival[P_TYPE]],_title,TEXTSIZE);
+  strcpyn(fformula[pival[P_TYPE]],_description,
+    TEXTSIZE);
 
   { attach data file and check size }
   if fileexists('FUNCDATA:X      ', 1) then
@@ -783,7 +777,6 @@ begin
   _putdataheader(f);
 
   { compute and store function }
-
   case pival[P_TYPE] of
 
     FT_COSINE:

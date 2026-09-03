@@ -2,6 +2,21 @@ library ftlib;
 
 { shared library for FUNCTION, FT and GRAPH }
 
+{ Data file header bytes
+
+  0 - 15    current binary header
+             version, n, datatype, domain,
+             min, max
+
+ 16 - 31    reserved for future binary fields
+
+ 32 - 96    title        64 chars + chr(0)
+ 97 -161    description  64 chars + chr(0)
+
+162 -255    reserved for future expansion
+
+Data starts at byte 256. }
+
 const
   DATA_REAL    = 0;
   DATA_COMPLEX = 1;
@@ -9,15 +24,20 @@ const
   DOMAIN_TIME  = 0;
   DOMAIN_FREQ  = 1;
 
-  DATAVERSION  = 1;
+  DATAVERSION  = 2;
   DATAFILESIZE = 8192;  { + 256 for header section }
   REALBASE     = 64;    { 256 div 4 }
   COMPLEXBASE  = 1088;  { REALBASE + 1024 }
+
+  TEXTSIZE    = 65;
+  TITLEPOS    = 32;
+  DESCRPOS    = 97;
 
 var
   _parampos: integer;
   _n, _datatype, _domain: integer;
   _min, _max: real;
+  _title, _description: cpnt;
 
 proc _runerr(e:integer);
 {**********************}
@@ -187,18 +207,8 @@ end;
 
 proc _getdataheader(f: file);
 {***************************}
-{ Header (words)
-
-  0  version
-  1  n
-  2  datatype
-  3  domain
-  4-5  min
-  6-7  max
-
-  Data starts at byte 256.
-}
 var version: integer;
+  i, vi: integer;
 
   proc getword(device:file; address:integer;
                                 var word:integer);
@@ -228,10 +238,17 @@ begin
   getword(f, 3, _domain);
   getreal(f, 2, _min);  { real has 4 bytes }
   getreal(f, 3, _max);
+  for i:=0 to TEXTSIZE-1 do begin
+    getbyte(f,TITLEPOS+i,vi);
+    _title[i] := chr(vi);
+    getbyte(f,DESCRPOS+i,vi);
+    _description[i] := chr(vi);
+  end;
 end;
 
 proc _putdataheader(f: file);
 {***************************}
+var i:integer;
 
   proc putword(device:file; address:integer;
     word:integer);
@@ -254,8 +271,16 @@ begin
   putword(f, 3, _domain);
   putreal(f, 2, _min);  { real has 4 bytes }
   putreal(f, 3, _max);
+  for i:=0 to TEXTSIZE-1 do begin
+    putbyte(f,TITLEPOS+i,_title[i]);
+    putbyte(f,DESCRPOS+i,_description[i]);
+  end;
 end;
 
 begin  { initialize library }
   _parampos := 0;
+  _title       := _allocate(TEXTSIZE);
+  _description := _allocate(TEXTSIZE);
+  strcpyn('',_title,TEXTSIZE);
+  strcpyn('',_description,TEXTSIZE);
 end. 

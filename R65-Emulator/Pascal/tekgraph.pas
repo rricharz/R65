@@ -556,7 +556,12 @@ begin
 
   _setlinemode(DOTTED);
   _setchsize(2);
-
+  _plotstr(_title,MAXX div 2, MAXY-50, CENTER);
+  _plotstr(_description,MAXX div 2, MAXY-125, CENTER);
+  if (_domain = DOMAIN_FREQ) then
+    _plotstr('FREQUENCY',MAXX div 2, 50, CENTER)
+  else
+    _plotstr('FREQUENCY',MAXX div 2, 50, CENTER)
   repeat
     labelstr[0] := chr(0);
     y:=trunc((axis-min)/(max-min)*conv(yw)+0.5);
@@ -598,6 +603,7 @@ begin
 end;
 
 func ypos(i: integer): integer;
+{*****************************}
 var j: integer;
     v: real;
 begin
