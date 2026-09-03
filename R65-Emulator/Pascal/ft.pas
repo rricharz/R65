@@ -1,5 +1,5 @@
 program ft;
-uses syslib,ralib,mathlib,writelib,ftlib;
+uses syslib,ralib,mathlib,ftlib,filelib,arglib;
 
 const maxsize     = 1024;
       tabsize     = 2048; { 2 * maxsize }
@@ -7,7 +7,7 @@ const maxsize     = 1024;
 
 var f: file;
     i: integer;
-    v: real;
+    v, fs: real;
 
     data:   array[tabsize] of real;
     sintab: array[sintabsize] of real;
@@ -24,14 +24,9 @@ begin
           (_n=512) or (_n=1024)) then begin
     _abortwith('Invalid FFT data size ');
   end;
-  writeln;
-  writeln('N:      ', _n:10);
   if _domain <> DOMAIN_TIME then
   _abortwith(
-    'Domain of data must be TIME, use FUNCTION again')
-;
-  writeln('Tmin:   ',_min:10);
-  writeln('Tmax:   ',_max:10);
+  'Domain of data must be TIME, use FUNCTION again');
   for i:=0 to _n - 1 do begin
     _getreal(f, REALBASE + i, v);
     data[i] := v;
@@ -170,11 +165,10 @@ begin
     tabstep := tabstep shr 1;
   end;
 
-  _min := 0.0;  { minimum and maximum frequency }
-  _max := conv(_n) / (2.0 * (_max - _min));
-  writeln('Fmin:   ',_min:10);
-  writeln('Fmax:   ',_max:10);
-  writeln;
+  { calculate minimum and maximum frequency }
+  fs := conv(_n) / (_max - _min);
+  _min := -fs / 2.0;
+  _max := fs/2.0;
 end;
 
 begin
@@ -182,4 +176,6 @@ begin
   makesintab;
   fft;
   putdata;
+  ARGTYPE[0] := chr(0);
+  _chainprog('TEKGRAPH:R      ', 0, 1);
 end. 

@@ -1,188 +1,184 @@
    1     4 program ft;
-   2     4 [  0] uses syslib,ralib,mathlib,writelib,ftlib;
-   3  8098 [126] 
-   4  8098 [126] const maxsize     = 1024;
-   5  8101 [127]       tabsize     = 2048; { 2 * maxsize }
-   6  8101 [128]       sintabsize  = 512; { maxsize div 2 }
-   7  8101 [129] 
-   8  8101 [129] var f: file;
-   9  8101 [130]     i: integer;
-  10  8101 [131]     v: real;
-  11  8101 [132] 
-  12  8101 [132]     data:   array[tabsize] of real;
-  13  8101 [133]     sintab: array[sintabsize] of real;
-  14  8101 [134] 
-  15  8101 [134] proc getdata;
-  16  8101 [135] begin
-  17  8101 [135]   f:=_attach('FUNCDATA:X      ',0,1,
-  18  8130 [135]                             FWRITE+FSILENT,0,0,'X');
-  19  8147 [135]   _getdataheader(f);
-  20  8161 [135]   if _n > maxsize then begin
-  21  8169 [135]     _abortwith('Max data size exceeded');
-  22  8203 [135]   end;
-  23  8203 [135]   if not ((_n=128) or (_n=256) or
-  24  8218 [135]           (_n=512) or (_n=1024)) then begin
-  25  8238 [135]     _abortwith('Invalid FFT data size ');
-  26  8272 [135]   end;
-  27  8272 [135]   writeln;
-  28  8272 [135]   writeln('N:      ', _n:10);
-  29  8305 [135]   if _domain <> DOMAIN_TIME then
-  30  8311 [135]   _abortwith(
-  31  8315 [135]     'Domain of data must be TIME, use FUNCTION again')
-  32  8365 [135] ;
-  33  8371 [135]   writeln('Tmin:   ',_min:10);
-  34  8402 [135]   writeln('Tmax:   ',_max:10);
-  35  8433 [135]   for i:=0 to _n - 1 do begin
-  36  8455 [135]     _getreal(f, REALBASE + i, v);
-  37  8484 [135]     data[i] := v;
-  38  8491 [135]   end;
-  39  8504 [135]   for i:=0 to _n - 1 do begin
-  40  8540 [135]     _getreal(f, COMPLEXBASE + i, v);
-  41  8570 [135]     data[_n + i] := v;
-  42  8582 [135]   end;
-  43  8595 [135] end;
-  44  8609 [135] 
-  45  8610 [135] proc putdata;
-  46  8610 [136] begin
-  47  8610 [136]   for i:=0 to _n-1 do
-  48  8627 [136]     _putreal(f,REALBASE+i,data[i]);
-  49  8667 [136] 
-  50  8681 [136]   for i:=0 to _n-1 do
-  51  8693 [136]     _putreal(f,COMPLEXBASE+i,data[_n+i]);
-  52  8739 [136] 
-  53  8753 [136]   _datatype := DATA_COMPLEX;
-  54  8755 [136]   _domain := DOMAIN_FREQ;
-  55  8761 [136] 
-  56  8765 [136]   { later set _min and _max to frequency limits }
-  57  8765 [136] 
-  58  8765 [136]   _putdataheader(f);
-  59  8775 [136]   close(f);
-  60  8781 [136] end;
-  61  8781 [136] 
-  62  8782 [136] proc makesintab;
-  63  8782 [137] var j: integer;
-  64  8785 [138]     s: real;
-  65  8785 [139] begin
-  66  8785 [139]   for j:=0 to sintabsize div 2 do begin
-  67  8808 [139]     s:=sin(180.0*conv(j)/conv(sintabsize));
-  68  8833 [139]     sintab[j]:=s;
-  69  8846 [139]     sintab[sintabsize-j]:=s;
-  70  8870 [139]   end;
-  71  8883 [139] end;
-  72  8897 [139] 
-  73  8898 [137] proc fft;
-  74  8898 [138] var
-  75  8898 [138]   i, group, groupsize, halfgroup: integer;
-  76  8901 [142]   sinindex, tabstep: integer;
-  77  8901 [144]   sine, cosine: real;
-  78  8901 [146] 
-  79  8901 [146]   func bitreverse(i, bits: integer): integer;
-  80  8901 [150]   var j, k, n: integer;
-  81  8904 [153]   begin
-  82  8904 [153]     n := i;
-  83  8906 [153]     j := 0;
-  84  8916 [153]     for k := 1 to bits do begin
-  85  8939 [153]       j := j shl 1;
-  86  8945 [153]       if (n and 1) <> 0 then
-  87  8959 [153]         j := j + 1;
-  88  8969 [153]       n := n shr 1;
-  89  8980 [153]     end;
-  90  8985 [153]     bitreverse := j;
-  91  8999 [153]   end;
-  92  9007 [153] 
-  93  9008 [148]   proc bitreverseperm;
-  94  9008 [149]   var i,j,bits: integer;
-  95  9011 [152]       t: real;
-  96  9011 [153]   begin
-  97  9011 [153]     bits := trunc(log(conv(_n))/log(2.0)+0.5);
-  98  9048 [153] 
-  99  9053 [153]     for i := 0 to _n - 1 do begin
- 100  9075 [153]       j := bitreverse(i, bits);
- 101  9091 [153] 
- 102  9095 [153]       if j > i then begin
- 103  9104 [153] 
- 104  9107 [153]         t := data[i];
- 105  9114 [153]         data[i] := data[j];
- 106  9140 [153]         data[j] := t;
- 107  9160 [153] 
- 108  9173 [153]         t := data[_n+i];
- 109  9185 [153]         data[_n+i] := data[_n+j];
- 110  9221 [153]         data[_n+j] := t;
- 111  9246 [153] 
- 112  9259 [153]       end;
- 113  9259 [153]     end;
- 114  9259 [153]   end;
- 115  9273 [153] 
- 116  9274 [149]   proc butterfly(i,j: integer;
- 117  9274 [152]                  cosine,sine: real);
- 118  9274 [154]   var ar,ai,br,bi,tr,ti: real;
- 119  9277 [160]   begin
- 120  9277 [160]     ar:=data[i];
- 121  9286 [160]     ai:=data[_n+i];
- 122  9310 [160]     br:=data[j];
- 123  9329 [160]     bi:=data[_n+j];
- 124  9353 [160] 
- 125  9365 [160]     tr:=br*cosine+bi*sine;
- 126  9384 [160]     ti:=bi*cosine-br*sine;
- 127  9417 [160] 
- 128  9431 [160]     data[i]:=ar+tr;
- 129  9444 [160]     data[_n+i]:=ai+ti;
- 130  9476 [160] 
- 131  9490 [160]     data[j]:=ar-tr;
- 132  9503 [160]     data[_n+j]:=ai-ti;
- 133  9535 [160]   end;
- 134  9549 [160] 
- 135  9550 [150] begin
- 136  9550 [150]   bitreverseperm;
- 137  9556 [150] 
- 138  9556 [150]   groupsize := 2;
- 139  9558 [150]   halfgroup := 1;
- 140  9564 [150]   tabstep := sintabsize;
- 141  9571 [150] 
- 142  9575 [150]   while groupsize <= _n do begin
- 143  9587 [150] 
- 144  9587 [150]     group := 0;
- 145  9589 [150]     while group < _n do begin
- 146  9605 [150] 
- 147  9605 [150]       sinindex := 0;
- 148  9607 [150] 
- 149  9611 [150]       for i := 0 to halfgroup-1 do begin
- 150  9633 [150] 
- 151  9633 [150]         sine := sintab[sinindex];
- 152  9640 [150] 
- 153  9652 [150]         if sinindex <= 256 then
- 154  9659 [150]           cosine := sintab[256-sinindex]
- 155  9666 [150]         else
- 156  9674 [150]           cosine := -sintab[sinindex-256];
- 157  9700 [150] 
- 158  9713 [150]         butterfly(group+i,
- 159  9717 [150]                   group+i+halfgroup,
- 160  9731 [150]                   cosine,sine);
- 161  9754 [150] 
- 162  9754 [150]         sinindex := sinindex+tabstep;
- 163  9758 [150]       end;
- 164  9767 [150] 
- 165  9781 [150]       group := group+groupsize;
- 166  9785 [150]     end;
- 167  9794 [150] 
- 168  9797 [150]     groupsize := groupsize shl 1;
- 169  9803 [150]     halfgroup := halfgroup shl 1;
- 170  9814 [150]     tabstep := tabstep shr 1;
- 171  9825 [150]   end;
- 172  9830 [150] 
- 173  9833 [150]   _min := 0.0;  { minimum and maximum frequency }
- 174  9845 [150]   _max := conv(_n) / (2.0 * (_max - _min));
- 175  9870 [150]   writeln('Fmin:   ',_min:10);
- 176  9908 [150]   writeln('Fmax:   ',_max:10);
- 177  9939 [150]   writeln;
- 178  9939 [150] end;
- 179  9945 [150] 
- 180  9946 [138] begin
- 181  9946 [138]   getdata;
- 182  9953 [138]   makesintab;
- 183  9957 [138]   fft;
- 184  9961 [138]   putdata;
- 185  9965 [138] end. 
-Code length:           9964
-Compiler stack size:   137
-Ident stack size:      160/300
+   2     4 [  0] uses syslib,ralib,mathlib,ftlib,filelib,arglib;
+   3  6628 [137] 
+   4  6628 [137] const maxsize     = 1024;
+   5  6631 [138]       tabsize     = 2048; { 2 * maxsize }
+   6  6631 [139]       sintabsize  = 512; { maxsize div 2 }
+   7  6631 [140] 
+   8  6631 [140] var f: file;
+   9  6631 [141]     i: integer;
+  10  6631 [142]     v, fs: real;
+  11  6631 [144] 
+  12  6631 [144]     data:   array[tabsize] of real;
+  13  6631 [145]     sintab: array[sintabsize] of real;
+  14  6631 [146] 
+  15  6631 [146] proc getdata;
+  16  6631 [147] begin
+  17  6631 [147]   f:=_attach('FUNCDATA:X      ',0,1,
+  18  6660 [147]                             FWRITE+FSILENT,0,0,'X');
+  19  6677 [147]   _getdataheader(f);
+  20  6691 [147]   if _n > maxsize then begin
+  21  6699 [147]     _abortwith('Max data size exceeded');
+  22  6733 [147]   end;
+  23  6733 [147]   if not ((_n=128) or (_n=256) or
+  24  6748 [147]           (_n=512) or (_n=1024)) then begin
+  25  6768 [147]     _abortwith('Invalid FFT data size ');
+  26  6802 [147]   end;
+  27  6802 [147]   if _domain <> DOMAIN_TIME then
+  28  6808 [147]   _abortwith(
+  29  6812 [147]   'Domain of data must be TIME, use FUNCTION again');
+  30  6868 [147]   for i:=0 to _n - 1 do begin
+  31  6890 [147]     _getreal(f, REALBASE + i, v);
+  32  6919 [147]     data[i] := v;
+  33  6926 [147]   end;
+  34  6939 [147]   for i:=0 to _n - 1 do begin
+  35  6975 [147]     _getreal(f, COMPLEXBASE + i, v);
+  36  7005 [147]     data[_n + i] := v;
+  37  7017 [147]   end;
+  38  7030 [147] end;
+  39  7044 [147] 
+  40  7045 [147] proc putdata;
+  41  7045 [148] begin
+  42  7045 [148]   for i:=0 to _n-1 do
+  43  7062 [148]     _putreal(f,REALBASE+i,data[i]);
+  44  7102 [148] 
+  45  7116 [148]   for i:=0 to _n-1 do
+  46  7128 [148]     _putreal(f,COMPLEXBASE+i,data[_n+i]);
+  47  7174 [148] 
+  48  7188 [148]   _datatype := DATA_COMPLEX;
+  49  7190 [148]   _domain := DOMAIN_FREQ;
+  50  7196 [148] 
+  51  7200 [148]   { later set _min and _max to frequency limits }
+  52  7200 [148] 
+  53  7200 [148]   _putdataheader(f);
+  54  7210 [148]   close(f);
+  55  7216 [148] end;
+  56  7216 [148] 
+  57  7217 [148] proc makesintab;
+  58  7217 [149] var j: integer;
+  59  7220 [150]     s: real;
+  60  7220 [151] begin
+  61  7220 [151]   for j:=0 to sintabsize div 2 do begin
+  62  7243 [151]     s:=sin(180.0*conv(j)/conv(sintabsize));
+  63  7268 [151]     sintab[j]:=s;
+  64  7281 [151]     sintab[sintabsize-j]:=s;
+  65  7305 [151]   end;
+  66  7318 [151] end;
+  67  7332 [151] 
+  68  7333 [149] proc fft;
+  69  7333 [150] var
+  70  7333 [150]   i, group, groupsize, halfgroup: integer;
+  71  7336 [154]   sinindex, tabstep: integer;
+  72  7336 [156]   sine, cosine: real;
+  73  7336 [158] 
+  74  7336 [158]   func bitreverse(i, bits: integer): integer;
+  75  7336 [162]   var j, k, n: integer;
+  76  7339 [165]   begin
+  77  7339 [165]     n := i;
+  78  7341 [165]     j := 0;
+  79  7351 [165]     for k := 1 to bits do begin
+  80  7374 [165]       j := j shl 1;
+  81  7380 [165]       if (n and 1) <> 0 then
+  82  7394 [165]         j := j + 1;
+  83  7404 [165]       n := n shr 1;
+  84  7415 [165]     end;
+  85  7420 [165]     bitreverse := j;
+  86  7434 [165]   end;
+  87  7442 [165] 
+  88  7443 [160]   proc bitreverseperm;
+  89  7443 [161]   var i,j,bits: integer;
+  90  7446 [164]       t: real;
+  91  7446 [165]   begin
+  92  7446 [165]     bits := trunc(log(conv(_n))/log(2.0)+0.5);
+  93  7483 [165] 
+  94  7488 [165]     for i := 0 to _n - 1 do begin
+  95  7510 [165]       j := bitreverse(i, bits);
+  96  7526 [165] 
+  97  7530 [165]       if j > i then begin
+  98  7539 [165] 
+  99  7542 [165]         t := data[i];
+ 100  7549 [165]         data[i] := data[j];
+ 101  7575 [165]         data[j] := t;
+ 102  7595 [165] 
+ 103  7608 [165]         t := data[_n+i];
+ 104  7620 [165]         data[_n+i] := data[_n+j];
+ 105  7656 [165]         data[_n+j] := t;
+ 106  7681 [165] 
+ 107  7694 [165]       end;
+ 108  7694 [165]     end;
+ 109  7694 [165]   end;
+ 110  7708 [165] 
+ 111  7709 [161]   proc butterfly(i,j: integer;
+ 112  7709 [164]                  cosine,sine: real);
+ 113  7709 [166]   var ar,ai,br,bi,tr,ti: real;
+ 114  7712 [172]   begin
+ 115  7712 [172]     ar:=data[i];
+ 116  7721 [172]     ai:=data[_n+i];
+ 117  7745 [172]     br:=data[j];
+ 118  7764 [172]     bi:=data[_n+j];
+ 119  7788 [172] 
+ 120  7800 [172]     tr:=br*cosine+bi*sine;
+ 121  7819 [172]     ti:=bi*cosine-br*sine;
+ 122  7852 [172] 
+ 123  7866 [172]     data[i]:=ar+tr;
+ 124  7879 [172]     data[_n+i]:=ai+ti;
+ 125  7911 [172] 
+ 126  7925 [172]     data[j]:=ar-tr;
+ 127  7938 [172]     data[_n+j]:=ai-ti;
+ 128  7970 [172]   end;
+ 129  7984 [172] 
+ 130  7985 [162] begin
+ 131  7985 [162]   bitreverseperm;
+ 132  7991 [162] 
+ 133  7991 [162]   groupsize := 2;
+ 134  7993 [162]   halfgroup := 1;
+ 135  7999 [162]   tabstep := sintabsize;
+ 136  8006 [162] 
+ 137  8010 [162]   while groupsize <= _n do begin
+ 138  8022 [162] 
+ 139  8022 [162]     group := 0;
+ 140  8024 [162]     while group < _n do begin
+ 141  8040 [162] 
+ 142  8040 [162]       sinindex := 0;
+ 143  8042 [162] 
+ 144  8046 [162]       for i := 0 to halfgroup-1 do begin
+ 145  8068 [162] 
+ 146  8068 [162]         sine := sintab[sinindex];
+ 147  8075 [162] 
+ 148  8087 [162]         if sinindex <= 256 then
+ 149  8094 [162]           cosine := sintab[256-sinindex]
+ 150  8101 [162]         else
+ 151  8109 [162]           cosine := -sintab[sinindex-256];
+ 152  8135 [162] 
+ 153  8148 [162]         butterfly(group+i,
+ 154  8152 [162]                   group+i+halfgroup,
+ 155  8166 [162]                   cosine,sine);
+ 156  8189 [162] 
+ 157  8189 [162]         sinindex := sinindex+tabstep;
+ 158  8193 [162]       end;
+ 159  8202 [162] 
+ 160  8216 [162]       group := group+groupsize;
+ 161  8220 [162]     end;
+ 162  8229 [162] 
+ 163  8232 [162]     groupsize := groupsize shl 1;
+ 164  8238 [162]     halfgroup := halfgroup shl 1;
+ 165  8249 [162]     tabstep := tabstep shr 1;
+ 166  8260 [162]   end;
+ 167  8265 [162] 
+ 168  8268 [162]   { calculate minimum and maximum frequency }
+ 169  8268 [162]   fs := conv(_n) / (_max - _min);
+ 170  8286 [162]   _min := -fs / 2.0;
+ 171  8305 [162]   _max := fs/2.0;
+ 172  8325 [162] end;
+ 173  8332 [162] 
+ 174  8333 [150] begin
+ 175  8333 [150]   getdata;
+ 176  8340 [150]   makesintab;
+ 177  8344 [150]   fft;
+ 178  8348 [150]   putdata;
+ 179  8352 [150]   ARGTYPE[0] := chr(0);
+ 180  8356 [150]   _chainprog('TEKGRAPH:R      ', 0, 1);
+ 181  8391 [150] end. 
+Code length:           8390
+Compiler stack size:   138
+Ident stack size:      172/300

@@ -1,5 +1,6 @@
 program function;
-uses syslib,strlib,writelib,mathlib,ralib,ftlib;
+uses syslib,strlib,writelib,mathlib,ralib,ftlib,
+     filelib,arglib;
 
 const
 
@@ -152,7 +153,6 @@ begin
   if type=0 then exit;
   writeln('FUNCTION: ',ftitle[type]);
   writeln('FORMULA:  ',fformula[type]);
-  writeln
   rows := (MAXPAR + columns) div columns;
   padding := (48 div columns) - namefield - valfield;
   for row := 0 to rows - 1 do begin
@@ -172,7 +172,6 @@ begin
     end {column};
     writeln;
   end {row};
-  writeln;
 end;
 
 proc setparam(p: integer; value: cpnt);
@@ -220,7 +219,7 @@ begin
     if not done then begin
       p := findparam(name);
       if p < 0 then
-        writeln('Unknown parameter ',name)
+        _abortwith('Unknown parameter ')
       else
         setparam(p,value);
     end;
@@ -328,7 +327,8 @@ begin
     'Triangle with CENTER and WIDTH';
 
   ftitle[FT_SINC]   := 'SINC';
-  fformula[FT_SINC] := 'A*sin(360*F1*x)/(360*F1*x)';
+  fformula[FT_SINC] :=
+    'A*sin(360*F1*x-CENTER)/(360*F1*x-CONTER)';
 end;
 
 proc loadparams;
@@ -429,20 +429,327 @@ proc displayfunctions;
 var i: integer;
 begin
   writeln('FUNCTION GENERATOR');
-  writeln;
   for i:=1 to MAXTYPE do
     writeln(i:2, '  ', ftitle[i]);
-  writeln;
   writeln('Select: FUNCTION TYPE=n');
   writeln('Help:   FUNCTION TYPE=0');
-  writeln;
+end;
+
+proc makecosine(f: file);
+{***********************}
+var
+  t, deltat, val, a, f1, phase, phaseval: real;
+  k: integer;
+begin
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a     := prval[P_A];
+  f1    := prval[P_F1];
+  phase := prval[P_PHASE];
+
+  for k := 0 to _n - 1 do begin
+    phaseval := 360.0 * f1 * t + phase;
+
+    { real part }
+    val := a * cos(phaseval);
+    _putreal(f, REALBASE + k, val);
+
+    { imaginary part }
+    if _datatype = DATA_COMPLEX then
+      val := a * sin(phaseval)
+    else
+      val := 0.0;
+
+    _putreal(f, COMPLEXBASE + k, val);
+
+    t := t + deltat;
+  end;
+end;
+
+proc makesum(f: file);
+{********************}
+var
+  t, deltat, val, a1, a2, f1, f2: real;
+  k: integer;
+begin
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a1 := prval[P_A1];
+  a2 := prval[P_A2];
+  f1 := prval[P_F1];
+  f2 := prval[P_F2];
+
+  for k := 0 to _n - 1 do begin
+
+    { real part }
+    val := a1 * cos(360.0 * f1 * t) +
+           a2 * cos(360.0 * f2 * t);
+    _putreal(f, REALBASE + k, val);
+
+    { imaginary part }
+    if _datatype = DATA_COMPLEX then
+      val := a1 * sin(360.0 * f1 * t) +
+             a2 * sin(360.0 * f2 * t)
+    else
+      val := 0.0;
+
+    _putreal(f, COMPLEXBASE + k, val);
+
+    t := t + deltat;
+  end;
+end;
+
+proc makeproduct(f: file);
+{************************}
+var
+  t, deltat, val, a, f1, f2: real;
+  c1, s1, c2, s2: real;
+  k: integer;
+begin
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a  := prval[P_A];
+  f1 := prval[P_F1];
+  f2 := prval[P_F2];
+
+  for k := 0 to _n - 1 do begin
+
+    c1 := cos(360.0 * f1 * t);
+    c2 := cos(360.0 * f2 * t);
+
+    { real part }
+    val := a * c1 * c2;
+    _putreal(f, REALBASE + k, val);
+
+    { imaginary part }
+    if _datatype = DATA_COMPLEX then begin
+      s1 := sin(360.0 * f1 * t);
+      s2 := sin(360.0 * f2 * t);
+      val := a * (c1 * s2 + s1 * c2);
+    end else
+      val := 0.0;
+
+    _putreal(f, COMPLEXBASE + k, val);
+
+    t := t + deltat;
+  end;
+end;
+
+proc makegaussian(f: file);
+{*************************}
+var
+  t, deltat, val, a, center, width, x: real;
+  k: integer;
+begin
+  if _datatype <> DATA_REAL then
+    _abortwith('Gaussian function requires DATA=REAL')
+;
+
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a      := prval[P_A];
+  center := prval[P_CENTER];
+  width  := prval[P_WIDTH];
+
+  if width <= 0.0 then
+    _abortwith('WIDTH must be > 0');
+
+  for k := 0 to _n - 1 do begin
+
+    x := (t - center) / width;
+    val := a * exp(-(x * x));
+
+    _putreal(f, REALBASE + k, val);
+    _putreal(f, COMPLEXBASE + k, 0.0);
+
+    t := t + deltat;
+  end;
+end;
+
+proc makeexp(f: file);
+{********************}
+var
+  t, deltat, val, a, tau: real;
+  k: integer;
+begin
+  if _datatype <> DATA_REAL then
+    _abortwith(
+      'Exponential function requires DATA=REAL');
+
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a   := prval[P_A];
+  tau := prval[P_TAU];
+
+  if tau <= 0.0 then
+    _abortwith('TAU must be > 0');
+
+  for k := 0 to _n - 1 do begin
+
+    val := a * exp(-(t - _min) / tau);
+
+    _putreal(f, REALBASE + k, val);
+    _putreal(f, COMPLEXBASE + k, 0.0);
+
+    t := t + deltat;
+  end;
+end;
+
+proc makepulse(f: file);
+{**********************}
+var
+  t, deltat, val, a, center, width: real;
+  k: integer;
+begin
+  if _datatype <> DATA_REAL then
+    _abortwith('Rectangular pulse requires DATA=REAL')
+;
+
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a      := prval[P_A];
+  center := prval[P_CENTER];
+  width  := prval[P_WIDTH];
+
+  if width <= 0.0 then
+    _abortwith('WIDTH must be > 0');
+
+  for k := 0 to _n - 1 do begin
+
+    if fabs(t-center) <= width/2.0 then
+      val := a
+    else
+      val := 0.0;
+
+    _putreal(f, REALBASE+k, val);
+    _putreal(f, COMPLEXBASE+k, 0.0);
+
+    t := t + deltat;
+  end;
+end;
+
+proc maketrapezoid(f: file);
+{**************************}
+var
+  t, deltat, val, a, center, width, rise, x: real;
+  k: integer;
+begin
+  if _datatype <> DATA_REAL then
+    _abortwith('Trapezoid requires DATA=REAL');
+
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a      := prval[P_A];
+  center := prval[P_CENTER];
+  width  := prval[P_WIDTH];
+  rise   := prval[P_RISE];
+
+  if width <= 0.0 then
+    _abortwith('WIDTH must be > 0');
+
+  if rise <= 0.0 then
+    _abortwith('RISE must be > 0');
+
+  if 2.0 * rise > width then
+    _abortwith('RISE must be <= WIDTH/2');
+
+  for k := 0 to _n - 1 do begin
+
+    x := fabs(t - center);
+
+    if x >= width / 2.0 then
+      val := 0.0
+    else if x <= width / 2.0 - rise then
+      val := a
+    else
+      val := a * (width / 2.0 - x) / rise;
+
+    _putreal(f, REALBASE + k, val);
+    _putreal(f, COMPLEXBASE + k, 0.0);
+
+    t := t + deltat;
+  end;
+end;
+
+proc maketriangle(f: file);
+{*************************}
+var
+  t, deltat, val, a, center, width, x: real;
+  k: integer;
+begin
+  if _datatype <> DATA_REAL then
+    _abortwith('Triangle requires DATA=REAL');
+
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a      := prval[P_A];
+  center := prval[P_CENTER];
+  width  := prval[P_WIDTH];
+
+  if width <= 0.0 then
+    _abortwith('WIDTH must be > 0');
+
+  for k := 0 to _n - 1 do begin
+
+    x := fabs(t - center);
+
+    if x >= width / 2.0 then
+      val := 0.0
+    else
+      val := a * (1.0 - 2.0 * x / width);
+
+    _putreal(f, REALBASE + k, val);
+    _putreal(f, COMPLEXBASE + k, 0.0);
+
+    t := t + deltat;
+  end;
+end;
+
+proc makesinc(f: file);
+{*********************}
+var
+  t, deltat, val, a, f1, arg: real;
+  k: integer;
+begin
+  if _datatype <> DATA_REAL then
+    _abortwith('Sinc function requires DATA=REAL');
+
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a  := prval[P_A];
+  f1 := prval[P_F1];
+
+  if f1 <= 0.0 then
+    _abortwith('F1 must be > 0');
+
+  for k := 0 to _n - 1 do begin
+
+    arg := 360.0 * f1 * (t - prval[P_CENTER]);
+
+    if fabs(arg) < 1.0e-6 then
+      val := a
+    else
+      val := a * sin(arg) / arg;
+
+    _putreal(f, REALBASE + k, val);
+    _putreal(f, COMPLEXBASE + k, 0.0);
+
+    t := t + deltat;
+  end;
 end;
 
 proc makefunction;
 {****************}
 var f: file;
-    t, deltat, val, a, f1, phase, phaseval: real;
-    k: integer;
 begin
   { validate common parameters }
   _n := pival[P_N];
@@ -476,36 +783,40 @@ begin
   _putdataheader(f);
 
   { compute and store function }
-  t := _min;
-  deltat := (_max - _min) / conv(_n);
-
-  a  := prval[P_A];
-  f1 := prval[P_F1];
-  phase := prval[P_PHASE];
 
   case pival[P_TYPE] of
-    1: begin
-         for k := 0 to _n - 1 do begin
-           phaseval := 360.0 * f1 * t + phase;
 
-           { real part }
-           val := a * cos(phaseval);
-           _putreal(f,REALBASE+k,val);
+    FT_COSINE:
+      makecosine(f);
 
-           { imaginary part }
-           if _datatype = DATA_COMPLEX then
-             val := a * sin(phaseval)
-          else
-             val := 0.0;
-          _putreal(f,COMPLEXBASE+k,val);
+    FT_SUM:
+      makesum(f);
 
-          t := t + deltat;
-         end;
-       end
-    else _abortwith(
-          'Function TYPE not yet implemented')
-    end {case};
+    FT_PRODUCT:
+      makeproduct(f);
 
+    FT_GAUSSIAN:
+      makegaussian(f);
+
+    FT_EXP:
+      makeexp(f);
+
+    FT_PULSE:
+      makepulse(f);
+
+    FT_TRAPEZOID:
+      maketrapezoid(f);
+
+    FT_TRIANGLE:
+      maketriangle(f);
+
+    FT_SINC:
+      makesinc(f)
+
+  else
+    _abortwith('Function TYPE not yet implemented')
+
+  end {case};
   close(f);
 end;
 
@@ -523,4 +834,9 @@ begin { main }
     makefunction;
   end;
   storeparams;
+
+  if pival[P_TYPE] <> 0 then begin
+    ARGTYPE[0] := chr(0);
+    _chainprog('TEKGRAPH:R      ', 0, 1);
+  end;
 end. 

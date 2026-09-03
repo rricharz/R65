@@ -167,7 +167,6 @@ begin
     end {column};
     writeln;
   end {row};
-  writeln;
 end;
 
 proc setparam(p: integer; value: cpnt);
@@ -538,7 +537,6 @@ begin
     writeln('DATA   ',' REAL')
   else
     writeln('DATA   ',' COMPLEX');
-  writeln;
 end;
 
 proc drawaxes;
@@ -600,13 +598,20 @@ begin
 end;
 
 func ypos(i: integer): integer;
-{*****************************}
-var v: real;
+var j: integer;
+    v: real;
 begin
+  j := i;
+  if _domain = DOMAIN_FREQ then begin
+    j := j + _n div 2;
+    if j >= _n then
+      j := j - _n;
+  end;
+
   if realmode then
-    _getreal(f, REALBASE+i, v)
+    _getreal(f, REALBASE+j, v)
   else
-    _getreal(f, COMPLEXBASE+i, v);
+    _getreal(f, COMPLEXBASE+j, v);
   if (v < min) then
     ypos := 0
   else if (v > max) then
