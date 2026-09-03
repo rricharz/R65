@@ -177,5 +177,5 @@ begin
   fft;
   putdata;
   ARGTYPE[0] := chr(0);
-  _chainprog('TEKGRAPH:R      ', 0, 1);
+  _chainprog('GRAPH:R         ', 0, 1);
 end. 
