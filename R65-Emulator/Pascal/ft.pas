@@ -176,6 +176,9 @@ begin
   makesintab;
   fft;
   putdata;
-  ARGTYPE[0] := chr(0);
+  ARGTYPE[0]  := 's';
+  ARGTYPE[1]  := chr(0);
+  ARGLISTS[0] := '/';
+  ARGLISTS[1] := 'Q';
   _chainprog('GRAPH:R         ', 0, 1);
-end. 
+end.

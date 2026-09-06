@@ -11,7 +11,8 @@ var mask,j,h: integer;
 begin
   writeln('LEDTEST: Test led library');
   writeln('Displaying text PASCAL');
-  _ledstring('PASCAL  ');
+  _ledstring('-1.23456');
+  exit;
   _delay10msec(100);
   _ledstring('        ');
   writeln('Displaying hex numbers');

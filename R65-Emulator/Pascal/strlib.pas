@@ -212,5 +212,42 @@ begin
   while _strlen(s)<fsize do _strinsc(' ',0,s);
 end;
 
+func field(text: cpnt; width0: integer): cpnt;
+{********************************************}
+{ justify a string in a larger string
+  size<0 right justified, size>0 left justified }
+var i, j: integer;
+    cp: cpnt;
+    width: integer;
+    len: integer;
+begin
+  cp := cpnt($17d8);
+  width := width0;
+  if width < 0 then
+    width := -width;
+  if width > 25 then
+    width := 25;
+  len := _strlen(text);
+  if len > width then
+    len := width;
+  if width0 >= 0 then begin
+    { left justified }
+    for i := 0 to len-1 do
+      cp[i] := text[i];
+    for i := len to width-1 do
+      cp[i] := ' ';
+  end
+  else begin
+    { right justified }
+    j := width - len;
+    for i := 0 to j-1 do
+      cp[i] := ' ';
+    for i := 0 to len-1 do
+      cp[j+i] := text[i];
+  end;
+  cp[width] := chr(0);
+  field := cp;
+end;
+
 begin
 end.

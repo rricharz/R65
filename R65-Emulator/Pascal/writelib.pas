@@ -100,29 +100,6 @@ begin
   trim16 := cp;
 end;
 
-func field(text: cpnt; width0: integer): cpnt;
-{********************************************}
-var i: integer;
-    cp: cpnt;
-    width: integer;
-begin
-  width := width0;
-  cp := cpnt($17d8);
-  if width>25 then width:=25;
-  if width<0 then width:=0;
-  i:=0;
-  while (i<width) and (text[i]<>chr(0)) do begin
-    cp[i]:=text[i];
-    i:=i+1
-  end;
-  while i<width do begin
-    cp[i]:=' ';
-    i:=i+1
-  end;
-  cp[width]:=chr(0);
-  field:=cp
-end;
-
 proc __wrintf(value, width: integer);
 {***********************************}
 { Write value right justified in a field of width.

@@ -165,7 +165,7 @@ begin
         case ptype[i] of
           'i':  write(pival[i]:valfield);
           'r':  write(prval[i]:valfield:2);
-          's':  write(field(psval[i],valfield))
+          's':  write(field(psval[i], -valfield))
           else write('undefined')
         end {case};
       end {if};
@@ -828,8 +828,11 @@ begin { main }
   end;
   storeparams;
 
-  if pival[P_TYPE] <> 0 then begin
-    ARGTYPE[0] := chr(0);
+ if pival[P_TYPE] <> 0 then begin
+    ARGTYPE[0]  := 's';
+    ARGTYPE[1]  := chr(0);
+    ARGLISTS[0] := '/';
+    ARGLISTS[1] := 'Q';
     _chainprog('GRAPH:R         ', 0, 1);
   end;
 end. 

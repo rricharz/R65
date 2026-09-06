@@ -4,7 +4,7 @@
 {$U+}
 
 program ARGLIST;
-uses syslib, arglib, writelib, paramlib;
+uses syslib, arglib, writelib, ftlib;
 
 var string: array[15] of char;
     i, val: integer;

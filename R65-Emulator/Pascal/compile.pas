@@ -29,10 +29,10 @@ const
     IDLENGTH  = 64;   {max. length of ident buffer}
     IDSIZE    = 16;   {chars per identifier in s_id}
     PIDSIZE   = 8;    {packed chars per identifier}
-    SYMBSIZE  = 300;  {id table entries}
+    SYMBSIZE  = 320;  {id table entries}
     IDTABSIZE = 2400; {SYMBSIZE * PIDSIZE}
 
-    STACKSIZE = 256;   {stack size}
+    STACKSIZE = 300;   {stack size}
     PAGELENGHT= 60;    {no of lines per page}
     MAXFI     = 3;     {max n  of nested input files}
     NRESW     = 64;    {number of reserved words - 1}
@@ -2843,7 +2843,8 @@ begin {main}
     if makeoutput then
       write(PRTON);
     writeln('Code length:           ',pc);
-    writeln('Compiler stack size:   ',stackmax);
+    writeln('Compiler stack size:   ',stackmax,
+          '/', STACKSIZE);
     writeln('Ident stack size:      ',spntmax,
           '/',SYMBSIZE);
     write(PRTOFF);

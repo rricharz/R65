@@ -19,11 +19,18 @@ const
   P_YSCALE = 1;
   P_YMIN   = 2;
   P_YMAX   = 3;
+  P_TSCALE = 4;
+  P_TMIN   = 5;
+  P_TMAX   = 6;
+  P_FSCALE = 7;
+  P_FMIN   = 8;
+  P_FMAX   = 9;
 
-  MAXPAR   = 3;
+  MAXPAR   = 9;
+
   NAMESIZE = 15;
 
-  PARVERSION = 1;
+  PARVERSION = 2;
   PARSIZE    = 256;
   STRSIZE    = 9;   { 8 chars + chr(0) }
 
@@ -50,6 +57,8 @@ var
   xs, xw, ys, yw, x:integer;
   min, max, nmax, v:real;
   realmode, autoscale: boolean;
+
+  firstbin, lastbin: integer;
 
 proc initparfile;
 {***************}
@@ -145,14 +154,20 @@ const
 var i,col,row,rows,k,padding: integer;
 begin
   writeln
-    ('DISPLAY PARAMETERS (change with TEKGRAPH)');
+    ('DISPLAY PARAMETERS (change with GRAPH)');
 
-  rows := (MAXPAR + columns) div columns;
+  rows := (MAXPAR - 3 + columns) div columns;
   padding := (48 div columns) - namefield - valfield;
 
   for row := 0 to rows - 1 do begin
     for col := 0 to columns - 1 do begin
-      i := row + col * rows;
+    i := row + col * rows;
+    if i > 3 then begin
+      if _domain = DOMAIN_TIME then
+        i := i
+      else
+        i := i + 3;
+    end;
       if i <= MAXPAR then begin
         if col > 0 then
           for k := 1 to padding do write(' ');
@@ -160,7 +175,7 @@ begin
         case ptype[i] of
           'i': write(pival[i]:valfield);
           'r': write(prval[i]:valfield:2);
-          's': write(field(psval[i],valfield))
+          's': write(field(psval[i], -valfield))
           else write('undefined')
         end {case};
       end {if};
@@ -249,6 +264,33 @@ begin
   pname[P_YMAX] := 'YMAX';
   ptype[P_YMAX] := 'r';
   prval[P_YMAX] := 1.0;
+
+  pname[P_TSCALE] := 'TSCALE';
+  ptype[P_TSCALE] := 's';
+  psval[P_TSCALE] := _allocate(9);
+  strcpyn('FULL',psval[P_TSCALE],9);
+
+  pname[P_TMIN] := 'TMIN';
+  ptype[P_TMIN] := 'r';
+  prval[P_TMIN] := 0.0;
+
+  pname[P_TMAX] := 'TMAX';
+  ptype[P_TMAX] := 'r';
+  prval[P_TMAX] := 1.0;
+
+  pname[P_FSCALE] := 'FSCALE';
+  ptype[P_FSCALE] := 's';
+  psval[P_FSCALE] := _allocate(9);
+  strcpyn('FULL',psval[P_FSCALE],9);
+
+  pname[P_FMIN] := 'FMIN';
+  ptype[P_FMIN] := 'r';
+  prval[P_FMIN] := 0.0;
+
+  pname[P_FMAX] := 'FMAX';
+  ptype[P_FMAX] := 'r';
+  prval[P_FMAX] := 1.0;
+
 end;
 
 proc loadparams;
@@ -378,65 +420,79 @@ end;
 proc tics;
 {********}
 const eps = 0.001;
-var r, base, frac: real;
+var r, base, frac, xleft, xright: real;
 begin
-{ ---------- Y axis ---------- }
 
-daxis0 := (max-min)/2.0;
-daxis := 1.0;
+  { ---------- Y axis ---------- }
 
-while daxis>daxis0 do
-  daxis:=daxis*0.1;
+  daxis0 := (max-min)/2.0;
+  daxis := 1.0;
 
-while daxis<0.1*daxis0 do
-  daxis:=daxis*10.0;
+  while daxis>daxis0 do
+    daxis:=daxis*0.1;
 
-{ round lower limit down to a tick }
-r:=min/daxis;
-if (r<=32767.0) and (r>=-32768.0) then begin
-  axis:=daxis*conv(trunc(r));
-  if axis>min+eps*daxis then
-    axis:=axis-daxis;
-end
-else
-  axis:=min;
-min:=axis;
+  while daxis<0.1*daxis0 do
+    daxis:=daxis*10.0;
 
-{ round upper limit up to a tick }
-r:=max/daxis;
-if (r<=32767.0) and (r>=-32768.0) then begin
-  nmax:=daxis*conv(trunc(r));
-  if nmax<max-eps*daxis then
-    nmax:=nmax+daxis;
-  max:=nmax;
-end;
+  r:=min/daxis;
+  if (r<=32767.0) and (r>=-32768.0) then begin
+    axis:=daxis*conv(trunc(r));
+    if axis>min+eps*daxis then
+      axis:=axis-daxis;
+  end
+  else
+    axis:=min;
+
+  min:=axis;
+
+  r:=max/daxis;
+  if (r<=32767.0) and (r>=-32768.0) then begin
+    nmax:=daxis*conv(trunc(r));
+    if nmax<max-eps*daxis then
+      nmax:=nmax+daxis;
+    max:=nmax;
+  end;
+
 
   { ---------- X axis ---------- }
 
-  daxis0 := (_max-_min)/5.0;
+  if _domain=DOMAIN_TIME then begin
+    xleft:=prval[P_TMIN];
+    xright:=prval[P_TMAX];
+  end
+  else begin
+    xleft:=prval[P_FMIN];
+    xright:=prval[P_FMAX];
+  end;
 
-  base := 1.0;
+  daxis0:=(xright-xleft)/5.0;
+
+  base:=1.0;
   while base>daxis0 do
-    base := base*0.1;
+    base:=base*0.1;
+
   while base*10.0<=daxis0 do
-    base := base*10.0;
+    base:=base*10.0;
 
-  frac := daxis0/base;
+  frac:=daxis0/base;
+
   if frac<=1.5 then
-    xaxis := base
+    xaxis:=base
   else if frac<=3.5 then
-    xaxis := 2.0*base
+    xaxis:=2.0*base
   else
-    xaxis := 5.0*base;
+    xaxis:=5.0*base;
 
-  r := _min/xaxis;
+  r:=xleft/xaxis;
+
   if (r<=32767.0) and (r>=-32768.0) then begin
-    xsaxis := xaxis*conv(trunc(r));
-    if xsaxis<_min-eps*xaxis then
-      xsaxis := xsaxis+xaxis;
+    xsaxis:=xaxis*conv(trunc(r));
+    if xsaxis<xleft-eps*xaxis then
+      xsaxis:=xsaxis+xaxis;
   end
   else
-    xsaxis := _min;
+    xsaxis:=xleft;
+
 end;
 
 proc initialize;
@@ -489,34 +545,143 @@ end;
 
 proc validate;
 {************}
+var
+  x1, x2, dx: real;
 begin
-  if (_strcmp(psval[P_MODE],'REAL') = 0) then
-    realmode := true
-  else if (_strcmp(psval[P_MODE],'IMAG')=0) then
-    realmode := false
+
+  { ----- MODE ----- }
+
+  if _strcmp(psval[P_MODE],'REAL')=0 then
+    realmode:=true
+  else if _strcmp(psval[P_MODE],'IMAG')=0 then
+    realmode:=false
   else
     _abortwith('MODE must be REAL or IMAG');
-  if (_strcmp(psval[P_YSCALE],'AUTO') = 0) then
-    autoscale := true
-  else if (_strcmp(psval[P_YSCALE],'MANUAL') = 0) then
-    autoscale := false
+
+
+  { ----- Y SCALE ----- }
+
+  if _strcmp(psval[P_YSCALE],'AUTO')=0 then
+    autoscale:=true
+  else if _strcmp(psval[P_YSCALE],'MANUAL')=0 then
+    autoscale:=false
   else
     _abortwith('YSCALE must be AUTO or MANUAL');
 
-
-  if (pchanged[P_YMIN]) or (pchanged[P_YMAX]) then
-  begin
-    strcpyn('MANUAL', psval[P_YSCALE], 9);
-    autoscale := false;
+  if pchanged[P_YMIN] or pchanged[P_YMAX] then begin
+    strcpyn('MANUAL',psval[P_YSCALE],9);
+    autoscale:=false;
   end;
-  if autoscale = true then
-    normalize
+
+  if autoscale then begin
+    normalize;
+    prval[P_YMIN]:=min;
+    prval[P_YMAX]:=max;
+  end
   else begin
-    min := prval[P_YMIN];
-    max := prval[P_YMAX];
-    if min >= max then
+    min:=prval[P_YMIN];
+    max:=prval[P_YMAX];
+    if min>=max then
       _abortwith('YMIN must be smaller than YMAX');
   end;
+
+
+  { ----- HORIZONTAL SCALE ----- }
+
+  dx:=(_max-_min)/conv(_n);
+
+  if _domain=DOMAIN_TIME then begin
+
+    if pchanged[P_TMIN] or pchanged[P_TMAX] then
+      strcpyn('MANUAL',psval[P_TSCALE],9);
+
+    if _strcmp(psval[P_TSCALE],'FULL')=0 then begin
+      firstbin:=0;
+      lastbin:=_n-1;
+    end
+    else if _strcmp(psval[P_TSCALE],'MANUAL')=0 then
+    begin
+      x1:=prval[P_TMIN];
+      x2:=prval[P_TMAX];
+
+      if x1>=x2 then
+        _abortwith('TMIN must be smaller than TMAX');
+
+      if (x1<_min) or (x2>_max) then
+        _abortwith('Time limits outside data range');
+
+      firstbin:=
+        trunc((x1-_min)/dx+0.5);
+      lastbin:=
+        trunc((x2-_min)/dx+0.5);
+
+      if firstbin<0 then
+        firstbin:=0;
+      if lastbin>=_n then
+        lastbin:=_n-1;
+    end
+    else
+      _abortwith('TSCALE must be FULL or MANUAL');
+
+    if firstbin>=lastbin then
+      _abortwith('Horizontal range too small');
+
+    { store limits actually used }
+    prval[P_TMIN]:=
+      _min+conv(firstbin)*dx;
+    prval[P_TMAX]:=
+      _min+conv(lastbin)*dx;
+
+  end
+
+  else if _domain=DOMAIN_FREQ then begin
+
+    if pchanged[P_FMIN] or pchanged[P_FMAX] then
+      strcpyn('MANUAL',psval[P_FSCALE],9);
+
+    if _strcmp(psval[P_FSCALE],'FULL')=0 then begin
+      firstbin:=0;
+      lastbin:=_n-1;
+    end
+    else if _strcmp(psval[P_FSCALE],'MANUAL')=0 then
+    begin
+      x1:=prval[P_FMIN];
+      x2:=prval[P_FMAX];
+
+      if x1>=x2 then
+        _abortwith('FMIN must be smaller than FMAX');
+
+      if (x1<_min) or (x2>_max) then
+        _abortwith(
+          'Frequency limits outside data range');
+
+      firstbin:=
+        trunc((x1-_min)/dx+0.5);
+      lastbin:=
+        trunc((x2-_min)/dx+0.5);
+
+      if firstbin<0 then
+        firstbin:=0;
+      if lastbin>=_n then
+        lastbin:=_n-1;
+    end
+    else
+      _abortwith('FSCALE must be FULL or MANUAL');
+
+    if firstbin>=lastbin then
+      _abortwith('Horizontal range too small');
+
+    { store limits actually used }
+    prval[P_FMIN]:=
+      _min+conv(firstbin)*dx;
+    prval[P_FMAX]:=
+      _min+conv(lastbin)*dx;
+
+  end
+
+  else
+    _abortwith('Invalid data domain');
+
 end;
 
 proc displayfuncpars;
@@ -541,12 +706,30 @@ end;
 
 proc drawaxes;
 {************}
-var labelstr : cpnt;
-    y: integer;
+var
+  labelstr, xlabel: cpnt;
+  y: integer;
+  xleft, xright: real;
 begin
+
+  { current horizontal display range }
+  if _domain=DOMAIN_TIME then begin
+    xleft:=prval[P_TMIN];
+    xright:=prval[P_TMAX];
+    xlabel:='TIME';
+  end
+  else begin
+    xleft:=prval[P_FMIN];
+    xright:=prval[P_FMAX];
+    xlabel:='FREQUENCY';
+  end;
+
   tics;
-  labelstr := _new;
+
+  labelstr:=_new;
+
   _starttek(T_HALF);
+
   xs:=leftborder;
   xw:=MAXX-leftborder-border;
   ys:=border;
@@ -556,18 +739,26 @@ begin
 
   _setlinemode(DOTTED);
   _setchsize(2);
-  _plotstr(_title,MAXX div 2, MAXY-50, CENTER);
-  _plotstr(_description,MAXX div 2, MAXY-125, CENTER);
-  if (_domain = DOMAIN_FREQ) then
-    _plotstr('FREQUENCY',MAXX div 2, 50, CENTER)
-  else
-    _plotstr('FREQUENCY',MAXX div 2, 50, CENTER)
+
+  { title and description }
+  _plotstr(_title,MAXX div 2,MAXY-50,CENTER);
+  _plotstr(_description,MAXX div 2,MAXY-125,CENTER);
+
+  { horizontal axis title }
+  _plotstr(xlabel,MAXX div 2,50,CENTER);
+
+
+  { ----- vertical grid and labels ----- }
+
   repeat
-    labelstr[0] := chr(0);
-    y:=trunc((axis-min)/(max-min)*conv(yw)+0.5);
+    labelstr[0]:=chr(0);
+
+    y:=trunc((axis-min)/
+             (max-min)*conv(yw)+0.5);
+
     if (y>0) and (y<yw) then
       _drawvector(xs,ys+y,xs+xw,ys+y);
-    _moveto(5,ys+y-5);
+
     if daxis<0.001 then
       write(@labelstr,axis:1:4)
     else if daxis<0.01 then
@@ -576,17 +767,28 @@ begin
       write(@labelstr,axis:1:2)
     else
       write(@labelstr,axis:1:1);
-    _plotstr(labelstr,xs,
-      ys + y, RIGHT);
+
+    _plotstr(labelstr,
+             xs,
+             ys+y,
+             RIGHT);
+
     axis:=axis+daxis;
+
   until axis>max*1.0001;
 
+
+  { ----- horizontal grid and labels ----- }
+
   repeat
-    labelstr[0] := chr(0);
-    x:=trunc((xsaxis-_min)/
-                 (_max-_min)*conv(xw)+0.5);
+    labelstr[0]:=chr(0);
+
+    x:=trunc((xsaxis-xleft)/
+             (xright-xleft)*conv(xw)+0.5);
+
     if (x>0) and (x<xw) then
       _drawvector(xs+x,ys,xs+x,ys+yw);
+
     if xaxis<0.001 then
       write(@labelstr,xsaxis:1:4)
     else if xaxis<0.01 then
@@ -595,12 +797,19 @@ begin
       write(@labelstr,xsaxis:1:2)
     else
       write(@labelstr,xsaxis:1:1);
-    _plotstr(labelstr,xs + x,
-      ys - trunc(0.4
-       * conv(border)), CENTER);
+
+    _plotstr(labelstr,
+             xs+x,
+             ys-trunc(0.4*conv(border)),
+             CENTER);
+
     xsaxis:=xsaxis+xaxis;
-  until xsaxis>_max;
+
+  until xsaxis>xright*1.0001;
+
 end;
+
+
 
 func ypos(i: integer): integer;
 {*****************************}
@@ -628,12 +837,18 @@ end;
 
 proc drawdata;
 {************}
+var span: integer;
 begin
   _setlinemode(SOLID);
   _setchsize(1);
   _startdraw(xs,ys+ypos(0));
-  for i:=1 to _n-1 do begin
-    x:=trunc(conv(xw)/conv(_n)*conv(i)+0.5);
+  span:=lastbin-firstbin;
+  _startdraw(xs,ys+ypos(firstbin));
+  for i:=firstbin+1 to lastbin do begin
+    x:=trunc(
+         conv(xw) *
+         conv(i-firstbin) /
+         conv(span) + 0.5);
     _draw(xs+x,ys+ypos(i));
   end;
   _enddraw;
