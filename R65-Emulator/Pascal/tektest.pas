@@ -24,7 +24,7 @@ begin
   ycenter:=MAXY div 2;
   radius:=9*MAXY div 20;
 
-  _starttek(T_HALF);
+  _starttek(0);
   _moveto(450,760);
   write(@PLOTTER,'tektest');
 

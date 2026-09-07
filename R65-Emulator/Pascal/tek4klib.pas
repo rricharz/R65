@@ -26,9 +26,9 @@ const MAXX = 4091; { Tektronix 4010 graphic mode }
       PLOTTER    = @1;
 
       { tek4010 window modes }
-      T_HALF     = 0;   { default }
       T_FULLV    = 1;
-      T_GAMING   = 2;
+      T_FAST     = 2;
+      T_BOTH     = 3; { T_FULLV or T_FAST }
 
 var   _xs,_ys: integer;
 
@@ -54,9 +54,10 @@ proc _starttek(mode: integer);
   are hidden. tek4010 is called with the following
   arguments
 
-  mode T_HALF:    -half        (default)
-  mode T_FULLV:   -fullv       (for large window)
-  mode T_GAMING:  -half -fast  (for games)       }
+  T_HALF  start with -half, else with -fullv
+  T_FAST  start in fast mode, else 192000 baud
+  T_BOTH for both                               }
+
 
 const C_SHELL  = 10;
       STOPCODE = $2010;
@@ -81,33 +82,36 @@ var dummy, res: integer;
 
 begin {starttek}
 
-  dummy := sh('pkill tek4010');
-  _delay10msec(5);
-
   dummy := sh('truncate -s 0 printout.txt');
   _delay10msec(5);
-
-  case mode of
-    T_FULLV: dummy := sh(
-'$HOME/bin/tek4010 -fullv tail -f printout.txt &');
-    T_GAMING: dummy := sh(
-'$HOME/bin/tek4010 -half -fast tail -f printout.txt &'
-)
-    else dummy := sh(
-'$HOME/bin/tek4010 -half -fast tail -f printout.txt &'
-)
-    end {case}
-  _delay10msec(50);
-
   res := sh('pgrep -x tek4010 >/dev/null');
+
   if res <> 0 then begin
-    writeln(INVVID, 'tek4010 did not start', NORVID);
-    RUNERR := 54;
-    call(STOPCODE);
+
+    case mode of
+      0:
+          dummy := sh('./r65tek 0 &');
+      T_FULLV:
+          dummy := sh('./r65tek 1 &');
+      T_FAST:
+          dummy := sh('./r65tek 2 &');
+      T_BOTH:
+          dummy := sh('./r65tek 3 &')
+        else
+          dummy := sh('./r65tek 0 &')
+    end;
+
+    _delay10msec(50);
+    res := sh('pgrep -x tek4010 >/dev/null');
+    if res <> 0 then begin
+      writeln(INVVID,'tek4010 did not start', NORVID);
+      RUNERR := 54;
+        call(STOPCODE);
+    end;
   end;
 
-  emucom := 11; { start raw mode }
-  _clearscreen;
+    emucom := 11; { start raw mode }
+    _clearscreen;
 
 end {starttek};
 

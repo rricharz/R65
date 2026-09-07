@@ -728,7 +728,7 @@ begin
 
   labelstr:=_new;
 
-  _starttek(T_HALF);
+  _starttek(T_FAST);
 
   xs:=leftborder;
   xw:=MAXX-leftborder-border;
