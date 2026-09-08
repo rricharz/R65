@@ -30,6 +30,10 @@ const
   P_FMIN   = 8;
   P_FMAX   = 9;
 
+  M_REAL  = 0;
+  M_IMAG  = 1;
+  M_ABS   = 2;
+
   MAXPAR   = 9;
   NAMESIZE = 15;
 
@@ -59,7 +63,8 @@ var
   axis, daxis, daxis0:real;
   xs, xw, ys, yw, x:integer;
   min, max, nmax, v:real;
-  realmode, autoscale: boolean;
+  autoscale: boolean;
+  mode: integer;
 
   yposarray: array[224] of integer;
   yvalue, xvalue: array[224] of real;
@@ -189,6 +194,14 @@ begin
     end {column};
     writeln;
   end {row};
+
+  writeln;
+  write('Expansion ', INVVID,
+    conv(_n) / conv(lastbin-firstbin+1):6:1,
+    NORVID);
+  writeln('        Points ', INVVID,
+    conv(lastbin-firstbin+1):9:0, NORVID);
+
 end;
 
 proc setparam(p: integer; value: cpnt);
@@ -514,34 +527,108 @@ begin
   yw:=MAXY-2*border;
 end;
 
+func dataindex(i: integer): integer;
+{**********************************}
+var j: integer;
+begin
+  j := i;
+  if _domain = DOMAIN_FREQ then begin
+    j := i + _n div 2;
+    if j >= _n then
+      j := j - _n;
+  end;
+  dataindex := j;
+end;
+
+func fvalue(i: integer): real;
+{*******************************}
+var
+  j: integer;
+  re, im: real;
+begin
+  j := dataindex(i);
+
+  case mode of
+
+    M_REAL:
+      begin
+        _getreal(f, REALBASE+j, re);
+        fvalue := re;
+      end;
+
+    M_IMAG:
+      begin
+        _getreal(f, COMPLEXBASE+j, im);
+        fvalue := im;
+      end;
+
+    M_ABS:
+      begin
+        _getreal(f, REALBASE+j, re);
+        _getreal(f, COMPLEXBASE+j, im);
+        fvalue := sqrt(re*re + im*im);
+      end
+
+  end;
+end;
+
 proc normalize;
 {*************}
 { normalize vertical axis }
-var minbin, maxbin: integer;
+var
+  minbin, maxbin: integer;
+  re, im: real;
 begin
+
+  if mode = M_ABS then begin
+    min := 0.0;
+    max := 0.0;
+    minbin := 0;
+    maxbin := 0;
+
+    for i:=0 to _n-1 do begin
+      _getreal(f, REALBASE+i, re);
+
+      if _datatype = DATA_COMPLEX then
+        _getreal(f, COMPLEXBASE+i, im)
+      else
+        im := 0.0;
+
+      v := sqrt(re*re + im*im);
+
+      if v > max then begin
+        max := v;
+        maxbin := i;
+      end;
+    end;
+
+    exit;
+  end;
+
   min := 1.0e10;
   max := -1.0e10;
   minbin := 0;
   maxbin := 0;
+
   for i:=0 to _n-1 do begin
     _getreal(f,REALBASE+i,v);
     if v<min then begin
       min:=v;
-      minbin := i;
+      minbin:=i;
     end;
     if v>max then begin
       max:=v;
-      maxbin := i;
+      maxbin:=i;
     end;
     if _datatype=DATA_COMPLEX then begin
       _getreal(f,COMPLEXBASE+i,v);
       if v<min then begin
         min:=v;
-        minbin := i;
+        minbin:=i;
       end;
       if v>max then begin
         max:=v;
-        maxbin := i;
+        maxbin:=i;
       end;
     end;
   end;
@@ -553,15 +640,16 @@ var
   x1, x2, dx: real;
 begin
 
-  { ----- MODE ----- }
+{ ----- MODE ----- }
 
-  if _strcmp(psval[P_MODE],'REAL')=0 then
-    realmode:=true
-  else if _strcmp(psval[P_MODE],'IMAG')=0 then
-    realmode:=false
-  else
-    _abortwith('MODE must be REAL or IMAG');
-
+if _strcmp(psval[P_MODE], 'REAL') = 0 then
+  mode := M_REAL
+else if _strcmp(psval[P_MODE], 'IMAG') = 0 then
+  mode := M_IMAG
+else if _strcmp(psval[P_MODE], 'ABS') = 0 then
+  mode := M_ABS
+else
+  _abortwith('MODE must be REAL, IMAG, or ABS');
 
   { ----- Y SCALE ----- }
 
@@ -685,59 +773,45 @@ begin
 
   else
     _abortwith('Invalid data domain');
-
 end;
 
 proc displayfuncpars;
 {*******************}
 begin
+  writeln;
   writeln(
     'FUNCTION PARAMETERS (change with FUNCTION)');
   writeln('N      ',_n:9);
 
   write  ('Xmin   ',_min:9:2,'        ');
   if _domain = DOMAIN_TIME then
-    writeln('DOMAIN ',' TIME')
+    writeln('DOMAIN ','     TIME')
   else
-    writeln('DOMAIN ',' FREQUENCY');
+    writeln('DOMAIN ','FREQUENCY');
 
   write  ('Xmax   ',_max:9:2,'        ');
   if _datatype = DATA_REAL then
-    writeln('DATA   ',' REAL')
+    writeln('DATA   ','     REAL')
   else
-    writeln('DATA   ',' COMPLEX');
+    writeln('DATA   ','  COMPLEX');
+  writeln;
 end;
 
-func dataindex(i: integer): integer;
-{**********************************}
-var j: integer;
+func valtoy(v: real): integer;
+{*****************************}
 begin
-  j := i;
-  if _domain = DOMAIN_FREQ then begin
-    j := i + _n div 2;
-    if j >= _n then
-      j := j - _n;
-  end;
-  dataindex := j;
+  if v < min then
+    valtoy := 0
+  else if v > max then
+    valtoy := yw
+  else
+    valtoy := trunc((v-min)/(max-min)*conv(yw)+0.5);
 end;
 
 func ypos(i: integer): integer;
 {*****************************}
-var j: integer;
-    v: real;
 begin
-  j := dataindex(i);
-
-  if realmode then
-    _getreal(f, REALBASE+j, v)
-  else
-    _getreal(f, COMPLEXBASE+j, v);
-  if (v < min) then
-    ypos := 0
-  else if (v > max) then
-    ypos := yw
-  else
-    ypos:=trunc((v-min)/(max-min)*conv(yw)+0.5);
+  ypos := valtoy(fvalue(i));
 end;
 
 proc drawdata;
@@ -783,13 +857,10 @@ begin
     xvalue[xi] :=
       _min + conv(i) * (_max - _min) / conv(_n - 1);
 
-    { y value }
-    if realmode then
-      _getreal(f, REALBASE + j, v)
-    else
-      _getreal(f, COMPLEXBASE + j, v);
-    yvalue[xi] := v;
-    yposarray[xi] := ypos(i);
+      { y value }
+      v := fvalue(i);
+      yvalue[xi] := v;
+      yposarray[xi] := valtoy(v);
   end;
 end;
 

@@ -29,8 +29,8 @@ const
     IDLENGTH  = 64;   {max. length of ident buffer}
     IDSIZE    = 16;   {chars per identifier in s_id}
     PIDSIZE   = 8;    {packed chars per identifier}
-    SYMBSIZE  = 320;  {id table entries}
-    IDTABSIZE = 2400; {SYMBSIZE * PIDSIZE}
+    SYMBSIZE  = 350;  {id table entries}
+    IDTABSIZE = 2800; {SYMBSIZE * PIDSIZE}
 
     STACKSIZE = 300;   {stack size}
     PAGELENGHT= 60;    {no of lines per page}
@@ -398,6 +398,12 @@ var i,j,dummy: integer;
     request: array[15] of char;
     default: boolean;
 begin {init}
+
+  if IDTABSIZE<>SYMBSIZE*PIDSIZE then begin
+    writeln(INVVID,'IDTABSIZE inconsistent',NORVID);
+    _abort;
+  end;
+
   ofno:=NOTOPEN;
   lpr:=PRINTER;
   ateof:=false; savefno:=@0;
