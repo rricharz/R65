@@ -30,7 +30,10 @@ const
   FT_TRAPEZOID = 7;
   FT_TRIANGLE  = 8;
   FT_SINC      = 9;
-  MAXTYPE      = 9;
+  FT_WHITE     = 10;
+  FT_LOWPASS   = 11;
+      FILTERSIZE = 16;
+  MAXTYPE      = 11;
 
   NAMESIZE = 15;
 
@@ -329,6 +332,14 @@ begin
   ftitle[FT_SINC]   := 'SINC';
   fformula[FT_SINC] :=
     'A*sin(360*F1*x-CENTER)/(360*F1*x-CONTER)';
+
+  ftitle[FT_WHITE]   := 'WHITE';
+  fformula[FT_WHITE] :=
+      'White noise with values between -A and A';
+
+  ftitle[FT_LOWPASS]   := 'LOW PASS';
+  fformula[FT_LOWPASS] :=
+      'White noise with low pass filter';
 end;
 
 proc loadparams;
@@ -591,40 +602,6 @@ begin
   end;
 end;
 
-proc makepulse(f: file);
-{**********************}
-var
-  t, deltat, val, a, center, width: real;
-  k: integer;
-begin
-  if _datatype <> DATA_REAL then
-    _abortwith('Rectangular pulse requires DATA=REAL')
-;
-
-  t := _min;
-  deltat := (_max - _min) / conv(_n);
-
-  a      := prval[P_A];
-  center := prval[P_CENTER];
-  width  := prval[P_WIDTH];
-
-  if width <= 0.0 then
-    _abortwith('WIDTH must be > 0');
-
-  for k := 0 to _n - 1 do begin
-
-    if fabs(t-center) <= width/2.0 then
-      val := a
-    else
-      val := 0.0;
-
-    _putreal(f, REALBASE+k, val);
-    _putreal(f, COMPLEXBASE+k, 0.0);
-
-    t := t + deltat;
-  end;
-end;
-
 proc maketrapezoid(f: file);
 {**************************}
 var
@@ -699,6 +676,101 @@ begin
 
     _putreal(f, REALBASE + k, val);
     _putreal(f, COMPLEXBASE + k, 0.0);
+
+    t := t + deltat;
+  end;
+end;
+
+proc makewhite(f: file);
+{*********************}
+var
+  a, t, deltat, val: real;
+  k: integer;
+begin
+  if _datatype <> DATA_REAL then
+    _abortwith('WHITE function requires DATA=REAL');
+
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a  := prval[P_A] / 128.0;
+
+  for k := 0 to _n - 1 do begin
+
+    val := (conv(_random) - 127.5) * a;
+
+    _putreal(f, REALBASE + k, val);
+    _putreal(f, COMPLEXBASE + k, 0.0);
+
+    t := t + deltat;
+  end;
+end;
+
+proc makelowpass(f: file);
+{************************}
+var
+  a, val, sum: real;
+  delay: array[FILTERSIZE] of real;
+  k, j: integer;
+begin
+  if _datatype <> DATA_REAL then
+    _abortwith('LOWPASS function requires DATA=REAL');
+
+  a := prval[P_A] / 128.0;
+
+  { clear delay line }
+  for j := 0 to FILTERSIZE-1 do
+    delay[j] := 0.0;
+
+  for k := 0 to _n-1 do begin
+
+    { shift delay line }
+    for j := FILTERSIZE-1 downto 1 do
+      delay[j] := delay[j-1];
+
+    { new white-noise sample }
+    delay[0] := (conv(_random) - 127.5) * a;
+
+    { moving average }
+    sum := 0.0;
+    for j := 0 to FILTERSIZE-1 do
+      sum := sum + delay[j];
+
+    val := sum / conv(FILTERSIZE);
+
+    _putreal(f, REALBASE+k, val);
+    _putreal(f, COMPLEXBASE+k, 0.0);
+  end;
+end;
+
+proc makepulse(f: file);
+{**********************}
+var
+  t, deltat, val, a, center, width: real;
+  k: integer;
+begin
+  if _datatype <> DATA_REAL then
+  _abortwith('Rectangular pulse requires DATA=REAL');
+
+  t := _min;
+  deltat := (_max - _min) / conv(_n);
+
+  a      := prval[P_A];
+  center := prval[P_CENTER];
+  width  := prval[P_WIDTH];
+
+  if width <= 0.0 then
+    _abortwith('WIDTH must be > 0');
+
+  for k := 0 to _n - 1 do begin
+
+    if fabs(t-center) <= width/2.0 then
+      val := a
+    else
+      val := 0.0;
+
+    _putreal(f, REALBASE+k, val);
+    _putreal(f, COMPLEXBASE+k, 0.0);
 
     t := t + deltat;
   end;
@@ -804,7 +876,13 @@ begin
       maketriangle(f);
 
     FT_SINC:
-      makesinc(f)
+      makesinc(f);
+
+    FT_WHITE:
+      makewhite(f);
+
+    FT_LOWPASS:
+      makelowpass(f)
 
   else
     _abortwith('Function TYPE not yet implemented')
