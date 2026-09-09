@@ -171,8 +171,8 @@ begin {main}
     drive := 1;
     done := not getentry(drive, entry, deleted);
     debug(entry,files,deleted,done);
-    if (not (deleted or done)) and
-        (FILSTP = 'P') then begin
+    if (not (deleted or done or (FILNAM[0]='I')) and
+        (FILSTP = 'P')) then begin
       name := '                ';
       i := 0;
       writeln(@PRINTER);

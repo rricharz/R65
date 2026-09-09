@@ -1,16 +1,23 @@
 program ft;
-uses syslib,ralib,mathlib,ftlib,filelib,arglib;
+uses syslib,ralib,mathlib,filelib,arglib,writelib,
+     strlib;
 
 const maxsize     = 1024;
       tabsize     = 2048; { 2 * maxsize }
       sintabsize  = 512; { maxsize div 2 }
 
-var f: file;
+      MAXPAR      = 1;
+      NAMESIZE    = 15;
+      PARVERSION  = 0;
+
+var f, f1: file;
     i: integer;
     v, fs: real;
 
     data:   array[tabsize] of real;
     sintab: array[sintabsize] of real;
+
+{$I IFTSHARED}
 
 proc getdata;
 begin
@@ -172,6 +179,7 @@ begin
 end;
 
 begin
+  initiftshared;
   getdata;
   makesintab;
   fft;

@@ -1,919 +1,1214 @@
    1     4 program function;
-   2     4 [  0] uses syslib,strlib,writelib,mathlib,ralib,ftlib,
-   3  9704 [150]      filelib,arglib;
-   4 10867 [178] 
-   5 10867 [178] const
-   6 10867 [178] 
-   7 10870 [178]   P_TYPE   = 0;
-   8 10870 [179]   P_N      = 1;
-   9 10870 [180]   P_TMIN   = 2;
-  10 10870 [181]   P_TMAX   = 3;
-  11 10870 [182]   P_A      = 4;
-  12 10870 [183]   P_A1     = 5;
-  13 10870 [184]   P_A2     = 6;
-  14 10870 [185]   P_F1     = 7;
-  15 10870 [186]   P_F2     = 8;
-  16 10870 [187]   P_PHASE  = 9;
-  17 10870 [188]   P_TAU    = 10;
-  18 10870 [189]   P_CENTER = 11;
-  19 10870 [190]   P_WIDTH  = 12;
-  20 10870 [191]   P_RISE   = 13;
-  21 10870 [192]   P_DATA   = 14;
-  22 10870 [193]   MAXPAR   = 14;
-  23 10870 [194] 
-  24 10870 [194]   FT_COSINE    = 1;
-  25 10870 [195]   FT_SUM       = 2;
-  26 10870 [196]   FT_PRODUCT   = 3;
-  27 10870 [197]   FT_GAUSSIAN  = 4;
-  28 10870 [198]   FT_EXP       = 5;
-  29 10870 [199]   FT_PULSE     = 6;
-  30 10870 [200]   FT_TRAPEZOID = 7;
-  31 10870 [201]   FT_TRIANGLE  = 8;
-  32 10870 [202]   FT_SINC      = 9;
-  33 10870 [203]   FT_WHITE     = 10;
-  34 10870 [204]   FT_LOWPASS   = 11;
-  35 10870 [205]   FILTERSIZE   = 16;
-  36 10870 [206]   MAXTYPE      = 11;
-  37 10870 [207] 
-  38 10870 [207]   NAMESIZE = 15;
-  39 10870 [208] 
-  40 10870 [208]   PARVERSION = 1;
-  41 10870 [209]   PARSIZE    = 256;
-  42 10870 [210]   STRSIZE    = 9;   { 8 chars + chr(0) }
-  43 10870 [211] 
-  44 10870 [211] var
-  45 10870 [211]   nparams: integer;
-  46 10870 [212] 
-  47 10870 [212]   ibase: integer;   { word address of integer values }
-  48 10870 [213]   rbase: integer;   { real address of real values }
-  49 10870 [214]   sbase: integer;   { byte address of string values }
-  50 10870 [215] 
-  51 10870 [215]   pname: array[MAXPAR] of cpnt;
-  52 10870 [216]   ptype: array[MAXPAR] of char;
-  53 10870 [217]   pival: array[MAXPAR] of integer;
-  54 10870 [218]   prval: array[MAXPAR] of real;
-  55 10870 [219]   psval: array[MAXPAR] of cpnt;
-  56 10870 [220] 
-  57 10870 [220]   parfileexists: boolean;
-  58 10870 [221] 
-  59 10870 [221]   ftitle: array[MAXTYPE] of cpnt;
-  60 10870 [222]   fformula: array[MAXTYPE] of cpnt;
-  61 10870 [223] 
-  62 10870 [223] proc initparfile;
-  63 10870 [224] {***************}
-  64 10870 [224] begin
-  65 10870 [224]   nparams := MAXPAR + 1;
-  66 10879 [224] 
-  67 10884 [224]   { Parameter file layout:
-  68 10884 [224]       word 0 : version
-  69 10884 [224]       word 1 : number of parameters
-  70 10884 [224] 
-  71 10884 [224]       integer values:
-  72 10884 [224]         nparams words, starting at ibase
-  73 10884 [224] 
-  74 10884 [224]       real values:
-  75 10884 [224]         nparams reals, starting at rbase
-  76 10884 [224] 
-  77 10884 [224]       string values:
-  78 10884 [224]         nparams slots of STRSIZE bytes,
-  79 10884 [224]         each containing up to 8 chars + chr(0)
-  80 10884 [224] 
-  81 10884 [224]       complete file size is fixed at 256 bytes
-  82 10884 [224]   }
-  83 10884 [224] 
-  84 10884 [224]   ibase := 2;
-  85 10886 [224] 
-  86 10890 [224]   { rbase is expressed in real addresses.
-  87 10890 [224]     Round integer section up to next real boundary. }
-  88 10890 [224]   rbase := (ibase + nparams + 1) shr 1;
-  89 10904 [224] 
-  90 10909 [224]   { sbase is expressed in byte addresses }
-  91 10909 [224]   sbase := 4 * (rbase + nparams);
-  92 10920 [224]   debug(ibase, rbase, sbase);
-  93 10925 [224] end;
-  94 10925 [224] 
-  95 10926 [224] func fileexists(nm: array[NAMESIZE] of char;
-  96 10926 [227]                            drv: integer): boolean;
-  97 10926 [228] {************************************************}
-  98 10926 [228] const aprepdo  = $f4a7;
-  99 10929 [229]       agetentx = $f63a;
- 100 10929 [230]       aenddo   = $f625;
- 101 10929 [231] 
- 102 10929 [231]       NUMENTRIES = 255;
- 103 10929 [232] 
- 104 10929 [232] mem   filtyp = $0300: char&;
- 105 10929 [233]       fillnk = $031e: integer&;
- 106 10929 [234]       scyfc  = $037c: integer&;
- 107 10929 [235]       fildrv = $00dc: integer&;
- 108 10929 [236]       FILNAM = $0301: array[NAMESIZE] of char&;
- 109 10929 [237] 
- 110 10929 [237] var ent,i: integer;
- 111 10929 [239]     found,last: boolean;
- 112 10929 [241] 
- 113 10929 [241]     func same: boolean;
- 114 10929 [243]     var k: integer;
- 115 10932 [244]         equal: boolean;
- 116 10932 [245]     begin
- 117 10932 [245]       equal:=true;
- 118 10936 [245]       k:=0;
- 119 10942 [245]       while equal and (k<=NAMESIZE) do begin
- 120 10961 [245]         equal:=nm[k]=FILNAM[k];
- 121 10976 [245]         k:=k+1;
- 122 10989 [245]       end;
- 123 10994 [245]       same:=equal;
- 124 10997 [245]     end;
- 125 11005 [245] 
- 126 11006 [243] begin
- 127 11006 [243]   fildrv:=drv;
- 128 11008 [243]   call(aprepdo);
- 129 11020 [243]   ent:=0;
- 130 11022 [243]   found:=false;
- 131 11028 [243]   last:=false;
- 132 11034 [243]   repeat
- 133 11038 [243]     scyfc:=ent;
- 134 11038 [243]     call(agetentx);
- 135 11051 [243]     last:=filtyp=chr(0);
- 136 11057 [243]     if not last then begin
- 137 11068 [243]       found:=same;
- 138 11077 [243]       if (fillnk and $80)<>0 then
- 139 11090 [243]         found:=false;
- 140 11096 [243]     end;
- 141 11100 [243]     ent:=ent+1;
- 142 11106 [243]   until found or last or (ent>=NUMENTRIES);
- 143 11127 [243]   call(aenddo);
- 144 11135 [243]   fileexists:=found;
- 145 11135 [243] end;
- 146 11143 [243] 
- 147 11144 [226] proc displayparams;
- 148 11144 [227] {*****************}
- 149 11144 [227] const
- 150 11144 [227]   columns   = 2;
- 151 11147 [228]   namefield = 7;
- 152 11147 [229]   valfield  = 9;
- 153 11147 [230] var i,col,row,rows,k,padding,type: integer;
- 154 11147 [237] begin
- 155 11147 [237]   type := pival[P_TYPE];
- 156 11151 [237]   if type=0 then exit;
- 157 11170 [237]   writeln('FUNCTION: ',ftitle[type]);
- 158 11196 [237]   writeln('FORMULA:  ',fformula[type]);
- 159 11222 [237]   rows := (MAXPAR + columns) div columns;
- 160 11229 [237]   padding := (48 div columns) - namefield - valfield;
- 161 11244 [237]   for row := 0 to rows - 1 do begin
- 162 11271 [237]     for col := 0 to columns - 1 do begin
- 163 11291 [237]       i := row + col * rows;
- 164 11299 [237]       if i <= MAXPAR then begin
- 165 11316 [237]         if col > 0 then
- 166 11325 [237]           for k := 1 to padding do write(' ');
- 167 11350 [237]         write(field(pname[i], namefield));
- 168 11383 [237]         case ptype[i] of
- 169 11387 [237]           'i':  write(pival[i]:valfield);
- 170 11414 [237]           'r':  write(prval[i]:valfield:2);
- 171 11447 [237]           's':  write(field(psval[i], -valfield))
- 172 11476 [237]           else write('undefined')
- 173 11490 [237]         end {case};
- 174 11492 [237]       end {if};
- 175 11492 [237]     end {column};
- 176 11492 [237]     writeln;
- 177 11506 [237]   end {row};
- 178 11512 [237] end;
- 179 11526 [237] 
- 180 11527 [227] proc setparam(p: integer; value: cpnt);
- 181 11527 [230] {*************************************}
- 182 11527 [230] begin
- 183 11527 [230]   case ptype[p] of
- 184 11536 [230]   'i':  begin
- 185 11547 [230]           pival[p] := round(str_real(value));
- 186 11571 [230]         end;
- 187 11575 [230]   'r':  begin
- 188 11585 [230]           prval[p] := str_real(value);
- 189 11604 [230]         end;
- 190 11611 [230]   's':  begin
- 191 11621 [230]           strcpyn(value, psval[p],9);
- 192 11641 [230]         end
- 193 11641 [230]   end {case }
- 194 11643 [230] end;
- 195 11643 [230] 
- 196 11644 [228] func findparam(name: cpnt): integer;
- 197 11644 [231] {**********************************}
- 198 11644 [231] var p: integer;
- 199 11647 [232]     found: boolean;
- 200 11647 [233] begin
- 201 11647 [233]   p := 0;
- 202 11651 [233]   repeat
- 203 11655 [233]     found := _strcmp(pname[p], name) = 0;
- 204 11677 [233]     p := p + 1;
- 205 11688 [233]   until found or (p > MAXPAR);
- 206 11704 [233]   if found then
- 207 11708 [233]     findparam := p - 1
- 208 11719 [233]   else
- 209 11721 [233]     findparam := -1;
- 210 11731 [233] end;
- 211 11736 [233] 
- 212 11737 [230] proc readparams;
- 213 11737 [231] {**************}
- 214 11737 [231] var name, value: cpnt;
- 215 11740 [233]     done: boolean;
- 216 11740 [234]     p: integer;
- 217 11740 [235] begin
- 218 11740 [235]   name  := _allocate(9);
- 219 11752 [235]   value := _allocate(17);
- 220 11766 [235]   repeat
- 221 11770 [235]     _nextparam(name, value, done);
- 222 11792 [235]     if not done then begin
- 223 11797 [235]       p := findparam(name);
- 224 11812 [235]       if p < 0 then
- 225 11822 [235]         _abortwith('Unknown parameter ')
- 226 11847 [235]       else
- 227 11853 [235]         setparam(p,value);
- 228 11870 [235]     end;
- 229 11870 [235]   until done;
- 230 11870 [235] end;
- 231 11877 [235] 
- 232 11878 [231] proc initparams;
- 233 11878 [232] {**************}
- 234 11878 [232] var i: integer;
- 235 11881 [233] begin
- 236 11881 [233]   for i:=0 to MAXPAR do
- 237 11891 [233]     psval[i]:=nil;
- 238 11906 [233] 
- 239 11924 [233]   pname[P_TYPE] := 'TYPE';
- 240 11933 [233]   ptype[P_TYPE] := 'i';
- 241 11941 [233]   pival[P_TYPE] := 0;
- 242 11949 [233] 
- 243 11953 [233]   pname[P_N] := cpnt('N');
- 244 11959 [233]   ptype[P_N] := 'i';
- 245 11967 [233]   pival[P_N] := 256;
- 246 11976 [233] 
- 247 11980 [233]   pname[P_TMIN] := 'TMIN';
- 248 11989 [233]   ptype[P_TMIN] := 'r';
- 249 11997 [233]   prval[P_TMIN] := 0.0;
- 250 12012 [233] 
- 251 12019 [233]   pname[P_TMAX] := 'TMAX';
- 252 12028 [233]   ptype[P_TMAX] := 'r';
- 253 12036 [233]   prval[P_TMAX] := 1.0;
- 254 12051 [233] 
- 255 12058 [233]   pname[P_A] := cpnt('A');
- 256 12064 [233]   ptype[P_A] := 'r';
- 257 12072 [233]   prval[P_A] := 1.0;
- 258 12087 [233] 
- 259 12094 [233]   pname[P_A1] := cpnt('A1');
- 260 12101 [233]   ptype[P_A1] := 'r';
- 261 12109 [233]   prval[P_A1] := 1.0;
- 262 12124 [233] 
- 263 12131 [233]   pname[P_A2] := cpnt('A2');
- 264 12138 [233]   ptype[P_A2] := 'r';
- 265 12146 [233]   prval[P_A2] := 1.0;
- 266 12161 [233] 
- 267 12168 [233]   pname[P_F1] := cpnt('F1');
- 268 12175 [233]   ptype[P_F1] := 'r';
- 269 12183 [233]   prval[P_F1] := 8.0;
- 270 12198 [233] 
- 271 12205 [233]   pname[P_F2] := cpnt('F2');
- 272 12212 [233]   ptype[P_F2] := 'r';
- 273 12220 [233]   prval[P_F2] := 16.0;
- 274 12235 [233] 
- 275 12242 [233]   pname[P_PHASE] := 'PHASE';
- 276 12252 [233]   ptype[P_PHASE] := 'r';
- 277 12260 [233]   prval[P_PHASE] := 0.0;
- 278 12275 [233] 
- 279 12282 [233]   pname[P_TAU] := 'TAU';
- 280 12290 [233]   ptype[P_TAU] := 'r';
- 281 12298 [233]   prval[P_TAU] := 1.0;
- 282 12313 [233] 
- 283 12320 [233]   pname[P_CENTER] := 'CENTER';
- 284 12331 [233]   ptype[P_CENTER] := 'r';
- 285 12339 [233]   prval[P_CENTER] := 0.5;
- 286 12354 [233] 
- 287 12361 [233]   pname[P_WIDTH] := 'WIDTH';
- 288 12371 [233]   ptype[P_WIDTH] := 'r';
- 289 12379 [233]   prval[P_WIDTH] := 0.25;
- 290 12394 [233] 
- 291 12401 [233]   pname[P_RISE] := 'RISE';
- 292 12410 [233]   ptype[P_RISE] := 'r';
- 293 12418 [233]   prval[P_RISE] := 0.05;
- 294 12433 [233] 
- 295 12440 [233]   pname[P_DATA] := 'DATA';
- 296 12449 [233]   ptype[P_DATA] := 's';
- 297 12457 [233]   psval[P_DATA] := _allocate(9);
- 298 12473 [233]   strcpyn('REAL',psval[P_DATA],9);
- 299 12498 [233] end;
- 300 12498 [233] 
- 301 12499 [232] proc initfunctions;
- 302 12499 [233] {*****************}
- 303 12499 [233] begin
- 304 12499 [233]   ftitle[FT_COSINE]   := 'COSINE';
- 305 12515 [233]   fformula[FT_COSINE] := 'A*cos(360*F1*x+PHASE)';
- 306 12545 [233] 
- 307 12549 [233]   ftitle[FT_SUM]   := 'SUM OF TWO COSINES';
- 308 12572 [233]   fformula[FT_SUM] :=
- 309 12578 [233]     'A1*cos(360*F1*x)+A2*cos(360*F2*x)';
- 310 12614 [233] 
- 311 12618 [233]   ftitle[FT_PRODUCT]   := 'PRODUCT OF TWO COSINES';
- 312 12645 [233]   fformula[FT_PRODUCT] :=
- 313 12651 [233]     'A*cos(360*F1*x)*cos(360*F2*x)';
- 314 12683 [233] 
- 315 12687 [233]   ftitle[FT_GAUSSIAN]   := 'GAUSSIAN';
- 316 12700 [233]   fformula[FT_GAUSSIAN] :=
- 317 12706 [233]     'A*exp(-((x-CENTER)/WIDTH)^2)';
- 318 12737 [233] 
- 319 12741 [233]   ftitle[FT_EXP]   := 'EXPONENTIAL';
- 320 12757 [233]   fformula[FT_EXP] := 'A*exp(-(x-TMIN)/TAU)';
- 321 12786 [233] 
- 322 12790 [233]   ftitle[FT_PULSE]   := 'RECTANGULAR PULSE';
- 323 12812 [233]   fformula[FT_PULSE] := 'A within WIDTH, otherwise 0';
- 324 12848 [233] 
- 325 12852 [233]   ftitle[FT_TRAPEZOID]   := 'TRAPEZOID';
- 326 12866 [233]   fformula[FT_TRAPEZOID] := 'Pulse with RISE time';
- 327 12895 [233] 
- 328 12899 [233]   ftitle[FT_TRIANGLE]   := 'TRIANGLE';
- 329 12912 [233]   fformula[FT_TRIANGLE] :=
- 330 12918 [233]     'Triangle with CENTER and WIDTH';
- 331 12951 [233] 
- 332 12955 [233]   ftitle[FT_SINC]   := 'SINC';
- 333 12964 [233]   fformula[FT_SINC] :=
- 334 12970 [233]     'A*sin(360*F1*x-CENTER)/(360*F1*x-CONTER)';
- 335 13013 [233] 
- 336 13017 [233]   ftitle[FT_WHITE]   := 'WHITE NOISE';
- 337 13033 [233]   fformula[FT_WHITE] :=
- 338 13039 [233]       'White noise with values between -A and A';
- 339 13082 [233] 
- 340 13086 [233]   ftitle[FT_LOWPASS]   := 'LOW PASS FILTER';
- 341 13106 [233]   fformula[FT_LOWPASS] :=
- 342 13112 [233]       'White noise with low pass filter';
- 343 13147 [233] end;
- 344 13151 [233] 
- 345 13152 [233] proc loadparams;
- 346 13152 [234] {**************}
- 347 13152 [234] var
- 348 13152 [234]   f: file;
- 349 13155 [235]   p,i,addr,version,np,ii: integer;
- 350 13155 [241]   ir: real;
- 351 13155 [242]   s: cpnt;
- 352 13155 [243] begin
- 353 13155 [243]   f:=_attach('FUNCPARS:X      ',0,1,FREAD+FSILENT,
- 354 13185 [243]                                     PARSIZE,0,'X');
- 355 13199 [243] 
- 356 13203 [243]   if _getsize<>PARSIZE then
- 357 13212 [243]     _abortwith('Wrong parameter file size');
- 358 13250 [243] 
- 359 13250 [243]   _getword(f,0,version);
- 360 13270 [243]   if version<>PARVERSION then
- 361 13276 [243]     _abortwith('Wrong parameter file version');
- 362 13317 [243] 
- 363 13317 [243]   _getword(f,1,np);
- 364 13337 [243]   if np<>nparams then
- 365 13341 [243]     _abortwith('Wrong number of parameters');
- 366 13384 [243] 
- 367 13384 [243]   for p:=0 to MAXPAR do begin
- 368 13401 [243]     _getword(f,ibase+p,ii);
- 369 13428 [243]     pival[p]:=ii;
- 370 13432 [243]   end;
- 371 13440 [243] 
- 372 13454 [243]   for p:=0 to MAXPAR do begin
- 373 13471 [243]     _getreal(f,rbase+p,ir);
- 374 13502 [243]     prval[p]:=ir;
- 375 13509 [243]   end;
- 376 13522 [243] 
- 377 13536 [243]   for p:=0 to MAXPAR do begin
- 378 13553 [243]     if psval[p]<>nil then begin
- 379 13564 [243]       s:=psval[p];
- 380 13571 [243]       addr:=sbase+STRSIZE*p;
- 381 13585 [243]       for i:=0 to STRSIZE-1 do begin
- 382 13615 [243]         getbyte(f,addr+i,ii);
- 383 13634 [243]         s[i]:=chr(ii);
- 384 13642 [243]       end;
- 385 13647 [243]     end;
- 386 13661 [243]   end;
- 387 13661 [243] 
- 388 13675 [243]   close(f);
- 389 13681 [243] end;
- 390 13681 [243] 
- 391 13682 [234] proc storeparams;
- 392 13682 [235] {***************}
- 393 13682 [235] const size = 256;
- 394 13685 [236] var f: file;
- 395 13685 [237]     p, i, addr: integer;
- 396 13685 [240]     s: cpnt;
- 397 13685 [241] begin
- 398 13685 [241]   if parfileexists then
- 399 13687 [241]     f := _attach('FUNCPARS:X      ',0,1,
- 400 13718 [241]                   FWRITE+FSILENT,size,0,'X')
- 401 13730 [241]   else begin
- 402 13743 [241]     f := _attach('FUNCPARS:X      ',0,1,
- 403 13767 [241]                   FNEW+FSILENT,size,0,'X');
- 404 13785 [241]     parfileexists := true;
- 405 13791 [241]   end;
- 406 13795 [241] 
- 407 13795 [241]   if _getsize <> size then
- 408 13804 [241]     _abortwith('Wrong parameter file size');
- 409 13842 [241] 
- 410 13842 [241]   { header }
- 411 13842 [241]   _putword(f,0,PARVERSION);
- 412 13856 [241]   _putword(f,1,nparams);
- 413 13872 [241] 
- 414 13872 [241]   { integer values }
- 415 13872 [241]   for p:=0 to MAXPAR do
- 416 13880 [241]     _putword(f,ibase+p,pival[p]);
- 417 13916 [241] 
- 418 13930 [241]   { real values }
- 419 13930 [241]   for p:=0 to MAXPAR do
- 420 13938 [241]     _putreal(f,rbase+p,prval[p]);
- 421 13979 [241] 
- 422 13993 [241]     { string values: fixed 9-byte slots }
- 423 13993 [241]     for p:=0 to MAXPAR do begin
- 424 14010 [241]       addr:=sbase+STRSIZE*p;
- 425 14016 [241]       if psval[p]=nil then begin
- 426 14037 [241]         for i:=0 to STRSIZE-1 do
- 427 14050 [241]           putbyte(f,addr+i,0);
- 428 14077 [241]       end else begin
- 429 14094 [241]         s:=psval[p];
- 430 14098 [241]         for i:=0 to STRSIZE-1 do
- 431 14116 [241]           putbyte(f,addr+i,ord(s[i]));
- 432 14151 [241]       end;
- 433 14165 [241]     end;
- 434 14165 [241] 
- 435 14179 [241]   close(f);
- 436 14185 [241] end;
- 437 14185 [241] 
- 438 14186 [235] proc displayfunctions;
- 439 14186 [236] {********************}
- 440 14186 [236] var i: integer;
- 441 14189 [237] begin
- 442 14189 [237]   writeln('FUNCTION GENERATOR');
- 443 14216 [237]   for i:=1 to MAXTYPE do
- 444 14224 [237]     writeln(i:2, '  ', ftitle[i]);
- 445 14263 [237]   writeln('Select: FUNCTION TYPE=n');
- 446 14307 [237]   writeln('Help:   FUNCTION TYPE=0');
- 447 14337 [237] end;
- 448 14337 [237] 
- 449 14338 [236] proc makecosine(f: file);
- 450 14338 [238] {***********************}
- 451 14338 [238] var
- 452 14338 [238]   t, deltat, val, a, f1, phase, phaseval: real;
- 453 14341 [245]   k: integer;
- 454 14341 [246] begin
- 455 14341 [246]   t := _min;
- 456 14343 [246]   deltat := (_max - _min) / conv(_n);
- 457 14372 [246] 
- 458 14380 [246]   a     := prval[P_A];
- 459 14385 [246]   f1    := prval[P_F1];
- 460 14402 [246]   phase := prval[P_PHASE];
- 461 14419 [246] 
- 462 14431 [246]   for k := 0 to _n - 1 do begin
- 463 14453 [246]     phaseval := 360.0 * f1 * t + phase;
- 464 14473 [246] 
- 465 14486 [246]     { real part }
- 466 14486 [246]     val := a * cos(phaseval);
- 467 14506 [246]     _putreal(f, REALBASE + k, val);
- 468 14536 [246] 
- 469 14536 [246]     { imaginary part }
- 470 14536 [246]     if _datatype = DATA_COMPLEX then
- 471 14542 [246]       val := a * sin(phaseval)
- 472 14554 [246]     else
- 473 14566 [246]       val := 0.0;
- 474 14582 [246] 
- 475 14588 [246]     _putreal(f, COMPLEXBASE + k, val);
- 476 14612 [246] 
- 477 14612 [246]     t := t + deltat;
- 478 14618 [246]   end;
- 479 14631 [246] end;
- 480 14645 [246] 
- 481 14646 [237] proc makesum(f: file);
- 482 14646 [239] {********************}
- 483 14646 [239] var
- 484 14646 [239]   t, deltat, val, a1, a2, f1, f2: real;
- 485 14649 [246]   k: integer;
- 486 14649 [247] begin
- 487 14649 [247]   t := _min;
- 488 14651 [247]   deltat := (_max - _min) / conv(_n);
- 489 14680 [247] 
- 490 14688 [247]   a1 := prval[P_A1];
- 491 14693 [247]   a2 := prval[P_A2];
- 492 14710 [247]   f1 := prval[P_F1];
- 493 14727 [247]   f2 := prval[P_F2];
- 494 14744 [247] 
- 495 14756 [247]   for k := 0 to _n - 1 do begin
- 496 14778 [247] 
- 497 14778 [247]     { real part }
- 498 14778 [247]     val := a1 * cos(360.0 * f1 * t) +
- 499 14812 [247]            a2 * cos(360.0 * f2 * t);
- 500 14847 [247]     _putreal(f, REALBASE + k, val);
- 501 14878 [247] 
- 502 14878 [247]     { imaginary part }
- 503 14878 [247]     if _datatype = DATA_COMPLEX then
- 504 14884 [247]       val := a1 * sin(360.0 * f1 * t) +
- 505 14922 [247]              a2 * sin(360.0 * f2 * t)
- 506 14944 [247]     else
- 507 14957 [247]       val := 0.0;
- 508 14974 [247] 
- 509 14980 [247]     _putreal(f, COMPLEXBASE + k, val);
- 510 15004 [247] 
- 511 15004 [247]     t := t + deltat;
- 512 15010 [247]   end;
- 513 15023 [247] end;
- 514 15037 [247] 
- 515 15038 [238] proc makeproduct(f: file);
- 516 15038 [240] {************************}
- 517 15038 [240] var
- 518 15038 [240]   t, deltat, val, a, f1, f2: real;
- 519 15041 [246]   c1, s1, c2, s2: real;
- 520 15041 [250]   k: integer;
- 521 15041 [251] begin
- 522 15041 [251]   if _datatype <> DATA_REAL then
- 523 15049 [251]     _abortwith('Product requires DATA=REAL');
- 524 15088 [251]   t := _min;
- 525 15088 [251]   deltat := (_max - _min) / conv(_n);
- 526 15117 [251] 
- 527 15125 [251]   a  := prval[P_A];
- 528 15130 [251]   f1 := prval[P_F1];
- 529 15147 [251]   f2 := prval[P_F2];
- 530 15164 [251] 
- 531 15176 [251]   for k := 0 to _n - 1 do begin
- 532 15198 [251] 
- 533 15198 [251]     c1 := cos(360.0 * f1 * t);
- 534 15226 [251]     c2 := cos(360.0 * f2 * t);
- 535 15260 [251] 
- 536 15266 [251]     val := a * c1 * c2;
- 537 15279 [251]     _putreal(f, REALBASE + k, val);
- 538 15315 [251]     _putreal(f, COMPLEXBASE + k, 0.0);
- 539 15339 [251] 
- 540 15339 [251]     t := t + deltat;
- 541 15345 [251]   end;
- 542 15358 [251] end;
- 543 15372 [251] 
- 544 15373 [239] proc makegaussian(f: file);
- 545 15373 [241] {*************************}
- 546 15373 [241] var
- 547 15373 [241]   t, deltat, val, a, center, width, x: real;
- 548 15376 [248]   k: integer;
- 549 15376 [249] begin
- 550 15376 [249]   if _datatype <> DATA_REAL then
- 551 15384 [249]   _abortwith('Gaussian function requires DATA=REAL');
- 552 15433 [249] 
- 553 15433 [249]   t := _min;
- 554 15433 [249]   deltat := (_max - _min) / conv(_n);
- 555 15462 [249] 
- 556 15470 [249]   a      := prval[P_A];
- 557 15475 [249]   center := prval[P_CENTER];
- 558 15492 [249]   width  := prval[P_WIDTH];
- 559 15509 [249] 
- 560 15521 [249]   if width <= 0.0 then
- 561 15533 [249]     _abortwith('WIDTH must be > 0');
- 562 15563 [249] 
- 563 15563 [249]   for k := 0 to _n - 1 do begin
- 564 15585 [249] 
- 565 15585 [249]     x := (t - center) / width;
- 566 15598 [249]     val := a * exp(-(x * x));
- 567 15639 [249] 
- 568 15646 [249]     _putreal(f, REALBASE + k, val);
- 569 15669 [249]     _putreal(f, COMPLEXBASE + k, 0.0);
- 570 15693 [249] 
- 571 15693 [249]     t := t + deltat;
- 572 15699 [249]   end;
- 573 15712 [249] end;
- 574 15726 [249] 
- 575 15727 [240] proc makeexp(f: file);
- 576 15727 [242] {********************}
- 577 15727 [242] var
- 578 15727 [242]   t, deltat, val, a, tau: real;
- 579 15730 [247]   k: integer;
- 580 15730 [248] begin
- 581 15730 [248]   if _datatype <> DATA_REAL then
- 582 15738 [248]     _abortwith(
- 583 15742 [248]       'Exponential function requires DATA=REAL');
- 584 15790 [248] 
- 585 15790 [248]   t := _min;
- 586 15790 [248]   deltat := (_max - _min) / conv(_n);
- 587 15819 [248] 
- 588 15827 [248]   a   := prval[P_A];
- 589 15832 [248]   tau := prval[P_TAU];
- 590 15849 [248] 
- 591 15861 [248]   if tau <= 0.0 then
- 592 15873 [248]     _abortwith('TAU must be > 0');
- 593 15901 [248] 
- 594 15901 [248]   for k := 0 to _n - 1 do begin
- 595 15923 [248] 
- 596 15923 [248]     val := a * exp(-(t - _min) / tau);
- 597 15958 [248] 
- 598 15965 [248]     _putreal(f, REALBASE + k, val);
- 599 15988 [248]     _putreal(f, COMPLEXBASE + k, 0.0);
- 600 16012 [248] 
- 601 16012 [248]     t := t + deltat;
- 602 16018 [248]   end;
- 603 16031 [248] end;
- 604 16045 [248] 
- 605 16046 [241] proc maketrapezoid(f: file);
- 606 16046 [243] {**************************}
- 607 16046 [243] var
- 608 16046 [243]   t, deltat, val, a, center, width, rise, x: real;
- 609 16049 [251]   k: integer;
- 610 16049 [252] begin
- 611 16049 [252]   if _datatype <> DATA_REAL then
- 612 16057 [252]     _abortwith('Trapezoid requires DATA=REAL');
- 613 16098 [252] 
- 614 16098 [252]   t := _min;
- 615 16098 [252]   deltat := (_max - _min) / conv(_n);
- 616 16127 [252] 
- 617 16135 [252]   a      := prval[P_A];
- 618 16140 [252]   center := prval[P_CENTER];
- 619 16157 [252]   width  := prval[P_WIDTH];
- 620 16174 [252]   rise   := prval[P_RISE];
- 621 16191 [252] 
- 622 16203 [252]   if width <= 0.0 then
- 623 16215 [252]     _abortwith('WIDTH must be > 0');
- 624 16245 [252] 
- 625 16245 [252]   if rise <= 0.0 then
- 626 16257 [252]     _abortwith('RISE must be > 0');
- 627 16286 [252] 
- 628 16286 [252]   if 2.0 * rise > width then
- 629 16299 [252]     _abortwith('RISE must be <= WIDTH/2');
- 630 16341 [252] 
- 631 16341 [252]   for k := 0 to _n - 1 do begin
- 632 16363 [252] 
- 633 16363 [252]     x := fabs(t - center);
- 634 16384 [252] 
- 635 16390 [252]     if x >= width / 2.0 then
- 636 16408 [252]       val := 0.0
- 637 16413 [252]     else if x <= width / 2.0 - rise then
- 638 16447 [252]       val := a
- 639 16458 [252]     else
- 640 16458 [252]       val := a * (width / 2.0 - x) / rise;
- 641 16500 [252] 
- 642 16513 [252]     _putreal(f, REALBASE + k, val);
- 643 16536 [252]     _putreal(f, COMPLEXBASE + k, 0.0);
- 644 16560 [252] 
- 645 16560 [252]     t := t + deltat;
- 646 16566 [252]   end;
- 647 16579 [252] end;
- 648 16593 [252] 
- 649 16594 [242] proc maketriangle(f: file);
- 650 16594 [244] {*************************}
- 651 16594 [244] var
- 652 16594 [244]   t, deltat, val, a, center, width, x: real;
- 653 16597 [251]   k: integer;
- 654 16597 [252] begin
- 655 16597 [252]   if _datatype <> DATA_REAL then
- 656 16605 [252]     _abortwith('Triangle requires DATA=REAL');
- 657 16645 [252] 
- 658 16645 [252]   t := _min;
- 659 16645 [252]   deltat := (_max - _min) / conv(_n);
- 660 16674 [252] 
- 661 16682 [252]   a      := prval[P_A];
- 662 16687 [252]   center := prval[P_CENTER];
- 663 16704 [252]   width  := prval[P_WIDTH];
- 664 16721 [252] 
- 665 16733 [252]   if width <= 0.0 then
- 666 16745 [252]     _abortwith('WIDTH must be > 0');
- 667 16775 [252] 
- 668 16775 [252]   for k := 0 to _n - 1 do begin
- 669 16797 [252] 
- 670 16797 [252]     x := fabs(t - center);
- 671 16818 [252] 
- 672 16824 [252]     if x >= width / 2.0 then
- 673 16842 [252]       val := 0.0
- 674 16847 [252]     else
- 675 16853 [252]       val := a * (1.0 - 2.0 * x / width);
- 676 16895 [252] 
- 677 16902 [252]     _putreal(f, REALBASE + k, val);
- 678 16925 [252]     _putreal(f, COMPLEXBASE + k, 0.0);
- 679 16949 [252] 
- 680 16949 [252]     t := t + deltat;
- 681 16955 [252]   end;
- 682 16968 [252] end;
- 683 16982 [252] 
- 684 16983 [243] proc makewhite(f: file);
- 685 16983 [245] {*********************}
- 686 16983 [245] var
- 687 16983 [245]   a, t, deltat, val: real;
- 688 16986 [249]   k: integer;
- 689 16986 [250] begin
- 690 16986 [250]   if _datatype <> DATA_REAL then
- 691 16994 [250]     _abortwith('WHITE function requires DATA=REAL');
- 692 17040 [250] 
- 693 17040 [250]   t := _min;
- 694 17040 [250]   deltat := (_max - _min) / conv(_n);
- 695 17069 [250] 
- 696 17077 [250]   a  := prval[P_A] / 128.0;
- 697 17094 [250] 
- 698 17101 [250]   for k := 0 to _n - 1 do begin
- 699 17123 [250] 
- 700 17123 [250]     val := (conv(_random) - 127.5) * a;
- 701 17137 [250] 
- 702 17150 [250]     _putreal(f, REALBASE + k, val);
- 703 17173 [250]     _putreal(f, COMPLEXBASE + k, 0.0);
- 704 17197 [250] 
- 705 17197 [250]     t := t + deltat;
- 706 17203 [250]   end;
- 707 17216 [250] end;
- 708 17230 [250] 
- 709 17231 [244] proc makelowpass(f: file);
- 710 17231 [246] {************************}
- 711 17231 [246] var
- 712 17231 [246]   a, val, sum: real;
- 713 17234 [249]   delay: array[FILTERSIZE] of real;
- 714 17234 [250]   k, j: integer;
- 715 17234 [252] begin
- 716 17234 [252]   if _datatype <> DATA_REAL then
- 717 17242 [252]     _abortwith('LOWPASS function requires DATA=REAL');
- 718 17290 [252] 
- 719 17290 [252]   a := prval[P_A] / 128.0;
- 720 17307 [252] 
- 721 17314 [252]   { clear delay line }
- 722 17314 [252]   for j := 0 to FILTERSIZE-1 do
- 723 17324 [252]     delay[j] := 0.0;
- 724 17347 [252] 
- 725 17368 [252]   for k := 0 to _n-1 do begin
- 726 17390 [252] 
- 727 17390 [252]     { shift delay line }
- 728 17390 [252]     for j := FILTERSIZE-1 downto 1 do
- 729 17401 [252]       delay[j] := delay[j-1];
- 730 17427 [252] 
- 731 17454 [252]     { new white-noise sample }
- 732 17454 [252]     delay[0] := (conv(_random) - 127.5) * a;
- 733 17473 [252] 
- 734 17487 [252]     { moving average }
- 735 17487 [252]     sum := 0.0;
- 736 17493 [252]     for j := 0 to FILTERSIZE-1 do
- 737 17509 [252]       sum := sum + delay[j];
- 738 17532 [252] 
- 739 17559 [252]     val := sum / conv(FILTERSIZE);
- 740 17567 [252] 
- 741 17575 [252]     _putreal(f, REALBASE+k, val);
- 742 17598 [252]     _putreal(f, COMPLEXBASE+k, 0.0);
- 743 17622 [252]   end;
- 744 17622 [252] end;
- 745 17636 [252] 
- 746 17637 [245] proc makepulse(f: file);
- 747 17637 [247] {**********************}
- 748 17637 [247] var
- 749 17637 [247]   t, deltat, val, a, center, width: real;
- 750 17640 [253]   k: integer;
- 751 17640 [254] begin
- 752 17640 [254]   if _datatype <> DATA_REAL then
- 753 17648 [254]   _abortwith('Rectangular pulse requires DATA=REAL');
- 754 17697 [254] 
- 755 17697 [254]   t := _min;
- 756 17697 [254]   deltat := (_max - _min) / conv(_n);
- 757 17726 [254] 
- 758 17734 [254]   a      := prval[P_A];
- 759 17739 [254]   center := prval[P_CENTER];
- 760 17756 [254]   width  := prval[P_WIDTH];
- 761 17773 [254] 
- 762 17785 [254]   if width <= 0.0 then
- 763 17797 [254]     _abortwith('WIDTH must be > 0');
- 764 17827 [254] 
- 765 17827 [254]   for k := 0 to _n - 1 do begin
- 766 17849 [254] 
- 767 17849 [254]     if fabs(t-center) <= width/2.0 then
- 768 17882 [254]       val := a
- 769 17887 [254]     else
- 770 17887 [254]       val := 0.0;
- 771 17908 [254] 
- 772 17914 [254]     _putreal(f, REALBASE+k, val);
- 773 17937 [254]     _putreal(f, COMPLEXBASE+k, 0.0);
- 774 17961 [254] 
- 775 17961 [254]     t := t + deltat;
- 776 17967 [254]   end;
- 777 17980 [254] end;
- 778 17994 [254] 
- 779 17995 [246] proc makesinc(f: file);
- 780 17995 [248] {*********************}
- 781 17995 [248] var
- 782 17995 [248]   t, deltat, val, a, f1, arg: real;
- 783 17998 [254]   k: integer;
- 784 17998 [255] begin
- 785 17998 [255]   if _datatype <> DATA_REAL then
- 786 18006 [255]     _abortwith('Sinc function requires DATA=REAL');
- 787 18051 [255] 
- 788 18051 [255]   t := _min;
- 789 18051 [255]   deltat := (_max - _min) / conv(_n);
- 790 18080 [255] 
- 791 18088 [255]   a  := prval[P_A];
- 792 18093 [255]   f1 := prval[P_F1];
- 793 18110 [255] 
- 794 18122 [255]   if f1 <= 0.0 then
- 795 18134 [255]     _abortwith('F1 must be > 0');
- 796 18161 [255] 
- 797 18161 [255]   for k := 0 to _n - 1 do begin
- 798 18183 [255] 
- 799 18183 [255]     arg := 360.0 * f1 * (t - prval[P_CENTER]);
- 800 18214 [255] 
- 801 18221 [255]     if fabs(arg) < 1.0e-6 then
- 802 18241 [255]       val := a
- 803 18245 [255]     else
- 804 18245 [255]       val := a * sin(arg) / arg;
- 805 18281 [255] 
- 806 18294 [255]     _putreal(f, REALBASE + k, val);
- 807 18317 [255]     _putreal(f, COMPLEXBASE + k, 0.0);
- 808 18341 [255] 
- 809 18341 [255]     t := t + deltat;
- 810 18347 [255]   end;
- 811 18360 [255] end;
- 812 18374 [255] 
- 813 18375 [247] proc makefunction;
- 814 18375 [248] {****************}
- 815 18375 [248] var f: file;
- 816 18378 [249] begin
- 817 18378 [249]   { validate common parameters }
- 818 18378 [249]   _n := pival[P_N];
- 819 18382 [249]   if not ((_n=128) or (_n=256) or
- 820 18405 [249]           (_n=512) or (_n=1024)) then begin
- 821 18425 [249]     _abortwith('N must be 128, 256, 512 or 1024');
- 822 18468 [249]   end;
- 823 18468 [249]   _min := prval[P_TMIN];
- 824 18473 [249]   _max := prval[P_TMAX];
- 825 18490 [249]   if (_max <= _min) then
- 826 18515 [249]     _abortwith('TMAX must be > TMIN');
- 827 18546 [249]   if (_strcmp(psval[P_DATA],'REAL') = 0) then
- 828 18570 [249]     _datatype := 0
- 829 18573 [249]   else if (_strcmp(psval[P_DATA],'COMPLEX') = 0) then
- 830 18609 [249]     _datatype := 1
- 831 18612 [249]   else
- 832 18614 [249]     _abortwith('DATA must be REAL or COMPLEX');
- 833 18658 [249]   _domain := 0;
- 834 18660 [249]   strcpyn(ftitle[pival[P_TYPE]],_title,TEXTSIZE);
- 835 18686 [249]   strcpyn(fformula[pival[P_TYPE]],_description,
- 836 18696 [249]     TEXTSIZE);
- 837 18708 [249] 
- 838 18708 [249]   { attach data file and check size }
- 839 18708 [249]   if fileexists('FUNCDATA:X      ', 1) then
- 840 18736 [249]     f := _attach('FUNCDATA:X      ', 0, 1,
- 841 18763 [249]       FWRITE + FSILENT, DATAFILESIZE + 256, 0, 'X')
- 842 18779 [249]   else
- 843 18785 [249]     f := _attach('FUNCDATA:X      ', 0, 1,
- 844 18816 [249]       FNEW + FSILENT, DATAFILESIZE + 256, 0, 'X');
- 845 18838 [249]   if _getsize <> DATAFILESIZE + 256 then
- 846 18854 [249]     _abortwith('Wrong data file size');
- 847 18888 [249] 
- 848 18888 [249]   { put data header in file }
- 849 18888 [249]   _putdataheader(f);
- 850 18898 [249] 
- 851 18898 [249]   { compute and store function }
- 852 18898 [249]   case pival[P_TYPE] of
- 853 18900 [249] 
- 854 18904 [249]     FT_COSINE:
- 855 18908 [249]       makecosine(f);
- 856 18921 [249] 
- 857 18924 [249]     FT_SUM:
- 858 18928 [249]       makesum(f);
- 859 18941 [249] 
- 860 18944 [249]     FT_PRODUCT:
- 861 18948 [249]       makeproduct(f);
- 862 18961 [249] 
- 863 18964 [249]     FT_GAUSSIAN:
- 864 18968 [249]       makegaussian(f);
- 865 18981 [249] 
- 866 18984 [249]     FT_EXP:
- 867 18988 [249]       makeexp(f);
- 868 19001 [249] 
- 869 19004 [249]     FT_PULSE:
- 870 19008 [249]       makepulse(f);
- 871 19021 [249] 
- 872 19024 [249]     FT_TRAPEZOID:
- 873 19028 [249]       maketrapezoid(f);
- 874 19041 [249] 
- 875 19044 [249]     FT_TRIANGLE:
- 876 19048 [249]       maketriangle(f);
- 877 19061 [249] 
- 878 19064 [249]     FT_SINC:
- 879 19068 [249]       makesinc(f);
- 880 19081 [249] 
- 881 19084 [249]     FT_WHITE:
- 882 19088 [249]       makewhite(f);
- 883 19101 [249] 
- 884 19104 [249]     FT_LOWPASS:
- 885 19108 [249]       makelowpass(f)
- 886 19111 [249] 
- 887 19121 [249]   else
- 888 19121 [249]     _abortwith('Function TYPE not yet implemented')
- 889 19160 [249] 
- 890 19166 [249]   end {case};
- 891 19168 [249]   close(f);
- 892 19174 [249] end;
- 893 19174 [249] 
- 894 19175 [248] begin { main }
- 895 19175 [248]   initfunctions;
- 896 19182 [248]   initparfile;
- 897 19186 [248]   parfileexists := fileexists('FUNCPARS:X      ', 1);
- 898 19214 [248]   initparams;
- 899 19222 [248]   if parfileexists then loadparams;
- 900 19233 [248]   readparams;
- 901 19237 [248]   if pival[P_TYPE] = 0 then
- 902 19245 [248]     displayfunctions
- 903 19246 [248]   else begin
- 904 19256 [248]     displayparams;
- 905 19260 [248]     makefunction;
- 906 19264 [248]   end;
- 907 19264 [248]   storeparams;
- 908 19268 [248] 
- 909 19268 [248]  if pival[P_TYPE] <> 0 then begin
- 910 19277 [248]     ARGTYPE[0]  := 's';
- 911 19284 [248]     ARGTYPE[1]  := chr(0);
- 912 19294 [248]     ARGLISTS[0] := '/';
- 913 19305 [248]     ARGLISTS[1] := 'Q';
- 914 19315 [248]     _chainprog('GRAPH:R         ', 0, 1);
- 915 19349 [248]   end;
- 916 19349 [248] end. 
-Code length:           19348
-Compiler stack size:   237/300
-Ident stack size:      255/350
+   2     4 [  0] uses syslib,strlib,writelib,mathlib,ralib,
+   3  7768 [119]      filelib,arglib;
+   4  8931 [147] 
+   5  8931 [147] const
+   6  8931 [147] 
+   7  8934 [147]   P_TYPE   = 0;
+   8  8934 [148]   P_N      = 1;
+   9  8934 [149]   P_TMIN   = 2;
+  10  8934 [150]   P_TMAX   = 3;
+  11  8934 [151]   P_A      = 4;
+  12  8934 [152]   P_A1     = 5;
+  13  8934 [153]   P_A2     = 6;
+  14  8934 [154]   P_F1     = 7;
+  15  8934 [155]   P_F2     = 8;
+  16  8934 [156]   P_PHASE  = 9;
+  17  8934 [157]   P_TAU    = 10;
+  18  8934 [158]   P_CENTER = 11;
+  19  8934 [159]   P_WIDTH  = 12;
+  20  8934 [160]   P_RISE   = 13;
+  21  8934 [161]   P_DATA   = 14;
+  22  8934 [162]   MAXPAR   = 14;
+  23  8934 [163] 
+  24  8934 [163]   FT_COSINE    = 1;
+  25  8934 [164]   FT_SUM       = 2;
+  26  8934 [165]   FT_PRODUCT   = 3;
+  27  8934 [166]   FT_GAUSSIAN  = 4;
+  28  8934 [167]   FT_EXP       = 5;
+  29  8934 [168]   FT_PULSE     = 6;
+  30  8934 [169]   FT_TRAPEZOID = 7;
+  31  8934 [170]   FT_TRIANGLE  = 8;
+  32  8934 [171]   FT_SINC      = 9;
+  33  8934 [172]   FT_WHITE     = 10;
+  34  8934 [173]   FT_LOWPASS   = 11;
+  35  8934 [174]   FILTERSIZE   = 16;
+  36  8934 [175]   MAXTYPE      = 11;
+  37  8934 [176] 
+  38  8934 [176]   NAMESIZE = 15;
+  39  8934 [177] 
+  40  8934 [177]   PARVERSION = 1;
+  41  8934 [178] 
+  42  8934 [178] var
+  43  8934 [178] 
+  44  8934 [178]   ftitle: array[MAXTYPE] of cpnt;
+  45  8934 [179]   fformula: array[MAXTYPE] of cpnt;
+  46  8934 [180]   f1: file;
+  47  8934 [181] 
+  48  8934 [181] {$I IFTSHARED:P}
+{I:IFTSHA}  1  8934 [181] { shared library for FUNCTION, FT and GRAPH }
+{I:IFTSHA}  2  8934 [181] 
+{I:IFTSHA}  3  8934 [181] { Data file header bytes
+{I:IFTSHA}  4  8934 [181] 
+{I:IFTSHA}  5  8934 [181]   0 - 15    current binary header
+{I:IFTSHA}  6  8934 [181]              version, n, datatype, domain,
+{I:IFTSHA}  7  8934 [181]              min, max
+{I:IFTSHA}  8  8934 [181] 
+{I:IFTSHA}  9  8934 [181]  16 - 31    reserved for future binary fields
+{I:IFTSHA} 10  8934 [181] 
+{I:IFTSHA} 11  8934 [181]  32 - 96    title        64 chars + chr(0)
+{I:IFTSHA} 12  8934 [181]  97 -161    description  64 chars + chr(0)
+{I:IFTSHA} 13  8934 [181] 
+{I:IFTSHA} 14  8934 [181] 162 -255    reserved for future expansion
+{I:IFTSHA} 15  8934 [181] 
+{I:IFTSHA} 16  8934 [181] Data starts at byte 256. }
+{I:IFTSHA} 17  8934 [181] 
+{I:IFTSHA} 18  8934 [181] const
+{I:IFTSHA} 19  8934 [181]   DATA_REAL    = 0;
+{I:IFTSHA} 20  8934 [182]   DATA_COMPLEX = 1;
+{I:IFTSHA} 21  8934 [183] 
+{I:IFTSHA} 22  8934 [183]   DOMAIN_TIME  = 0;
+{I:IFTSHA} 23  8934 [184]   DOMAIN_FREQ  = 1;
+{I:IFTSHA} 24  8934 [185] 
+{I:IFTSHA} 25  8934 [185]   DATAVERSION  = 2;
+{I:IFTSHA} 26  8934 [186]   DATAFILESIZE = 8192;  { + 256 for header section }
+{I:IFTSHA} 27  8934 [187]   REALBASE     = 64;    { 256 div 4 }
+{I:IFTSHA} 28  8934 [188]   COMPLEXBASE  = 1088;  { REALBASE + 1024 }
+{I:IFTSHA} 29  8934 [189] 
+{I:IFTSHA} 30  8934 [189]   TEXTSIZE    = 65;
+{I:IFTSHA} 31  8934 [190]   TITLEPOS    = 32;
+{I:IFTSHA} 32  8934 [191]   DESCRPOS    = 97;
+{I:IFTSHA} 33  8934 [192] 
+{I:IFTSHA} 34  8934 [192]   PARSIZE    = 256;
+{I:IFTSHA} 35  8934 [193]   STRSIZE    = 9;   { 8 chars + chr(0) }
+{I:IFTSHA} 36  8934 [194] 
+{I:IFTSHA} 37  8934 [194] var
+{I:IFTSHA} 38  8934 [194]   _parampos: integer;
+{I:IFTSHA} 39  8934 [195]   _n, _datatype, _domain: integer;
+{I:IFTSHA} 40  8934 [198]   _min, _max: real;
+{I:IFTSHA} 41  8934 [200]   _title, _description: cpnt;
+{I:IFTSHA} 42  8934 [202] 
+{I:IFTSHA} 43  8934 [202]   pname: array[MAXPAR] of cpnt;
+{I:IFTSHA} 44  8934 [203]   ptype: array[MAXPAR] of char;
+{I:IFTSHA} 45  8934 [204]   pchanged: array[MAXPAR] of boolean;
+{I:IFTSHA} 46  8934 [205] 
+{I:IFTSHA} 47  8934 [205]   pival: array[MAXPAR] of integer;
+{I:IFTSHA} 48  8934 [206]   prval: array[MAXPAR] of real;
+{I:IFTSHA} 49  8934 [207]   psval: array[MAXPAR] of cpnt;
+{I:IFTSHA} 50  8934 [208]   parfileexists: boolean;
+{I:IFTSHA} 51  8934 [209]   nparams: integer;
+{I:IFTSHA} 52  8934 [210] 
+{I:IFTSHA} 53  8934 [210]   ibase: integer;    { word address }
+{I:IFTSHA} 54  8934 [211]   rbase: integer;    { real address }
+{I:IFTSHA} 55  8934 [212]   sbase: integer;    { byte address }
+{I:IFTSHA} 56  8934 [213] 
+{I:IFTSHA} 57  8934 [213] proc _runerr(e:integer);
+{I:IFTSHA} 58  8934 [215] {**********************}
+{I:IFTSHA} 59  8934 [215] { set runerr to e and stop execution of app }
+{I:IFTSHA} 60  8934 [215] const stopcode = $2010;
+{I:IFTSHA} 61  8937 [216] mem   _mrunerr = $000c: integer&;
+{I:IFTSHA} 62  8937 [217] begin
+{I:IFTSHA} 63  8937 [217]   _mrunerr:=e;
+{I:IFTSHA} 64  8939 [217]   call(stopcode);
+{I:IFTSHA} 65  8951 [217] end;
+{I:IFTSHA} 66  8951 [217] 
+{I:IFTSHA} 67  8952 [214] proc _abortwith(s: cpnt);
+{I:IFTSHA} 68  8952 [216] {**********************}
+{I:IFTSHA} 69  8952 [216] const stopcode = $2010;
+{I:IFTSHA} 70  8955 [217] begin
+{I:IFTSHA} 71  8955 [217]   writeln(chr($0e),s,chr($0b));
+{I:IFTSHA} 72  8976 [217]   _runerr(54);
+{I:IFTSHA} 73  8984 [217] end;
+{I:IFTSHA} 74  8984 [217] 
+{I:IFTSHA} 75  8985 [215] func _allocate(b: integer): cpnt;
+{I:IFTSHA} 76  8985 [218] {*******************************}
+{I:IFTSHA} 77  8985 [218] { allocate memory on heap for string }
+{I:IFTSHA} 78  8985 [218] mem  stackp = $0008: integer;
+{I:IFTSHA} 79  8988 [219]      endstk = $000e: integer;
+{I:IFTSHA} 80  8988 [220] var  freewords: integer;
+{I:IFTSHA} 81  8988 [221]      str: cpnt;
+{I:IFTSHA} 82  8988 [222] begin
+{I:IFTSHA} 83  8988 [222]   { Pascal has no type unsigned integer. }
+{I:IFTSHA} 84  8988 [222]   { But the free space can be larger than 32767 }
+{I:IFTSHA} 85  8988 [222]   { We work therefore with free words here }
+{I:IFTSHA} 86  8988 [222]   freewords:=(endstk-stackp) shr 1;
+{I:IFTSHA} 87  8999 [222]   if freewords < (b div 2 + 256) then begin
+{I:IFTSHA} 88  9020 [222]     { 256 words are left for the growing stack }
+{I:IFTSHA} 89  9023 [222]     _runerr($88);
+{I:IFTSHA} 90  9031 [222]   end;
+{I:IFTSHA} 91  9031 [222]   { allocate heap memory }
+{I:IFTSHA} 92  9031 [222]   endstk := endstk - b;
+{I:IFTSHA} 93  9034 [222]   str := cpnt(endstk);
+{I:IFTSHA} 94  9045 [222]   { initialize the string }
+{I:IFTSHA} 95  9049 [222]   str[0] := chr(0);
+{I:IFTSHA} 96  9053 [222]   _allocate := str;
+{I:IFTSHA} 97  9058 [222] end;
+{I:IFTSHA} 98  9066 [222] 
+{I:IFTSHA} 99  9067 [217] proc _nextparam(name, value: cpnt; var done: boolean);
+{I:IFTSHA}100  9067 [221] {****************************************************}
+{I:IFTSHA}101  9067 [221] mem
+{I:IFTSHA}102  9067 [221]     ARGTYPE  = $00a0: array[31] of char&;
+{I:IFTSHA}103  9070 [222] var s: cpnt;
+{I:IFTSHA}104  9070 [223]     i: integer;
+{I:IFTSHA}105  9070 [224]     ch: char;
+{I:IFTSHA}106  9070 [225] begin
+{I:IFTSHA}107  9070 [225]   if (ARGTYPE[0] <> 'l') then begin
+{I:IFTSHA}108  9081 [225]     done := true;
+{I:IFTSHA}109  9086 [225]     exit;
+{I:IFTSHA}110  9091 [225]   end;
+{I:IFTSHA}111  9091 [225]   s := cpnt($60);
+{I:IFTSHA}112  9093 [225]   { initialize returned strings }
+{I:IFTSHA}113  9097 [225]   name[0] := chr(0);
+{I:IFTSHA}114  9101 [225]   value[0] := chr(0);
+{I:IFTSHA}115  9110 [225]   { skip blanks before next parameter }
+{I:IFTSHA}116  9115 [225]   while s[_parampos] = ' ' do
+{I:IFTSHA}117  9127 [225]     _parampos := _parampos + 1;
+{I:IFTSHA}118  9137 [225]   { end of parameter line }
+{I:IFTSHA}119  9145 [225]   if s[_parampos] = chr(0) then begin
+{I:IFTSHA}120  9159 [225]     done := true;
+{I:IFTSHA}121  9164 [225]     exit;
+{I:IFTSHA}122  9169 [225]   end;
+{I:IFTSHA}123  9169 [225]   done := false;
+{I:IFTSHA}124  9171 [225]   { get parameter name }
+{I:IFTSHA}125  9175 [225]   i := 0;
+{I:IFTSHA}126  9177 [225]   ch := s[_parampos];
+{I:IFTSHA}127  9189 [225]   while ch <> '=' do begin
+{I:IFTSHA}128  9205 [225]     if (ch = chr(0)) or (ch = ' ') then
+{I:IFTSHA}129  9220 [225]       _runerr(106);
+{I:IFTSHA}130  9232 [225]     if not (((ch >= 'A') and (ch <= 'Z')) or
+{I:IFTSHA}131  9247 [225]             ((ch >= '0') and (ch <= '9'))) then
+{I:IFTSHA}132  9263 [225]       _runerr(106);
+{I:IFTSHA}133  9275 [225]     if i >= 8 then
+{I:IFTSHA}134  9281 [225]       _runerr(106);
+{I:IFTSHA}135  9293 [225]     name[i] := ch;
+{I:IFTSHA}136  9297 [225]     i := i + 1;
+{I:IFTSHA}137  9311 [225]     _parampos := _parampos + 1;
+{I:IFTSHA}138  9322 [225]     ch := s[_parampos];
+{I:IFTSHA}139  9335 [225]   end;
+{I:IFTSHA}140  9341 [225]   name[i] := chr(0);
+{I:IFTSHA}141  9350 [225]   { skip '=' }
+{I:IFTSHA}142  9355 [225]   _parampos := _parampos + 1;
+{I:IFTSHA}143  9361 [225]   { get parameter value }
+{I:IFTSHA}144  9366 [225]   i := 0;
+{I:IFTSHA}145  9368 [225]   ch := s[_parampos];
+{I:IFTSHA}146  9380 [225]   while (ch <> ' ') and (ch <> chr(0)) do begin
+{I:IFTSHA}147  9405 [225]     if i >= 16 then
+{I:IFTSHA}148  9411 [225]       _runerr(106);
+{I:IFTSHA}149  9423 [225]     value[i] := ch;
+{I:IFTSHA}150  9427 [225]     i := i + 1;
+{I:IFTSHA}151  9441 [225]     _parampos := _parampos + 1;
+{I:IFTSHA}152  9452 [225]     ch := s[_parampos];
+{I:IFTSHA}153  9465 [225]   end;
+{I:IFTSHA}154  9471 [225]   value[i] := chr(0);
+{I:IFTSHA}155  9480 [225] end;
+{I:IFTSHA}156  9485 [225] 
+{I:IFTSHA}157  9486 [218] proc strcpyn(source, dest: cpnt; maxlen: integer);
+{I:IFTSHA}158  9486 [222] {************************************************}
+{I:IFTSHA}159  9486 [222] var i: integer;
+{I:IFTSHA}160  9489 [223] begin
+{I:IFTSHA}161  9489 [223]   if dest=nil then
+{I:IFTSHA}162  9497 [223]     _runerr($89);
+{I:IFTSHA}163  9509 [223]   i:=0;
+{I:IFTSHA}164  9511 [223]   while (source[i]<>chr(0)) and (i<maxlen-1) do begin
+{I:IFTSHA}165  9545 [223]     dest[i]:=source[i];
+{I:IFTSHA}166  9557 [223]     i:=i+1;
+{I:IFTSHA}167  9569 [223]   end;
+{I:IFTSHA}168  9574 [223]   if source[i]<>chr(0) then
+{I:IFTSHA}169  9589 [223]     _runerr($91);
+{I:IFTSHA}170  9602 [223]   dest[i]:=chr(0);
+{I:IFTSHA}171  9608 [223]   i:=i+1;
+{I:IFTSHA}172  9619 [223]   while i<maxlen do begin
+{I:IFTSHA}173  9636 [223]     dest[i]:=chr(0);
+{I:IFTSHA}174  9642 [223]     i:=i+1;
+{I:IFTSHA}175  9653 [223]   end;
+{I:IFTSHA}176  9658 [223] end;
+{I:IFTSHA}177  9661 [223] 
+{I:IFTSHA}178  9662 [219] func str_real(s: cpnt): real;
+{I:IFTSHA}179  9662 [222] {***************************}
+{I:IFTSHA}180  9662 [222] var i, sign: integer;
+{I:IFTSHA}181  9665 [224]     val, frac, scale: real;
+{I:IFTSHA}182  9665 [227] begin
+{I:IFTSHA}183  9665 [227]   i := 0;
+{I:IFTSHA}184  9669 [227]   sign := 1;
+{I:IFTSHA}185  9675 [227]   if s[0] = '-' then begin
+{I:IFTSHA}186  9690 [227]     sign := -1;
+{I:IFTSHA}187  9695 [227]     i := 1;
+{I:IFTSHA}188  9702 [227]   end;
+{I:IFTSHA}189  9706 [227]   if s[i] = chr(0) then
+{I:IFTSHA}190  9718 [227]     _runerr(106);
+{I:IFTSHA}191  9731 [227]   val := 0.0;
+{I:IFTSHA}192  9737 [227]   { integer part }
+{I:IFTSHA}193  9743 [227]   while (s[i] >= '0') and (s[i] <= '9') do begin
+{I:IFTSHA}194  9773 [227]     val := val * 10.0 + conv(ord(s[i]) - ord('0'));
+{I:IFTSHA}195  9799 [227]     i := i + 1;
+{I:IFTSHA}196  9813 [227]   end;
+{I:IFTSHA}197  9818 [227]   { fractional part }
+{I:IFTSHA}198  9821 [227]   if s[i] = '.' then begin
+{I:IFTSHA}199  9834 [227]     i := i + 1;
+{I:IFTSHA}200  9843 [227]     frac := 0.0;
+{I:IFTSHA}201  9854 [227]     scale := 1.0;
+{I:IFTSHA}202  9866 [227]     while (s[i] >= '0') and (s[i] <= '9') do begin
+{I:IFTSHA}203  9902 [227]       frac := frac * 10.0 + conv(ord(s[i])-ord('0'));
+{I:IFTSHA}204  9928 [227]       scale := scale * 10.0;
+{I:IFTSHA}205  9948 [227]       i := i + 1;
+{I:IFTSHA}206  9961 [227]     end;
+{I:IFTSHA}207  9966 [227]     val := val + frac / scale;
+{I:IFTSHA}208  9981 [227]   end;
+{I:IFTSHA}209  9995 [227]   if s[i] <> chr(0) then
+{I:IFTSHA}210 10007 [227]     _runerr(106);
+{I:IFTSHA}211 10020 [227]   str_real := conv(sign) * val;
+{I:IFTSHA}212 10025 [227] end;
+{I:IFTSHA}213 10038 [227] 
+{I:IFTSHA}214 10039 [221] func round(r: real): integer;
+{I:IFTSHA}215 10039 [224] {**************************}
+{I:IFTSHA}216 10039 [224] begin
+{I:IFTSHA}217 10039 [224]   if r >= 0.0 then
+{I:IFTSHA}218 10056 [224]     round := trunc(r + 0.5)
+{I:IFTSHA}219 10072 [224]   else
+{I:IFTSHA}220 10073 [224]     round := trunc(r - 0.5);
+{I:IFTSHA}221 10094 [224] end;
+{I:IFTSHA}222 10099 [224] 
+{I:IFTSHA}223 10100 [223] proc _getdataheader(f: file);
+{I:IFTSHA}224 10100 [225] {***************************}
+{I:IFTSHA}225 10100 [225] var version: integer;
+{I:IFTSHA}226 10103 [226]   i, vi: integer;
+{I:IFTSHA}227 10103 [228] 
+{I:IFTSHA}228 10103 [228]   proc getword(device:file; address:integer;
+{I:IFTSHA}229 10103 [231]                                 var word:integer);
+{I:IFTSHA}230 10103 [232]   var h,l:integer;
+{I:IFTSHA}231 10106 [234]   begin
+{I:IFTSHA}232 10106 [234]     getbyte(device,2*address,l);
+{I:IFTSHA}233 10125 [234]     getbyte(device,2*address+1,h);
+{I:IFTSHA}234 10145 [234]     word:=(h shl 8) + l;
+{I:IFTSHA}235 10152 [234]   end;
+{I:IFTSHA}236 10161 [234] 
+{I:IFTSHA}237 10162 [229]   proc getreal(device:file; address:integer;
+{I:IFTSHA}238 10162 [232]     var rvalue:array[1] of %integer);
+{I:IFTSHA}239 10162 [233]   var i1,i2:integer;
+{I:IFTSHA}240 10165 [235]   begin
+{I:IFTSHA}241 10165 [235]     getword(device,2*address,i1);
+{I:IFTSHA}242 10192 [235]     getword(device,2*address+1,i2);
+{I:IFTSHA}243 10220 [235]     rvalue[0]:=i1;
+{I:IFTSHA}244 10222 [235]     rvalue[1]:=i2;
+{I:IFTSHA}245 10232 [235]   end;
+{I:IFTSHA}246 10240 [235] 
+{I:IFTSHA}247 10241 [230] begin
+{I:IFTSHA}248 10241 [230]   getword(f, 0, version);
+{I:IFTSHA}249 10263 [230]   if version <> DATAVERSION then
+{I:IFTSHA}250 10269 [230]     _abortwith('Wrong data file version');
+{I:IFTSHA}251 10305 [230]   getword(f, 1, _n);
+{I:IFTSHA}252 10325 [230]   getword(f, 2, _datatype);
+{I:IFTSHA}253 10345 [230]   getword(f, 3, _domain);
+{I:IFTSHA}254 10365 [230]   getreal(f, 2, _min);  { real has 4 bytes }
+{I:IFTSHA}255 10389 [230]   getreal(f, 3, _max);
+{I:IFTSHA}256 10413 [230]   for i:=0 to TEXTSIZE-1 do begin
+{I:IFTSHA}257 10433 [230]     getbyte(f,TITLEPOS+i,vi);
+{I:IFTSHA}258 10450 [230]     _title[i] := chr(vi);
+{I:IFTSHA}259 10458 [230]     getbyte(f,DESCRPOS+i,vi);
+{I:IFTSHA}260 10480 [230]     _description[i] := chr(vi);
+{I:IFTSHA}261 10488 [230]   end;
+{I:IFTSHA}262 10493 [230] end;
+{I:IFTSHA}263 10507 [230] 
+{I:IFTSHA}264 10508 [224] proc _putdataheader(f: file);
+{I:IFTSHA}265 10508 [226] {***************************}
+{I:IFTSHA}266 10508 [226] var i:integer;
+{I:IFTSHA}267 10511 [227] 
+{I:IFTSHA}268 10511 [227]   proc putword(device:file; address:integer;
+{I:IFTSHA}269 10511 [230]     word:integer);
+{I:IFTSHA}270 10511 [231]   begin
+{I:IFTSHA}271 10511 [231]     putbyte(device,2*address, word and 255);
+{I:IFTSHA}272 10536 [231]     putbyte(device,2*address+1, word shr 8);
+{I:IFTSHA}273 10559 [231]   end;
+{I:IFTSHA}274 10559 [231] 
+{I:IFTSHA}275 10560 [228]   proc putreal(device:file; address:integer;
+{I:IFTSHA}276 10560 [231]     rvalue:array[1] of %integer);
+{I:IFTSHA}277 10560 [232]   begin
+{I:IFTSHA}278 10560 [232]     putword(device,2*address, rvalue[0]);
+{I:IFTSHA}279 10588 [232]     putword(device,2*address+1, rvalue[1]);
+{I:IFTSHA}280 10614 [232]   end;
+{I:IFTSHA}281 10614 [232] 
+{I:IFTSHA}282 10615 [229] begin
+{I:IFTSHA}283 10615 [229]   putword(f, 0, DATAVERSION);
+{I:IFTSHA}284 10631 [229]   putword(f, 1, _n);
+{I:IFTSHA}285 10647 [229]   putword(f, 2, _datatype);
+{I:IFTSHA}286 10663 [229]   putword(f, 3, _domain);
+{I:IFTSHA}287 10679 [229]   putreal(f, 2, _min);  { real has 4 bytes }
+{I:IFTSHA}288 10697 [229]   putreal(f, 3, _max);
+{I:IFTSHA}289 10715 [229]   for i:=0 to TEXTSIZE-1 do begin
+{I:IFTSHA}290 10735 [229]     putbyte(f,TITLEPOS+i,_title[i]);
+{I:IFTSHA}291 10758 [229]     putbyte(f,DESCRPOS+i,_description[i]);
+{I:IFTSHA}292 10781 [229]   end;
+{I:IFTSHA}293 10781 [229] end;
+{I:IFTSHA}294 10795 [229] 
+{I:IFTSHA}295 10796 [225] {*****************}
+{I:IFTSHA}296 10796 [225] proc initiftshared;
+{I:IFTSHA}297 10796 [226] {*****************}
+{I:IFTSHA}298 10796 [226] begin  { initialize library }
+{I:IFTSHA}299 10799 [226]   _parampos := 0;
+{I:IFTSHA}300 10803 [226]   _title       := _allocate(TEXTSIZE);
+{I:IFTSHA}301 10817 [226]   _description := _allocate(TEXTSIZE);
+{I:IFTSHA}302 10831 [226]   strcpyn('',_title,TEXTSIZE);
+{I:IFTSHA}303 10850 [226]   strcpyn('',_description,TEXTSIZE);
+{I:IFTSHA}304 10865 [226] end;
+{I:IFTSHA}305 10865 [226] 
+{I:IFTSHA}306 10866 [226] proc initparfile;
+{I:IFTSHA}307 10866 [227] {***************}
+{I:IFTSHA}308 10866 [227] begin
+{I:IFTSHA}309 10866 [227]   nparams := MAXPAR + 1;
+{I:IFTSHA}310 10875 [227] 
+{I:IFTSHA}311 10880 [227]   { Parameter file layout:
+{I:IFTSHA}312 10880 [227]       word 0 : version
+{I:IFTSHA}313 10880 [227]       word 1 : number of parameters
+{I:IFTSHA}314 10880 [227] 
+{I:IFTSHA}315 10880 [227]       integer values:
+{I:IFTSHA}316 10880 [227]         nparams words, starting at ibase
+{I:IFTSHA}317 10880 [227] 
+{I:IFTSHA}318 10880 [227]       real values:
+{I:IFTSHA}319 10880 [227]         nparams reals, starting at rbase
+{I:IFTSHA}320 10880 [227] 
+{I:IFTSHA}321 10880 [227]       string values:
+{I:IFTSHA}322 10880 [227]         nparams slots of STRSIZE bytes,
+{I:IFTSHA}323 10880 [227]         each containing up to 8 chars + chr(0)
+{I:IFTSHA}324 10880 [227] 
+{I:IFTSHA}325 10880 [227]       complete file size is fixed at 256 bytes
+{I:IFTSHA}326 10880 [227]   }
+{I:IFTSHA}327 10880 [227] 
+{I:IFTSHA}328 10880 [227]   ibase := 2;
+{I:IFTSHA}329 10882 [227] 
+{I:IFTSHA}330 10886 [227]   { rbase is expressed in real addresses.
+{I:IFTSHA}331 10886 [227]     Round integer section up to next real boundary. }
+{I:IFTSHA}332 10886 [227]   rbase := (ibase + nparams + 1) shr 1;
+{I:IFTSHA}333 10900 [227] 
+{I:IFTSHA}334 10905 [227]   { sbase is expressed in byte addresses }
+{I:IFTSHA}335 10905 [227]   sbase := 4 * (rbase + nparams);
+{I:IFTSHA}336 10916 [227]   debug(ibase, rbase, sbase);
+{I:IFTSHA}337 10921 [227] end;
+{I:IFTSHA}338 10921 [227] 
+{I:IFTSHA}339 10922 [227] func fileexists(nm: array[NAMESIZE] of char;
+{I:IFTSHA}340 10922 [230]                            drv: integer): boolean;
+{I:IFTSHA}341 10922 [231] {************************************************}
+{I:IFTSHA}342 10922 [231] const aprepdo  = $f4a7;
+{I:IFTSHA}343 10925 [232]       agetentx = $f63a;
+{I:IFTSHA}344 10925 [233]       aenddo   = $f625;
+{I:IFTSHA}345 10925 [234] 
+{I:IFTSHA}346 10925 [234]       NUMENTRIES = 255;
+{I:IFTSHA}347 10925 [235] 
+{I:IFTSHA}348 10925 [235] mem   filtyp = $0300: char&;
+{I:IFTSHA}349 10925 [236]       fillnk = $031e: integer&;
+{I:IFTSHA}350 10925 [237]       scyfc  = $037c: integer&;
+{I:IFTSHA}351 10925 [238]       fildrv = $00dc: integer&;
+{I:IFTSHA}352 10925 [239]       FILNAM = $0301: array[NAMESIZE] of char&;
+{I:IFTSHA}353 10925 [240] 
+{I:IFTSHA}354 10925 [240] var ent,i: integer;
+{I:IFTSHA}355 10925 [242]     found,last: boolean;
+{I:IFTSHA}356 10925 [244] 
+{I:IFTSHA}357 10925 [244]     func same: boolean;
+{I:IFTSHA}358 10925 [246]     var k: integer;
+{I:IFTSHA}359 10928 [247]         equal: boolean;
+{I:IFTSHA}360 10928 [248]     begin
+{I:IFTSHA}361 10928 [248]       equal:=true;
+{I:IFTSHA}362 10932 [248]       k:=0;
+{I:IFTSHA}363 10938 [248]       while equal and (k<=NAMESIZE) do begin
+{I:IFTSHA}364 10957 [248]         equal:=nm[k]=FILNAM[k];
+{I:IFTSHA}365 10972 [248]         k:=k+1;
+{I:IFTSHA}366 10985 [248]       end;
+{I:IFTSHA}367 10990 [248]       same:=equal;
+{I:IFTSHA}368 10993 [248]     end;
+{I:IFTSHA}369 11001 [248] 
+{I:IFTSHA}370 11002 [246] begin
+{I:IFTSHA}371 11002 [246]   fildrv:=drv;
+{I:IFTSHA}372 11004 [246]   call(aprepdo);
+{I:IFTSHA}373 11016 [246]   ent:=0;
+{I:IFTSHA}374 11018 [246]   found:=false;
+{I:IFTSHA}375 11024 [246]   last:=false;
+{I:IFTSHA}376 11030 [246]   repeat
+{I:IFTSHA}377 11034 [246]     scyfc:=ent;
+{I:IFTSHA}378 11034 [246]     call(agetentx);
+{I:IFTSHA}379 11047 [246]     last:=filtyp=chr(0);
+{I:IFTSHA}380 11053 [246]     if not last then begin
+{I:IFTSHA}381 11064 [246]       found:=same;
+{I:IFTSHA}382 11073 [246]       if (fillnk and $80)<>0 then
+{I:IFTSHA}383 11086 [246]         found:=false;
+{I:IFTSHA}384 11092 [246]     end;
+{I:IFTSHA}385 11096 [246]     ent:=ent+1;
+{I:IFTSHA}386 11102 [246]   until found or last or (ent>=NUMENTRIES);
+{I:IFTSHA}387 11123 [246]   call(aenddo);
+{I:IFTSHA}388 11131 [246]   fileexists:=found;
+{I:IFTSHA}389 11131 [246] end;
+{I:IFTSHA}390 11139 [246] 
+{I:IFTSHA}391 11140 [229] proc setparam(p: integer; value: cpnt);
+{I:IFTSHA}392 11140 [232] {*************************************}
+{I:IFTSHA}393 11140 [232] begin
+{I:IFTSHA}394 11140 [232]   pchanged[p] := true;
+{I:IFTSHA}395 11151 [232]   case ptype[p] of
+{I:IFTSHA}396 11159 [232]   'i':  begin
+{I:IFTSHA}397 11170 [232]           pival[p] := round(str_real(value));
+{I:IFTSHA}398 11194 [232]         end;
+{I:IFTSHA}399 11198 [232]   'r':  begin
+{I:IFTSHA}400 11208 [232]           prval[p] := str_real(value);
+{I:IFTSHA}401 11227 [232]         end;
+{I:IFTSHA}402 11234 [232]   's':  begin
+{I:IFTSHA}403 11244 [232]           strcpyn(value, psval[p],9);
+{I:IFTSHA}404 11264 [232]         end
+{I:IFTSHA}405 11264 [232]   end {case }
+{I:IFTSHA}406 11266 [232] end;
+{I:IFTSHA}407 11266 [232] 
+{I:IFTSHA}408 11267 [230] func findparam(name: cpnt): integer;
+{I:IFTSHA}409 11267 [233] {**********************************}
+{I:IFTSHA}410 11267 [233] var p: integer;
+{I:IFTSHA}411 11270 [234]     found: boolean;
+{I:IFTSHA}412 11270 [235] begin
+{I:IFTSHA}413 11270 [235]   p := 0;
+{I:IFTSHA}414 11274 [235]   repeat
+{I:IFTSHA}415 11278 [235]     found := _strcmp(pname[p], name) = 0;
+{I:IFTSHA}416 11300 [235]     p := p + 1;
+{I:IFTSHA}417 11311 [235]   until found or (p > MAXPAR);
+{I:IFTSHA}418 11327 [235] 
+{I:IFTSHA}419 11331 [235]   if found then
+{I:IFTSHA}420 11331 [235]     findparam := p - 1
+{I:IFTSHA}421 11342 [235]   else
+{I:IFTSHA}422 11344 [235]     findparam := -1;
+{I:IFTSHA}423 11354 [235] end;
+{I:IFTSHA}424 11359 [235] 
+{I:IFTSHA}425 11360 [232] proc readparams;
+{I:IFTSHA}426 11360 [233] {**************}
+{I:IFTSHA}427 11360 [233] var name, value: cpnt;
+{I:IFTSHA}428 11363 [235]     done: boolean;
+{I:IFTSHA}429 11363 [236]     p: integer;
+{I:IFTSHA}430 11363 [237] begin
+{I:IFTSHA}431 11363 [237]   name  := _allocate(9);
+{I:IFTSHA}432 11375 [237]   value := _allocate(17);
+{I:IFTSHA}433 11389 [237]   repeat
+{I:IFTSHA}434 11393 [237]     _nextparam(name, value, done);
+{I:IFTSHA}435 11415 [237]     if not done then begin
+{I:IFTSHA}436 11420 [237]       p := findparam(name);
+{I:IFTSHA}437 11435 [237]       if p < 0 then
+{I:IFTSHA}438 11445 [237]         _abortwith('Unknown parameter')
+{I:IFTSHA}439 11469 [237]       else
+{I:IFTSHA}440 11475 [237]         setparam(p,value);
+{I:IFTSHA}441 11492 [237]     end;
+{I:IFTSHA}442 11492 [237]   until done;
+{I:IFTSHA}443 11492 [237] end;
+{I:IFTSHA}444 11499 [237] 
+{I:IFTSHA}445 11500 [233] proc loadparams(f: file);
+{I:IFTSHA}446 11500 [235] {***********************}
+{I:IFTSHA}447 11500 [235] var
+{I:IFTSHA}448 11500 [235]   p,i,addr,version,np,ii: integer;
+{I:IFTSHA}449 11503 [241]   ir: real;
+{I:IFTSHA}450 11503 [242]   s: cpnt;
+{I:IFTSHA}451 11503 [243] begin
+{I:IFTSHA}452 11503 [243]   if _getsize<>PARSIZE then
+{I:IFTSHA}453 11514 [243]     _abortwith('Wrong parameter file size');
+{I:IFTSHA}454 11552 [243] 
+{I:IFTSHA}455 11552 [243]   _getword(f,0,version);
+{I:IFTSHA}456 11572 [243]   if version<>PARVERSION then
+{I:IFTSHA}457 11578 [243]     _abortwith('Wrong parameter file version');
+{I:IFTSHA}458 11619 [243] 
+{I:IFTSHA}459 11619 [243]   _getword(f,1,np);
+{I:IFTSHA}460 11639 [243]   if np<>nparams then
+{I:IFTSHA}461 11643 [243]     _abortwith('Wrong number of parameters');
+{I:IFTSHA}462 11686 [243] 
+{I:IFTSHA}463 11686 [243]   for p:=0 to MAXPAR do begin
+{I:IFTSHA}464 11703 [243]     _getword(f,ibase+p,ii);
+{I:IFTSHA}465 11730 [243]     pival[p]:=ii;
+{I:IFTSHA}466 11734 [243]   end;
+{I:IFTSHA}467 11742 [243] 
+{I:IFTSHA}468 11756 [243]   for p:=0 to MAXPAR do begin
+{I:IFTSHA}469 11773 [243]     _getreal(f,rbase+p,ir);
+{I:IFTSHA}470 11804 [243]     prval[p]:=ir;
+{I:IFTSHA}471 11811 [243]   end;
+{I:IFTSHA}472 11824 [243] 
+{I:IFTSHA}473 11838 [243]   for p:=0 to MAXPAR do begin
+{I:IFTSHA}474 11855 [243]     if psval[p]<>nil then begin
+{I:IFTSHA}475 11866 [243]       s:=psval[p];
+{I:IFTSHA}476 11873 [243]       addr:=sbase+STRSIZE*p;
+{I:IFTSHA}477 11887 [243]       for i:=0 to STRSIZE-1 do begin
+{I:IFTSHA}478 11917 [243]         getbyte(f,addr+i,ii);
+{I:IFTSHA}479 11936 [243]         s[i]:=chr(ii);
+{I:IFTSHA}480 11944 [243]       end;
+{I:IFTSHA}481 11949 [243]     end;
+{I:IFTSHA}482 11963 [243]   end;
+{I:IFTSHA}483 11963 [243] end;
+{I:IFTSHA}484 11977 [243] 
+  49 11978 [234] 
+  50 11978 [234] proc displayparams;
+  51 11978 [235] {*****************}
+  52 11978 [235] const
+  53 11978 [235]   columns   = 2;
+  54 11981 [236]   namefield = 7;
+  55 11981 [237]   valfield  = 9;
+  56 11981 [238] var i,col,row,rows,k,padding,type: integer;
+  57 11981 [245] begin
+  58 11981 [245]   type := pival[P_TYPE];
+  59 11985 [245]   if type=0 then exit;
+  60 12004 [245]   writeln('FUNCTION: ',ftitle[type]);
+  61 12030 [245]   writeln('FORMULA:  ',fformula[type]);
+  62 12056 [245]   rows := (MAXPAR + columns) div columns;
+  63 12063 [245]   padding := (48 div columns) - namefield - valfield;
+  64 12078 [245]   for row := 0 to rows - 1 do begin
+  65 12105 [245]     for col := 0 to columns - 1 do begin
+  66 12125 [245]       i := row + col * rows;
+  67 12133 [245]       if i <= MAXPAR then begin
+  68 12150 [245]         if col > 0 then
+  69 12159 [245]           for k := 1 to padding do write(' ');
+  70 12184 [245]         write(field(pname[i], namefield));
+  71 12217 [245]         case ptype[i] of
+  72 12221 [245]           'i':  write(pival[i]:valfield);
+  73 12248 [245]           'r':  write(prval[i]:valfield:2);
+  74 12281 [245]           's':  write(field(psval[i], -valfield))
+  75 12310 [245]           else write('undefined')
+  76 12324 [245]         end {case};
+  77 12326 [245]       end {if};
+  78 12326 [245]     end {column};
+  79 12326 [245]     writeln;
+  80 12340 [245]   end {row};
+  81 12346 [245] end;
+  82 12360 [245] 
+  83 12361 [235] proc initparams;
+  84 12361 [236] {**************}
+  85 12361 [236] var i: integer;
+  86 12364 [237] begin
+  87 12364 [237]   for i:=0 to MAXPAR do
+  88 12374 [237]     psval[i]:=nil;
+  89 12389 [237] 
+  90 12407 [237]   pname[P_TYPE] := 'TYPE';
+  91 12416 [237]   ptype[P_TYPE] := 'i';
+  92 12424 [237]   pival[P_TYPE] := 0;
+  93 12432 [237] 
+  94 12436 [237]   pname[P_N] := cpnt('N');
+  95 12442 [237]   ptype[P_N] := 'i';
+  96 12450 [237]   pival[P_N] := 256;
+  97 12459 [237] 
+  98 12463 [237]   pname[P_TMIN] := 'TMIN';
+  99 12472 [237]   ptype[P_TMIN] := 'r';
+ 100 12480 [237]   prval[P_TMIN] := 0.0;
+ 101 12495 [237] 
+ 102 12502 [237]   pname[P_TMAX] := 'TMAX';
+ 103 12511 [237]   ptype[P_TMAX] := 'r';
+ 104 12519 [237]   prval[P_TMAX] := 1.0;
+ 105 12534 [237] 
+ 106 12541 [237]   pname[P_A] := cpnt('A');
+ 107 12547 [237]   ptype[P_A] := 'r';
+ 108 12555 [237]   prval[P_A] := 1.0;
+ 109 12570 [237] 
+ 110 12577 [237]   pname[P_A1] := cpnt('A1');
+ 111 12584 [237]   ptype[P_A1] := 'r';
+ 112 12592 [237]   prval[P_A1] := 1.0;
+ 113 12607 [237] 
+ 114 12614 [237]   pname[P_A2] := cpnt('A2');
+ 115 12621 [237]   ptype[P_A2] := 'r';
+ 116 12629 [237]   prval[P_A2] := 1.0;
+ 117 12644 [237] 
+ 118 12651 [237]   pname[P_F1] := cpnt('F1');
+ 119 12658 [237]   ptype[P_F1] := 'r';
+ 120 12666 [237]   prval[P_F1] := 8.0;
+ 121 12681 [237] 
+ 122 12688 [237]   pname[P_F2] := cpnt('F2');
+ 123 12695 [237]   ptype[P_F2] := 'r';
+ 124 12703 [237]   prval[P_F2] := 16.0;
+ 125 12718 [237] 
+ 126 12725 [237]   pname[P_PHASE] := 'PHASE';
+ 127 12735 [237]   ptype[P_PHASE] := 'r';
+ 128 12743 [237]   prval[P_PHASE] := 0.0;
+ 129 12758 [237] 
+ 130 12765 [237]   pname[P_TAU] := 'TAU';
+ 131 12773 [237]   ptype[P_TAU] := 'r';
+ 132 12781 [237]   prval[P_TAU] := 1.0;
+ 133 12796 [237] 
+ 134 12803 [237]   pname[P_CENTER] := 'CENTER';
+ 135 12814 [237]   ptype[P_CENTER] := 'r';
+ 136 12822 [237]   prval[P_CENTER] := 0.5;
+ 137 12837 [237] 
+ 138 12844 [237]   pname[P_WIDTH] := 'WIDTH';
+ 139 12854 [237]   ptype[P_WIDTH] := 'r';
+ 140 12862 [237]   prval[P_WIDTH] := 0.25;
+ 141 12877 [237] 
+ 142 12884 [237]   pname[P_RISE] := 'RISE';
+ 143 12893 [237]   ptype[P_RISE] := 'r';
+ 144 12901 [237]   prval[P_RISE] := 0.05;
+ 145 12916 [237] 
+ 146 12923 [237]   pname[P_DATA] := 'DATA';
+ 147 12932 [237]   ptype[P_DATA] := 's';
+ 148 12940 [237]   psval[P_DATA] := _allocate(9);
+ 149 12956 [237]   strcpyn('REAL',psval[P_DATA],9);
+ 150 12981 [237] end;
+ 151 12981 [237] 
+ 152 12982 [236] proc initfunctions;
+ 153 12982 [237] {*****************}
+ 154 12982 [237] begin
+ 155 12982 [237]   ftitle[FT_COSINE]   := 'COSINE';
+ 156 12998 [237]   fformula[FT_COSINE] := 'A*cos(360*F1*x+PHASE)';
+ 157 13028 [237] 
+ 158 13032 [237]   ftitle[FT_SUM]   := 'SUM OF TWO COSINES';
+ 159 13055 [237]   fformula[FT_SUM] :=
+ 160 13061 [237]     'A1*cos(360*F1*x)+A2*cos(360*F2*x)';
+ 161 13097 [237] 
+ 162 13101 [237]   ftitle[FT_PRODUCT]   := 'PRODUCT OF TWO COSINES';
+ 163 13128 [237]   fformula[FT_PRODUCT] :=
+ 164 13134 [237]     'A*cos(360*F1*x)*cos(360*F2*x)';
+ 165 13166 [237] 
+ 166 13170 [237]   ftitle[FT_GAUSSIAN]   := 'GAUSSIAN';
+ 167 13183 [237]   fformula[FT_GAUSSIAN] :=
+ 168 13189 [237]     'A*exp(-((x-CENTER)/WIDTH)^2)';
+ 169 13220 [237] 
+ 170 13224 [237]   ftitle[FT_EXP]   := 'EXPONENTIAL';
+ 171 13240 [237]   fformula[FT_EXP] := 'A*exp(-(x-TMIN)/TAU)';
+ 172 13269 [237] 
+ 173 13273 [237]   ftitle[FT_PULSE]   := 'RECTANGULAR PULSE';
+ 174 13295 [237]   fformula[FT_PULSE] := 'A within WIDTH, otherwise 0';
+ 175 13331 [237] 
+ 176 13335 [237]   ftitle[FT_TRAPEZOID]   := 'TRAPEZOID';
+ 177 13349 [237]   fformula[FT_TRAPEZOID] := 'Pulse with RISE time';
+ 178 13378 [237] 
+ 179 13382 [237]   ftitle[FT_TRIANGLE]   := 'TRIANGLE';
+ 180 13395 [237]   fformula[FT_TRIANGLE] :=
+ 181 13401 [237]     'Triangle with CENTER and WIDTH';
+ 182 13434 [237] 
+ 183 13438 [237]   ftitle[FT_SINC]   := 'SINC';
+ 184 13447 [237]   fformula[FT_SINC] :=
+ 185 13453 [237]     'A*sin(360*F1*x-CENTER)/(360*F1*x-CONTER)';
+ 186 13496 [237] 
+ 187 13500 [237]   ftitle[FT_WHITE]   := 'WHITE NOISE';
+ 188 13516 [237]   fformula[FT_WHITE] :=
+ 189 13522 [237]       'White noise, values between -A and A';
+ 190 13561 [237] 
+ 191 13565 [237]   ftitle[FT_LOWPASS]   := 'LOW PASS FILTER';
+ 192 13585 [237]   fformula[FT_LOWPASS] :=
+ 193 13591 [237]       'White noise with low pass filter';
+ 194 13626 [237] end;
+ 195 13630 [237] 
+ 196 13631 [237] proc storeparams;
+ 197 13631 [238] {***************}
+ 198 13631 [238] const size = 256;
+ 199 13634 [239] var f: file;
+ 200 13634 [240]     p, i, addr: integer;
+ 201 13634 [243]     s: cpnt;
+ 202 13634 [244] begin
+ 203 13634 [244]   if parfileexists then
+ 204 13636 [244]     f := _attach('FUNCPARS:X      ',0,1,
+ 205 13667 [244]                   FWRITE+FSILENT,size,0,'X')
+ 206 13679 [244]   else begin
+ 207 13692 [244]     f := _attach('FUNCPARS:X      ',0,1,
+ 208 13716 [244]                   FNEW+FSILENT,size,0,'X');
+ 209 13734 [244]     parfileexists := true;
+ 210 13740 [244]   end;
+ 211 13744 [244] 
+ 212 13744 [244]   if _getsize <> size then
+ 213 13753 [244]     _abortwith('Wrong parameter file size');
+ 214 13791 [244] 
+ 215 13791 [244]   { header }
+ 216 13791 [244]   _putword(f,0,PARVERSION);
+ 217 13805 [244]   _putword(f,1,nparams);
+ 218 13821 [244] 
+ 219 13821 [244]   { integer values }
+ 220 13821 [244]   for p:=0 to MAXPAR do
+ 221 13829 [244]     _putword(f,ibase+p,pival[p]);
+ 222 13865 [244] 
+ 223 13879 [244]   { real values }
+ 224 13879 [244]   for p:=0 to MAXPAR do
+ 225 13887 [244]     _putreal(f,rbase+p,prval[p]);
+ 226 13928 [244] 
+ 227 13942 [244]     { string values: fixed 9-byte slots }
+ 228 13942 [244]     for p:=0 to MAXPAR do begin
+ 229 13959 [244]       addr:=sbase+STRSIZE*p;
+ 230 13965 [244]       if psval[p]=nil then begin
+ 231 13986 [244]         for i:=0 to STRSIZE-1 do
+ 232 13999 [244]           putbyte(f,addr+i,0);
+ 233 14026 [244]       end else begin
+ 234 14043 [244]         s:=psval[p];
+ 235 14047 [244]         for i:=0 to STRSIZE-1 do
+ 236 14065 [244]           putbyte(f,addr+i,ord(s[i]));
+ 237 14100 [244]       end;
+ 238 14114 [244]     end;
+ 239 14114 [244] 
+ 240 14128 [244]   close(f);
+ 241 14134 [244] end;
+ 242 14134 [244] 
+ 243 14135 [238] proc displayfunctions;
+ 244 14135 [239] {********************}
+ 245 14135 [239] var i: integer;
+ 246 14138 [240] begin
+ 247 14138 [240]   writeln('FUNCTION GENERATOR');
+ 248 14165 [240]   for i:=1 to MAXTYPE do
+ 249 14173 [240]     writeln(i:2, '  ', ftitle[i]);
+ 250 14212 [240]   writeln('Select: FUNCTION TYPE=n');
+ 251 14256 [240]   writeln('Help:   FUNCTION TYPE=0');
+ 252 14286 [240] end;
+ 253 14286 [240] 
+ 254 14287 [239] proc makecosine(f: file);
+ 255 14287 [241] {***********************}
+ 256 14287 [241] var
+ 257 14287 [241]   t, deltat, val, a, f1, phase, phaseval: real;
+ 258 14290 [248]   k: integer;
+ 259 14290 [249] begin
+ 260 14290 [249]   t := _min;
+ 261 14292 [249]   deltat := (_max - _min) / conv(_n);
+ 262 14321 [249] 
+ 263 14329 [249]   a     := prval[P_A];
+ 264 14334 [249]   f1    := prval[P_F1];
+ 265 14351 [249]   phase := prval[P_PHASE];
+ 266 14368 [249] 
+ 267 14380 [249]   for k := 0 to _n - 1 do begin
+ 268 14402 [249]     phaseval := 360.0 * f1 * t + phase;
+ 269 14422 [249] 
+ 270 14435 [249]     { real part }
+ 271 14435 [249]     val := a * cos(phaseval);
+ 272 14455 [249]     _putreal(f, REALBASE + k, val);
+ 273 14485 [249] 
+ 274 14485 [249]     { imaginary part }
+ 275 14485 [249]     if _datatype = DATA_COMPLEX then
+ 276 14491 [249]       val := a * sin(phaseval)
+ 277 14503 [249]     else
+ 278 14515 [249]       val := 0.0;
+ 279 14531 [249] 
+ 280 14537 [249]     _putreal(f, COMPLEXBASE + k, val);
+ 281 14561 [249] 
+ 282 14561 [249]     t := t + deltat;
+ 283 14567 [249]   end;
+ 284 14580 [249] end;
+ 285 14594 [249] 
+ 286 14595 [240] proc makesum(f: file);
+ 287 14595 [242] {********************}
+ 288 14595 [242] var
+ 289 14595 [242]   t, deltat, val, a1, a2, f1, f2: real;
+ 290 14598 [249]   k: integer;
+ 291 14598 [250] begin
+ 292 14598 [250]   t := _min;
+ 293 14600 [250]   deltat := (_max - _min) / conv(_n);
+ 294 14629 [250] 
+ 295 14637 [250]   a1 := prval[P_A1];
+ 296 14642 [250]   a2 := prval[P_A2];
+ 297 14659 [250]   f1 := prval[P_F1];
+ 298 14676 [250]   f2 := prval[P_F2];
+ 299 14693 [250] 
+ 300 14705 [250]   for k := 0 to _n - 1 do begin
+ 301 14727 [250] 
+ 302 14727 [250]     { real part }
+ 303 14727 [250]     val := a1 * cos(360.0 * f1 * t) +
+ 304 14761 [250]            a2 * cos(360.0 * f2 * t);
+ 305 14796 [250]     _putreal(f, REALBASE + k, val);
+ 306 14827 [250] 
+ 307 14827 [250]     { imaginary part }
+ 308 14827 [250]     if _datatype = DATA_COMPLEX then
+ 309 14833 [250]       val := a1 * sin(360.0 * f1 * t) +
+ 310 14871 [250]              a2 * sin(360.0 * f2 * t)
+ 311 14893 [250]     else
+ 312 14906 [250]       val := 0.0;
+ 313 14923 [250] 
+ 314 14929 [250]     _putreal(f, COMPLEXBASE + k, val);
+ 315 14953 [250] 
+ 316 14953 [250]     t := t + deltat;
+ 317 14959 [250]   end;
+ 318 14972 [250] end;
+ 319 14986 [250] 
+ 320 14987 [241] proc makeproduct(f: file);
+ 321 14987 [243] {************************}
+ 322 14987 [243] var
+ 323 14987 [243]   t, deltat, val, a, f1, f2: real;
+ 324 14990 [249]   c1, s1, c2, s2: real;
+ 325 14990 [253]   k: integer;
+ 326 14990 [254] begin
+ 327 14990 [254]   if _datatype <> DATA_REAL then
+ 328 14998 [254]     _abortwith('Product requires DATA=REAL');
+ 329 15037 [254]   t := _min;
+ 330 15037 [254]   deltat := (_max - _min) / conv(_n);
+ 331 15066 [254] 
+ 332 15074 [254]   a  := prval[P_A];
+ 333 15079 [254]   f1 := prval[P_F1];
+ 334 15096 [254]   f2 := prval[P_F2];
+ 335 15113 [254] 
+ 336 15125 [254]   for k := 0 to _n - 1 do begin
+ 337 15147 [254] 
+ 338 15147 [254]     c1 := cos(360.0 * f1 * t);
+ 339 15175 [254]     c2 := cos(360.0 * f2 * t);
+ 340 15209 [254] 
+ 341 15215 [254]     val := a * c1 * c2;
+ 342 15228 [254]     _putreal(f, REALBASE + k, val);
+ 343 15264 [254]     _putreal(f, COMPLEXBASE + k, 0.0);
+ 344 15288 [254] 
+ 345 15288 [254]     t := t + deltat;
+ 346 15294 [254]   end;
+ 347 15307 [254] end;
+ 348 15321 [254] 
+ 349 15322 [242] proc makegaussian(f: file);
+ 350 15322 [244] {*************************}
+ 351 15322 [244] var
+ 352 15322 [244]   t, deltat, val, a, center, width, x: real;
+ 353 15325 [251]   k: integer;
+ 354 15325 [252] begin
+ 355 15325 [252]   if _datatype <> DATA_REAL then
+ 356 15333 [252]   _abortwith('Gaussian function requires DATA=REAL');
+ 357 15382 [252] 
+ 358 15382 [252]   t := _min;
+ 359 15382 [252]   deltat := (_max - _min) / conv(_n);
+ 360 15411 [252] 
+ 361 15419 [252]   a      := prval[P_A];
+ 362 15424 [252]   center := prval[P_CENTER];
+ 363 15441 [252]   width  := prval[P_WIDTH];
+ 364 15458 [252] 
+ 365 15470 [252]   if width <= 0.0 then
+ 366 15482 [252]     _abortwith('WIDTH must be > 0');
+ 367 15512 [252] 
+ 368 15512 [252]   for k := 0 to _n - 1 do begin
+ 369 15534 [252] 
+ 370 15534 [252]     x := (t - center) / width;
+ 371 15547 [252]     val := a * exp(-(x * x));
+ 372 15588 [252] 
+ 373 15595 [252]     _putreal(f, REALBASE + k, val);
+ 374 15618 [252]     _putreal(f, COMPLEXBASE + k, 0.0);
+ 375 15642 [252] 
+ 376 15642 [252]     t := t + deltat;
+ 377 15648 [252]   end;
+ 378 15661 [252] end;
+ 379 15675 [252] 
+ 380 15676 [243] proc makeexp(f: file);
+ 381 15676 [245] {********************}
+ 382 15676 [245] var
+ 383 15676 [245]   t, deltat, val, a, tau: real;
+ 384 15679 [250]   k: integer;
+ 385 15679 [251] begin
+ 386 15679 [251]   if _datatype <> DATA_REAL then
+ 387 15687 [251]     _abortwith(
+ 388 15691 [251]       'Exponential function requires DATA=REAL');
+ 389 15739 [251] 
+ 390 15739 [251]   t := _min;
+ 391 15739 [251]   deltat := (_max - _min) / conv(_n);
+ 392 15768 [251] 
+ 393 15776 [251]   a   := prval[P_A];
+ 394 15781 [251]   tau := prval[P_TAU];
+ 395 15798 [251] 
+ 396 15810 [251]   if tau <= 0.0 then
+ 397 15822 [251]     _abortwith('TAU must be > 0');
+ 398 15850 [251] 
+ 399 15850 [251]   for k := 0 to _n - 1 do begin
+ 400 15872 [251] 
+ 401 15872 [251]     val := a * exp(-(t - _min) / tau);
+ 402 15907 [251] 
+ 403 15914 [251]     _putreal(f, REALBASE + k, val);
+ 404 15937 [251]     _putreal(f, COMPLEXBASE + k, 0.0);
+ 405 15961 [251] 
+ 406 15961 [251]     t := t + deltat;
+ 407 15967 [251]   end;
+ 408 15980 [251] end;
+ 409 15994 [251] 
+ 410 15995 [244] proc maketrapezoid(f: file);
+ 411 15995 [246] {**************************}
+ 412 15995 [246] var
+ 413 15995 [246]   t, deltat, val, a, center, width, rise, x: real;
+ 414 15998 [254]   k: integer;
+ 415 15998 [255] begin
+ 416 15998 [255]   if _datatype <> DATA_REAL then
+ 417 16006 [255]     _abortwith('Trapezoid requires DATA=REAL');
+ 418 16047 [255] 
+ 419 16047 [255]   t := _min;
+ 420 16047 [255]   deltat := (_max - _min) / conv(_n);
+ 421 16076 [255] 
+ 422 16084 [255]   a      := prval[P_A];
+ 423 16089 [255]   center := prval[P_CENTER];
+ 424 16106 [255]   width  := prval[P_WIDTH];
+ 425 16123 [255]   rise   := prval[P_RISE];
+ 426 16140 [255] 
+ 427 16152 [255]   if width <= 0.0 then
+ 428 16164 [255]     _abortwith('WIDTH must be > 0');
+ 429 16194 [255] 
+ 430 16194 [255]   if rise <= 0.0 then
+ 431 16206 [255]     _abortwith('RISE must be > 0');
+ 432 16235 [255] 
+ 433 16235 [255]   if 2.0 * rise > width then
+ 434 16248 [255]     _abortwith('RISE must be <= WIDTH/2');
+ 435 16290 [255] 
+ 436 16290 [255]   for k := 0 to _n - 1 do begin
+ 437 16312 [255] 
+ 438 16312 [255]     x := fabs(t - center);
+ 439 16333 [255] 
+ 440 16339 [255]     if x >= width / 2.0 then
+ 441 16357 [255]       val := 0.0
+ 442 16362 [255]     else if x <= width / 2.0 - rise then
+ 443 16396 [255]       val := a
+ 444 16407 [255]     else
+ 445 16407 [255]       val := a * (width / 2.0 - x) / rise;
+ 446 16449 [255] 
+ 447 16462 [255]     _putreal(f, REALBASE + k, val);
+ 448 16485 [255]     _putreal(f, COMPLEXBASE + k, 0.0);
+ 449 16509 [255] 
+ 450 16509 [255]     t := t + deltat;
+ 451 16515 [255]   end;
+ 452 16528 [255] end;
+ 453 16542 [255] 
+ 454 16543 [245] proc maketriangle(f: file);
+ 455 16543 [247] {*************************}
+ 456 16543 [247] var
+ 457 16543 [247]   t, deltat, val, a, center, width, x: real;
+ 458 16546 [254]   k: integer;
+ 459 16546 [255] begin
+ 460 16546 [255]   if _datatype <> DATA_REAL then
+ 461 16554 [255]     _abortwith('Triangle requires DATA=REAL');
+ 462 16594 [255] 
+ 463 16594 [255]   t := _min;
+ 464 16594 [255]   deltat := (_max - _min) / conv(_n);
+ 465 16623 [255] 
+ 466 16631 [255]   a      := prval[P_A];
+ 467 16636 [255]   center := prval[P_CENTER];
+ 468 16653 [255]   width  := prval[P_WIDTH];
+ 469 16670 [255] 
+ 470 16682 [255]   if width <= 0.0 then
+ 471 16694 [255]     _abortwith('WIDTH must be > 0');
+ 472 16724 [255] 
+ 473 16724 [255]   for k := 0 to _n - 1 do begin
+ 474 16746 [255] 
+ 475 16746 [255]     x := fabs(t - center);
+ 476 16767 [255] 
+ 477 16773 [255]     if x >= width / 2.0 then
+ 478 16791 [255]       val := 0.0
+ 479 16796 [255]     else
+ 480 16802 [255]       val := a * (1.0 - 2.0 * x / width);
+ 481 16844 [255] 
+ 482 16851 [255]     _putreal(f, REALBASE + k, val);
+ 483 16874 [255]     _putreal(f, COMPLEXBASE + k, 0.0);
+ 484 16898 [255] 
+ 485 16898 [255]     t := t + deltat;
+ 486 16904 [255]   end;
+ 487 16917 [255] end;
+ 488 16931 [255] 
+ 489 16932 [246] proc makewhite(f: file);
+ 490 16932 [248] {*********************}
+ 491 16932 [248] var
+ 492 16932 [248]   a, t, deltat, val: real;
+ 493 16935 [252]   k: integer;
+ 494 16935 [253] begin
+ 495 16935 [253]   if _datatype <> DATA_REAL then
+ 496 16943 [253]     _abortwith('WHITE function requires DATA=REAL');
+ 497 16989 [253] 
+ 498 16989 [253]   t := _min;
+ 499 16989 [253]   deltat := (_max - _min) / conv(_n);
+ 500 17018 [253] 
+ 501 17026 [253]   a  := prval[P_A] / 128.0;
+ 502 17043 [253] 
+ 503 17050 [253]   for k := 0 to _n - 1 do begin
+ 504 17072 [253] 
+ 505 17072 [253]     val := (conv(_random) - 127.5) * a;
+ 506 17086 [253] 
+ 507 17099 [253]     _putreal(f, REALBASE + k, val);
+ 508 17122 [253]     _putreal(f, COMPLEXBASE + k, 0.0);
+ 509 17146 [253] 
+ 510 17146 [253]     t := t + deltat;
+ 511 17152 [253]   end;
+ 512 17165 [253] end;
+ 513 17179 [253] 
+ 514 17180 [247] proc makelowpass(f: file);
+ 515 17180 [249] {************************}
+ 516 17180 [249] var
+ 517 17180 [249]   a, val, sum: real;
+ 518 17183 [252]   delay: array[FILTERSIZE] of real;
+ 519 17183 [253]   k, j: integer;
+ 520 17183 [255] begin
+ 521 17183 [255]   if _datatype <> DATA_REAL then
+ 522 17191 [255]     _abortwith('LOWPASS function requires DATA=REAL');
+ 523 17239 [255] 
+ 524 17239 [255]   a := prval[P_A] / 128.0;
+ 525 17256 [255] 
+ 526 17263 [255]   { clear delay line }
+ 527 17263 [255]   for j := 0 to FILTERSIZE-1 do
+ 528 17273 [255]     delay[j] := 0.0;
+ 529 17296 [255] 
+ 530 17317 [255]   for k := 0 to _n-1 do begin
+ 531 17339 [255] 
+ 532 17339 [255]     { shift delay line }
+ 533 17339 [255]     for j := FILTERSIZE-1 downto 1 do
+ 534 17350 [255]       delay[j] := delay[j-1];
+ 535 17376 [255] 
+ 536 17403 [255]     { new white-noise sample }
+ 537 17403 [255]     delay[0] := (conv(_random) - 127.5) * a;
+ 538 17422 [255] 
+ 539 17436 [255]     { moving average }
+ 540 17436 [255]     sum := 0.0;
+ 541 17442 [255]     for j := 0 to FILTERSIZE-1 do
+ 542 17458 [255]       sum := sum + delay[j];
+ 543 17481 [255] 
+ 544 17508 [255]     val := sum / conv(FILTERSIZE);
+ 545 17516 [255] 
+ 546 17524 [255]     _putreal(f, REALBASE+k, val);
+ 547 17547 [255]     _putreal(f, COMPLEXBASE+k, 0.0);
+ 548 17571 [255]   end;
+ 549 17571 [255] end;
+ 550 17585 [255] 
+ 551 17586 [248] proc makepulse(f: file);
+ 552 17586 [250] {**********************}
+ 553 17586 [250] var
+ 554 17586 [250]   t, deltat, val, a, center, width: real;
+ 555 17589 [256]   k: integer;
+ 556 17589 [257] begin
+ 557 17589 [257]   if _datatype <> DATA_REAL then
+ 558 17597 [257]   _abortwith('Rectangular pulse requires DATA=REAL');
+ 559 17646 [257] 
+ 560 17646 [257]   t := _min;
+ 561 17646 [257]   deltat := (_max - _min) / conv(_n);
+ 562 17675 [257] 
+ 563 17683 [257]   a      := prval[P_A];
+ 564 17688 [257]   center := prval[P_CENTER];
+ 565 17705 [257]   width  := prval[P_WIDTH];
+ 566 17722 [257] 
+ 567 17734 [257]   if width <= 0.0 then
+ 568 17746 [257]     _abortwith('WIDTH must be > 0');
+ 569 17776 [257] 
+ 570 17776 [257]   for k := 0 to _n - 1 do begin
+ 571 17798 [257] 
+ 572 17798 [257]     if fabs(t-center) <= width/2.0 then
+ 573 17831 [257]       val := a
+ 574 17836 [257]     else
+ 575 17836 [257]       val := 0.0;
+ 576 17857 [257] 
+ 577 17863 [257]     _putreal(f, REALBASE+k, val);
+ 578 17886 [257]     _putreal(f, COMPLEXBASE+k, 0.0);
+ 579 17910 [257] 
+ 580 17910 [257]     t := t + deltat;
+ 581 17916 [257]   end;
+ 582 17929 [257] end;
+ 583 17943 [257] 
+ 584 17944 [249] proc makesinc(f: file);
+ 585 17944 [251] {*********************}
+ 586 17944 [251] var
+ 587 17944 [251]   t, deltat, val, a, f1, arg: real;
+ 588 17947 [257]   k: integer;
+ 589 17947 [258] begin
+ 590 17947 [258]   if _datatype <> DATA_REAL then
+ 591 17955 [258]     _abortwith('Sinc function requires DATA=REAL');
+ 592 18000 [258] 
+ 593 18000 [258]   t := _min;
+ 594 18000 [258]   deltat := (_max - _min) / conv(_n);
+ 595 18029 [258] 
+ 596 18037 [258]   a  := prval[P_A];
+ 597 18042 [258]   f1 := prval[P_F1];
+ 598 18059 [258] 
+ 599 18071 [258]   if f1 <= 0.0 then
+ 600 18083 [258]     _abortwith('F1 must be > 0');
+ 601 18110 [258] 
+ 602 18110 [258]   for k := 0 to _n - 1 do begin
+ 603 18132 [258] 
+ 604 18132 [258]     arg := 360.0 * f1 * (t - prval[P_CENTER]);
+ 605 18163 [258] 
+ 606 18170 [258]     if fabs(arg) < 1.0e-6 then
+ 607 18190 [258]       val := a
+ 608 18194 [258]     else
+ 609 18194 [258]       val := a * sin(arg) / arg;
+ 610 18230 [258] 
+ 611 18243 [258]     _putreal(f, REALBASE + k, val);
+ 612 18266 [258]     _putreal(f, COMPLEXBASE + k, 0.0);
+ 613 18290 [258] 
+ 614 18290 [258]     t := t + deltat;
+ 615 18296 [258]   end;
+ 616 18309 [258] end;
+ 617 18323 [258] 
+ 618 18324 [250] proc makefunction;
+ 619 18324 [251] {****************}
+ 620 18324 [251] var f: file;
+ 621 18327 [252] begin
+ 622 18327 [252]   { validate common parameters }
+ 623 18327 [252]   _n := pival[P_N];
+ 624 18331 [252]   if not ((_n=128) or (_n=256) or
+ 625 18354 [252]           (_n=512) or (_n=1024)) then begin
+ 626 18374 [252]     _abortwith('N must be 128, 256, 512 or 1024');
+ 627 18417 [252]   end;
+ 628 18417 [252]   _min := prval[P_TMIN];
+ 629 18422 [252]   _max := prval[P_TMAX];
+ 630 18439 [252]   if (_max <= _min) then
+ 631 18464 [252]     _abortwith('TMAX must be > TMIN');
+ 632 18495 [252]   if (_strcmp(psval[P_DATA],'REAL') = 0) then
+ 633 18519 [252]     _datatype := 0
+ 634 18522 [252]   else if (_strcmp(psval[P_DATA],'COMPLEX') = 0) then
+ 635 18558 [252]     _datatype := 1
+ 636 18561 [252]   else
+ 637 18563 [252]     _abortwith('DATA must be REAL or COMPLEX');
+ 638 18607 [252]   _domain := 0;
+ 639 18609 [252]   strcpyn(ftitle[pival[P_TYPE]],_title,TEXTSIZE);
+ 640 18635 [252]   strcpyn(fformula[pival[P_TYPE]],_description,
+ 641 18645 [252]     TEXTSIZE);
+ 642 18657 [252] 
+ 643 18657 [252]   { attach data file and check size }
+ 644 18657 [252]   if fileexists('FUNCDATA:X      ', 1) then
+ 645 18685 [252]     f := _attach('FUNCDATA:X      ', 0, 1,
+ 646 18712 [252]       FWRITE + FSILENT, DATAFILESIZE + 256, 0, 'X')
+ 647 18728 [252]   else
+ 648 18734 [252]     f := _attach('FUNCDATA:X      ', 0, 1,
+ 649 18765 [252]       FNEW + FSILENT, DATAFILESIZE + 256, 0, 'X');
+ 650 18787 [252]   if _getsize <> DATAFILESIZE + 256 then
+ 651 18803 [252]     _abortwith('Wrong data file size');
+ 652 18837 [252] 
+ 653 18837 [252]   { put data header in file }
+ 654 18837 [252]   _putdataheader(f);
+ 655 18847 [252] 
+ 656 18847 [252]   { compute and store function }
+ 657 18847 [252]   case pival[P_TYPE] of
+ 658 18849 [252] 
+ 659 18853 [252]     FT_COSINE:
+ 660 18857 [252]       makecosine(f);
+ 661 18870 [252] 
+ 662 18873 [252]     FT_SUM:
+ 663 18877 [252]       makesum(f);
+ 664 18890 [252] 
+ 665 18893 [252]     FT_PRODUCT:
+ 666 18897 [252]       makeproduct(f);
+ 667 18910 [252] 
+ 668 18913 [252]     FT_GAUSSIAN:
+ 669 18917 [252]       makegaussian(f);
+ 670 18930 [252] 
+ 671 18933 [252]     FT_EXP:
+ 672 18937 [252]       makeexp(f);
+ 673 18950 [252] 
+ 674 18953 [252]     FT_PULSE:
+ 675 18957 [252]       makepulse(f);
+ 676 18970 [252] 
+ 677 18973 [252]     FT_TRAPEZOID:
+ 678 18977 [252]       maketrapezoid(f);
+ 679 18990 [252] 
+ 680 18993 [252]     FT_TRIANGLE:
+ 681 18997 [252]       maketriangle(f);
+ 682 19010 [252] 
+ 683 19013 [252]     FT_SINC:
+ 684 19017 [252]       makesinc(f);
+ 685 19030 [252] 
+ 686 19033 [252]     FT_WHITE:
+ 687 19037 [252]       makewhite(f);
+ 688 19050 [252] 
+ 689 19053 [252]     FT_LOWPASS:
+ 690 19057 [252]       makelowpass(f)
+ 691 19060 [252] 
+ 692 19070 [252]   else
+ 693 19070 [252]     _abortwith('Function TYPE not yet implemented')
+ 694 19109 [252] 
+ 695 19115 [252]   end {case};
+ 696 19117 [252]   close(f);
+ 697 19123 [252] end;
+ 698 19123 [252] 
+ 699 19124 [251] begin { main }
+ 700 19124 [251]   initiftshared;
+ 701 19131 [251]   initfunctions;
+ 702 19135 [251]   initparfile;
+ 703 19139 [251]   parfileexists := fileexists('FUNCPARS:X      ', 1);
+ 704 19167 [251]   initparams;
+ 705 19175 [251]   if parfileexists then begin
+ 706 19179 [251]     f1:=_attach('FUNCPARS:X      ',0,1,FREAD+FSILENT,
+ 707 19210 [251]                                     PARSIZE,0,'X');
+ 708 19224 [251]     loadparams(f1);
+ 709 19238 [251]     close(f1);
+ 710 19244 [251]   end;
+ 711 19244 [251]   readparams;
+ 712 19248 [251]   if pival[P_TYPE] = 0 then
+ 713 19256 [251]     displayfunctions
+ 714 19257 [251]   else begin
+ 715 19267 [251]     displayparams;
+ 716 19271 [251]     makefunction;
+ 717 19275 [251]   end;
+ 718 19275 [251]   storeparams;
+ 719 19279 [251] 
+ 720 19279 [251]  if pival[P_TYPE] <> 0 then begin
+ 721 19288 [251]     ARGTYPE[0]  := 's';
+ 722 19295 [251]     ARGTYPE[1]  := chr(0);
+ 723 19305 [251]     ARGLISTS[0] := '/';
+ 724 19316 [251]     ARGLISTS[1] := 'Q';
+ 725 19326 [251]     _chainprog('GRAPH:R         ', 0, 1);
+ 726 19360 [251]   end;
+ 727 19360 [251] end. 
+Code length:           19359
+Compiler stack size:   239/300
+Ident stack size:      258/350

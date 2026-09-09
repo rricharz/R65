@@ -6,7 +6,7 @@
 
 program graph;
 uses syslib,ralib,mathlib,plotlib,writelib,
-      strlib,ftlib,arglib,filelib;
+      strlib,arglib,filelib;
 
 const
   MAXX = 223;
@@ -38,24 +38,8 @@ const
   NAMESIZE = 15;
 
   PARVERSION = 2;
-  PARSIZE    = 256;
-  STRSIZE    = 9;   { 8 chars + chr(0) }
 
 var
-  pname: array[MAXPAR] of cpnt;
-  ptype: array[MAXPAR] of char;
-  pchanged: array[MAXPAR] of boolean;
-
-  pival: array[MAXPAR] of integer;
-  prval: array[MAXPAR] of real;
-  psval: array[MAXPAR] of cpnt;
-
-  parfileexists: boolean;
-
-  nparams: integer;
-  ibase: integer;    { word address }
-  rbase: integer;    { real address }
-  sbase: integer;    { byte address }
 
   f:file;
   i:integer;
@@ -72,90 +56,7 @@ var
 
   quiet: boolean;
 
-proc initparfile;
-{***************}
-begin
-  nparams := MAXPAR + 1;
-
-  { Parameter file layout:
-      word 0 : version
-      word 1 : number of parameters
-
-      integer values:
-        nparams words, starting at ibase
-
-      real values:
-        nparams reals, starting at rbase
-
-      string values:
-        nparams slots of STRSIZE bytes,
-        each containing up to 8 chars + chr(0)
-
-      complete file size is fixed at 256 bytes
-  }
-
-  ibase := 2;
-
-  { rbase is expressed in real addresses.
-    Round integer section up to next real boundary. }
-  rbase := (ibase + nparams + 1) shr 1;
-
-  { sbase is expressed in byte addresses }
-  sbase := 4 * (rbase + nparams);
-
-end;
-
-func fileexists(nm: array[NAMESIZE] of char;
-                           drv: integer): boolean;
-{************************************************}
-const aprepdo  = $f4a7;
-      agetentx = $f63a;
-      aenddo   = $f625;
-
-      NUMENTRIES = 255;
-
-mem   filtyp = $0300: char&;
-      fillnk = $031e: integer&;
-      scyfc  = $037c: integer&;
-      fildrv = $00dc: integer&;
-      FILNAM = $0301: array[NAMESIZE] of char&;
-
-var ent,i: integer;
-    found,last: boolean;
-
-    func same: boolean;
-    var k: integer;
-        equal: boolean;
-    begin
-      equal:=true;
-      k:=0;
-      while equal and (k<=NAMESIZE) do begin
-        equal:=nm[k]=FILNAM[k];
-        k:=k+1;
-      end;
-      same:=equal;
-    end;
-
-begin
-  fildrv:=drv;
-  call(aprepdo);
-  ent:=0;
-  found:=false;
-  last:=false;
-  repeat
-    scyfc:=ent;
-    call(agetentx);
-    last:=filtyp=chr(0);
-    if not last then begin
-      found:=same;
-      if (fillnk and $80)<>0 then
-        found:=false;
-    end;
-    ent:=ent+1;
-  until found or last or (ent>=NUMENTRIES);
-  call(aenddo);
-  fileexists:=found;
-end;
+{$I IFTSHARED:P}
 
 proc displayparams;
 {*****************}
@@ -202,60 +103,6 @@ begin
   writeln('        Points ', INVVID,
     conv(lastbin-firstbin+1):9:0, NORVID);
 
-end;
-
-proc setparam(p: integer; value: cpnt);
-{*************************************}
-begin
-  pchanged[p] := true;
-  case ptype[p] of
-  'i':  begin
-          pival[p] := round(str_real(value));
-        end;
-  'r':  begin
-          prval[p] := str_real(value);
-        end;
-  's':  begin
-          strcpyn(value, psval[p],9);
-        end
-  end {case }
-end;
-
-func findparam(name: cpnt): integer;
-{**********************************}
-var p: integer;
-    found: boolean;
-begin
-  p := 0;
-  repeat
-    found := _strcmp(pname[p], name) = 0;
-    p := p + 1;
-  until found or (p > MAXPAR);
-
-  if found then
-    findparam := p - 1
-  else
-    findparam := -1;
-end;
-
-proc readparams;
-{**************}
-var name, value: cpnt;
-    done: boolean;
-    p: integer;
-begin
-  name  := _allocate(9);
-  value := _allocate(17);
-  repeat
-    _nextparam(name, value, done);
-    if not done then begin
-      p := findparam(name);
-      if p < 0 then
-        _abortwith('Unknown parameter')
-      else
-        setparam(p,value);
-    end;
-  until done;
 end;
 
 proc initparams;
@@ -311,52 +158,6 @@ begin
   ptype[P_FMAX] := 'r';
   prval[P_FMAX] := 1.0;
 
-end;
-
-proc loadparams;
-{**************}
-var
-  f: file;
-  p,i,addr,version,np,ii: integer;
-  ir: real;
-  s: cpnt;
-begin
-  f:=_attach('GRAPHPARS:X     ',0,1,FREAD+FSILENT,
-                                    PARSIZE,0,'X');
-
-  if _getsize<>PARSIZE then
-    _abortwith('Wrong parameter file size');
-
-  _getword(f,0,version);
-  if version<>PARVERSION then
-    _abortwith('Wrong parameter file version');
-
-  _getword(f,1,np);
-  if np<>nparams then
-    _abortwith('Wrong number of parameters');
-
-  for p:=0 to MAXPAR do begin
-    _getword(f,ibase+p,ii);
-    pival[p]:=ii;
-  end;
-
-  for p:=0 to MAXPAR do begin
-    _getreal(f,rbase+p,ir);
-    prval[p]:=ir;
-  end;
-
-  for p:=0 to MAXPAR do begin
-    if psval[p]<>nil then begin
-      s:=psval[p];
-      addr:=sbase+STRSIZE*p;
-      for i:=0 to STRSIZE-1 do begin
-        getbyte(f,addr+i,ii);
-        s[i]:=chr(ii);
-      end;
-    end;
-  end;
-
-  close(f);
 end;
 
 proc storeparams;
@@ -503,6 +304,7 @@ end;
 
 proc initialize;
 {**************}
+var f1: file;
 begin
   quiet := false;
   if ARGTYPE[0] = 's' then
@@ -516,7 +318,12 @@ begin
   initparfile;
   initparams;
   parfileexists := fileexists('GRAPHPARS:X     ', 1);
-  if parfileexists then loadparams;
+  if parfileexists then begin
+    f1:=_attach('GRAPHPARS:X     ',0,1,FREAD+FSILENT,
+                                    PARSIZE,0,'X');
+    loadparams(f1);
+    close(f1);
+  end;
   readparams;
   _grinit;
   _cleargr;
@@ -963,6 +770,7 @@ begin
 end;
 
 begin
+  initiftshared;
   initialize;
   validate;
   if not quiet then begin

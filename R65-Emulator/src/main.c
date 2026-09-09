@@ -75,6 +75,8 @@ int crtWidth, crtHeight, crtOffset;
 int panelSize, panelOffset;
 double panelScale;
 
+static gboolean global_hasFocus = FALSE;
+
 /////////////////////////////////////////////
 void Background(double r, double g, double b)
 /////////////////////////////////////////////
@@ -325,13 +327,49 @@ int clickStillDown(void)
 }
 
 //////////////////////////////////////////////////////
+static gboolean on_focus_in_event(GtkWidget *widget,
+                                  GdkEventFocus *event,
+                                  gpointer user_data)
+//////////////////////////////////////////////////////
+                                    
+{
+    global_hasFocus = TRUE;
+    showCursor = TRUE;
+
+    global_pendingCrtUpdate = TRUE;
+    crtUpdate();
+    gtk_widget_queue_draw(widget);
+
+    return FALSE;
+}
+
+///////////////////////////////////////////////////////
+static gboolean on_focus_out_event(GtkWidget *widget,
+                                   GdkEventFocus *event,
+                                   gpointer user_data)
+///////////////////////////////////////////////////////
+{
+    global_hasFocus = FALSE;
+    showCursor = FALSE;
+
+    global_pendingCrtUpdate = TRUE;
+    crtUpdate();
+    gtk_widget_queue_draw(widget);
+
+    return FALSE;
+}
+
+//////////////////////////////////////////////////////
 static gboolean on_next_timer_event(GtkWidget *widget)
 //////////////////////////////////////////////////////
 // Blinks the cursor and updates the screen
 {
     global_surface_has_been_updated = FALSE;
     g_source_remove(global_timeout_ref);    // stop timer, in case crtUpdate takes too long
-    showCursor = !showCursor;
+    if (global_hasFocus)
+        showCursor = !showCursor;
+    else
+        showCursor = FALSE;
     global_pendingCrtUpdate = TRUE;
     crtUpdate();
 	if (global_surface_has_been_updated)
@@ -709,7 +747,9 @@ int main (int argc, char *argv[])
     g_signal_connect(G_OBJECT(darea), "button-press-event", G_CALLBACK(clicked), NULL);
     g_signal_connect(G_OBJECT(darea), "button-release-event", G_CALLBACK(released), NULL);
     g_signal_connect(G_OBJECT(global_window), "key_press_event", G_CALLBACK(on_key_press), NULL);
-    g_signal_connect(G_OBJECT(global_window), "key_release_event", G_CALLBACK(on_key_release), NULL);		
+    g_signal_connect(G_OBJECT(global_window), "key_release_event", G_CALLBACK(on_key_release), NULL);
+    g_signal_connect(global_window, "focus-in-event", G_CALLBACK(on_focus_in_event), NULL);
+    g_signal_connect(global_window, "focus-out-event", G_CALLBACK(on_focus_out_event), NULL);	
 
     gtk_widget_show_all(global_window);
 	

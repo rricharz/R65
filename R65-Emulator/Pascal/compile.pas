@@ -629,7 +629,7 @@ begin
              incname[i]:=' '; i:=i+1;
            end;
            icyclus:=0;
-           _asetfile(incname,icyclus,0,'P');
+           _asetfile(incname,icyclus,1,'P');
            savefno:=fno;
            openr(fno);
            lineinc:=0;
