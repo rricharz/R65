@@ -2648,27 +2648,22 @@ begin {findforw}
     end
 end {findforw};
 
-{###############}
-{ body of block }
-{###############}
-
+{###################}
+{ constant of block }
+{###################}
+proc constant;
 begin
-  dpnt:=3; s_vda[bottom]:=pc;
-  code3(36,0);
-  stackpn1:=stackpnt; forwpn:=0;
-
-  if token='co' then begin    { * const * }
-    scan;
-    repeat
-      deccon; testto(' ;'); scan
+  scan;
+  repeat
+    deccon; testto(' ;'); scan
     until token <> 'id';
-  end {const};
+end;
 
-  if token='me' then memory;  { * mem * }
-
-  if token='va' then variable;{ * var * }
-
-    while (token='pr')or (token='fu') do begin
+{####################}
+{ procedure of block }
+{####################}
+proc procedure;
+begin
     parlevel:=0;
     isfunc:=token='fu';
     case token of
@@ -2727,7 +2722,30 @@ begin
       's':  s_typ[spnt]:=packed('u',low(s_typ[spnt]))
     end {case};
     testto(' ;'); scan
-  end {procedure of function};
+end {procedure of function};
+
+{###############}
+{ body of block }
+{###############}
+
+begin
+  dpnt:=3; s_vda[bottom]:=pc;
+  code3(36,0);
+  stackpn1:=stackpnt; forwpn:=0;
+
+  while (token='co') or
+        (token='me') or
+        (token='va') or
+        (token='pr') or
+        (token='fu') do begin
+
+    case token of
+      'co': constant;
+      'me': memory;
+      'va': variable;
+      'pr','fu': procedure
+    end;
+  end;
 
   testto('be');     { * begin * }
   if forwpn<>0 then merror(13,'ur');
