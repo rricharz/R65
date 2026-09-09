@@ -32,7 +32,7 @@ const
   FT_SINC      = 9;
   FT_WHITE     = 10;
   FT_LOWPASS   = 11;
-      FILTERSIZE = 16;
+  FILTERSIZE   = 16;
   MAXTYPE      = 11;
 
   NAMESIZE = 15;
@@ -333,11 +333,11 @@ begin
   fformula[FT_SINC] :=
     'A*sin(360*F1*x-CENTER)/(360*F1*x-CONTER)';
 
-  ftitle[FT_WHITE]   := 'WHITE';
+  ftitle[FT_WHITE]   := 'WHITE NOISE';
   fformula[FT_WHITE] :=
       'White noise with values between -A and A';
 
-  ftitle[FT_LOWPASS]   := 'LOW PASS';
+  ftitle[FT_LOWPASS]   := 'LOW PASS FILTER';
   fformula[FT_LOWPASS] :=
       'White noise with low pass filter';
 end;

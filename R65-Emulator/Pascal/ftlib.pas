@@ -283,4 +283,5 @@ begin  { initialize library }
   _description := _allocate(TEXTSIZE);
   strcpyn('',_title,TEXTSIZE);
   strcpyn('',_description,TEXTSIZE);
-end. 
+end.
+ 
