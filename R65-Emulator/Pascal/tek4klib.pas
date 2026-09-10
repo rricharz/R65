@@ -82,11 +82,12 @@ var dummy, res: integer;
 
 begin {starttek}
 
-  dummy := sh('truncate -s 0 printout.txt');
-  _delay10msec(5);
   res := sh('pgrep -x tek4010 >/dev/null');
 
   if res <> 0 then begin
+
+        dummy := sh('truncate -s 0 printout.txt');
+        _delay10msec(5);
 
     case mode of
       0:
