@@ -26,9 +26,10 @@ const
   P_FMIN   = 8;
   P_FMAX   = 9;
 
-  M_REAL  = 0;
-  M_IMAG  = 1;
-  M_ABS   = 2;
+  M_REAL   = 0;
+  M_IMAG   = 1;
+  M_ABS    = 2;
+  M_PHASE  = 3;
 
   MAXPAR   = 9;
 
@@ -50,6 +51,73 @@ var
   firstbin, lastbin: integer;
 
 {$I IFTSHARED}
+
+func atan(x:real):real;
+{*******************}
+{ result in degree }
+
+const
+  eps  = 0.00001;
+  tan225 = 0.41421356;
+  tan675 = 2.41421356;
+
+  func atan0(x0:real):real;
+  var t,s:real;
+      p:integer;
+  begin
+    p:=0;
+    s:=x0;
+    t:=x0;
+
+    while fabs(t)>eps do begin
+      p:=p+1;
+      t:=-t*x0*x0*
+         conv(2*p-1)/conv(2*p+1);
+      s:=s+t;
+    end;
+
+    atan0:=s;
+  end;
+
+var a:real;
+
+begin
+  if x<0. then begin
+    atan:=-atan(-x);
+    exit;
+  end;
+
+  if x<=tan225 then
+    a:=atan0(x)
+
+  else if x<=tan675 then
+    a:=PI/4.+
+       atan0((x-1.)/(x+1.))
+
+  else
+    a:=PI/2.-atan0(1./x);
+
+  atan:=a*180./PI;
+end;
+
+func phase(re, im: real): real;
+{*****************************}
+begin
+if re > 0. then
+  phase := atan(im/re)
+else if re < 0. then
+  if im >= 0. then
+    phase := atan(im/re) + 180.
+  else
+    phase := atan(im/re) - 180.
+else { re = 0 }
+  if im > 0. then
+    phase := 90.
+  else if im < 0. then
+    phase := -90.
+  else
+    phase := 0.;   { undefined }
+end;
 
 proc displayparams;
 {*****************}
@@ -345,6 +413,7 @@ end;
 
 func fvalue(i: integer): real;
 {*******************************}
+const eps = 0.005;
 var
   j: integer;
   re, im: real;
@@ -370,6 +439,16 @@ begin
         _getreal(f, REALBASE+j, re);
         _getreal(f, COMPLEXBASE+j, im);
         fvalue := sqrt(re*re + im*im);
+      end;
+
+    M_PHASE:
+      begin
+        _getreal(f, REALBASE+j, re);
+        _getreal(f, COMPLEXBASE+j, im);
+        if (fabs(re)<eps) and (fabs(im)<eps) then
+          fvalue:=0.0
+        else
+          fvalue:=phase(re,im);
       end
 
   end;
@@ -382,6 +461,14 @@ var
   minbin, maxbin: integer;
   re, im: real;
 begin
+
+  if mode = M_PHASE then begin
+    min := -180.0;
+    max :=180.0;
+    minbin := 0;  {It is not worth computing these}
+    maxbin := 0;  {because they are presently unused}
+    exit;
+    end;
 
   if mode = M_ABS then begin
     min := 0.0;
@@ -450,6 +537,8 @@ else if _strcmp(psval[P_MODE], 'IMAG') = 0 then
   mode := M_IMAG
 else if _strcmp(psval[P_MODE], 'ABS') = 0 then
   mode := M_ABS
+else if _strcmp(psval[P_MODE], 'PHASE') = 0 then
+  mode := M_PHASE
 else
   _abortwith('MODE must be REAL, IMAG, or ABS');
 
