@@ -19,47 +19,6 @@ var
 {$I IMILLPLOT}
 {$I IMILLCOMM}
 
-proc drawreserve;
-{****************}
-var stone,x,y: integer;
-begin
-
-  y:=82;
-  for stone:=0 to stones[WHITE]-1 do begin
-    x:=121+stone*11;
-    drawstone(x,y,WHITE);
-  end;
-
-  y:=22;
-  for stone:=0 to stones[BLACK]-1 do begin
-    x:=121+stone*12;
-    drawstone(x,y,BLACK);
-  end;
-end;
-
-proc debugdash(y,player: integer);
-{********************************}
-var stone, x0, y0: integer;
-begin
-  _move(DASHX+1,y+NAMEOFF);
-
-  if player=WHITE then
-    write(@PLOTDEV,'Player')
-  else
-    write(@PLOTDEV,'Computer');
-
-  y0:=y+STONEOFF;
-  for stone:=0 to stones[player]-1 do begin
-    x0:=DASHX+8+stone*10;
-    dashstone(x0,y0,player);
-  end;
-
-  if player=WHITE then  begin
-    _rectangle(DASHX,y,DASHWIDTH,DASHHEIGHT,WHITE);
-
-  end;
-end;
-
 proc debuglabels;
 {****************}
 var position,neighbornumber,neighborbase: integer;
@@ -86,11 +45,65 @@ begin
   end;
 end;
 
+func otherplayer(player:integer):integer;
+{***************************************}
+begin
+  if player=WHITE then
+    otherplayer:=BLACK
+  else
+    otherplayer:=WHITE;
+end;
+
+proc placestone(player:integer);
+{*******************************}
+var p1,p2,x,y: integer;
+    valid: boolean;
+begin
+  repeat
+    getinput(player,I_PLACE,p1,p2);
+
+    valid:=board[p1]=EMPTY;
+
+    if not valid then
+      message(6,label[p1],player);
+
+  until valid;
+
+  board[p1]:=player;
+  stones[player]:=stones[player]-1;
+
+  x:=X0+(ord(low(label[p1]))-ord('1'))*SPACING;
+  y:=Y0+(ord(high(label[p1]))-ord('A'))*SPACING;
+
+  drawstone(x,y,player);
+  drawreserve(player);
+end;
+
+proc movestone(player:integer);
+{******************************}
+begin
+end;
+
+proc playerturn(player:integer);
+{******************************}
+begin
+  selectdashboard(player);
+  if stones[player]>0 then
+    placestone(player)
+  else
+    movestone(player);
+end;
+
+func gameover:boolean;
+{********************}
+begin
+  gameover := false;
+end;
+
 { main body }
 {***********}
 
-var n1, n2: integer;
-    flag: boolean;
+var player: integer;
 
 begin
   init_canvas;
@@ -99,18 +112,23 @@ begin
 
   writeln(@DEBUG,
     '----------------------------------------------');
-  writeln(@DEBUG, 'MILL initialized');
+  writeln(@DEBUG,'MILL initialized');
 
   drawboard;
   drawlabels;
   drawstones;
-  { drawreserve; }
+  drawreserve(WHITE);
+  drawreserve(BLACK);
+  _move(DASHX+1,DASHWHITEY+NAMEOFF);
+  write(@PLOTDEV,'PLAYER 1');
+  _move(DASHX+1,DASHBLACKY+NAMEOFF);
+  write(@PLOTDEV,'PLAYER 2');
 
-  { game loop }
-  { debuglabels; }
-  debugdash(DASHWHITEY,WHITE);
-  debugdash(DASHBLACKY,BLACK);
-  getinput(WHITE, n1, n2, flag);
-  debug('debugdash', n1,  n2, flag);
+  player:=WHITE;
+
+  repeat
+    playerturn(player);
+    player:=otherplayer(player);
+  until gameover;
 
 end.

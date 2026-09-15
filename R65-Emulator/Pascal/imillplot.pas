@@ -9,7 +9,7 @@ const
     DASHX      = 125;
     DASHWHITEY = 63;
     DASHBLACKY = 15;
-    DASHWIDTH  = 95;
+    DASHWIDTH  = 96;
     DASHHEIGHT = 48;
     MSGOFF     = 3;
     INPUTOFF   = 13;
@@ -92,16 +92,43 @@ begin
     findpos:=-1;
 end;
 
-proc getinput(player: integer; var p1,p2: integer;
-              var ismove: boolean);
-{************************************************}
+const
+  I_PLACE  = 1;
+  I_MOVE   = 2;
+  I_TAKE = 3;
+
+proc getinput(player, request: integer;
+              var p1,p2: integer);
+{**************************************}
 
 const TOGGLE    = chr(12);
       BACKSPACE = chr(127);
 
 var s: cpnt;
-    y, len, res: integer;
+    x,y,len,maxlen: integer;
     valid: boolean;
+
+  proc prompt;
+  begin
+    _move(DASHX+1,y);
+    case request of
+      I_PLACE:
+        begin
+          write(@PLOTDEV,'PLACE?');
+          x:=DASHX+1+6*8;
+        end;
+      I_MOVE:
+        begin
+          write(@PLOTDEV,'MOVE?');
+          x:=DASHX+1+5*8;
+        end;
+      I_TAKE:
+        begin
+          write(@PLOTDEV,'TAKE?');
+          x:=DASHX+1+5*8;
+        end
+    end;
+  end;
 
   proc editinput;
   var c: char;
@@ -110,131 +137,164 @@ var s: cpnt;
     proc redraw;
     var j: integer;
     begin
+      { clear complete input line }
       _move(DASHX+1,y);
-      write(@PLOTDEV,'      ');
-      _move(DASHX+1,y);
+      write(@PLOTDEV,'           ');
+
+      { redraw prompt }
+      prompt;
+
+      { redraw input and cursor }
+      _move(x,y);
       for j:=0 to len-1 do
         write(@PLOTDEV,s[j]);
       write(@PLOTDEV,'_');
     end;
 
-    func readandblink(x,y: integer): char;
+    func readandblink(x0,y0: integer): char;
     const BLINKTIME = 16;
     var dummy,count: integer;
         ch: char;
         cursoron: boolean;
     begin
-      dummy := _syncscreen;
-      count := 0;
-      cursoron := true;
-      _move(x,y);
+      dummy:=_syncscreen;
+      count:=0;
+      cursoron:=true;
+
+      _move(x0,y0);
       write(@PLOTDEV,'_');
+
       repeat
-        ch := KEYPRESSED;
+        ch:=KEYPRESSED;
+
         if ch<>chr(0) then begin
-          { remove cursor before returning }
-          _move(x,y);
+          _move(x0,y0);
           write(@PLOTDEV,' ');
-          readandblink := ch;
-          KEYPRESSED := chr(0);
+          readandblink:=ch;
+          KEYPRESSED:=chr(0);
           exit;
         end;
-        count := count+1;
+
+        count:=count+1;
         _delay10msec(3);
+
         if count>=BLINKTIME then begin
-          count := 0;
-          _move(x,y);
+          count:=0;
+          _move(x0,y0);
+
           if cursoron then
             write(@PLOTDEV,' ')
           else
             write(@PLOTDEV,'_');
-          cursoron := not cursoron;
-          dummy := _syncscreen;
-        end;
+
+          cursoron:=not cursoron;
+          dummy:=_syncscreen;
+        end
       until false;
     end;
 
   begin
-    len := 0;
-    for i:=0 to 4 do s[i] := ' ';
+    len:=0;
+    s[0]:=ENDMARK;
+
+    if request=I_MOVE then
+      maxlen:=5
+    else
+      maxlen:=4;       { enough for QUIT }
 
     redraw;
 
     repeat
-      c := readandblink(DASHX+1+8*len,y);
+      c:=readandblink(x+8*len,y);
 
       if c=BACKSPACE then begin
         if len>0 then begin
           len:=len-1;
-          s[len]:=' ';
+          s[len]:=ENDMARK;
           redraw;
         end
       end
 
-      else if c=TOGGLE then begin
-        write(TOGGLE);
-      end
+      else if c=TOGGLE then
+        write(TOGGLE)
 
       else if c<>CR then begin
-        if len<5 then begin
+        if len<maxlen then begin
           s[len]:=c;
           len:=len+1;
+          s[len]:=ENDMARK;
           redraw;
         end
       end
+
     until c=CR;
 
-    { remove cursor }
+    { clear complete input line }
     _move(DASHX+1,y);
-    write(@PLOTDEV,'      ');
-    s[len] := ENDMARK;
+    write(@PLOTDEV,'           ');
   end;
 
 begin { getinput }
-  s := _new;
-  s[0] := ENDMARK;
+
+  s:=_new;
+  s[0]:=ENDMARK;
 
   if player=BLACK then
-    y := DASHBLACKY + INPUTOFF
+    y:=DASHBLACKY+INPUTOFF
   else
-    y := DASHWHITEY + INPUTOFF;
+    y:=DASHWHITEY+INPUTOFF;
 
   repeat
+    message(0,packed(' ',' '),player);
+
     editinput;
 
     if _strcmp(s,'QUIT')=0 then
       _abort;
 
-    valid := false;
-    ismove := false;
-    p1 := -1;
-    p2 := -1;
+    valid:=false;
+    p1:=-1;
+    p2:=-1;
 
-    if len=2 then begin
-      p1 := findpos(packed(s[0],s[1]));
-      if p1>=0 then
-        valid := true
-      else
-        message(2,packed(s[0],s[1]),player);
-    end
+    case request of
 
-    else if (len=5) and (s[2]='-') then begin
-      p1 := findpos(packed(s[0],s[1]));
-      if p1<0 then
-        message(2,packed(s[0],s[1]),player)
-      else begin
-        p2 := findpos(packed(s[3],s[4]));
-        if p2<0 then
-          message(2,packed(s[3],s[4]),player)
-        else begin
-          ismove := true;
-          valid := true;
+      I_PLACE,I_TAKE:
+        begin
+          if len=2 then begin
+            p1:=findpos(packed(s[0],s[1]));
+
+            if p1>=0 then
+              valid:=true
+            else
+              message(2,packed(s[0],s[1]),player);
+          end
+          else
+            message(1,packed(' ',' '),player);
         end;
-      end;
-    end
 
-    else
-      message(1,packed(' ',' '),player);
+      I_MOVE:
+        begin
+          if (len=5) and (s[2]='-') then begin
+            p1:=findpos(packed(s[0],s[1]));
+
+            if p1<0 then
+              message(2,packed(s[0],s[1]),player)
+
+            else begin
+              p2:=findpos(packed(s[3],s[4]));
+
+              if p2<0 then
+                message(2,packed(s[3],s[4]),player)
+
+              else
+                valid:=true;
+            end
+          end
+          else
+            message(1,packed(' ',' '),player)
+        end
+
+    end;
 
   until valid;
 
@@ -297,6 +357,16 @@ begin
     c:=chr(ord('A')+i);
     _move(0, Y0+i*SPACING-4);
     write(@PLOTDEV,c);
+  end;
+end;
+
+proc clearstone(x,y,dl,dr: integer);
+{**********************************}
+var i: integer;
+begin
+  for i:=0 to 10 do begin
+    _move(x-dl,y+i-5);
+    _draw(x+dr,y+i-5, BLACK);
   end;
 end;
 
