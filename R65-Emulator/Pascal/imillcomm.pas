@@ -29,6 +29,8 @@ begin
 
   stones[WHITE]:=NSTONES;
   stones[BLACK]:=NSTONES;
+  captured[WHITE]:=0;
+  captured[BLACK]:=0;
 
   for position:=0 to NPOSITIONS-1 do
     label[position]:=
@@ -77,51 +79,6 @@ begin
     findpos('D1'),findpos('D2'),findpos('D3'));
 
   { initialize neighbor }
-end;
-
-proc drawboard;
-{*************}
-var i,x1,y1,x2,y2: integer;
-
-begin
-
-  { three nested squares }
-  for i:=0 to 2 do begin
-    x1 := X0 + i*SPACING;
-    y1 := Y0 + i*SPACING;
-    x2 := X0 + (6-i)*SPACING;
-    y2 := Y0 + (6-i)*SPACING;
-    vector(x1,y1,x2,y1,WHITE);
-    vector(x2,y1,x2,y2,WHITE);
-    vector(x2,y2,x1,y2,WHITE);
-    vector(x1,y2,x1,y1,WHITE);
-  end;
-
-  { connections between the squares }
-  vector(X0+3*SPACING,Y0,
-         X0+3*SPACING,Y0+2*SPACING,WHITE);
-  vector(X0+3*SPACING,Y0+4*SPACING,
-         X0+3*SPACING,Y0+6*SPACING,WHITE);
-  vector(X0,Y0+3*SPACING,
-         X0+2*SPACING,Y0+3*SPACING,WHITE);
-  vector(X0+4*SPACING,Y0+3*SPACING,
-         X0+6*SPACING,Y0+3*SPACING,WHITE);
-end;
-
-proc drawstones;
-{**************}
-var position,x,y: integer;
-begin
-  for position:=0 to NPOSITIONS-1 do
-    if board[position]<>EMPTY then begin
-      x:=X0+
-        (ord(low(label[position]))
-        -ord('1'))*SPACING;
-      y:=Y0+
-        (ord(high(label[position]))
-        -ord('A'))*SPACING;
-      drawstone(x,y,board[position]);
-    end;
 end;
 
 proc removeneighbor(position1,position2: integer);
@@ -226,6 +183,15 @@ begin
   ismill:=false;
 end;
 
+func otherplayer(player:integer):integer;
+{***************************************}
+begin
+  if player=WHITE then
+    otherplayer:=BLACK
+  else
+    otherplayer:=WHITE;
+end;
+
 proc drawreserve(player: integer);
 {****************************}
 var stone,x,y,color: integer;
@@ -243,10 +209,14 @@ begin
     else
       color:=EMPTY;
 
-    if stone<stones[player] then
-      drawstone(x,y,player)
+    if stone>8-captured[player] then begin
+      color:=otherplayer(player);
+    end;
+
+    if color<>EMPTY then
+      dashstone(stone,player,color)
     else
-      clearstone(x,y,4,5);
+      cleardashstone(stone, player);
   end;
 end;
 

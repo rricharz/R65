@@ -1,6 +1,6 @@
 program mill;
 
-uses plotlib, syslib, strlib;
+uses plotlib, syslib, strlib, striolib;
 
 const
   NPOSITIONS   = 24;
@@ -10,11 +10,125 @@ const
 
   EMPTY = 4;
 
+mem
+  ARGTYPE = $00a0: array[31] of char&;
+
 var
   board: array[23] of integer;
-  stones: array[BLACK] of integer;
+  stones, captured: array[BLACK] of integer;
   label:    array[23] of packed char;
   DEBUG: file;
+
+proc savegame(name: cpnt; player: integer);
+{*****************************************}
+const SAVEVERSION=1;
+var f: file;
+    filename: cpnt;
+    i: integer;
+    c: char;
+begin
+  filename:=_new;
+  filename[0]:=ENDMARK;
+
+  i:=0;
+  while name[i]<>ENDMARK do begin
+    c:=name[i];
+    if not (((c>='A') and (c<='Z')) or
+           ((c>='0') and (c<='9'))) then
+      name[i]:='X';
+    i:=i+1;
+  end;
+  write(@filename,'MILL',name,':B');
+  debug('savegame ',name,filename);
+
+  _strfio(filename,0,1);
+  openw(f);
+
+  writeln(@f,'MILL ',SAVEVERSION);
+  if player=WHITE then
+    writeln(@f,'PLAYER WHITE')
+  else
+    writeln(@f,'PLAYER BLACK');
+  writeln(@f,'RESERVE ',
+          stones[WHITE],' ',stones[BLACK]);
+  writeln(@f,'CAPTURED ',
+          captured[WHITE],' ',captured[BLACK]);
+  write(@f,'BOARD ');
+  for i:=0 to 23 do begin
+    if board[i]=WHITE then
+      write(@f,'W')
+    else if board[i]=BLACK then
+      write(@f,'B')
+    else
+      write(@f,'-');
+  end;
+  writeln(@f);
+
+  close(f);
+  _release(filename);
+end;
+
+proc loadgame;
+{************}
+var filename, line, s: cpnt;
+    carg, nchars: integer;
+    dummy: boolean;
+    f: file;
+    ateof:boolean;
+
+  func _strbegins(s1,s2:cpnt):boolean;
+  var i:integer;
+  begin
+    i:=0;
+
+    while (s2[i]<>ENDMARK) and
+          (s1[i]=s2[i]) do
+      i:=i+1;
+
+    _strbegins:=s2[i]=ENDMARK;
+  end;
+
+begin
+  filename:=_new;
+  line:=_new;
+  carg:=0;
+  _sgetstring(filename, carg, dummy);
+  _ssetsubtype(filename, 'B', true);
+  _strfio(filename, 0, 1);
+  openr(f);
+
+  repeat
+    nchars:=_strread(f,line,ateof);
+    debug(line);
+    if _strbegins(line,'MILL') then begin
+      s:=line+5;
+    end
+
+    else if _strcmp(line,'PLAYER WHITE')=0 then
+      player:=WHITE
+
+    else if _strcmp(line,'PLAYER BLACK')=0 then
+      player:=BLACK
+
+    else if _strbegins(line,'RESERVE') then begin
+      stones[WHITE]:=digit(line[8]);
+      stones[BLACK]:=digit(line[10]);
+    end
+
+    else if _strbegins(line,'CAPTURED') then begin
+      captured[WHITE]:=digit(line[9]);
+      captured[BLACK]:=digit(line[11]);
+    end
+
+    else if _strbegins(line,'BOARD') then begin
+      ...
+    end;
+  until ateof;
+
+  close(f);
+  _release(line);
+  _release(filename);
+end;
 
 {$I IMILLPLOT}
 {$I IMILLCOMM}
@@ -45,18 +159,57 @@ begin
   end;
 end;
 
-func otherplayer(player:integer):integer;
-{***************************************}
+func allinmills(player: integer): boolean;
+{*************************************}
+var i: integer;
 begin
-  if player=WHITE then
-    otherplayer:=BLACK
-  else
-    otherplayer:=WHITE;
+  allinmills:=true;
+  for i:=0 to 23 do
+    if board[i]=player then
+      if not ismill(i,player) then begin
+        allinmills:=false;
+        exit;
+      end;
+end;
+
+proc takestone(player: integer);
+{******************************}
+var p1,p2,opponent: integer;
+    valid: boolean;
+begin
+  opponent:=otherplayer(player);
+
+  repeat
+    getinput(player,I_TAKE,p1,p2);
+
+    valid:=false;
+
+    if board[p1]<>opponent then begin
+      if board[p1]=EMPTY then
+        message(3,label[p1],player)
+      else
+        message(4,label[p1],player);
+    end
+
+    else if ismill(p1,opponent) and
+            not allinmills(opponent) then
+      message(8,label[p1],player)
+
+    else
+      valid:=true;
+
+  until valid;
+
+  board[p1]:=EMPTY;
+  clearstone(p1,player);
+  captured[player]:=captured[player]+1;
+  drawreserve(player);
+  debug(captured[WHITE],captured[BLACK]);
 end;
 
 proc placestone(player:integer);
 {*******************************}
-var p1,p2,x,y: integer;
+var p1, p2: integer;
     valid: boolean;
 begin
   repeat
@@ -71,12 +224,11 @@ begin
 
   board[p1]:=player;
   stones[player]:=stones[player]-1;
-
-  x:=X0+(ord(low(label[p1]))-ord('1'))*SPACING;
-  y:=Y0+(ord(high(label[p1]))-ord('A'))*SPACING;
-
-  drawstone(x,y,player);
+  drawstone(p1,player);
   drawreserve(player);
+
+  if ismill(p1,player) then
+    takestone(player);
 end;
 
 proc movestone(player:integer);
@@ -116,6 +268,9 @@ begin
 
   drawboard;
   drawlabels;
+
+  if ARGTYPE[0]='s' then loadgame;
+
   drawstones;
   drawreserve(WHITE);
   drawreserve(BLACK);

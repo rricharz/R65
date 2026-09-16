@@ -9,7 +9,7 @@ const
     DASHX      = 125;
     DASHWHITEY = 63;
     DASHBLACKY = 15;
-    DASHWIDTH  = 96;
+    DASHWIDTH  = 95;
     DASHHEIGHT = 48;
     MSGOFF     = 3;
     INPUTOFF   = 13;
@@ -72,7 +72,8 @@ begin
    23: write(@PLOTDEV,'THINKING');
    24: write(@PLOTDEV,'WINS');
    25: write(@PLOTDEV,'DRAW');
-   26: write(@PLOTDEV,'READY')
+   26: write(@PLOTDEV,'READY');
+   27: write(@PLOTDEV,'SAVED')
    else write(@PLOTDEV,'ERROR ', number)
   end;
 end;
@@ -95,9 +96,10 @@ end;
 const
   I_PLACE  = 1;
   I_MOVE   = 2;
-  I_TAKE = 3;
+  I_TAKE   = 3;
+  I_NAME   = 4;
 
-proc getinput(player, request: integer;
+proc getinput(player, request0: integer;
               var p1,p2: integer);
 {**************************************}
 
@@ -105,7 +107,7 @@ const TOGGLE    = chr(12);
       BACKSPACE = chr(127);
 
 var s: cpnt;
-    x,y,len,maxlen: integer;
+    x,y,len,maxlen, request: integer;
     valid: boolean;
 
   proc prompt;
@@ -125,6 +127,11 @@ var s: cpnt;
       I_TAKE:
         begin
           write(@PLOTDEV,'TAKE?');
+          x:=DASHX+1+5*8;
+        end;
+      I_NAME:
+        begin
+          write(@PLOTDEV,'NAME?');
           x:=DASHX+1+5*8;
         end
     end;
@@ -236,6 +243,7 @@ var s: cpnt;
 
 begin { getinput }
 
+  request:=request0;
   s:=_new;
   s[0]:=ENDMARK;
 
@@ -245,12 +253,19 @@ begin { getinput }
     y:=DASHWHITEY+INPUTOFF;
 
   repeat
-    message(0,packed(' ',' '),player);
 
     editinput;
 
     if _strcmp(s,'QUIT')=0 then
       _abort;
+
+    if _strcmp(s,'SAVE')=0 then begin
+      request:=I_NAME;
+      editinput;
+      savegame(s, player);
+      message(27,'  ',player);
+      _abort;
+    end;
 
     valid:=false;
     p1:=-1;
@@ -269,7 +284,7 @@ begin { getinput }
               message(2,packed(s[0],s[1]),player);
           end
           else
-            message(1,packed(' ',' '),player);
+            message(1,'  ',player);
         end;
 
       I_MOVE:
@@ -291,20 +306,24 @@ begin { getinput }
             end
           end
           else
-            message(1,packed(' ',' '),player)
+            message(1,'  ',player)
         end
 
     end;
 
   until valid;
 
-  message(0,packed(' ',' '),player);
+  message(0,'  ',player);
   _release(s);
 end;
 
-proc drawstone(x,y,player: integer);
+proc drawstone(pos, player: integer);
 {**********************************}
+var x, y: integer;
 begin
+  x:=X0+(ord(low(label[pos]))-ord('1'))*SPACING;
+  y:=Y0+(ord(high(label[pos]))-ord('A'))*SPACING;
+
   vector(x-1, y-5, x+1, y-5, WHITE);
   vector(x-1, y+5, x+1, y+5, WHITE);
 
@@ -340,6 +359,58 @@ begin
   end;
 end;
 
+proc drawboard;
+{*************}
+var i,x1,y1,x2,y2: integer;
+
+begin
+
+  { three nested squares }
+  for i:=0 to 2 do begin
+    x1 := X0 + i*SPACING;
+    y1 := Y0 + i*SPACING;
+    x2 := X0 + (6-i)*SPACING;
+    y2 := Y0 + (6-i)*SPACING;
+    vector(x1,y1,x2,y1,WHITE);
+    vector(x2,y1,x2,y2,WHITE);
+    vector(x2,y2,x1,y2,WHITE);
+    vector(x1,y2,x1,y1,WHITE);
+  end;
+
+  { connections between the squares }
+  vector(X0+3*SPACING,Y0,
+         X0+3*SPACING,Y0+2*SPACING,WHITE);
+  vector(X0+3*SPACING,Y0+4*SPACING,
+         X0+3*SPACING,Y0+6*SPACING,WHITE);
+  vector(X0,Y0+3*SPACING,
+         X0+2*SPACING,Y0+3*SPACING,WHITE);
+  vector(X0+4*SPACING,Y0+3*SPACING,
+         X0+6*SPACING,Y0+3*SPACING,WHITE);
+end;
+
+proc drawstones;
+{**************}
+var position: integer;
+begin
+  for position:=0 to NPOSITIONS-1 do
+    if board[position]<>EMPTY then
+      drawstone(position,board[position]);
+end;
+
+proc clearstone(stone, player: integer);
+{*************************************}
+var i, x, y: integer;
+begin
+  x:=X0+(ord(low(label[stone]))-ord('1'))*SPACING;
+  y:=Y0+(ord(high(label[stone]))-ord('A'))*SPACING;
+  for i:=0 to 10 do begin
+    _move(x-5,y+i-5);
+    _draw(x+5,y+i-5, BLACK);
+  end;
+  drawboard;
+  drawstones;
+end;
+
 proc drawlabels;
 {**************}
 var i: integer;
@@ -360,23 +431,35 @@ begin
   end;
 end;
 
-proc clearstone(x,y,dl,dr: integer);
-{**********************************}
-var i: integer;
+proc cleardashstone(stone, player: integer);
+{******************************************}
+var i, x, y: integer;
 begin
-  for i:=0 to 10 do begin
-    _move(x-dl,y+i-5);
-    _draw(x+dr,y+i-5, BLACK);
+  if player=WHITE then
+    y:=DASHWHITEY+STONEOFF
+  else
+    y:=DASHBLACKY+STONEOFF;
+  x:=DASHX+8+stone*10;
+  for i:=0 to 8 do begin
+    _move(x-4,y+i-4);
+    _draw(x+4,y+i-4, BLACK);
   end;
 end;
 
-proc dashstone(x,y,player: integer);
-{**********************************}
+proc dashstone(stone,player,color: integer);
+{******************************************}
+var x, y: integer;
 begin
+  if player=WHITE then
+    y:=DASHWHITEY+STONEOFF
+  else
+    y:=DASHBLACKY+STONEOFF;
+  x:=DASHX+8+stone*10;
+
   vector(x-1, y-4, x+1, y-4, WHITE);
   vector(x-1, y+4, x+1, y+4, WHITE);
 
-  if player=WHITE then begin
+  if color=WHITE then begin
     vector(x-3, y-3, x+3, y-3, WHITE);
     vector(x-3, y+3, x+3, y+3, WHITE);
 
