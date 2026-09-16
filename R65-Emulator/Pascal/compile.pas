@@ -2041,10 +2041,22 @@ begin
           testtype('b'); code1(opcode)
         end {boolean}
         else begin {not boolean}
-          testtype('i'); scan;
-          term(arsize1);
-          if arsize1<>0 then error(15);
-          testtype('i'); code1(opcode);
+          if (opcode=3) and (restype='q') then begin
+            scan;
+            term(arsize1);
+            if arsize1<>0 then error(15);
+            testtype('i');
+            code1(opcode);
+            restype:='q';
+          end
+          else begin
+            testtype('i');
+            scan;
+            term(arsize1);
+            if arsize1<>0 then error(15);
+            testtype('i');
+            code1(opcode);
+          end
         end {not boolean}
       end {not real}
     end {if 1}
