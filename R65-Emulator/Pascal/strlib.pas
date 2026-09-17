@@ -98,28 +98,35 @@ begin
   write(@strinout, strin);
 end;
 
-func _strcmp(s1,s2:cpnt):integer;
-{*******************************}
-{ compare 2 strings }
-{ returns -1  if s1<s2                   }
-{          0  if s1=s2                   }
-{          1  if s1>s2                   }
+func _strncmp(s1,s2:cpnt; n:integer):integer;
+{*******************************************}
+{ compare up to n characters }
+{ returns -1  if s1<s2        }
+{          0  if equal        }
+{          1  if s1>s2        }
+
 var i:integer;
 begin
   i:=0;
-  while i<STRSIZE do begin
+  while i<n do begin
     if s1[i]<>s2[i] then begin
-      if s1[i]>s2[i] then _strcmp:=1
-      else _strcmp:=-1;
+      if s1[i]>s2[i] then _strncmp:=1
+      else _strncmp:=-1;
       exit;
     end;
     if s1[i]=ENDMARK then begin
-      _strcmp:=0;
+      _strncmp:=0;
       exit;
     end;
     i:=i+1;
   end;
-  _strcmp:=0;
+  _strncmp:=0;
+end;
+
+func _strcmp(s1,s2:cpnt):integer;
+{*******************************}
+begin
+  _strcmp:=_strncmp(s1,s2,STRSIZE);
 end;
 
 func _strpos(ch:char; s1:cpnt;

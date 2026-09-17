@@ -65,7 +65,7 @@ begin
     7: write(@PLOTDEV,'BAD MOVE');
     8: write(@PLOTDEV,field,' IS MILL');
     9: write(@PLOTDEV,'REMOVE ONE');
-   10: write(@PLOTDEV,'GAME OVER');
+   10: write(@PLOTDEV,'LOST');
    20: write(@PLOTDEV,'YOUR MOVE');
    21: write(@PLOTDEV,'COMPUTING');
    22: write(@PLOTDEV,'WAITING');
