@@ -3,6 +3,7 @@ program mill;
 uses plotlib, syslib, strlib, striolib;
 
 const
+  DUALPLAYER   = false;
   NPOSITIONS   = 24;
   NSTONES      = 9;
   NMILLS       = 16;
@@ -18,7 +19,9 @@ var
   stones, captured: array[BLACK] of integer;
   label:    array[23] of packed char;
   DEBUG: file;
-  player: integer;
+  player,action: integer;
+
+  startsec,starttenmillis: integer;
 
 proc savegame(name: cpnt; player: integer);
 {*****************************************}
@@ -40,7 +43,6 @@ begin
     i:=i+1;
   end;
   write(@filename,'MILL',name,':B');
-  debug('savegame ',name,filename);
 
   _strfio(filename,0,1);
   openw(f);
@@ -106,7 +108,6 @@ begin
 
   repeat
     length:=_strread(f,line,ateof);
-    debug(line);
 
     if _strncmp(line,'MILL ',5)=0 then begin
       if _strcmp(line,'MILL 1')<>0 then begin
@@ -263,7 +264,6 @@ begin
   clearstone(p1,player);
   captured[player]:=captured[player]+1;
   drawreserve(player);
-  debug(captured[WHITE],captured[BLACK]);
 end;
 
 proc placestone(player:integer);
@@ -285,6 +285,7 @@ begin
   stones[player]:=stones[player]-1;
   drawstone(p1,player);
   drawreserve(player);
+  protocolplace(player,p1,0,0)
 
   if ismill(p1,player) then
     takestone(player);
@@ -397,14 +398,31 @@ begin
   findlegalmove:=true;
 end;
 
-proc playerturn(player:integer);
-{******************************}
+{$I IMILLAUTO:P}
+
+proc playerturn(player: integer);
+{*******************************}
 begin
   selectdashboard(player);
-  if stones[player]>0 then
-    placestone(player)
-  else
-    movestone(player);
+
+  if DUALPLAYER then begin
+    if stones[player]>0 then
+      placestone(player)
+    else
+      movestone(player);
+  end
+  else begin
+    if player=WHITE then begin
+      if stones[player]>0 then
+        placestone(player)
+      else
+        movestone(player);
+    end
+    else begin
+      message(21,'  ',player);
+      computerturn(player);
+    end;
+  end;
 end;
 
 func gameover(player: integer): boolean;
@@ -451,14 +469,16 @@ begin
   drawreserve(WHITE);
   drawreserve(BLACK);
   _move(DASHX+1,DASHWHITEY+NAMEOFF);
-  write(@PLOTDEV,'PLAYER 1');
+  write(@PLOTDEV,'PLAYER');
   _move(DASHX+1,DASHBLACKY+NAMEOFF);
-  write(@PLOTDEV,'PLAYER 2');
+  write(@PLOTDEV,'COMPUTER');
 
   player:=WHITE;
-
+  action:=0;
   repeat
+    action:=action+1;
     playerturn(player);
+    protocolboard;
     player:=otherplayer(player);
     if gameover(player) then begin
       message(10,'  ',player);

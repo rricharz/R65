@@ -3,1199 +3,1504 @@
    3     4 [  0] uses plotlib, syslib, strlib, striolib;
    4  4747 [107] 
    5  4747 [107] const
-   6  4747 [107]   NPOSITIONS   = 24;
-   7  4750 [108]   NSTONES      = 9;
-   8  4750 [109]   NMILLS       = 16;
-   9  4750 [110]   MAXNEIGHBORS = 4;
-  10  4750 [111] 
-  11  4750 [111]   EMPTY = 4;
-  12  4750 [112] 
-  13  4750 [112] mem
-  14  4750 [112]   ARGTYPE = $00a0: array[31] of char&;
-  15  4750 [113] 
-  16  4750 [113] var
-  17  4750 [113]   board: array[23] of integer;
-  18  4750 [114]   stones, captured: array[BLACK] of integer;
-  19  4750 [116]   label:    array[23] of packed char;
-  20  4750 [117]   DEBUG: file;
-  21  4750 [118]   player: integer;
-  22  4750 [119] 
-  23  4750 [119] proc savegame(name: cpnt; player: integer);
-  24  4750 [122] {*****************************************}
-  25  4750 [122] const SAVEVERSION=1;
-  26  4753 [123] var f: file;
-  27  4753 [124]     filename: cpnt;
-  28  4753 [125]     i: integer;
-  29  4753 [126]     c: char;
-  30  4753 [127] begin
-  31  4753 [127]   filename:=_new;
-  32  4761 [127]   filename[0]:=ENDMARK;
-  33  4769 [127] 
-  34  4773 [127]   i:=0;
-  35  4775 [127]   while name[i]<>ENDMARK do begin
-  36  4795 [127]     c:=name[i];
-  37  4803 [127]     if not (((c>='A') and (c<='Z')) or
-  38  4824 [127]            ((c>='0') and (c<='9'))) then
-  39  4840 [127]       name[i]:='X';
-  40  4850 [127]     i:=i+1;
-  41  4860 [127]   end;
-  42  4865 [127]   write(@filename,'MILL',name,':B');
-  43  4887 [127]   debug('savegame ',name,filename);
-  44  4887 [127] 
-  45  4887 [127]   _strfio(filename,0,1);
-  46  4901 [127]   openw(f);
-  47  4907 [127] 
-  48  4907 [127]   writeln(@f,'MILL ',SAVEVERSION);
-  49  4928 [127]   if player=WHITE then
-  50  4934 [127]     writeln(@f,'PLAYER WHITE')
-  51  4956 [127]   else
-  52  4963 [127]     writeln(@f,'PLAYER BLACK');
-  53  4991 [127]   writeln(@f,'RESERVE ',
-  54  5005 [127]           stones[WHITE],' ',stones[BLACK]);
-  55  5028 [127]   writeln(@f,'CAPTURED ',
-  56  5043 [127]           captured[WHITE],' ',captured[BLACK]);
-  57  5066 [127]   write(@f,'BOARD ');
-  58  5079 [127]   for i:=0 to 23 do begin
-  59  5096 [127]     if board[i]=WHITE then
-  60  5106 [127]       write(@f,'W')
-  61  5117 [127]     else if board[i]=BLACK then
-  62  5131 [127]       write(@f,'B')
-  63  5142 [127]     else
-  64  5143 [127]       write(@f,'-');
-  65  5154 [127]   end;
-  66  5154 [127]   writeln(@f);
-  67  5180 [127] 
-  68  5180 [127]   close(f);
-  69  5186 [127]   _release(filename);
-  70  5196 [127] end;
-  71  5196 [127] 
-  72  5197 [120] proc loadgame;
-  73  5197 [121] {************}
-  74  5197 [121] var name,fullname,line, s: cpnt;
-  75  5200 [125]     carg,length,i: integer;
-  76  5200 [128]     dummy: boolean;
-  77  5200 [129]     f: file;
-  78  5200 [130]     ateof:boolean;
-  79  5200 [131]     validfile:boolean;
-  80  5200 [132] 
-  81  5200 [132]   func strbegins(s,prefix:cpnt):boolean;
-  82  5200 [136]   begin
-  83  5200 [136]     strbegins:=_strncmp(s,prefix,_strlen(prefix))=0;
-  84  5235 [136]   end;
-  85  5240 [136] 
-  86  5241 [134]   func digit(c:char):integer;
-  87  5241 [137]   begin
-  88  5241 [137]     digit:=ord(c)-ord('0');
-  89  5252 [137]   end;
-  90  5257 [137] 
-  91  5258 [136] begin
-  92  5258 [136]   name:=_new;
-  93  5266 [136]   fullname:=_new;
-  94  5276 [136]   line:=_new;
-  95  5286 [136]   carg:=0;
-  96  5292 [136]   _sgetstring(name, carg, dummy);
-  97  5322 [136]   if strbegins(name,'MILL') then
-  98  5341 [136]     write(@fullname,name)
-  99  5349 [136]   else
- 100  5355 [136]     write(@fullname,'MILL',name);
- 101  5374 [136]   _ssetsubtype(fullname, 'B', true);
- 102  5388 [136]   _strfio(fullname, 0, 1);
- 103  5402 [136]   openr(f);
- 104  5408 [136] 
- 105  5408 [136]   validfile:=false;
- 106  5410 [136] 
- 107  5414 [136]   repeat
- 108  5414 [136]     length:=_strread(f,line,ateof);
- 109  5438 [136]     debug(line);
- 110  5442 [136] 
- 111  5442 [136]     if _strncmp(line,'MILL ',5)=0 then begin
- 112  5467 [136]       if _strcmp(line,'MILL 1')<>0 then begin
- 113  5494 [136]         writeln('Wrong MILL file version');
- 114  5527 [136]         _abort;
- 115  5531 [136]       end;
- 116  5531 [136]       validfile:=true;
- 117  5533 [136]     end
- 118  5537 [136] 
- 119  5537 [136]     else if _strcmp(line,'PLAYER WHITE')=0 then
- 120  5569 [136]       player:=WHITE
- 121  5573 [136] 
- 122  5575 [136]     else if _strcmp(line,'PLAYER BLACK')=0 then
- 123  5611 [136]       player:=BLACK
- 124  5615 [136] 
- 125  5617 [136]     else if strbegins(line,'RESERVE') then begin
- 126  5646 [136]       stones[WHITE]:=digit(line[8]);
- 127  5667 [136]       stones[BLACK]:=digit(line[10]);
- 128  5689 [136]     end
- 129  5693 [136] 
- 130  5693 [136]     else if strbegins(line,'CAPTURED') then begin
- 131  5719 [136]       captured[WHITE]:=digit(line[9]);
- 132  5740 [136]       captured[BLACK]:=digit(line[11]);
- 133  5762 [136]     end
- 134  5766 [136] 
- 135  5766 [136]     else if _strncmp(line,'BOARD ',6)=0 then begin
- 136  5795 [136]       if length<>30 then begin
- 137  5805 [136]         writeln('Illegal BOARD line');
- 138  5833 [136]         exit;
- 139  5834 [136]       end;
- 140  5834 [136] 
- 141  5834 [136]       for i:=0 to 23 do begin
- 142  5851 [136]         case line[i+6] of
- 143  5862 [136]           'W': board[i]:=WHITE;
- 144  5877 [136]           'B': board[i]:=BLACK;
- 145  5897 [136]           '-': board[i]:=EMPTY
- 146  5915 [136]           else begin
- 147  5924 [136]           writeln('Illegal character in BOARD line');
- 148  5962 [136]           _abort
- 149  5962 [136]           end
- 150  5966 [136]         end {case}
- 151  5968 [136]       end {for}
- 152  5968 [136]     end
- 153  5968 [136] 
- 154  5982 [136]     else if (line[0]='{') or (length=0) then begin
- 155  6004 [136]       { comment }
- 156  6007 [136]     end
- 157  6007 [136] 
- 158  6007 [136]     else begin
- 159  6010 [136]       writeln('Illegal line in MILL file:');
- 160  6043 [136]       writeln(line);
- 161  6054 [136]       _abort;
- 162  6058 [136]     end
- 163  6058 [136] 
- 164  6058 [136]   until ateof;
- 165  6058 [136] 
- 166  6065 [136]   if not validfile then begin
- 167  6070 [136]     writeln('Not a MILL file');
- 168  6095 [136]     _abort;
- 169  6099 [136]   end;
- 170  6099 [136] 
- 171  6099 [136]   close(f);
- 172  6105 [136]   _release(line);
- 173  6115 [136]   _release(fullname);
- 174  6125 [136]   _release(name);
- 175  6135 [136] end;
- 176  6135 [136] 
- 177  6136 [121] {$I IMILLPLOT}
-{I:IMILLP}  1  6136 [121] { section for MILL on onbard screen (plotlib) }
-{I:IMILLP}  2  6136 [121] { ############################################}
-{I:IMILLP}  3  6136 [121] 
-{I:IMILLP}  4  6136 [121] const
-{I:IMILLP}  5  6136 [121]     SPACING = 16;
-{I:IMILLP}  6  6136 [122]     X0 = 15;
-{I:IMILLP}  7  6136 [123]     Y0 = 15;
-{I:IMILLP}  8  6136 [124] 
-{I:IMILLP}  9  6136 [124]     DASHX      = 125;
-{I:IMILLP} 10  6136 [125]     DASHWHITEY = 63;
-{I:IMILLP} 11  6136 [126]     DASHBLACKY = 15;
-{I:IMILLP} 12  6136 [127]     DASHWIDTH  = 95;
-{I:IMILLP} 13  6136 [128]     DASHHEIGHT = 48;
-{I:IMILLP} 14  6136 [129]     MSGOFF     = 3;
-{I:IMILLP} 15  6136 [130]     INPUTOFF   = 13;
-{I:IMILLP} 16  6136 [131]     STONEOFF   = 29;
-{I:IMILLP} 17  6136 [132]     NAMEOFF    = 37;
-{I:IMILLP} 18  6136 [133] 
-{I:IMILLP} 19  6136 [133] proc init_canvas;
-{I:IMILLP} 20  6136 [134] {***************}
-{I:IMILLP} 21  6136 [134] begin
-{I:IMILLP} 22  6136 [134]   DEBUG := PRINTER;
-{I:IMILLP} 23  6143 [134]   _grinit;
-{I:IMILLP} 24  6151 [134]   _fullview;
-{I:IMILLP} 25  6155 [134]   _cleargr;
-{I:IMILLP} 26  6159 [134]   end;
-{I:IMILLP} 27  6159 [134] 
-{I:IMILLP} 28  6160 [134] proc vector(x1,y1,x2,y2, color: integer);
-{I:IMILLP} 29  6160 [140] {***************************************}
-{I:IMILLP} 30  6160 [140] begin
-{I:IMILLP} 31  6160 [140]   _move(x1,y1);
-{I:IMILLP} 32  6179 [140]   _draw(x2,y2,color);
-{I:IMILLP} 33  6197 [140] end;
-{I:IMILLP} 34  6197 [140] 
-{I:IMILLP} 35  6198 [135] proc endpoints(x1,y1,x2,y2: integer);
-{I:IMILLP} 36  6198 [140] {***********************************}
-{I:IMILLP} 37  6198 [140] begin
-{I:IMILLP} 38  6198 [140]   _plot(x1,y1,WHITE);
-{I:IMILLP} 39  6219 [140]   _plot(x2,y2,WHITE);
-{I:IMILLP} 40  6235 [140] end;
-{I:IMILLP} 41  6235 [140] 
-{I:IMILLP} 42  6236 [136] proc message(number: integer; field: packed char;
-{I:IMILLP} 43  6236 [139]            player: integer);
-{I:IMILLP} 44  6236 [140] {***********************************************}
-{I:IMILLP} 45  6236 [140] var  y: integer;
-{I:IMILLP} 46  6239 [141] begin
-{I:IMILLP} 47  6239 [141]   debug('message',player,number,field);
-{I:IMILLP} 48  6241 [141]   if player=WHITE then
-{I:IMILLP} 49  6247 [141]     y := DASHWHITEY
-{I:IMILLP} 50  6251 [141]   else
-{I:IMILLP} 51  6253 [141]     y := DASHBLACKY;
-{I:IMILLP} 52  6262 [141] 
-{I:IMILLP} 53  6266 [141]   _move(DASHX+1, y+MSGOFF);
-{I:IMILLP} 54  6284 [141]   write(@PLOTDEV,'           '); { 11 blanks }
-{I:IMILLP} 55  6300 [141] 
-{I:IMILLP} 56  6300 [141]   _move(DASHX+1, y+MSGOFF);
-{I:IMILLP} 57  6318 [141]   case number of
-{I:IMILLP} 58  6318 [141]     0: begin end;
-{I:IMILLP} 59  6329 [141]     1: write(@PLOTDEV,'BAD INPUT');
-{I:IMILLP} 60  6353 [141]     2: write(@PLOTDEV,field,' INVALID');
-{I:IMILLP} 61  6385 [141]     3: write(@PLOTDEV,field,' EMPTY');
-{I:IMILLP} 62  6415 [141]     4: write(@PLOTDEV,field,' WHITE');
-{I:IMILLP} 63  6445 [141]     5: write(@PLOTDEV,field,' BLACK');
-{I:IMILLP} 64  6475 [141]     6: write(@PLOTDEV,field,' OCCUPIED');
-{I:IMILLP} 65  6508 [141]     7: write(@PLOTDEV,'BAD MOVE');
-{I:IMILLP} 66  6531 [141]     8: write(@PLOTDEV,field,' IS MILL');
-{I:IMILLP} 67  6563 [141]     9: write(@PLOTDEV,'REMOVE ONE');
-{I:IMILLP} 68  6588 [141]    10: write(@PLOTDEV,'LOST');
-{I:IMILLP} 69  6607 [141]    20: write(@PLOTDEV,'YOUR MOVE');
-{I:IMILLP} 70  6631 [141]    21: write(@PLOTDEV,'COMPUTING');
-{I:IMILLP} 71  6655 [141]    22: write(@PLOTDEV,'WAITING');
-{I:IMILLP} 72  6677 [141]    23: write(@PLOTDEV,'THINKING');
-{I:IMILLP} 73  6700 [141]    24: write(@PLOTDEV,'WINS');
-{I:IMILLP} 74  6719 [141]    25: write(@PLOTDEV,'DRAW');
-{I:IMILLP} 75  6738 [141]    26: write(@PLOTDEV,'READY');
-{I:IMILLP} 76  6758 [141]    27: write(@PLOTDEV,'SAVED')
-{I:IMILLP} 77  6777 [141]    else write(@PLOTDEV,'ERROR ', number)
-{I:IMILLP} 78  6791 [141]   end;
-{I:IMILLP} 79  6799 [141] end;
-{I:IMILLP} 80  6799 [141] 
-{I:IMILLP} 81  6800 [137] func findpos(labelvalue: packed char): integer;
-{I:IMILLP} 82  6800 [140] {*********************************************}
-{I:IMILLP} 83  6800 [140] var position: integer;
-{I:IMILLP} 84  6803 [141] begin
-{I:IMILLP} 85  6803 [141]   position:=0;
-{I:IMILLP} 86  6807 [141]   while (position<NPOSITIONS) and
-{I:IMILLP} 87  6818 [141]         (labelvalue<>label[position]) do
-{I:IMILLP} 88  6831 [141]     position:=position+1;
-{I:IMILLP} 89  6841 [141] 
-{I:IMILLP} 90  6849 [141]   if position<NPOSITIONS then
-{I:IMILLP} 91  6855 [141]     findpos:=position
-{I:IMILLP} 92  6859 [141]   else
-{I:IMILLP} 93  6859 [141]     findpos:=-1;
-{I:IMILLP} 94  6872 [141] end;
-{I:IMILLP} 95  6877 [141] 
-{I:IMILLP} 96  6878 [139] const
-{I:IMILLP} 97  6878 [139]   I_PLACE  = 1;
-{I:IMILLP} 98  6878 [140]   I_MOVE   = 2;
-{I:IMILLP} 99  6878 [141]   I_TAKE   = 3;
-{I:IMILLP}100  6878 [142]   I_NAME   = 4;
-{I:IMILLP}101  6878 [143] 
-{I:IMILLP}102  6878 [143] proc getinput(player, request0: integer;
-{I:IMILLP}103  6878 [146]               var p1,p2: integer);
-{I:IMILLP}104  6878 [148] {**************************************}
-{I:IMILLP}105  6878 [148] 
-{I:IMILLP}106  6878 [148] const TOGGLE    = chr(12);
-{I:IMILLP}107  6881 [149]       BACKSPACE = chr(127);
-{I:IMILLP}108  6881 [150] 
-{I:IMILLP}109  6881 [150] var s: cpnt;
-{I:IMILLP}110  6881 [151]     x,y,len,maxlen, request: integer;
-{I:IMILLP}111  6881 [156]     valid: boolean;
-{I:IMILLP}112  6881 [157] 
-{I:IMILLP}113  6881 [157]   proc prompt;
-{I:IMILLP}114  6881 [158]   begin
-{I:IMILLP}115  6881 [158]     _move(DASHX+1,y);
-{I:IMILLP}116  6901 [158]     case request of
-{I:IMILLP}117  6901 [158]       I_PLACE:
-{I:IMILLP}118  6909 [158]         begin
-{I:IMILLP}119  6912 [158]           write(@PLOTDEV,'PLACE?');
-{I:IMILLP}120  6923 [158]           x:=DASHX+1+6*8;
-{I:IMILLP}121  6932 [158]         end;
-{I:IMILLP}122  6938 [158]       I_MOVE:
-{I:IMILLP}123  6945 [158]         begin
-{I:IMILLP}124  6948 [158]           write(@PLOTDEV,'MOVE?');
-{I:IMILLP}125  6958 [158]           x:=DASHX+1+5*8;
-{I:IMILLP}126  6967 [158]         end;
-{I:IMILLP}127  6973 [158]       I_TAKE:
-{I:IMILLP}128  6980 [158]         begin
-{I:IMILLP}129  6983 [158]           write(@PLOTDEV,'TAKE?');
-{I:IMILLP}130  6993 [158]           x:=DASHX+1+5*8;
-{I:IMILLP}131  7002 [158]         end;
-{I:IMILLP}132  7008 [158]       I_NAME:
-{I:IMILLP}133  7015 [158]         begin
-{I:IMILLP}134  7018 [158]           write(@PLOTDEV,'NAME?');
-{I:IMILLP}135  7028 [158]           x:=DASHX+1+5*8;
-{I:IMILLP}136  7037 [158]         end
-{I:IMILLP}137  7043 [158]     end;
-{I:IMILLP}138  7045 [158]   end;
-{I:IMILLP}139  7045 [158] 
-{I:IMILLP}140  7046 [158]   proc editinput;
-{I:IMILLP}141  7046 [159]   var c: char;
-{I:IMILLP}142  7049 [160]       i: integer;
-{I:IMILLP}143  7049 [161] 
-{I:IMILLP}144  7049 [161]     proc redraw;
-{I:IMILLP}145  7049 [162]     var j: integer;
-{I:IMILLP}146  7052 [163]     begin
-{I:IMILLP}147  7052 [163]       { clear complete input line }
-{I:IMILLP}148  7052 [163]       _move(DASHX+1,y);
-{I:IMILLP}149  7069 [163]       write(@PLOTDEV,'           ');
-{I:IMILLP}150  7085 [163] 
-{I:IMILLP}151  7085 [163]       { redraw prompt }
-{I:IMILLP}152  7085 [163]       prompt;
-{I:IMILLP}153  7089 [163] 
-{I:IMILLP}154  7089 [163]       { redraw input and cursor }
-{I:IMILLP}155  7089 [163]       _move(x,y);
-{I:IMILLP}156  7103 [163]       for j:=0 to len-1 do
-{I:IMILLP}157  7115 [163]         write(@PLOTDEV,s[j]);
-{I:IMILLP}158  7140 [163]       write(@PLOTDEV,'_');
-{I:IMILLP}159  7160 [163]     end;
-{I:IMILLP}160  7160 [163] 
-{I:IMILLP}161  7161 [162]     func readandblink(x0,y0: integer): char;
-{I:IMILLP}162  7161 [166]     const BLINKTIME = 16;
-{I:IMILLP}163  7164 [167]     var dummy,count: integer;
-{I:IMILLP}164  7164 [169]         ch: char;
-{I:IMILLP}165  7164 [170]         cursoron: boolean;
-{I:IMILLP}166  7164 [171]     begin
-{I:IMILLP}167  7164 [171]       dummy:=_syncscreen;
-{I:IMILLP}168  7172 [171]       count:=0;
-{I:IMILLP}169  7178 [171]       cursoron:=true;
-{I:IMILLP}170  7184 [171] 
-{I:IMILLP}171  7188 [171]       _move(x0,y0);
-{I:IMILLP}172  7202 [171]       write(@PLOTDEV,'_');
-{I:IMILLP}173  7208 [171] 
-{I:IMILLP}174  7208 [171]       repeat
-{I:IMILLP}175  7208 [171]         ch:=KEYPRESSED;
-{I:IMILLP}176  7212 [171] 
-{I:IMILLP}177  7216 [171]         if ch<>chr(0) then begin
-{I:IMILLP}178  7224 [171]           _move(x0,y0);
-{I:IMILLP}179  7241 [171]           write(@PLOTDEV,' ');
-{I:IMILLP}180  7247 [171]           readandblink:=ch;
-{I:IMILLP}181  7247 [171]           KEYPRESSED:=chr(0);
-{I:IMILLP}182  7257 [171]           exit;
-{I:IMILLP}183  7264 [171]         end;
-{I:IMILLP}184  7264 [171] 
-{I:IMILLP}185  7264 [171]         count:=count+1;
-{I:IMILLP}186  7270 [171]         _delay10msec(3);
-{I:IMILLP}187  7283 [171] 
-{I:IMILLP}188  7283 [171]         if count>=BLINKTIME then begin
-{I:IMILLP}189  7290 [171]           count:=0;
-{I:IMILLP}190  7295 [171]           _move(x0,y0);
-{I:IMILLP}191  7313 [171] 
-{I:IMILLP}192  7313 [171]           if cursoron then
-{I:IMILLP}193  7313 [171]             write(@PLOTDEV,' ')
-{I:IMILLP}194  7325 [171]           else
-{I:IMILLP}195  7326 [171]             write(@PLOTDEV,'_');
-{I:IMILLP}196  7335 [171] 
-{I:IMILLP}197  7335 [171]           cursoron:=not cursoron;
-{I:IMILLP}198  7335 [171]           dummy:=_syncscreen;
-{I:IMILLP}199  7350 [171]         end
-{I:IMILLP}200  7354 [171]       until false;
-{I:IMILLP}201  7356 [171]     end;
-{I:IMILLP}202  7359 [171] 
-{I:IMILLP}203  7360 [164]   begin
-{I:IMILLP}204  7360 [164]     len:=0;
-{I:IMILLP}205  7364 [164]     s[0]:=ENDMARK;
-{I:IMILLP}206  7372 [164] 
-{I:IMILLP}207  7376 [164]     if request=I_MOVE then
-{I:IMILLP}208  7382 [164]       maxlen:=5
-{I:IMILLP}209  7386 [164]     else
-{I:IMILLP}210  7388 [164]       maxlen:=4;       { enough for QUIT }
-{I:IMILLP}211  7401 [164] 
-{I:IMILLP}212  7401 [164]     redraw;
-{I:IMILLP}213  7405 [164] 
-{I:IMILLP}214  7405 [164]     repeat
-{I:IMILLP}215  7405 [164]       c:=readandblink(x+8*len,y);
-{I:IMILLP}216  7429 [164] 
-{I:IMILLP}217  7433 [164]       if c=BACKSPACE then begin
-{I:IMILLP}218  7440 [164]         if len>0 then begin
-{I:IMILLP}219  7450 [164]           len:=len-1;
-{I:IMILLP}220  7459 [164]           s[len]:=ENDMARK;
-{I:IMILLP}221  7470 [164]           redraw;
-{I:IMILLP}222  7478 [164]         end
-{I:IMILLP}223  7478 [164]       end
-{I:IMILLP}224  7478 [164] 
-{I:IMILLP}225  7478 [164]       else if c=TOGGLE then
-{I:IMILLP}226  7487 [164]         write(TOGGLE)
-{I:IMILLP}227  7493 [164] 
-{I:IMILLP}228  7494 [164]       else if c<>CR then begin
-{I:IMILLP}229  7504 [164]         if len<maxlen then begin
-{I:IMILLP}230  7516 [164]           s[len]:=c;
-{I:IMILLP}231  7523 [164]           len:=len+1;
-{I:IMILLP}232  7537 [164]           s[len]:=ENDMARK;
-{I:IMILLP}233  7548 [164]           redraw;
-{I:IMILLP}234  7556 [164]         end
-{I:IMILLP}235  7556 [164]       end
-{I:IMILLP}236  7556 [164] 
-{I:IMILLP}237  7556 [164]     until c=CR;
-{I:IMILLP}238  7562 [164] 
-{I:IMILLP}239  7566 [164]     { clear complete input line }
-{I:IMILLP}240  7566 [164]     _move(DASHX+1,y);
-{I:IMILLP}241  7581 [164]     write(@PLOTDEV,'           ');
-{I:IMILLP}242  7597 [164]   end;
-{I:IMILLP}243  7597 [164] 
-{I:IMILLP}244  7598 [159] begin { getinput }
-{I:IMILLP}245  7598 [159] 
-{I:IMILLP}246  7598 [159]   request:=request0;
-{I:IMILLP}247  7600 [159]   s:=_new;
-{I:IMILLP}248  7614 [159]   s[0]:=ENDMARK;
-{I:IMILLP}249  7622 [159] 
-{I:IMILLP}250  7626 [159]   if player=BLACK then
-{I:IMILLP}251  7632 [159]     y:=DASHBLACKY+INPUTOFF
-{I:IMILLP}252  7638 [159]   else
-{I:IMILLP}253  7640 [159]     y:=DASHWHITEY+INPUTOFF;
-{I:IMILLP}254  7652 [159] 
-{I:IMILLP}255  7657 [159]   repeat
-{I:IMILLP}256  7657 [159] 
-{I:IMILLP}257  7657 [159]     editinput;
-{I:IMILLP}258  7661 [159] 
-{I:IMILLP}259  7661 [159]     if _strcmp(s,'QUIT')=0 then
-{I:IMILLP}260  7682 [159]       _abort;
-{I:IMILLP}261  7690 [159] 
-{I:IMILLP}262  7690 [159]     if _strcmp(s,'SAVE')=0 then begin
-{I:IMILLP}263  7712 [159]       request:=I_NAME;
-{I:IMILLP}264  7717 [159]       editinput;
-{I:IMILLP}265  7725 [159]       savegame(s, player);
-{I:IMILLP}266  7739 [159]       message(27,'  ',player);
-{I:IMILLP}267  7754 [159]       _abort;
-{I:IMILLP}268  7758 [159]     end;
-{I:IMILLP}269  7758 [159] 
-{I:IMILLP}270  7758 [159]     valid:=false;
-{I:IMILLP}271  7760 [159]     p1:=-1;
-{I:IMILLP}272  7766 [159]     p2:=-1;
-{I:IMILLP}273  7773 [159] 
-{I:IMILLP}274  7778 [159]     case request of
-{I:IMILLP}275  7778 [159] 
-{I:IMILLP}276  7782 [159]       I_PLACE,I_TAKE:
-{I:IMILLP}277  7793 [159]         begin
-{I:IMILLP}278  7796 [159]           if len=2 then begin
-{I:IMILLP}279  7803 [159]             p1:=findpos(packed(s[0],s[1]));
-{I:IMILLP}280  7831 [159] 
-{I:IMILLP}281  7835 [159]             if p1>=0 then
-{I:IMILLP}282  7841 [159]               valid:=true
-{I:IMILLP}283  7845 [159]             else
-{I:IMILLP}284  7847 [159]               message(2,packed(s[0],s[1]),player);
-{I:IMILLP}285  7883 [159]           end
-{I:IMILLP}286  7883 [159]           else
-{I:IMILLP}287  7883 [159]             message(1,'  ',player);
-{I:IMILLP}288  7901 [159]         end;
-{I:IMILLP}289  7901 [159] 
-{I:IMILLP}290  7904 [159]       I_MOVE:
-{I:IMILLP}291  7908 [159]         begin
-{I:IMILLP}292  7911 [159]           if (len=5) and (s[2]='-') then begin
-{I:IMILLP}293  7930 [159]             p1:=findpos(packed(s[0],s[1]));
-{I:IMILLP}294  7958 [159] 
-{I:IMILLP}295  7962 [159]             if p1<0 then
-{I:IMILLP}296  7968 [159]               message(2,packed(s[0],s[1]),player)
-{I:IMILLP}297  7991 [159] 
-{I:IMILLP}298  8001 [159]             else begin
-{I:IMILLP}299  8004 [159]               p2:=findpos(packed(s[3],s[4]));
-{I:IMILLP}300  8029 [159] 
-{I:IMILLP}301  8033 [159]               if p2<0 then
-{I:IMILLP}302  8039 [159]                 message(2,packed(s[3],s[4]),player)
-{I:IMILLP}303  8062 [159] 
-{I:IMILLP}304  8072 [159]               else
-{I:IMILLP}305  8072 [159]                 valid:=true;
-{I:IMILLP}306  8077 [159]             end
-{I:IMILLP}307  8081 [159]           end
-{I:IMILLP}308  8081 [159]           else
-{I:IMILLP}309  8081 [159]             message(1,'  ',player)
-{I:IMILLP}310  8089 [159]         end
-{I:IMILLP}311  8099 [159] 
-{I:IMILLP}312  8099 [159]     end;
-{I:IMILLP}313  8101 [159] 
-{I:IMILLP}314  8101 [159]   until valid;
-{I:IMILLP}315  8101 [159] 
-{I:IMILLP}316  8108 [159]   message(0,'  ',player);
-{I:IMILLP}317  8123 [159]   _release(s);
-{I:IMILLP}318  8133 [159] end;
-{I:IMILLP}319  8133 [159] 
-{I:IMILLP}320  8134 [144] proc drawstone(pos, player: integer);
-{I:IMILLP}321  8134 [147] {**********************************}
-{I:IMILLP}322  8134 [147] var x, y: integer;
-{I:IMILLP}323  8137 [149] begin
-{I:IMILLP}324  8137 [149]   x:=X0+(ord(low(label[pos]))-ord('1'))*SPACING;
-{I:IMILLP}325  8155 [149]   y:=Y0+(ord(high(label[pos]))-ord('A'))*SPACING;
-{I:IMILLP}326  8177 [149] 
-{I:IMILLP}327  8183 [149]   vector(x-1, y-5, x+1, y-5, WHITE);
-{I:IMILLP}328  8219 [149]   vector(x-1, y+5, x+1, y+5, WHITE);
-{I:IMILLP}329  8255 [149] 
-{I:IMILLP}330  8255 [149]   if player=WHITE then begin
-{I:IMILLP}331  8262 [149]     vector(x-3, y-4, x+3, y-4, WHITE);
-{I:IMILLP}332  8301 [149]     vector(x-3, y+4, x+3, y+4, WHITE);
-{I:IMILLP}333  8337 [149] 
-{I:IMILLP}334  8337 [149]     vector(x-4, y-3, x+4, y-3, WHITE);
-{I:IMILLP}335  8373 [149]     vector(x-4, y+3, x+4, y+3, WHITE);
-{I:IMILLP}336  8409 [149] 
-{I:IMILLP}337  8409 [149]     vector(x-5, y-2, x+5, y-2, WHITE);
-{I:IMILLP}338  8445 [149]     vector(x-5, y-1, x+5, y-1, WHITE);
-{I:IMILLP}339  8481 [149]     vector(x-5, y,   x+5, y,   WHITE);
-{I:IMILLP}340  8511 [149]     vector(x-5, y+1, x+5, y+1, WHITE);
-{I:IMILLP}341  8547 [149]     vector(x-5, y+2, x+5, y+2, WHITE)
-{I:IMILLP}342  8577 [149]   end else begin
-{I:IMILLP}343  8586 [149]     vector(x-3, y-4, x-2, y-4, WHITE);
-{I:IMILLP}344  8622 [149]     vector(x+2, y-4, x+3, y-4, WHITE);
-{I:IMILLP}345  8658 [149]     vector(x-3, y+4, x-2, y+4, WHITE);
-{I:IMILLP}346  8694 [149]     vector(x+2, y+4, x+3, y+4, WHITE);
-{I:IMILLP}347  8730 [149] 
-{I:IMILLP}348  8730 [149]     endpoints(x-4, y-3, x+4, y-3);
-{I:IMILLP}349  8764 [149]     endpoints(x-4, y+3, x+4, y+3);
-{I:IMILLP}350  8798 [149] 
-{I:IMILLP}351  8798 [149]     endpoints(x-5, y-2, x+5, y-2);
-{I:IMILLP}352  8832 [149]     endpoints(x-5, y-1, x+5, y-1);
-{I:IMILLP}353  8866 [149]     endpoints(x-5, y,   x+5, y);
-{I:IMILLP}354  8894 [149]     endpoints(x-5, y+1, x+5, y+1);
-{I:IMILLP}355  8928 [149]     endpoints(x-5, y+2, x+5, y+2);
-{I:IMILLP}356  8962 [149] 
-{I:IMILLP}357  8962 [149]     vector(x,   y-4, x,   y+4, BLACK);
-{I:IMILLP}358  8992 [149]     vector(x-4, y,   x+4, y,   BLACK)
-{I:IMILLP}359  9016 [149]   end;
-{I:IMILLP}360  9022 [149] end;
-{I:IMILLP}361  9022 [149] 
-{I:IMILLP}362  9023 [145] proc drawboard;
-{I:IMILLP}363  9023 [146] {*************}
-{I:IMILLP}364  9023 [146] var i,x1,y1,x2,y2: integer;
-{I:IMILLP}365  9026 [151] 
-{I:IMILLP}366  9026 [151] begin
-{I:IMILLP}367  9026 [151] 
-{I:IMILLP}368  9026 [151]   { three nested squares }
-{I:IMILLP}369  9026 [151]   for i:=0 to 2 do begin
-{I:IMILLP}370  9045 [151]     x1 := X0 + i*SPACING;
-{I:IMILLP}371  9053 [151]     y1 := Y0 + i*SPACING;
-{I:IMILLP}372  9067 [151]     x2 := X0 + (6-i)*SPACING;
-{I:IMILLP}373  9084 [151]     y2 := Y0 + (6-i)*SPACING;
-{I:IMILLP}374  9101 [151]     vector(x1,y1,x2,y1,WHITE);
-{I:IMILLP}375  9131 [151]     vector(x2,y1,x2,y2,WHITE);
-{I:IMILLP}376  9155 [151]     vector(x2,y2,x1,y2,WHITE);
-{I:IMILLP}377  9179 [151]     vector(x1,y2,x1,y1,WHITE);
-{I:IMILLP}378  9203 [151]   end;
-{I:IMILLP}379  9203 [151] 
-{I:IMILLP}380  9217 [151]   { connections between the squares }
-{I:IMILLP}381  9217 [151]   vector(X0+3*SPACING,Y0,
-{I:IMILLP}382  9227 [151]          X0+3*SPACING,Y0+2*SPACING,WHITE);
-{I:IMILLP}383  9251 [151]   vector(X0+3*SPACING,Y0+4*SPACING,
-{I:IMILLP}384  9265 [151]          X0+3*SPACING,Y0+6*SPACING,WHITE);
-{I:IMILLP}385  9291 [151]   vector(X0,Y0+3*SPACING,
-{I:IMILLP}386  9299 [151]          X0+2*SPACING,Y0+3*SPACING,WHITE);
-{I:IMILLP}387  9325 [151]   vector(X0+4*SPACING,Y0+3*SPACING,
-{I:IMILLP}388  9339 [151]          X0+6*SPACING,Y0+3*SPACING,WHITE);
-{I:IMILLP}389  9365 [151] end;
-{I:IMILLP}390  9365 [151] 
-{I:IMILLP}391  9366 [146] proc drawstones;
-{I:IMILLP}392  9366 [147] {**************}
-{I:IMILLP}393  9366 [147] var position: integer;
-{I:IMILLP}394  9369 [148] begin
-{I:IMILLP}395  9369 [148]   for position:=0 to NPOSITIONS-1 do
-{I:IMILLP}396  9381 [148]     if board[position]<>EMPTY then
-{I:IMILLP}397  9401 [148]       drawstone(position,board[position]);
-{I:IMILLP}398  9423 [148] end;
-{I:IMILLP}399  9437 [148] 
-{I:IMILLP}400  9438 [147] proc clearstone(stone, player: integer);
-{I:IMILLP}401  9438 [150] {*************************************}
-{I:IMILLP}402  9438 [150] var i, x, y: integer;
-{I:IMILLP}403  9441 [153] begin
-{I:IMILLP}404  9441 [153]   x:=X0+(ord(low(label[stone]))-ord('1'))*SPACING;
-{I:IMILLP}405  9459 [153]   y:=Y0+(ord(high(label[stone]))-ord('A'))*SPACING;
-{I:IMILLP}406  9481 [153]   for i:=0 to 10 do begin
-{I:IMILLP}407  9504 [153]     _move(x-5,y+i-5);
-{I:IMILLP}408  9529 [153]     _draw(x+5,y+i-5, BLACK);
-{I:IMILLP}409  9556 [153]   end;
-{I:IMILLP}410  9556 [153]   drawboard;
-{I:IMILLP}411  9574 [153]   drawstones;
-{I:IMILLP}412  9578 [153] end;
-{I:IMILLP}413  9578 [153] 
-{I:IMILLP}414  9579 [148] proc drawlabels;
-{I:IMILLP}415  9579 [149] {**************}
-{I:IMILLP}416  9579 [149] var i: integer;
-{I:IMILLP}417  9582 [150]     c: char;
-{I:IMILLP}418  9582 [151] begin
-{I:IMILLP}419  9582 [151]   { 1..7 below the board }
-{I:IMILLP}420  9582 [151]   for i:=0 to 6 do begin
-{I:IMILLP}421  9601 [151]     c:=chr(ord('1')+i);
-{I:IMILLP}422  9608 [151]     _move(X0+i*SPACING-5, 0);
-{I:IMILLP}423  9634 [151]     write(@PLOTDEV,c);
-{I:IMILLP}424  9643 [151]   end;
-{I:IMILLP}425  9643 [151] 
-{I:IMILLP}426  9657 [151]   { A..G left of the board }
-{I:IMILLP}427  9657 [151]   for i:=0 to 6 do begin
-{I:IMILLP}428  9674 [151]     c:=chr(ord('A')+i);
-{I:IMILLP}429  9681 [151]     _move(0, Y0+i*SPACING-4);
-{I:IMILLP}430  9707 [151]     write(@PLOTDEV,c);
-{I:IMILLP}431  9716 [151]   end;
-{I:IMILLP}432  9716 [151] end;
-{I:IMILLP}433  9730 [151] 
-{I:IMILLP}434  9731 [149] proc cleardashstone(stone, player: integer);
-{I:IMILLP}435  9731 [152] {******************************************}
-{I:IMILLP}436  9731 [152] var i, x, y: integer;
-{I:IMILLP}437  9734 [155] begin
-{I:IMILLP}438  9734 [155]   if player=WHITE then
-{I:IMILLP}439  9742 [155]     y:=DASHWHITEY+STONEOFF
-{I:IMILLP}440  9748 [155]   else
-{I:IMILLP}441  9750 [155]     y:=DASHBLACKY+STONEOFF;
-{I:IMILLP}442  9762 [155]   x:=DASHX+8+stone*10;
-{I:IMILLP}443  9778 [155]   for i:=0 to 8 do begin
-{I:IMILLP}444  9801 [155]     _move(x-4,y+i-4);
-{I:IMILLP}445  9826 [155]     _draw(x+4,y+i-4, BLACK);
-{I:IMILLP}446  9853 [155]   end;
-{I:IMILLP}447  9853 [155] end;
-{I:IMILLP}448  9867 [155] 
-{I:IMILLP}449  9868 [150] proc dashstone(stone,player,color: integer);
-{I:IMILLP}450  9868 [154] {******************************************}
-{I:IMILLP}451  9868 [154] var x, y: integer;
-{I:IMILLP}452  9871 [156] begin
-{I:IMILLP}453  9871 [156]   if player=WHITE then
-{I:IMILLP}454  9879 [156]     y:=DASHWHITEY+STONEOFF
-{I:IMILLP}455  9885 [156]   else
-{I:IMILLP}456  9887 [156]     y:=DASHBLACKY+STONEOFF;
-{I:IMILLP}457  9899 [156]   x:=DASHX+8+stone*10;
-{I:IMILLP}458  9915 [156] 
-{I:IMILLP}459  9921 [156]   vector(x-1, y-4, x+1, y-4, WHITE);
-{I:IMILLP}460  9957 [156]   vector(x-1, y+4, x+1, y+4, WHITE);
-{I:IMILLP}461  9993 [156] 
-{I:IMILLP}462  9993 [156]   if color=WHITE then begin
-{I:IMILLP}463 10000 [156]     vector(x-3, y-3, x+3, y-3, WHITE);
-{I:IMILLP}464 10039 [156]     vector(x-3, y+3, x+3, y+3, WHITE);
-{I:IMILLP}465 10075 [156] 
-{I:IMILLP}466 10075 [156]     vector(x-4, y-2, x+4, y-2, WHITE);
-{I:IMILLP}467 10111 [156]     vector(x-4, y-1, x+4, y-1, WHITE);
-{I:IMILLP}468 10147 [156]     vector(x-4, y,   x+4, y,   WHITE);
-{I:IMILLP}469 10177 [156]     vector(x-4, y+1, x+4, y+1, WHITE);
-{I:IMILLP}470 10213 [156]     vector(x-4, y+2, x+4, y+2, WHITE)
-{I:IMILLP}471 10243 [156]   end else begin
-{I:IMILLP}472 10252 [156]     vector(x-3, y-3, x-2, y-3, WHITE);
-{I:IMILLP}473 10288 [156]     vector(x+2, y-3, x+3, y-3, WHITE);
-{I:IMILLP}474 10324 [156]     vector(x-3, y+3, x-2, y+3, WHITE);
-{I:IMILLP}475 10360 [156]     vector(x+2, y+3, x+3, y+3, WHITE);
-{I:IMILLP}476 10396 [156] 
-{I:IMILLP}477 10396 [156]     endpoints(x-4, y-2, x+4, y-2);
-{I:IMILLP}478 10430 [156]     endpoints(x-4, y-1, x+4, y-1);
-{I:IMILLP}479 10464 [156]     endpoints(x-4, y,   x+4, y);
-{I:IMILLP}480 10492 [156]     endpoints(x-4, y+1, x+4, y+1);
-{I:IMILLP}481 10526 [156]     endpoints(x-4, y+2, x+4, y+2);
-{I:IMILLP}482 10560 [156] 
-{I:IMILLP}483 10560 [156]     vector(x,   y-3, x,   y+3, BLACK);
-{I:IMILLP}484 10590 [156]     vector(x-3, y,   x+3, y,   BLACK)
-{I:IMILLP}485 10614 [156]   end;
-{I:IMILLP}486 10620 [156] end;
-{I:IMILLP}487 10620 [156] 
- 178 10621 [151] {$I IMILLCOMM}
-{I:IMILLC}  1 10621 [151] { common section for MILL and TEKMILL }
-{I:IMILLC}  2 10621 [151] {#####################################}
-{I:IMILLC}  3 10621 [151] 
-{I:IMILLC}  4 10621 [151] const
-{I:IMILLC}  5 10621 [151]   LABELS =
-{I:IMILLC}  6 10621 [152]   'A1A4A7D7G7G4G1D1B2B4B6D6F6F4F2D2C3C4C5D5E5E4E3D3';
-{I:IMILLC}  7 10670 [152] 
-{I:IMILLC}  8 10670 [152] var
-{I:IMILLC}  9 10670 [152]   mills:    array[47] of integer;
-{I:IMILLC} 10 10670 [153]   neighbor: array[95] of integer;
-{I:IMILLC} 11 10670 [154]   { There is no INVERSE stone; BLACK and WHITE used }
-{I:IMILLC} 12 10670 [154] 
-{I:IMILLC} 13 10670 [154] proc setmill(mill,p1,p2,p3: integer);
-{I:IMILLC} 14 10670 [159] {***********************************}
-{I:IMILLC} 15 10670 [159] var millbase: integer;
-{I:IMILLC} 16 10673 [160] begin
-{I:IMILLC} 17 10673 [160]   millbase:=mill*3;
-{I:IMILLC} 18 10681 [160]   mills[millbase]:=p1;
-{I:IMILLC} 19 10690 [160]   mills[millbase+1]:=p2;
-{I:IMILLC} 20 10705 [160]   mills[millbase+2]:=p3;
-{I:IMILLC} 21 10720 [160] end;
-{I:IMILLC} 22 10728 [160] 
-{I:IMILLC} 23 10729 [155] proc init_common;
-{I:IMILLC} 24 10729 [156] {***************}
-{I:IMILLC} 25 10729 [156] var position: integer;
-{I:IMILLC} 26 10732 [157] begin
-{I:IMILLC} 27 10732 [157]   for position:=0 to NPOSITIONS-1 do
-{I:IMILLC} 28 10744 [157]     board[position]:=EMPTY;
-{I:IMILLC} 29 10760 [157] 
-{I:IMILLC} 30 10778 [157]   stones[WHITE]:=NSTONES;
-{I:IMILLC} 31 10782 [157]   stones[BLACK]:=NSTONES;
-{I:IMILLC} 32 10790 [157]   captured[WHITE]:=0;
-{I:IMILLC} 33 10798 [157]   captured[BLACK]:=0;
-{I:IMILLC} 34 10806 [157] 
-{I:IMILLC} 35 10810 [157]   for position:=0 to NPOSITIONS-1 do
-{I:IMILLC} 36 10820 [157]     label[position]:=
-{I:IMILLC} 37 10834 [157]       packed(LABELS[2*position],LABELS[2*position+1]);
-{I:IMILLC} 38 10864 [157] 
-{I:IMILLC} 39 10882 [157]   { initialize mills }
-{I:IMILLC} 40 10882 [157] 
-{I:IMILLC} 41 10882 [157]   { outer square }
-{I:IMILLC} 42 10882 [157]   setmill(0,
-{I:IMILLC} 43 10884 [157]     findpos('A1'),findpos('A4'),findpos('A7'));
-{I:IMILLC} 44 10923 [157]   setmill(1,
-{I:IMILLC} 45 10925 [157]     findpos('A7'),findpos('D7'),findpos('G7'));
-{I:IMILLC} 46 10964 [157]   setmill(2,
-{I:IMILLC} 47 10966 [157]     findpos('G7'),findpos('G4'),findpos('G1'));
-{I:IMILLC} 48 11005 [157]   setmill(3,
-{I:IMILLC} 49 11007 [157]     findpos('G1'),findpos('D1'),findpos('A1'));
-{I:IMILLC} 50 11046 [157] 
-{I:IMILLC} 51 11046 [157]   { middle square }
-{I:IMILLC} 52 11046 [157]   setmill(4,
-{I:IMILLC} 53 11048 [157]     findpos('B2'),findpos('B4'),findpos('B6'));
-{I:IMILLC} 54 11087 [157]   setmill(5,
-{I:IMILLC} 55 11089 [157]     findpos('B6'),findpos('D6'),findpos('F6'));
-{I:IMILLC} 56 11128 [157]   setmill(6,
-{I:IMILLC} 57 11130 [157]     findpos('F6'),findpos('F4'),findpos('F2'));
-{I:IMILLC} 58 11169 [157]   setmill(7,
-{I:IMILLC} 59 11171 [157]     findpos('F2'),findpos('D2'),findpos('B2'));
-{I:IMILLC} 60 11210 [157] 
-{I:IMILLC} 61 11210 [157]   { inner square }
-{I:IMILLC} 62 11210 [157]   setmill(8,
-{I:IMILLC} 63 11212 [157]     findpos('C3'),findpos('C4'),findpos('C5'));
-{I:IMILLC} 64 11251 [157]   setmill(9,
-{I:IMILLC} 65 11253 [157]     findpos('C5'),findpos('D5'),findpos('E5'));
-{I:IMILLC} 66 11292 [157]   setmill(10,
-{I:IMILLC} 67 11294 [157]     findpos('E5'),findpos('E4'),findpos('E3'));
-{I:IMILLC} 68 11333 [157]   setmill(11,
-{I:IMILLC} 69 11335 [157]     findpos('E3'),findpos('D3'),findpos('C3'));
-{I:IMILLC} 70 11374 [157] 
-{I:IMILLC} 71 11374 [157]   { connections between the squares }
-{I:IMILLC} 72 11374 [157]   setmill(12,
-{I:IMILLC} 73 11376 [157]     findpos('A4'),findpos('B4'),findpos('C4'));
-{I:IMILLC} 74 11415 [157]   setmill(13,
-{I:IMILLC} 75 11417 [157]     findpos('D7'),findpos('D6'),findpos('D5'));
-{I:IMILLC} 76 11456 [157]   setmill(14,
-{I:IMILLC} 77 11458 [157]     findpos('G4'),findpos('F4'),findpos('E4'));
-{I:IMILLC} 78 11497 [157]   setmill(15,
-{I:IMILLC} 79 11499 [157]     findpos('D1'),findpos('D2'),findpos('D3'));
-{I:IMILLC} 80 11538 [157] 
-{I:IMILLC} 81 11538 [157]   { initialize neighbor }
-{I:IMILLC} 82 11538 [157] end;
-{I:IMILLC} 83 11538 [157] 
-{I:IMILLC} 84 11539 [156] proc removeneighbor(position1,position2: integer);
-{I:IMILLC} 85 11539 [159] {***********************************************}
-{I:IMILLC} 86 11539 [159] var neighbornumber,neighborbase: integer;
-{I:IMILLC} 87 11542 [161] begin
-{I:IMILLC} 88 11542 [161]   neighborbase:=position1*MAXNEIGHBORS;
-{I:IMILLC} 89 11550 [161] 
-{I:IMILLC} 90 11555 [161]   for neighbornumber:=0 to MAXNEIGHBORS-1 do
-{I:IMILLC} 91 11565 [161]     if neighbor[neighborbase+neighbornumber]
-{I:IMILLC} 92 11579 [161]        =position2 then
-{I:IMILLC} 93 11588 [161]       neighbor[neighborbase+neighbornumber]:=-1;
-{I:IMILLC} 94 11607 [161] end;
-{I:IMILLC} 95 11626 [161] 
-{I:IMILLC} 96 11627 [157] proc init_neighbors;
-{I:IMILLC} 97 11627 [158] {*******************}
-{I:IMILLC} 98 11627 [158] var position,neighborbase: integer;
-{I:IMILLC} 99 11630 [160]     x,y: char;
-{I:IMILLC}100 11630 [162]     p: integer;
-{I:IMILLC}101 11630 [163] begin
-{I:IMILLC}102 11630 [163]   for position:=0 to NPOSITIONS-1 do begin
-{I:IMILLC}103 11652 [163] 
-{I:IMILLC}104 11652 [163]     neighborbase:=position*MAXNEIGHBORS;
-{I:IMILLC}105 11658 [163] 
-{I:IMILLC}106 11663 [163]     neighbor[neighborbase]:=-1;
-{I:IMILLC}107 11669 [163]     neighbor[neighborbase+1]:=-1;
-{I:IMILLC}108 11683 [163]     neighbor[neighborbase+2]:=-1;
-{I:IMILLC}109 11697 [163]     neighbor[neighborbase+3]:=-1;
-{I:IMILLC}110 11711 [163] 
-{I:IMILLC}111 11716 [163]     { up }
-{I:IMILLC}112 11716 [163]     x:=low(label[position]);
-{I:IMILLC}113 11724 [163]     y:=high(label[position]);
-{I:IMILLC}114 11737 [163]     p:=-1;
-{I:IMILLC}115 11744 [163]     while (y<'G') and (p<0) do begin
-{I:IMILLC}116 11767 [163]       y:=chr(ord(y)+1);
-{I:IMILLC}117 11774 [163]       p:=findpos(packed(y,x));
-{I:IMILLC}118 11796 [163]     end;
-{I:IMILLC}119 11800 [163]     neighbor[neighborbase]:=p;
-{I:IMILLC}120 11807 [163] 
-{I:IMILLC}121 11815 [163]     { right }
-{I:IMILLC}122 11815 [163]     x:=low(label[position]);
-{I:IMILLC}123 11823 [163]     y:=high(label[position]);
-{I:IMILLC}124 11836 [163]     p:=-1;
-{I:IMILLC}125 11843 [163]     while (x<'7') and (p<0) do begin
-{I:IMILLC}126 11866 [163]       x:=chr(ord(x)+1);
-{I:IMILLC}127 11873 [163]       p:=findpos(packed(y,x));
-{I:IMILLC}128 11895 [163]     end;
-{I:IMILLC}129 11899 [163]     neighbor[neighborbase+1]:=p;
-{I:IMILLC}130 11909 [163] 
-{I:IMILLC}131 11917 [163]     { down }
-{I:IMILLC}132 11917 [163]     x:=low(label[position]);
-{I:IMILLC}133 11925 [163]     y:=high(label[position]);
-{I:IMILLC}134 11938 [163]     p:=-1;
-{I:IMILLC}135 11945 [163]     while (y>'A') and (p<0) do begin
-{I:IMILLC}136 11968 [163]       y:=chr(ord(y)-1);
-{I:IMILLC}137 11975 [163]       p:=findpos(packed(y,x));
-{I:IMILLC}138 11997 [163]     end;
-{I:IMILLC}139 12001 [163]     neighbor[neighborbase+2]:=p;
-{I:IMILLC}140 12011 [163] 
-{I:IMILLC}141 12019 [163]     { left }
-{I:IMILLC}142 12019 [163]     x:=low(label[position]);
-{I:IMILLC}143 12027 [163]     y:=high(label[position]);
-{I:IMILLC}144 12040 [163]     p:=-1;
-{I:IMILLC}145 12047 [163]     while (x>'1') and (p<0) do begin
-{I:IMILLC}146 12070 [163]       x:=chr(ord(x)-1);
-{I:IMILLC}147 12077 [163]       p:=findpos(packed(y,x));
-{I:IMILLC}148 12099 [163]     end;
-{I:IMILLC}149 12103 [163]     neighbor[neighborbase+3]:=p;
-{I:IMILLC}150 12113 [163] 
-{I:IMILLC}151 12121 [163]     { no cross in the center }
-{I:IMILLC}152 12121 [163]     removeneighbor(findpos('D3'),findpos('D5'));
-{I:IMILLC}153 12149 [163]     removeneighbor(findpos('D5'),findpos('D3'));
-{I:IMILLC}154 12177 [163]     removeneighbor(findpos('C4'),findpos('E4'));
-{I:IMILLC}155 12205 [163]     removeneighbor(findpos('E4'),findpos('C4'));
-{I:IMILLC}156 12233 [163] 
-{I:IMILLC}157 12233 [163]   end;
-{I:IMILLC}158 12233 [163] end;
-{I:IMILLC}159 12247 [163] 
-{I:IMILLC}160 12248 [158] func ismill(position,player: integer): boolean;
-{I:IMILLC}161 12248 [162] {****************************************}
-{I:IMILLC}162 12248 [162] var mill,millbase,i,p: integer;
-{I:IMILLC}163 12251 [166]     found: boolean;
-{I:IMILLC}164 12251 [167] begin
-{I:IMILLC}165 12251 [167]   for mill:=0 to NMILLS-1 do begin
-{I:IMILLC}166 12273 [167]     millbase:=mill*3;
-{I:IMILLC}167 12279 [167] 
-{I:IMILLC}168 12284 [167]     { is this position in the current mill? }
-{I:IMILLC}169 12284 [167]     if (mills[millbase]=position) or
-{I:IMILLC}170 12297 [167]        (mills[millbase+1]=position) or
-{I:IMILLC}171 12313 [167]        (mills[millbase+2]=position) then begin
-{I:IMILLC}172 12331 [167]       found:=true;
-{I:IMILLC}173 12336 [167]       for i:=0 to 2 do begin
-{I:IMILLC}174 12357 [167]         p:=mills[millbase+i];
-{I:IMILLC}175 12366 [167]         if board[p]<>player then found:=false;
-{I:IMILLC}176 12392 [167]       end;
-{I:IMILLC}177 12396 [167]       if found then begin
-{I:IMILLC}178 12414 [167]         ismill:=true;
-{I:IMILLC}179 12419 [167]        exit;
-{I:IMILLC}180 12424 [167]        end;
-{I:IMILLC}181 12424 [167]     end;
-{I:IMILLC}182 12424 [167]   end;
-{I:IMILLC}183 12424 [167]   ismill:=false;
-{I:IMILLC}184 12440 [167] end;
-{I:IMILLC}185 12444 [167] 
-{I:IMILLC}186 12445 [160] func otherplayer(player:integer):integer;
-{I:IMILLC}187 12445 [163] {***************************************}
-{I:IMILLC}188 12445 [163] begin
-{I:IMILLC}189 12445 [163]   if player=WHITE then
-{I:IMILLC}190 12456 [163]     otherplayer:=BLACK
-{I:IMILLC}191 12460 [163]   else
-{I:IMILLC}192 12462 [163]     otherplayer:=WHITE;
-{I:IMILLC}193 12471 [163] end;
-{I:IMILLC}194 12475 [163] 
-{I:IMILLC}195 12476 [162] proc drawreserve(player: integer);
-{I:IMILLC}196 12476 [164] {****************************}
-{I:IMILLC}197 12476 [164] var stone,x,y,color: integer;
-{I:IMILLC}198 12479 [168] begin
-{I:IMILLC}199 12479 [168]   if player=WHITE then
-{I:IMILLC}200 12487 [168]     y:=DASHWHITEY+STONEOFF
-{I:IMILLC}201 12493 [168]   else
-{I:IMILLC}202 12495 [168]     y:=DASHBLACKY+STONEOFF;
-{I:IMILLC}203 12507 [168] 
-{I:IMILLC}204 12512 [168]   for stone:=0 to 8 do begin
-{I:IMILLC}205 12529 [168]     x:=DASHX+8+stone*10;
-{I:IMILLC}206 12540 [168] 
-{I:IMILLC}207 12546 [168]     if stone<stones[player] then
-{I:IMILLC}208 12554 [168]       color:=player
-{I:IMILLC}209 12562 [168]     else
-{I:IMILLC}210 12562 [168]       color:=EMPTY;
-{I:IMILLC}211 12575 [168] 
-{I:IMILLC}212 12579 [168]     if stone>8-captured[player] then begin
-{I:IMILLC}213 12595 [168]       color:=otherplayer(player);
-{I:IMILLC}214 12610 [168]     end;
-{I:IMILLC}215 12614 [168] 
-{I:IMILLC}216 12614 [168]     if color<>EMPTY then
-{I:IMILLC}217 12620 [168]       dashstone(stone,player,color)
-{I:IMILLC}218 12632 [168]     else
-{I:IMILLC}219 12642 [168]       cleardashstone(stone, player);
-{I:IMILLC}220 12659 [168]   end;
-{I:IMILLC}221 12659 [168] end;
-{I:IMILLC}222 12673 [168] 
-{I:IMILLC}223 12674 [163] proc selectdashboard(player: integer);
-{I:IMILLC}224 12674 [165] {**********************************}
-{I:IMILLC}225 12674 [165] begin
-{I:IMILLC}226 12674 [165]   { erase both boxes }
-{I:IMILLC}227 12677 [165]   _rectangle(DASHX,DASHWHITEY,
-{I:IMILLC}228 12683 [165]              DASHWIDTH,DASHHEIGHT,BLACK);
-{I:IMILLC}229 12695 [165]   _rectangle(DASHX,DASHBLACKY,
-{I:IMILLC}230 12699 [165]              DASHWIDTH,DASHHEIGHT,BLACK);
-{I:IMILLC}231 12711 [165] 
-{I:IMILLC}232 12711 [165]   { draw box around active player }
-{I:IMILLC}233 12711 [165]   if player=WHITE then
-{I:IMILLC}234 12717 [165]     _rectangle(DASHX,DASHWHITEY,
-{I:IMILLC}235 12725 [165]                DASHWIDTH,DASHHEIGHT,WHITE)
-{I:IMILLC}236 12731 [165]   else
-{I:IMILLC}237 12737 [165]     _rectangle(DASHX,DASHBLACKY,
-{I:IMILLC}238 12744 [165]                DASHWIDTH,DASHHEIGHT,WHITE);
-{I:IMILLC}239 12756 [165] end;
-{I:IMILLC}240 12756 [165] 
-{I:IMILLC}241 12757 [164]  
- 179 12757 [164] 
- 180 12757 [164] func isneighbor(p1,p2: integer): boolean;
- 181 12757 [168] {*************************************}
- 182 12757 [168] var i,base: integer;
- 183 12760 [170] begin
- 184 12760 [170]   base:=p1*MAXNEIGHBORS;
- 185 12768 [170] 
- 186 12773 [170]   for i:=0 to MAXNEIGHBORS-1 do
- 187 12783 [170]     if neighbor[base+i]=p2 then begin
- 188 12811 [170]       isneighbor:=true;
- 189 12816 [170]       exit;
- 190 12821 [170]     end;
- 191 12821 [170] 
- 192 12835 [170]   isneighbor:=false;
- 193 12837 [170] end;
- 194 12841 [170] 
- 195 12842 [166] proc debuglabels;
- 196 12842 [167] {****************}
- 197 12842 [167] var position,neighbornumber,neighborbase: integer;
- 198 12845 [170]     nextposition: integer;
- 199 12845 [171] begin
- 200 12845 [171]   writeln(@DEBUG);
- 201 12859 [171]   writeln(@DEBUG,'Board positions and neighbors');
- 202 12901 [171]   writeln(@DEBUG);
- 203 12913 [171] 
- 204 12913 [171]   for position:=0 to NPOSITIONS-1 do begin
- 205 12933 [171]     write(@DEBUG, label[position], ': ');
- 206 12955 [171] 
- 207 12955 [171]     neighborbase:=position*MAXNEIGHBORS;
- 208 12961 [171] 
- 209 12966 [171]     for neighbornumber:=0 to MAXNEIGHBORS-1 do begin
- 210 12986 [171]       nextposition:=
- 211 12986 [171]         neighbor[neighborbase+neighbornumber];
- 212 12995 [171] 
- 213 13003 [171]       if nextposition>=0 then
- 214 13009 [171]         write(@DEBUG, label[nextposition], ' ');
- 215 13034 [171]     end;
- 216 13034 [171] 
- 217 13048 [171]     writeln(@DEBUG);
- 218 13060 [171]   end;
- 219 13060 [171] end;
- 220 13074 [171] 
- 221 13075 [167] func allinmills(player: integer): boolean;
- 222 13075 [170] {*************************************}
- 223 13075 [170] var i: integer;
- 224 13078 [171] begin
- 225 13078 [171]   allinmills:=true;
- 226 13082 [171]   for i:=0 to 23 do
- 227 13094 [171]     if board[i]=player then
- 228 13111 [171]       if not ismill(i,player) then begin
- 229 13136 [171]         allinmills:=false;
- 230 13141 [171]         exit;
- 231 13146 [171]       end;
- 232 13146 [171] end;
- 233 13160 [171] 
- 234 13161 [169] proc takestone(player: integer);
- 235 13161 [171] {******************************}
- 236 13161 [171] var p1,p2,opponent: integer;
- 237 13164 [174]     valid: boolean;
- 238 13164 [175] begin
- 239 13164 [175]   opponent:=otherplayer(player);
- 240 13178 [175] 
- 241 13182 [175]   repeat
- 242 13182 [175]     getinput(player,I_TAKE,p1,p2);
- 243 13210 [175] 
- 244 13210 [175]     valid:=false;
- 245 13212 [175] 
- 246 13216 [175]     if board[p1]<>opponent then begin
- 247 13229 [175]       if board[p1]=EMPTY then
- 248 13242 [175]         message(3,label[p1],player)
- 249 13256 [175]       else
- 250 13266 [175]         message(4,label[p1],player);
- 251 13289 [175]     end
- 252 13289 [175] 
- 253 13289 [175]     else if ismill(p1,opponent) and
- 254 13308 [175]             not allinmills(opponent) then
- 255 13320 [175]       message(8,label[p1],player)
- 256 13335 [175] 
- 257 13345 [175]     else
- 258 13345 [175]       valid:=true;
- 259 13350 [175] 
- 260 13354 [175]   until valid;
- 261 13354 [175] 
- 262 13361 [175]   board[p1]:=EMPTY;
- 263 13367 [175]   clearstone(p1,player);
- 264 13385 [175]   captured[player]:=captured[player]+1;
- 265 13399 [175]   drawreserve(player);
- 266 13414 [175]   debug(captured[WHITE],captured[BLACK]);
- 267 13414 [175] end;
- 268 13414 [175] 
- 269 13415 [170] proc placestone(player:integer);
- 270 13415 [172] {*******************************}
- 271 13415 [172] var p1, p2: integer;
- 272 13418 [174]     valid: boolean;
- 273 13418 [175] begin
- 274 13418 [175]   repeat
- 275 13418 [175]     getinput(player,I_PLACE,p1,p2);
- 276 13448 [175] 
- 277 13448 [175]     valid:=board[p1]=EMPTY;
- 278 13458 [175] 
- 279 13463 [175]     if not valid then
- 280 13463 [175]       message(6,label[p1],player);
- 281 13491 [175] 
- 282 13491 [175]   until valid;
- 283 13491 [175] 
- 284 13498 [175]   board[p1]:=player;
- 285 13502 [175]   stones[player]:=stones[player]-1;
- 286 13524 [175]   drawstone(p1,player);
- 287 13543 [175]   drawreserve(player);
- 288 13553 [175] 
- 289 13553 [175]   if ismill(p1,player) then
- 290 13569 [175]     takestone(player);
- 291 13582 [175] end;
- 292 13582 [175] 
- 293 13583 [171] func boardstones(player: integer): integer;
- 294 13583 [174] {*****************************************}
- 295 13583 [174] var i, count: integer;
- 296 13586 [176] begin
- 297 13586 [176]   count:=0;
- 298 13590 [176]   for i:=0 to 23 do
- 299 13602 [176]     if board[i]=player then count:=count+1;
- 300 13633 [176]   boardstones:=count;
- 301 13652 [176] end;
- 302 13660 [176] 
- 303 13661 [173] func islegalmove(player,p1,p2: integer): boolean;
- 304 13661 [178] {**********************************************}
- 305 13661 [178] begin
- 306 13661 [178]   islegalmove:=false;
- 307 13668 [178] 
- 308 13672 [178]   if board[p1]<>player then
- 309 13680 [178]     exit;
- 310 13689 [178] 
- 311 13689 [178]   if board[p2]<>EMPTY then
- 312 13699 [178]     exit;
- 313 13704 [178] 
- 314 13704 [178]   if boardstones(player)=3 then begin
- 315 13719 [178]     islegalmove:=true;
- 316 13724 [178]     exit;
- 317 13729 [178]   end;
- 318 13729 [178] 
- 319 13729 [178]   if isneighbor(p1,p2) then
- 320 13745 [178]     islegalmove:=true;
- 321 13750 [178] end;
- 322 13754 [178] 
- 323 13755 [175] proc movestone(player:integer);
- 324 13755 [177] {******************************}
- 325 13755 [177] var p1,p2: integer;
- 326 13758 [179]     valid: boolean;
- 327 13758 [180] 
- 328 13758 [180] begin
- 329 13758 [180]   repeat
- 330 13758 [180]     getinput(player,I_MOVE,p1,p2);
- 331 13788 [180]     valid:=false;
- 332 13790 [180] 
- 333 13794 [180]     if board[p1]=EMPTY then
- 334 13804 [180]       message(3,label[p1],player)
- 335 13818 [180] 
- 336 13828 [180]     else if board[p1]<>player then begin
- 337 13844 [180]       if player=WHITE then
- 338 13853 [180]         message(5,label[p1],player)
- 339 13867 [180]       else
- 340 13877 [180]         message(4,label[p1],player);
- 341 13900 [180] 
- 342 13900 [180]     end else if board[p2]<>EMPTY then
- 343 13913 [180]       message(6,label[p2],player)
- 344 13927 [180] 
- 345 13937 [180]     else if (boardstones(player)>3)
- 346 13954 [180]                  and not isneighbor(p1,p2) then
- 347 13971 [180]       message(7,'  ',player)
- 348 13981 [180] 
- 349 13991 [180]     else
- 350 13991 [180]       valid:=true;
- 351 13996 [180] 
- 352 14000 [180]   until valid;
- 353 14000 [180] 
- 354 14007 [180]   board[p2]:=board[p1];
- 355 14015 [180]   board[p1]:=EMPTY;
- 356 14029 [180] 
- 357 14033 [180]   clearstone(p1,player);
- 358 14047 [180]   drawstone(p2,player);
- 359 14061 [180] 
- 360 14061 [180]   if ismill(p2,player) then
- 361 14077 [180]     takestone(player);
- 362 14090 [180] end;
- 363 14090 [180] 
- 364 14091 [176] func findlegalmove(player: integer;
- 365 14091 [179]                    var p1,p2: integer): boolean;
- 366 14091 [181] {***************************************************}
- 367 14091 [181] { Enumerates all legal moves of PLAYER.
- 368 14091 [181]   Used by gameover and by the computer player.
- 369 14091 [181] 
- 370 14091 [181]   Initialize, set
- 371 14091 [181] 
- 372 14091 [181]       p1 := 0;
- 373 14091 [181]       p2 := -1;
- 374 14091 [181] 
- 375 14091 [181]   before the first call.
- 376 14091 [181] 
- 377 14091 [181]   Each successful call returns the next legal move
- 378 14091 [181]   in P1,P2. FALSE indicates that there are no more
- 379 14091 [181]   legal moves.                                      }
- 380 14091 [181] 
- 381 14091 [181] begin
- 382 14091 [181]   repeat
- 383 14094 [181]     p2:=p2+1;
- 384 14102 [181] 
- 385 14107 [181]     if p2>23 then begin
- 386 14114 [181]       p2:=0;
- 387 14119 [181]       p1:=p1+1;
- 388 14129 [181]     end;
- 389 14134 [181] 
- 390 14134 [181]     if p1>23 then begin
- 391 14141 [181]       findlegalmove:=false;
- 392 14146 [181]       exit;
- 393 14151 [181]     end;
- 394 14151 [181] 
- 395 14151 [181]   until islegalmove(player,p1,p2);
- 396 14171 [181] 
- 397 14174 [181]   findlegalmove:=true;
- 398 14176 [181] end;
- 399 14180 [181] 
- 400 14181 [178] proc playerturn(player:integer);
- 401 14181 [180] {******************************}
- 402 14181 [180] begin
- 403 14181 [180]   selectdashboard(player);
- 404 14196 [180]   if stones[player]>0 then
- 405 14206 [180]     placestone(player)
- 406 14210 [180]   else
- 407 14220 [180]     movestone(player);
- 408 14233 [180] end;
- 409 14233 [180] 
- 410 14234 [179] func gameover(player: integer): boolean;
- 411 14234 [182] {*************************************}
- 412 14234 [182] { A player can only lose after all his stones have
- 413 14234 [182]   been placed. He loses with fewer than three stones
- 414 14234 [182]   or when no legal move exists. }
- 415 14234 [182] 
- 416 14234 [182] var p1,p2: integer;
- 417 14237 [184] begin
- 418 14237 [184]   if stones[player]>0 then begin
- 419 14250 [184]     gameover:=false;
- 420 14255 [184]     exit;
- 421 14260 [184]   end;
- 422 14260 [184] 
- 423 14260 [184]   if boardstones(player)<3 then begin
- 424 14275 [184]     gameover:=true;
- 425 14280 [184]     exit;
- 426 14285 [184]   end;
- 427 14285 [184] 
- 428 14285 [184]   p1:=0;
- 429 14287 [184]   p2:=-1;
- 430 14293 [184]   gameover:=not findlegalmove(player,p1,p2);
- 431 14326 [184] end;
- 432 14331 [184] 
- 433 14332 [181] { main body }
- 434 14332 [181] {***********}
- 435 14332 [181] 
- 436 14332 [181] begin
- 437 14332 [181]   init_canvas;
- 438 14339 [181]   init_common;
- 439 14343 [181]   init_neighbors;
- 440 14347 [181] 
- 441 14347 [181]   writeln(@DEBUG,
- 442 14347 [181]     '----------------------------------------------');
- 443 14406 [181]   writeln(@DEBUG,'MILL initialized');
- 444 14435 [181] 
- 445 14435 [181]   drawboard;
- 446 14439 [181]   drawlabels;
- 447 14443 [181] 
- 448 14443 [181]   if ARGTYPE[0]='s' then loadgame;
- 449 14459 [181] 
- 450 14459 [181]   drawstones;
- 451 14463 [181]   drawreserve(WHITE);
- 452 14471 [181]   drawreserve(BLACK);
- 453 14479 [181]   _move(DASHX+1,DASHWHITEY+NAMEOFF);
- 454 14495 [181]   write(@PLOTDEV,'PLAYER 1');
- 455 14508 [181]   _move(DASHX+1,DASHBLACKY+NAMEOFF);
- 456 14524 [181]   write(@PLOTDEV,'PLAYER 2');
- 457 14537 [181] 
- 458 14537 [181]   player:=WHITE;
- 459 14539 [181] 
- 460 14543 [181]   repeat
- 461 14543 [181]     playerturn(player);
- 462 14553 [181]     player:=otherplayer(player);
- 463 14565 [181]     if gameover(player) then begin
- 464 14581 [181]       message(10,'  ',player);
- 465 14599 [181]       _abort;
- 466 14603 [181]     end;
- 467 14603 [181]   until false;
- 468 14605 [181] 
- 469 14608 [181] end.
- 470 14608 [181] 
-Code length:           14607
-Compiler stack size:   197/300
-Ident stack size:      184/350
+   6  4747 [107]   DUALPLAYER   = false;
+   7  4750 [108]   NPOSITIONS   = 24;
+   8  4750 [109]   NSTONES      = 9;
+   9  4750 [110]   NMILLS       = 16;
+  10  4750 [111]   MAXNEIGHBORS = 4;
+  11  4750 [112] 
+  12  4750 [112]   EMPTY = 4;
+  13  4750 [113] 
+  14  4750 [113] mem
+  15  4750 [113]   ARGTYPE = $00a0: array[31] of char&;
+  16  4750 [114] 
+  17  4750 [114] var
+  18  4750 [114]   board: array[23] of integer;
+  19  4750 [115]   stones, captured: array[BLACK] of integer;
+  20  4750 [117]   label:    array[23] of packed char;
+  21  4750 [118]   DEBUG: file;
+  22  4750 [119]   player,action: integer;
+  23  4750 [121] 
+  24  4750 [121]   startsec,starttenmillis: integer;
+  25  4750 [123] 
+  26  4750 [123] proc savegame(name: cpnt; player: integer);
+  27  4750 [126] {*****************************************}
+  28  4750 [126] const SAVEVERSION=1;
+  29  4753 [127] var f: file;
+  30  4753 [128]     filename: cpnt;
+  31  4753 [129]     i: integer;
+  32  4753 [130]     c: char;
+  33  4753 [131] begin
+  34  4753 [131]   filename:=_new;
+  35  4761 [131]   filename[0]:=ENDMARK;
+  36  4769 [131] 
+  37  4773 [131]   i:=0;
+  38  4775 [131]   while name[i]<>ENDMARK do begin
+  39  4795 [131]     c:=name[i];
+  40  4803 [131]     if not (((c>='A') and (c<='Z')) or
+  41  4824 [131]            ((c>='0') and (c<='9'))) then
+  42  4840 [131]       name[i]:='X';
+  43  4850 [131]     i:=i+1;
+  44  4860 [131]   end;
+  45  4865 [131]   write(@filename,'MILL',name,':B');
+  46  4887 [131] 
+  47  4887 [131]   _strfio(filename,0,1);
+  48  4901 [131]   openw(f);
+  49  4907 [131] 
+  50  4907 [131]   writeln(@f,'MILL ',SAVEVERSION);
+  51  4928 [131]   if player=WHITE then
+  52  4934 [131]     writeln(@f,'PLAYER WHITE')
+  53  4956 [131]   else
+  54  4963 [131]     writeln(@f,'PLAYER BLACK');
+  55  4991 [131]   writeln(@f,'RESERVE ',
+  56  5005 [131]           stones[WHITE],' ',stones[BLACK]);
+  57  5028 [131]   writeln(@f,'CAPTURED ',
+  58  5043 [131]           captured[WHITE],' ',captured[BLACK]);
+  59  5066 [131]   write(@f,'BOARD ');
+  60  5079 [131]   for i:=0 to 23 do begin
+  61  5096 [131]     if board[i]=WHITE then
+  62  5106 [131]       write(@f,'W')
+  63  5117 [131]     else if board[i]=BLACK then
+  64  5131 [131]       write(@f,'B')
+  65  5142 [131]     else
+  66  5143 [131]       write(@f,'-');
+  67  5154 [131]   end;
+  68  5154 [131]   writeln(@f);
+  69  5180 [131] 
+  70  5180 [131]   close(f);
+  71  5186 [131]   _release(filename);
+  72  5196 [131] end;
+  73  5196 [131] 
+  74  5197 [124] proc loadgame;
+  75  5197 [125] {************}
+  76  5197 [125] var name,fullname,line, s: cpnt;
+  77  5200 [129]     carg,length,i: integer;
+  78  5200 [132]     dummy: boolean;
+  79  5200 [133]     f: file;
+  80  5200 [134]     ateof:boolean;
+  81  5200 [135]     validfile:boolean;
+  82  5200 [136] 
+  83  5200 [136]   func strbegins(s,prefix:cpnt):boolean;
+  84  5200 [140]   begin
+  85  5200 [140]     strbegins:=_strncmp(s,prefix,_strlen(prefix))=0;
+  86  5235 [140]   end;
+  87  5240 [140] 
+  88  5241 [138]   func digit(c:char):integer;
+  89  5241 [141]   begin
+  90  5241 [141]     digit:=ord(c)-ord('0');
+  91  5252 [141]   end;
+  92  5257 [141] 
+  93  5258 [140] begin
+  94  5258 [140]   name:=_new;
+  95  5266 [140]   fullname:=_new;
+  96  5276 [140]   line:=_new;
+  97  5286 [140]   carg:=0;
+  98  5292 [140]   _sgetstring(name, carg, dummy);
+  99  5322 [140]   if strbegins(name,'MILL') then
+ 100  5341 [140]     write(@fullname,name)
+ 101  5349 [140]   else
+ 102  5355 [140]     write(@fullname,'MILL',name);
+ 103  5374 [140]   _ssetsubtype(fullname, 'B', true);
+ 104  5388 [140]   _strfio(fullname, 0, 1);
+ 105  5402 [140]   openr(f);
+ 106  5408 [140] 
+ 107  5408 [140]   validfile:=false;
+ 108  5410 [140] 
+ 109  5414 [140]   repeat
+ 110  5414 [140]     length:=_strread(f,line,ateof);
+ 111  5438 [140] 
+ 112  5442 [140]     if _strncmp(line,'MILL ',5)=0 then begin
+ 113  5467 [140]       if _strcmp(line,'MILL 1')<>0 then begin
+ 114  5494 [140]         writeln('Wrong MILL file version');
+ 115  5527 [140]         _abort;
+ 116  5531 [140]       end;
+ 117  5531 [140]       validfile:=true;
+ 118  5533 [140]     end
+ 119  5537 [140] 
+ 120  5537 [140]     else if _strcmp(line,'PLAYER WHITE')=0 then
+ 121  5569 [140]       player:=WHITE
+ 122  5573 [140] 
+ 123  5575 [140]     else if _strcmp(line,'PLAYER BLACK')=0 then
+ 124  5611 [140]       player:=BLACK
+ 125  5615 [140] 
+ 126  5617 [140]     else if strbegins(line,'RESERVE') then begin
+ 127  5646 [140]       stones[WHITE]:=digit(line[8]);
+ 128  5667 [140]       stones[BLACK]:=digit(line[10]);
+ 129  5689 [140]     end
+ 130  5693 [140] 
+ 131  5693 [140]     else if strbegins(line,'CAPTURED') then begin
+ 132  5719 [140]       captured[WHITE]:=digit(line[9]);
+ 133  5740 [140]       captured[BLACK]:=digit(line[11]);
+ 134  5762 [140]     end
+ 135  5766 [140] 
+ 136  5766 [140]     else if _strncmp(line,'BOARD ',6)=0 then begin
+ 137  5795 [140]       if length<>30 then begin
+ 138  5805 [140]         writeln('Illegal BOARD line');
+ 139  5833 [140]         exit;
+ 140  5834 [140]       end;
+ 141  5834 [140] 
+ 142  5834 [140]       for i:=0 to 23 do begin
+ 143  5851 [140]         case line[i+6] of
+ 144  5862 [140]           'W': board[i]:=WHITE;
+ 145  5877 [140]           'B': board[i]:=BLACK;
+ 146  5897 [140]           '-': board[i]:=EMPTY
+ 147  5915 [140]           else begin
+ 148  5924 [140]           writeln('Illegal character in BOARD line');
+ 149  5962 [140]           _abort
+ 150  5962 [140]           end
+ 151  5966 [140]         end {case}
+ 152  5968 [140]       end {for}
+ 153  5968 [140]     end
+ 154  5968 [140] 
+ 155  5982 [140]     else if (line[0]='{') or (length=0) then begin
+ 156  6004 [140]       { comment }
+ 157  6007 [140]     end
+ 158  6007 [140] 
+ 159  6007 [140]     else begin
+ 160  6010 [140]       writeln('Illegal line in MILL file:');
+ 161  6043 [140]       writeln(line);
+ 162  6054 [140]       _abort;
+ 163  6058 [140]     end
+ 164  6058 [140] 
+ 165  6058 [140]   until ateof;
+ 166  6058 [140] 
+ 167  6065 [140]   if not validfile then begin
+ 168  6070 [140]     writeln('Not a MILL file');
+ 169  6095 [140]     _abort;
+ 170  6099 [140]   end;
+ 171  6099 [140] 
+ 172  6099 [140]   close(f);
+ 173  6105 [140]   _release(line);
+ 174  6115 [140]   _release(fullname);
+ 175  6125 [140]   _release(name);
+ 176  6135 [140] end;
+ 177  6135 [140] 
+ 178  6136 [125] {$I IMILLPLOT}
+{I:IMILLP}  1  6136 [125] { section for MILL on onbard screen (plotlib) }
+{I:IMILLP}  2  6136 [125] { ############################################}
+{I:IMILLP}  3  6136 [125] 
+{I:IMILLP}  4  6136 [125] const
+{I:IMILLP}  5  6136 [125]     SPACING = 16;
+{I:IMILLP}  6  6136 [126]     X0 = 15;
+{I:IMILLP}  7  6136 [127]     Y0 = 15;
+{I:IMILLP}  8  6136 [128] 
+{I:IMILLP}  9  6136 [128]     DASHX      = 125;
+{I:IMILLP} 10  6136 [129]     DASHWHITEY = 63;
+{I:IMILLP} 11  6136 [130]     DASHBLACKY = 15;
+{I:IMILLP} 12  6136 [131]     DASHWIDTH  = 95;
+{I:IMILLP} 13  6136 [132]     DASHHEIGHT = 48;
+{I:IMILLP} 14  6136 [133]     MSGOFF     = 3;
+{I:IMILLP} 15  6136 [134]     INPUTOFF   = 13;
+{I:IMILLP} 16  6136 [135]     STONEOFF   = 29;
+{I:IMILLP} 17  6136 [136]     NAMEOFF    = 37;
+{I:IMILLP} 18  6136 [137] 
+{I:IMILLP} 19  6136 [137] proc init_canvas;
+{I:IMILLP} 20  6136 [138] {***************}
+{I:IMILLP} 21  6136 [138] begin
+{I:IMILLP} 22  6136 [138]   DEBUG := PRINTER;
+{I:IMILLP} 23  6143 [138]   _grinit;
+{I:IMILLP} 24  6151 [138]   _fullview;
+{I:IMILLP} 25  6155 [138]   _cleargr;
+{I:IMILLP} 26  6159 [138]   end;
+{I:IMILLP} 27  6159 [138] 
+{I:IMILLP} 28  6160 [138] proc vector(x1,y1,x2,y2, color: integer);
+{I:IMILLP} 29  6160 [144] {***************************************}
+{I:IMILLP} 30  6160 [144] begin
+{I:IMILLP} 31  6160 [144]   _move(x1,y1);
+{I:IMILLP} 32  6179 [144]   _draw(x2,y2,color);
+{I:IMILLP} 33  6197 [144] end;
+{I:IMILLP} 34  6197 [144] 
+{I:IMILLP} 35  6198 [139] proc endpoints(x1,y1,x2,y2: integer);
+{I:IMILLP} 36  6198 [144] {***********************************}
+{I:IMILLP} 37  6198 [144] begin
+{I:IMILLP} 38  6198 [144]   _plot(x1,y1,WHITE);
+{I:IMILLP} 39  6219 [144]   _plot(x2,y2,WHITE);
+{I:IMILLP} 40  6235 [144] end;
+{I:IMILLP} 41  6235 [144] 
+{I:IMILLP} 42  6236 [140] proc message(number: integer; field: packed char;
+{I:IMILLP} 43  6236 [143]            player: integer);
+{I:IMILLP} 44  6236 [144] {***********************************************}
+{I:IMILLP} 45  6236 [144] var  y, dummy: integer;
+{I:IMILLP} 46  6239 [146] begin
+{I:IMILLP} 47  6239 [146]   if player=WHITE then
+{I:IMILLP} 48  6247 [146]     y := DASHWHITEY
+{I:IMILLP} 49  6251 [146]   else
+{I:IMILLP} 50  6253 [146]     y := DASHBLACKY;
+{I:IMILLP} 51  6262 [146] 
+{I:IMILLP} 52  6266 [146]   _move(DASHX+1, y+MSGOFF);
+{I:IMILLP} 53  6284 [146]   write(@PLOTDEV,'           '); { 11 blanks }
+{I:IMILLP} 54  6300 [146] 
+{I:IMILLP} 55  6300 [146]   _move(DASHX+1, y+MSGOFF);
+{I:IMILLP} 56  6318 [146]   case number of
+{I:IMILLP} 57  6318 [146]     0: begin end;
+{I:IMILLP} 58  6329 [146]     1: write(@PLOTDEV,'BAD INPUT');
+{I:IMILLP} 59  6353 [146]     2: write(@PLOTDEV,field,' INVALID');
+{I:IMILLP} 60  6385 [146]     3: write(@PLOTDEV,field,' EMPTY');
+{I:IMILLP} 61  6415 [146]     4: write(@PLOTDEV,field,' WHITE');
+{I:IMILLP} 62  6445 [146]     5: write(@PLOTDEV,field,' BLACK');
+{I:IMILLP} 63  6475 [146]     6: write(@PLOTDEV,field,' OCCUPIED');
+{I:IMILLP} 64  6508 [146]     7: write(@PLOTDEV,'BAD MOVE');
+{I:IMILLP} 65  6531 [146]     8: write(@PLOTDEV,field,' IS MILL');
+{I:IMILLP} 66  6563 [146]     9: write(@PLOTDEV,'REMOVE ONE');
+{I:IMILLP} 67  6588 [146]    10: write(@PLOTDEV,'LOST');
+{I:IMILLP} 68  6607 [146]    20: write(@PLOTDEV,'YOUR MOVE');
+{I:IMILLP} 69  6631 [146]    21: write(@PLOTDEV,'THINKING');
+{I:IMILLP} 70  6654 [146]    24: write(@PLOTDEV,'WINS');
+{I:IMILLP} 71  6673 [146]    25: write(@PLOTDEV,'DRAW');
+{I:IMILLP} 72  6692 [146]    26: write(@PLOTDEV,'READY');
+{I:IMILLP} 73  6712 [146]    27: write(@PLOTDEV,'SAVED')
+{I:IMILLP} 74  6731 [146]    else write(@PLOTDEV,'ERROR ', number)
+{I:IMILLP} 75  6745 [146]   end;
+{I:IMILLP} 76  6753 [146]   {if number=21 then
+{I:IMILLP} 77  6753 [146]     dummy:=_syncscreen;}
+{I:IMILLP} 78  6753 [146] end;
+{I:IMILLP} 79  6753 [146] 
+{I:IMILLP} 80  6754 [141] proc strmessage(s:cpnt; player: integer);
+{I:IMILLP} 81  6754 [144] {***************************************}
+{I:IMILLP} 82  6754 [144] var  y: integer;
+{I:IMILLP} 83  6757 [145] begin
+{I:IMILLP} 84  6757 [145]   if player=WHITE then
+{I:IMILLP} 85  6765 [145]     y:=DASHWHITEY
+{I:IMILLP} 86  6769 [145]   else if player=BLACK then
+{I:IMILLP} 87  6784 [145]     y:=DASHBLACKY
+{I:IMILLP} 88  6788 [145]   else
+{I:IMILLP} 89  6790 [145]     y:=2-MSGOFF;
+{I:IMILLP} 90  6801 [145]   _move(DASHX+1, y+MSGOFF);
+{I:IMILLP} 91  6824 [145]   write(@PLOTDEV,'           '); { 11 blanks }
+{I:IMILLP} 92  6840 [145]   _move(DASHX+1, y+MSGOFF);
+{I:IMILLP} 93  6858 [145]   write(@PLOTDEV,s);
+{I:IMILLP} 94  6867 [145] end;
+{I:IMILLP} 95  6867 [145] 
+{I:IMILLP} 96  6868 [142] func findpos(labelvalue: packed char): integer;
+{I:IMILLP} 97  6868 [145] {*********************************************}
+{I:IMILLP} 98  6868 [145] var position: integer;
+{I:IMILLP} 99  6871 [146] begin
+{I:IMILLP}100  6871 [146]   position:=0;
+{I:IMILLP}101  6875 [146]   while (position<NPOSITIONS) and
+{I:IMILLP}102  6886 [146]         (labelvalue<>label[position]) do
+{I:IMILLP}103  6899 [146]     position:=position+1;
+{I:IMILLP}104  6909 [146] 
+{I:IMILLP}105  6917 [146]   if position<NPOSITIONS then
+{I:IMILLP}106  6923 [146]     findpos:=position
+{I:IMILLP}107  6927 [146]   else
+{I:IMILLP}108  6927 [146]     findpos:=-1;
+{I:IMILLP}109  6940 [146] end;
+{I:IMILLP}110  6945 [146] 
+{I:IMILLP}111  6946 [144] const
+{I:IMILLP}112  6946 [144]   I_PLACE  = 1;
+{I:IMILLP}113  6946 [145]   I_MOVE   = 2;
+{I:IMILLP}114  6946 [146]   I_TAKE   = 3;
+{I:IMILLP}115  6946 [147]   I_NAME   = 4;
+{I:IMILLP}116  6946 [148] 
+{I:IMILLP}117  6946 [148] proc getinput(player, request0: integer;
+{I:IMILLP}118  6946 [151]               var p1,p2: integer);
+{I:IMILLP}119  6946 [153] {**************************************}
+{I:IMILLP}120  6946 [153] 
+{I:IMILLP}121  6946 [153] const TOGGLE    = chr(12);
+{I:IMILLP}122  6949 [154]       BACKSPACE = chr(127);
+{I:IMILLP}123  6949 [155] 
+{I:IMILLP}124  6949 [155] var s: cpnt;
+{I:IMILLP}125  6949 [156]     x,y,len,maxlen, request: integer;
+{I:IMILLP}126  6949 [161]     valid: boolean;
+{I:IMILLP}127  6949 [162] 
+{I:IMILLP}128  6949 [162]   proc prompt;
+{I:IMILLP}129  6949 [163]   begin
+{I:IMILLP}130  6949 [163]     _move(DASHX+1,y);
+{I:IMILLP}131  6969 [163]     case request of
+{I:IMILLP}132  6969 [163]       I_PLACE:
+{I:IMILLP}133  6977 [163]         begin
+{I:IMILLP}134  6980 [163]           write(@PLOTDEV,'PLACE?');
+{I:IMILLP}135  6991 [163]           x:=DASHX+1+6*8;
+{I:IMILLP}136  7000 [163]         end;
+{I:IMILLP}137  7006 [163]       I_MOVE:
+{I:IMILLP}138  7013 [163]         begin
+{I:IMILLP}139  7016 [163]           write(@PLOTDEV,'MOVE?');
+{I:IMILLP}140  7026 [163]           x:=DASHX+1+5*8;
+{I:IMILLP}141  7035 [163]         end;
+{I:IMILLP}142  7041 [163]       I_TAKE:
+{I:IMILLP}143  7048 [163]         begin
+{I:IMILLP}144  7051 [163]           write(@PLOTDEV,'TAKE?');
+{I:IMILLP}145  7061 [163]           x:=DASHX+1+5*8;
+{I:IMILLP}146  7070 [163]         end;
+{I:IMILLP}147  7076 [163]       I_NAME:
+{I:IMILLP}148  7083 [163]         begin
+{I:IMILLP}149  7086 [163]           write(@PLOTDEV,'NAME?');
+{I:IMILLP}150  7096 [163]           x:=DASHX+1+5*8;
+{I:IMILLP}151  7105 [163]         end
+{I:IMILLP}152  7111 [163]     end;
+{I:IMILLP}153  7113 [163]   end;
+{I:IMILLP}154  7113 [163] 
+{I:IMILLP}155  7114 [163]   proc editinput;
+{I:IMILLP}156  7114 [164]   var c: char;
+{I:IMILLP}157  7117 [165]       i: integer;
+{I:IMILLP}158  7117 [166] 
+{I:IMILLP}159  7117 [166]     proc redraw;
+{I:IMILLP}160  7117 [167]     var j: integer;
+{I:IMILLP}161  7120 [168]     begin
+{I:IMILLP}162  7120 [168]       { clear complete input line }
+{I:IMILLP}163  7120 [168]       _move(DASHX+1,y);
+{I:IMILLP}164  7137 [168]       write(@PLOTDEV,'           ');
+{I:IMILLP}165  7153 [168] 
+{I:IMILLP}166  7153 [168]       { redraw prompt }
+{I:IMILLP}167  7153 [168]       prompt;
+{I:IMILLP}168  7157 [168] 
+{I:IMILLP}169  7157 [168]       { redraw input and cursor }
+{I:IMILLP}170  7157 [168]       _move(x,y);
+{I:IMILLP}171  7171 [168]       for j:=0 to len-1 do
+{I:IMILLP}172  7183 [168]         write(@PLOTDEV,s[j]);
+{I:IMILLP}173  7208 [168]       write(@PLOTDEV,'_');
+{I:IMILLP}174  7228 [168]     end;
+{I:IMILLP}175  7228 [168] 
+{I:IMILLP}176  7229 [167]     func readandblink(x0,y0: integer): char;
+{I:IMILLP}177  7229 [171]     const BLINKTIME = 16;
+{I:IMILLP}178  7232 [172]     var dummy,count: integer;
+{I:IMILLP}179  7232 [174]         ch: char;
+{I:IMILLP}180  7232 [175]         cursoron: boolean;
+{I:IMILLP}181  7232 [176]     begin
+{I:IMILLP}182  7232 [176]       dummy:=_syncscreen;
+{I:IMILLP}183  7240 [176]       count:=0;
+{I:IMILLP}184  7246 [176]       cursoron:=true;
+{I:IMILLP}185  7252 [176] 
+{I:IMILLP}186  7256 [176]       _move(x0,y0);
+{I:IMILLP}187  7270 [176]       write(@PLOTDEV,'_');
+{I:IMILLP}188  7276 [176] 
+{I:IMILLP}189  7276 [176]       repeat
+{I:IMILLP}190  7276 [176]         ch:=KEYPRESSED;
+{I:IMILLP}191  7280 [176] 
+{I:IMILLP}192  7284 [176]         if ch<>chr(0) then begin
+{I:IMILLP}193  7292 [176]           _move(x0,y0);
+{I:IMILLP}194  7309 [176]           write(@PLOTDEV,' ');
+{I:IMILLP}195  7315 [176]           readandblink:=ch;
+{I:IMILLP}196  7315 [176]           KEYPRESSED:=chr(0);
+{I:IMILLP}197  7325 [176]           exit;
+{I:IMILLP}198  7332 [176]         end;
+{I:IMILLP}199  7332 [176] 
+{I:IMILLP}200  7332 [176]         count:=count+1;
+{I:IMILLP}201  7338 [176]         _delay10msec(3);
+{I:IMILLP}202  7351 [176] 
+{I:IMILLP}203  7351 [176]         if count>=BLINKTIME then begin
+{I:IMILLP}204  7358 [176]           count:=0;
+{I:IMILLP}205  7363 [176]           _move(x0,y0);
+{I:IMILLP}206  7381 [176] 
+{I:IMILLP}207  7381 [176]           if cursoron then
+{I:IMILLP}208  7381 [176]             write(@PLOTDEV,' ')
+{I:IMILLP}209  7393 [176]           else
+{I:IMILLP}210  7394 [176]             write(@PLOTDEV,'_');
+{I:IMILLP}211  7403 [176] 
+{I:IMILLP}212  7403 [176]           cursoron:=not cursoron;
+{I:IMILLP}213  7403 [176]           dummy:=_syncscreen;
+{I:IMILLP}214  7418 [176]         end
+{I:IMILLP}215  7422 [176]       until false;
+{I:IMILLP}216  7424 [176]     end;
+{I:IMILLP}217  7427 [176] 
+{I:IMILLP}218  7428 [169]   begin
+{I:IMILLP}219  7428 [169]     len:=0;
+{I:IMILLP}220  7432 [169]     s[0]:=ENDMARK;
+{I:IMILLP}221  7440 [169] 
+{I:IMILLP}222  7444 [169]     if request=I_MOVE then
+{I:IMILLP}223  7450 [169]       maxlen:=5
+{I:IMILLP}224  7454 [169]     else
+{I:IMILLP}225  7456 [169]       maxlen:=4;       { enough for QUIT }
+{I:IMILLP}226  7469 [169] 
+{I:IMILLP}227  7469 [169]     redraw;
+{I:IMILLP}228  7473 [169] 
+{I:IMILLP}229  7473 [169]     repeat
+{I:IMILLP}230  7473 [169]       c:=readandblink(x+8*len,y);
+{I:IMILLP}231  7497 [169] 
+{I:IMILLP}232  7501 [169]       if c=BACKSPACE then begin
+{I:IMILLP}233  7508 [169]         if len>0 then begin
+{I:IMILLP}234  7518 [169]           len:=len-1;
+{I:IMILLP}235  7527 [169]           s[len]:=ENDMARK;
+{I:IMILLP}236  7538 [169]           redraw;
+{I:IMILLP}237  7546 [169]         end
+{I:IMILLP}238  7546 [169]       end
+{I:IMILLP}239  7546 [169] 
+{I:IMILLP}240  7546 [169]       else if c=TOGGLE then
+{I:IMILLP}241  7555 [169]         write(TOGGLE)
+{I:IMILLP}242  7561 [169] 
+{I:IMILLP}243  7562 [169]       else if c<>CR then begin
+{I:IMILLP}244  7572 [169]         if len<maxlen then begin
+{I:IMILLP}245  7584 [169]           s[len]:=c;
+{I:IMILLP}246  7591 [169]           len:=len+1;
+{I:IMILLP}247  7605 [169]           s[len]:=ENDMARK;
+{I:IMILLP}248  7616 [169]           redraw;
+{I:IMILLP}249  7624 [169]         end
+{I:IMILLP}250  7624 [169]       end
+{I:IMILLP}251  7624 [169] 
+{I:IMILLP}252  7624 [169]     until c=CR;
+{I:IMILLP}253  7630 [169] 
+{I:IMILLP}254  7634 [169]     { clear complete input line }
+{I:IMILLP}255  7634 [169]     _move(DASHX+1,y);
+{I:IMILLP}256  7649 [169]     write(@PLOTDEV,'           ');
+{I:IMILLP}257  7665 [169]   end;
+{I:IMILLP}258  7665 [169] 
+{I:IMILLP}259  7666 [164] begin { getinput }
+{I:IMILLP}260  7666 [164] 
+{I:IMILLP}261  7666 [164]   request:=request0;
+{I:IMILLP}262  7668 [164]   s:=_new;
+{I:IMILLP}263  7682 [164]   s[0]:=ENDMARK;
+{I:IMILLP}264  7690 [164] 
+{I:IMILLP}265  7694 [164]   if player=BLACK then
+{I:IMILLP}266  7700 [164]     y:=DASHBLACKY+INPUTOFF
+{I:IMILLP}267  7706 [164]   else
+{I:IMILLP}268  7708 [164]     y:=DASHWHITEY+INPUTOFF;
+{I:IMILLP}269  7720 [164] 
+{I:IMILLP}270  7725 [164]   repeat
+{I:IMILLP}271  7725 [164] 
+{I:IMILLP}272  7725 [164]     editinput;
+{I:IMILLP}273  7729 [164] 
+{I:IMILLP}274  7729 [164]     if _strcmp(s,'QUIT')=0 then
+{I:IMILLP}275  7750 [164]       _abort;
+{I:IMILLP}276  7758 [164] 
+{I:IMILLP}277  7758 [164]     if _strcmp(s,'SAVE')=0 then begin
+{I:IMILLP}278  7780 [164]       request:=I_NAME;
+{I:IMILLP}279  7785 [164]       editinput;
+{I:IMILLP}280  7793 [164]       savegame(s, player);
+{I:IMILLP}281  7807 [164]       message(27,'  ',player);
+{I:IMILLP}282  7822 [164]       _abort;
+{I:IMILLP}283  7826 [164]     end;
+{I:IMILLP}284  7826 [164] 
+{I:IMILLP}285  7826 [164]     valid:=false;
+{I:IMILLP}286  7828 [164]     p1:=-1;
+{I:IMILLP}287  7834 [164]     p2:=-1;
+{I:IMILLP}288  7841 [164] 
+{I:IMILLP}289  7846 [164]     case request of
+{I:IMILLP}290  7846 [164] 
+{I:IMILLP}291  7850 [164]       I_PLACE,I_TAKE:
+{I:IMILLP}292  7861 [164]         begin
+{I:IMILLP}293  7864 [164]           if len=2 then begin
+{I:IMILLP}294  7871 [164]             p1:=findpos(packed(s[0],s[1]));
+{I:IMILLP}295  7899 [164] 
+{I:IMILLP}296  7903 [164]             if p1>=0 then
+{I:IMILLP}297  7909 [164]               valid:=true
+{I:IMILLP}298  7913 [164]             else
+{I:IMILLP}299  7915 [164]               message(2,packed(s[0],s[1]),player);
+{I:IMILLP}300  7951 [164]           end
+{I:IMILLP}301  7951 [164]           else
+{I:IMILLP}302  7951 [164]             message(1,'  ',player);
+{I:IMILLP}303  7969 [164]         end;
+{I:IMILLP}304  7969 [164] 
+{I:IMILLP}305  7972 [164]       I_MOVE:
+{I:IMILLP}306  7976 [164]         begin
+{I:IMILLP}307  7979 [164]           if (len=5) and (s[2]='-') then begin
+{I:IMILLP}308  7998 [164]             p1:=findpos(packed(s[0],s[1]));
+{I:IMILLP}309  8026 [164] 
+{I:IMILLP}310  8030 [164]             if p1<0 then
+{I:IMILLP}311  8036 [164]               message(2,packed(s[0],s[1]),player)
+{I:IMILLP}312  8059 [164] 
+{I:IMILLP}313  8069 [164]             else begin
+{I:IMILLP}314  8072 [164]               p2:=findpos(packed(s[3],s[4]));
+{I:IMILLP}315  8097 [164] 
+{I:IMILLP}316  8101 [164]               if p2<0 then
+{I:IMILLP}317  8107 [164]                 message(2,packed(s[3],s[4]),player)
+{I:IMILLP}318  8130 [164] 
+{I:IMILLP}319  8140 [164]               else
+{I:IMILLP}320  8140 [164]                 valid:=true;
+{I:IMILLP}321  8145 [164]             end
+{I:IMILLP}322  8149 [164]           end
+{I:IMILLP}323  8149 [164]           else
+{I:IMILLP}324  8149 [164]             message(1,'  ',player)
+{I:IMILLP}325  8157 [164]         end
+{I:IMILLP}326  8167 [164] 
+{I:IMILLP}327  8167 [164]     end;
+{I:IMILLP}328  8169 [164] 
+{I:IMILLP}329  8169 [164]   until valid;
+{I:IMILLP}330  8169 [164] 
+{I:IMILLP}331  8176 [164]   message(0,'  ',player);
+{I:IMILLP}332  8191 [164]   _release(s);
+{I:IMILLP}333  8201 [164] end;
+{I:IMILLP}334  8201 [164] 
+{I:IMILLP}335  8202 [149] proc drawstone(pos, player: integer);
+{I:IMILLP}336  8202 [152] {**********************************}
+{I:IMILLP}337  8202 [152] var x, y: integer;
+{I:IMILLP}338  8205 [154] begin
+{I:IMILLP}339  8205 [154]   x:=X0+(ord(low(label[pos]))-ord('1'))*SPACING;
+{I:IMILLP}340  8223 [154]   y:=Y0+(ord(high(label[pos]))-ord('A'))*SPACING;
+{I:IMILLP}341  8245 [154] 
+{I:IMILLP}342  8251 [154]   vector(x-1, y-5, x+1, y-5, WHITE);
+{I:IMILLP}343  8287 [154]   vector(x-1, y+5, x+1, y+5, WHITE);
+{I:IMILLP}344  8323 [154] 
+{I:IMILLP}345  8323 [154]   if player=WHITE then begin
+{I:IMILLP}346  8330 [154]     vector(x-3, y-4, x+3, y-4, WHITE);
+{I:IMILLP}347  8369 [154]     vector(x-3, y+4, x+3, y+4, WHITE);
+{I:IMILLP}348  8405 [154] 
+{I:IMILLP}349  8405 [154]     vector(x-4, y-3, x+4, y-3, WHITE);
+{I:IMILLP}350  8441 [154]     vector(x-4, y+3, x+4, y+3, WHITE);
+{I:IMILLP}351  8477 [154] 
+{I:IMILLP}352  8477 [154]     vector(x-5, y-2, x+5, y-2, WHITE);
+{I:IMILLP}353  8513 [154]     vector(x-5, y-1, x+5, y-1, WHITE);
+{I:IMILLP}354  8549 [154]     vector(x-5, y,   x+5, y,   WHITE);
+{I:IMILLP}355  8579 [154]     vector(x-5, y+1, x+5, y+1, WHITE);
+{I:IMILLP}356  8615 [154]     vector(x-5, y+2, x+5, y+2, WHITE)
+{I:IMILLP}357  8645 [154]   end else begin
+{I:IMILLP}358  8654 [154]     vector(x-3, y-4, x-2, y-4, WHITE);
+{I:IMILLP}359  8690 [154]     vector(x+2, y-4, x+3, y-4, WHITE);
+{I:IMILLP}360  8726 [154]     vector(x-3, y+4, x-2, y+4, WHITE);
+{I:IMILLP}361  8762 [154]     vector(x+2, y+4, x+3, y+4, WHITE);
+{I:IMILLP}362  8798 [154] 
+{I:IMILLP}363  8798 [154]     endpoints(x-4, y-3, x+4, y-3);
+{I:IMILLP}364  8832 [154]     endpoints(x-4, y+3, x+4, y+3);
+{I:IMILLP}365  8866 [154] 
+{I:IMILLP}366  8866 [154]     endpoints(x-5, y-2, x+5, y-2);
+{I:IMILLP}367  8900 [154]     endpoints(x-5, y-1, x+5, y-1);
+{I:IMILLP}368  8934 [154]     endpoints(x-5, y,   x+5, y);
+{I:IMILLP}369  8962 [154]     endpoints(x-5, y+1, x+5, y+1);
+{I:IMILLP}370  8996 [154]     endpoints(x-5, y+2, x+5, y+2);
+{I:IMILLP}371  9030 [154] 
+{I:IMILLP}372  9030 [154]     vector(x,   y-4, x,   y+4, BLACK);
+{I:IMILLP}373  9060 [154]     vector(x-4, y,   x+4, y,   BLACK)
+{I:IMILLP}374  9084 [154]   end;
+{I:IMILLP}375  9090 [154] end;
+{I:IMILLP}376  9090 [154] 
+{I:IMILLP}377  9091 [150] proc drawboard;
+{I:IMILLP}378  9091 [151] {*************}
+{I:IMILLP}379  9091 [151] var i,x1,y1,x2,y2: integer;
+{I:IMILLP}380  9094 [156] 
+{I:IMILLP}381  9094 [156] begin
+{I:IMILLP}382  9094 [156] 
+{I:IMILLP}383  9094 [156]   { three nested squares }
+{I:IMILLP}384  9094 [156]   for i:=0 to 2 do begin
+{I:IMILLP}385  9113 [156]     x1 := X0 + i*SPACING;
+{I:IMILLP}386  9121 [156]     y1 := Y0 + i*SPACING;
+{I:IMILLP}387  9135 [156]     x2 := X0 + (6-i)*SPACING;
+{I:IMILLP}388  9152 [156]     y2 := Y0 + (6-i)*SPACING;
+{I:IMILLP}389  9169 [156]     vector(x1,y1,x2,y1,WHITE);
+{I:IMILLP}390  9199 [156]     vector(x2,y1,x2,y2,WHITE);
+{I:IMILLP}391  9223 [156]     vector(x2,y2,x1,y2,WHITE);
+{I:IMILLP}392  9247 [156]     vector(x1,y2,x1,y1,WHITE);
+{I:IMILLP}393  9271 [156]   end;
+{I:IMILLP}394  9271 [156] 
+{I:IMILLP}395  9285 [156]   { connections between the squares }
+{I:IMILLP}396  9285 [156]   vector(X0+3*SPACING,Y0,
+{I:IMILLP}397  9295 [156]          X0+3*SPACING,Y0+2*SPACING,WHITE);
+{I:IMILLP}398  9319 [156]   vector(X0+3*SPACING,Y0+4*SPACING,
+{I:IMILLP}399  9333 [156]          X0+3*SPACING,Y0+6*SPACING,WHITE);
+{I:IMILLP}400  9359 [156]   vector(X0,Y0+3*SPACING,
+{I:IMILLP}401  9367 [156]          X0+2*SPACING,Y0+3*SPACING,WHITE);
+{I:IMILLP}402  9393 [156]   vector(X0+4*SPACING,Y0+3*SPACING,
+{I:IMILLP}403  9407 [156]          X0+6*SPACING,Y0+3*SPACING,WHITE);
+{I:IMILLP}404  9433 [156] end;
+{I:IMILLP}405  9433 [156] 
+{I:IMILLP}406  9434 [151] proc drawstones;
+{I:IMILLP}407  9434 [152] {**************}
+{I:IMILLP}408  9434 [152] var position: integer;
+{I:IMILLP}409  9437 [153] begin
+{I:IMILLP}410  9437 [153]   for position:=0 to NPOSITIONS-1 do
+{I:IMILLP}411  9449 [153]     if board[position]<>EMPTY then
+{I:IMILLP}412  9469 [153]       drawstone(position,board[position]);
+{I:IMILLP}413  9491 [153] end;
+{I:IMILLP}414  9505 [153] 
+{I:IMILLP}415  9506 [152] proc clearstone(stone, player: integer);
+{I:IMILLP}416  9506 [155] {*************************************}
+{I:IMILLP}417  9506 [155] var i, x, y: integer;
+{I:IMILLP}418  9509 [158] begin
+{I:IMILLP}419  9509 [158]   x:=X0+(ord(low(label[stone]))-ord('1'))*SPACING;
+{I:IMILLP}420  9527 [158]   y:=Y0+(ord(high(label[stone]))-ord('A'))*SPACING;
+{I:IMILLP}421  9549 [158]   for i:=0 to 10 do begin
+{I:IMILLP}422  9572 [158]     _move(x-5,y+i-5);
+{I:IMILLP}423  9597 [158]     _draw(x+5,y+i-5, BLACK);
+{I:IMILLP}424  9624 [158]   end;
+{I:IMILLP}425  9624 [158]   drawboard;
+{I:IMILLP}426  9642 [158]   drawstones;
+{I:IMILLP}427  9646 [158] end;
+{I:IMILLP}428  9646 [158] 
+{I:IMILLP}429  9647 [153] proc drawlabels;
+{I:IMILLP}430  9647 [154] {**************}
+{I:IMILLP}431  9647 [154] var i: integer;
+{I:IMILLP}432  9650 [155]     c: char;
+{I:IMILLP}433  9650 [156] begin
+{I:IMILLP}434  9650 [156]   { 1..7 below the board }
+{I:IMILLP}435  9650 [156]   for i:=0 to 6 do begin
+{I:IMILLP}436  9669 [156]     c:=chr(ord('1')+i);
+{I:IMILLP}437  9676 [156]     _move(X0+i*SPACING-5, 0);
+{I:IMILLP}438  9702 [156]     write(@PLOTDEV,c);
+{I:IMILLP}439  9711 [156]   end;
+{I:IMILLP}440  9711 [156] 
+{I:IMILLP}441  9725 [156]   { A..G left of the board }
+{I:IMILLP}442  9725 [156]   for i:=0 to 6 do begin
+{I:IMILLP}443  9742 [156]     c:=chr(ord('A')+i);
+{I:IMILLP}444  9749 [156]     _move(0, Y0+i*SPACING-4);
+{I:IMILLP}445  9775 [156]     write(@PLOTDEV,c);
+{I:IMILLP}446  9784 [156]   end;
+{I:IMILLP}447  9784 [156] end;
+{I:IMILLP}448  9798 [156] 
+{I:IMILLP}449  9799 [154] proc cleardashstone(stone, player: integer);
+{I:IMILLP}450  9799 [157] {******************************************}
+{I:IMILLP}451  9799 [157] var i, x, y: integer;
+{I:IMILLP}452  9802 [160] begin
+{I:IMILLP}453  9802 [160]   if player=WHITE then
+{I:IMILLP}454  9810 [160]     y:=DASHWHITEY+STONEOFF
+{I:IMILLP}455  9816 [160]   else
+{I:IMILLP}456  9818 [160]     y:=DASHBLACKY+STONEOFF;
+{I:IMILLP}457  9830 [160]   x:=DASHX+8+stone*10;
+{I:IMILLP}458  9846 [160]   for i:=0 to 8 do begin
+{I:IMILLP}459  9869 [160]     _move(x-4,y+i-4);
+{I:IMILLP}460  9894 [160]     _draw(x+4,y+i-4, BLACK);
+{I:IMILLP}461  9921 [160]   end;
+{I:IMILLP}462  9921 [160] end;
+{I:IMILLP}463  9935 [160] 
+{I:IMILLP}464  9936 [155] proc dashstone(stone,player,color: integer);
+{I:IMILLP}465  9936 [159] {******************************************}
+{I:IMILLP}466  9936 [159] var x, y: integer;
+{I:IMILLP}467  9939 [161] begin
+{I:IMILLP}468  9939 [161]   if player=WHITE then
+{I:IMILLP}469  9947 [161]     y:=DASHWHITEY+STONEOFF
+{I:IMILLP}470  9953 [161]   else
+{I:IMILLP}471  9955 [161]     y:=DASHBLACKY+STONEOFF;
+{I:IMILLP}472  9967 [161]   x:=DASHX+8+stone*10;
+{I:IMILLP}473  9983 [161] 
+{I:IMILLP}474  9989 [161]   vector(x-1, y-4, x+1, y-4, WHITE);
+{I:IMILLP}475 10025 [161]   vector(x-1, y+4, x+1, y+4, WHITE);
+{I:IMILLP}476 10061 [161] 
+{I:IMILLP}477 10061 [161]   if color=WHITE then begin
+{I:IMILLP}478 10068 [161]     vector(x-3, y-3, x+3, y-3, WHITE);
+{I:IMILLP}479 10107 [161]     vector(x-3, y+3, x+3, y+3, WHITE);
+{I:IMILLP}480 10143 [161] 
+{I:IMILLP}481 10143 [161]     vector(x-4, y-2, x+4, y-2, WHITE);
+{I:IMILLP}482 10179 [161]     vector(x-4, y-1, x+4, y-1, WHITE);
+{I:IMILLP}483 10215 [161]     vector(x-4, y,   x+4, y,   WHITE);
+{I:IMILLP}484 10245 [161]     vector(x-4, y+1, x+4, y+1, WHITE);
+{I:IMILLP}485 10281 [161]     vector(x-4, y+2, x+4, y+2, WHITE)
+{I:IMILLP}486 10311 [161]   end else begin
+{I:IMILLP}487 10320 [161]     vector(x-3, y-3, x-2, y-3, WHITE);
+{I:IMILLP}488 10356 [161]     vector(x+2, y-3, x+3, y-3, WHITE);
+{I:IMILLP}489 10392 [161]     vector(x-3, y+3, x-2, y+3, WHITE);
+{I:IMILLP}490 10428 [161]     vector(x+2, y+3, x+3, y+3, WHITE);
+{I:IMILLP}491 10464 [161] 
+{I:IMILLP}492 10464 [161]     endpoints(x-4, y-2, x+4, y-2);
+{I:IMILLP}493 10498 [161]     endpoints(x-4, y-1, x+4, y-1);
+{I:IMILLP}494 10532 [161]     endpoints(x-4, y,   x+4, y);
+{I:IMILLP}495 10560 [161]     endpoints(x-4, y+1, x+4, y+1);
+{I:IMILLP}496 10594 [161]     endpoints(x-4, y+2, x+4, y+2);
+{I:IMILLP}497 10628 [161] 
+{I:IMILLP}498 10628 [161]     vector(x,   y-3, x,   y+3, BLACK);
+{I:IMILLP}499 10658 [161]     vector(x-3, y,   x+3, y,   BLACK)
+{I:IMILLP}500 10682 [161]   end;
+{I:IMILLP}501 10688 [161] end;
+{I:IMILLP}502 10688 [161] 
+ 179 10689 [156] {$I IMILLCOMM}
+{I:IMILLC}  1 10689 [156] { common section for MILL and TEKMILL }
+{I:IMILLC}  2 10689 [156] {#####################################}
+{I:IMILLC}  3 10689 [156] 
+{I:IMILLC}  4 10689 [156] const
+{I:IMILLC}  5 10689 [156]   LABELS =
+{I:IMILLC}  6 10689 [157]   'A1A4A7D7G7G4G1D1B2B4B6D6F6F4F2D2C3C4C5D5E5E4E3D3';
+{I:IMILLC}  7 10738 [157] 
+{I:IMILLC}  8 10738 [157] var
+{I:IMILLC}  9 10738 [157]   mills:    array[47] of integer;
+{I:IMILLC} 10 10738 [158]   neighbor: array[95] of integer;
+{I:IMILLC} 11 10738 [159]   { There is no INVERSE stone; BLACK and WHITE used }
+{I:IMILLC} 12 10738 [159] 
+{I:IMILLC} 13 10738 [159] proc protocolboard;
+{I:IMILLC} 14 10738 [160] {*****************}
+{I:IMILLC} 15 10738 [160] var i,row,col,pos: integer;
+{I:IMILLC} 16 10741 [164]     r,c,ch: char;
+{I:IMILLC} 17 10741 [167] begin
+{I:IMILLC} 18 10741 [167] 
+{I:IMILLC} 19 10741 [167]   { machine readable board }
+{I:IMILLC} 20 10741 [167]   write(@DEBUG,'BOARD ');
+{I:IMILLC} 21 10756 [167]   for i:=0 to 23 do begin
+{I:IMILLC} 22 10773 [167]     if board[i]=WHITE then
+{I:IMILLC} 23 10783 [167]       write(@DEBUG,'W')
+{I:IMILLC} 24 10794 [167]     else if board[i]=BLACK then
+{I:IMILLC} 25 10808 [167]       write(@DEBUG,'B')
+{I:IMILLC} 26 10819 [167]     else
+{I:IMILLC} 27 10820 [167]       write(@DEBUG,'-');
+{I:IMILLC} 28 10831 [167]   end;
+{I:IMILLC} 29 10831 [167]   writeln(@DEBUG);
+{I:IMILLC} 30 10857 [167] 
+{I:IMILLC} 31 10857 [167]   { human readable board }
+{I:IMILLC} 32 10857 [167]   writeln(@DEBUG,'MATRIX');
+{I:IMILLC} 33 10876 [167]   writeln(@DEBUG,'    1 2 3 4 5 6 7');
+{I:IMILLC} 34 10906 [167] 
+{I:IMILLC} 35 10906 [167]   for row:=6 downto 0 do begin
+{I:IMILLC} 36 10923 [167]     r:=chr(ord('A')+row);
+{I:IMILLC} 37 10930 [167]     write(@DEBUG,r,'   ');
+{I:IMILLC} 38 10950 [167] 
+{I:IMILLC} 39 10950 [167]     for col:=0 to 6 do begin
+{I:IMILLC} 40 10967 [167]       c:=chr(ord('1')+col);
+{I:IMILLC} 41 10974 [167]       pos:=findpos(packed(r,c));
+{I:IMILLC} 42 10996 [167] 
+{I:IMILLC} 43 11000 [167]       if pos<0 then
+{I:IMILLC} 44 11006 [167]         ch:='-'
+{I:IMILLC} 45 11010 [167]       else if board[pos]=WHITE then
+{I:IMILLC} 46 11029 [167]         ch:='W'
+{I:IMILLC} 47 11033 [167]       else if board[pos]=BLACK then
+{I:IMILLC} 48 11052 [167]         ch:='B'
+{I:IMILLC} 49 11056 [167]       else
+{I:IMILLC} 50 11058 [167]         ch:='#';
+{I:IMILLC} 51 11067 [167] 
+{I:IMILLC} 52 11071 [167]       write(@DEBUG,ch);
+{I:IMILLC} 53 11082 [167]       if col<6 then
+{I:IMILLC} 54 11088 [167]         write(@DEBUG,' ');
+{I:IMILLC} 55 11100 [167]     end;
+{I:IMILLC} 56 11100 [167] 
+{I:IMILLC} 57 11114 [167]     writeln(@DEBUG);
+{I:IMILLC} 58 11126 [167]   end;
+{I:IMILLC} 59 11126 [167]   writeln(@DEBUG);
+{I:IMILLC} 60 11152 [167] end;
+{I:IMILLC} 61 11152 [167] 
+{I:IMILLC} 62 11153 [160] proc protocolplace(player,pos,value,
+{I:IMILLC} 63 11153 [164]                    elapsed: integer);
+{I:IMILLC} 64 11153 [165] {***********************************}
+{I:IMILLC} 65 11153 [165] begin
+{I:IMILLC} 66 11153 [165]   write(@DEBUG,'ACTION ',action,' ');
+{I:IMILLC} 67 11179 [165] 
+{I:IMILLC} 68 11179 [165]   if player=WHITE then
+{I:IMILLC} 69 11185 [165]     write(@DEBUG,'WHITE ')
+{I:IMILLC} 70 11201 [165]   else
+{I:IMILLC} 71 11202 [165]     write(@DEBUG,'BLACK ');
+{I:IMILLC} 72 11218 [165] 
+{I:IMILLC} 73 11218 [165]   write(@DEBUG,'PLACE ',label[pos]);
+{I:IMILLC} 74 11244 [165]   if player=BLACK then
+{I:IMILLC} 75 11250 [165]     write(@DEBUG,' VALUE ',value,
+{I:IMILLC} 76 11267 [165]                 ' TIME ',elapsed,'0 MS');
+{I:IMILLC} 77 11290 [165] 
+{I:IMILLC} 78 11290 [165]   writeln(@DEBUG);
+{I:IMILLC} 79 11302 [165] end;
+{I:IMILLC} 80 11302 [165] 
+{I:IMILLC} 81 11303 [161] proc readtime(var sec,tenmillis: integer);
+{I:IMILLC} 82 11303 [164] {****************************************}
+{I:IMILLC} 83 11303 [164] var dummy: integer;
+{I:IMILLC} 84 11306 [165] 
+{I:IMILLC} 85 11306 [165]   func getbcd(address: integer): integer;
+{I:IMILLC} 86 11306 [168]   var data: integer;
+{I:IMILLC} 87 11309 [169]   begin
+{I:IMILLC} 88 11309 [169]     data:=mem[address];
+{I:IMILLC} 89 11315 [169]     getbcd:=data-6*(data div 16);
+{I:IMILLC} 90 11333 [169]   end;
+{I:IMILLC} 91 11339 [169] 
+{I:IMILLC} 92 11340 [167] begin
+{I:IMILLC} 93 11340 [167]   { update host clock }
+{I:IMILLC} 94 11340 [167]   dummy:=getbcd($17b9);
+{I:IMILLC} 95 11353 [167]   tenmillis:=getbcd($17b5);
+{I:IMILLC} 96 11368 [167]   sec:=getbcd($17b6);
+{I:IMILLC} 97 11383 [167] end;
+{I:IMILLC} 98 11387 [167] 
+{I:IMILLC} 99 11388 [162] proc starttimer;
+{I:IMILLC}100 11388 [163] {***************}
+{I:IMILLC}101 11388 [163] begin
+{I:IMILLC}102 11388 [163]   readtime(startsec,starttenmillis);
+{I:IMILLC}103 11413 [163] end;
+{I:IMILLC}104 11413 [163] 
+{I:IMILLC}105 11414 [163] func elapsed10ms: integer;
+{I:IMILLC}106 11414 [165] {************************}
+{I:IMILLC}107 11414 [165] var sec,tenmillis: integer;
+{I:IMILLC}108 11417 [167]     dsec,dtenmillis: integer;
+{I:IMILLC}109 11417 [169] begin
+{I:IMILLC}110 11417 [169]   readtime(sec,tenmillis);
+{I:IMILLC}111 11439 [169] 
+{I:IMILLC}112 11439 [169]   dsec:=sec-startsec;
+{I:IMILLC}113 11443 [169]   dtenmillis:=tenmillis-starttenmillis;
+{I:IMILLC}114 11456 [169] 
+{I:IMILLC}115 11465 [169]   if dtenmillis<0 then begin
+{I:IMILLC}116 11472 [169]     dtenmillis:=dtenmillis+100;
+{I:IMILLC}117 11481 [169]     dsec:=dsec-1;
+{I:IMILLC}118 11492 [169]   end;
+{I:IMILLC}119 11497 [169] 
+{I:IMILLC}120 11497 [169]   { wrap from 59 to 0 seconds }
+{I:IMILLC}121 11497 [169]   if dsec<0 then
+{I:IMILLC}122 11503 [169]     dsec:=dsec+60;
+{I:IMILLC}123 11513 [169] 
+{I:IMILLC}124 11518 [169]   elapsed10ms:=100*dsec+dtenmillis;
+{I:IMILLC}125 11525 [169] end;
+{I:IMILLC}126 11534 [169] 
+{I:IMILLC}127 11535 [165] proc setmill(mill,p1,p2,p3: integer);
+{I:IMILLC}128 11535 [170] {***********************************}
+{I:IMILLC}129 11535 [170] var millbase: integer;
+{I:IMILLC}130 11538 [171] begin
+{I:IMILLC}131 11538 [171]   millbase:=mill*3;
+{I:IMILLC}132 11546 [171]   mills[millbase]:=p1;
+{I:IMILLC}133 11555 [171]   mills[millbase+1]:=p2;
+{I:IMILLC}134 11570 [171]   mills[millbase+2]:=p3;
+{I:IMILLC}135 11585 [171] end;
+{I:IMILLC}136 11593 [171] 
+{I:IMILLC}137 11594 [166] proc init_common;
+{I:IMILLC}138 11594 [167] {***************}
+{I:IMILLC}139 11594 [167] var position: integer;
+{I:IMILLC}140 11597 [168] begin
+{I:IMILLC}141 11597 [168]   for position:=0 to NPOSITIONS-1 do
+{I:IMILLC}142 11609 [168]     board[position]:=EMPTY;
+{I:IMILLC}143 11625 [168] 
+{I:IMILLC}144 11643 [168]   stones[WHITE]:=NSTONES;
+{I:IMILLC}145 11647 [168]   stones[BLACK]:=NSTONES;
+{I:IMILLC}146 11655 [168]   captured[WHITE]:=0;
+{I:IMILLC}147 11663 [168]   captured[BLACK]:=0;
+{I:IMILLC}148 11671 [168] 
+{I:IMILLC}149 11675 [168]   for position:=0 to NPOSITIONS-1 do
+{I:IMILLC}150 11685 [168]     label[position]:=
+{I:IMILLC}151 11699 [168]       packed(LABELS[2*position],LABELS[2*position+1]);
+{I:IMILLC}152 11729 [168] 
+{I:IMILLC}153 11747 [168]   { initialize mills }
+{I:IMILLC}154 11747 [168] 
+{I:IMILLC}155 11747 [168]   { outer square }
+{I:IMILLC}156 11747 [168]   setmill(0,
+{I:IMILLC}157 11749 [168]     findpos('A1'),findpos('A4'),findpos('A7'));
+{I:IMILLC}158 11788 [168]   setmill(1,
+{I:IMILLC}159 11790 [168]     findpos('A7'),findpos('D7'),findpos('G7'));
+{I:IMILLC}160 11829 [168]   setmill(2,
+{I:IMILLC}161 11831 [168]     findpos('G7'),findpos('G4'),findpos('G1'));
+{I:IMILLC}162 11870 [168]   setmill(3,
+{I:IMILLC}163 11872 [168]     findpos('G1'),findpos('D1'),findpos('A1'));
+{I:IMILLC}164 11911 [168] 
+{I:IMILLC}165 11911 [168]   { middle square }
+{I:IMILLC}166 11911 [168]   setmill(4,
+{I:IMILLC}167 11913 [168]     findpos('B2'),findpos('B4'),findpos('B6'));
+{I:IMILLC}168 11952 [168]   setmill(5,
+{I:IMILLC}169 11954 [168]     findpos('B6'),findpos('D6'),findpos('F6'));
+{I:IMILLC}170 11993 [168]   setmill(6,
+{I:IMILLC}171 11995 [168]     findpos('F6'),findpos('F4'),findpos('F2'));
+{I:IMILLC}172 12034 [168]   setmill(7,
+{I:IMILLC}173 12036 [168]     findpos('F2'),findpos('D2'),findpos('B2'));
+{I:IMILLC}174 12075 [168] 
+{I:IMILLC}175 12075 [168]   { inner square }
+{I:IMILLC}176 12075 [168]   setmill(8,
+{I:IMILLC}177 12077 [168]     findpos('C3'),findpos('C4'),findpos('C5'));
+{I:IMILLC}178 12116 [168]   setmill(9,
+{I:IMILLC}179 12118 [168]     findpos('C5'),findpos('D5'),findpos('E5'));
+{I:IMILLC}180 12157 [168]   setmill(10,
+{I:IMILLC}181 12159 [168]     findpos('E5'),findpos('E4'),findpos('E3'));
+{I:IMILLC}182 12198 [168]   setmill(11,
+{I:IMILLC}183 12200 [168]     findpos('E3'),findpos('D3'),findpos('C3'));
+{I:IMILLC}184 12239 [168] 
+{I:IMILLC}185 12239 [168]   { connections between the squares }
+{I:IMILLC}186 12239 [168]   setmill(12,
+{I:IMILLC}187 12241 [168]     findpos('A4'),findpos('B4'),findpos('C4'));
+{I:IMILLC}188 12280 [168]   setmill(13,
+{I:IMILLC}189 12282 [168]     findpos('D7'),findpos('D6'),findpos('D5'));
+{I:IMILLC}190 12321 [168]   setmill(14,
+{I:IMILLC}191 12323 [168]     findpos('G4'),findpos('F4'),findpos('E4'));
+{I:IMILLC}192 12362 [168]   setmill(15,
+{I:IMILLC}193 12364 [168]     findpos('D1'),findpos('D2'),findpos('D3'));
+{I:IMILLC}194 12403 [168] 
+{I:IMILLC}195 12403 [168]   { initialize neighbor }
+{I:IMILLC}196 12403 [168] end;
+{I:IMILLC}197 12403 [168] 
+{I:IMILLC}198 12404 [167] proc removeneighbor(position1,position2: integer);
+{I:IMILLC}199 12404 [170] {***********************************************}
+{I:IMILLC}200 12404 [170] var neighbornumber,neighborbase: integer;
+{I:IMILLC}201 12407 [172] begin
+{I:IMILLC}202 12407 [172]   neighborbase:=position1*MAXNEIGHBORS;
+{I:IMILLC}203 12415 [172] 
+{I:IMILLC}204 12420 [172]   for neighbornumber:=0 to MAXNEIGHBORS-1 do
+{I:IMILLC}205 12430 [172]     if neighbor[neighborbase+neighbornumber]
+{I:IMILLC}206 12444 [172]        =position2 then
+{I:IMILLC}207 12453 [172]       neighbor[neighborbase+neighbornumber]:=-1;
+{I:IMILLC}208 12472 [172] end;
+{I:IMILLC}209 12491 [172] 
+{I:IMILLC}210 12492 [168] proc init_neighbors;
+{I:IMILLC}211 12492 [169] {*******************}
+{I:IMILLC}212 12492 [169] var position,neighborbase: integer;
+{I:IMILLC}213 12495 [171]     x,y: char;
+{I:IMILLC}214 12495 [173]     p: integer;
+{I:IMILLC}215 12495 [174] begin
+{I:IMILLC}216 12495 [174]   for position:=0 to NPOSITIONS-1 do begin
+{I:IMILLC}217 12517 [174] 
+{I:IMILLC}218 12517 [174]     neighborbase:=position*MAXNEIGHBORS;
+{I:IMILLC}219 12523 [174] 
+{I:IMILLC}220 12528 [174]     neighbor[neighborbase]:=-1;
+{I:IMILLC}221 12534 [174]     neighbor[neighborbase+1]:=-1;
+{I:IMILLC}222 12548 [174]     neighbor[neighborbase+2]:=-1;
+{I:IMILLC}223 12562 [174]     neighbor[neighborbase+3]:=-1;
+{I:IMILLC}224 12576 [174] 
+{I:IMILLC}225 12581 [174]     { up }
+{I:IMILLC}226 12581 [174]     x:=low(label[position]);
+{I:IMILLC}227 12589 [174]     y:=high(label[position]);
+{I:IMILLC}228 12602 [174]     p:=-1;
+{I:IMILLC}229 12609 [174]     while (y<'G') and (p<0) do begin
+{I:IMILLC}230 12632 [174]       y:=chr(ord(y)+1);
+{I:IMILLC}231 12639 [174]       p:=findpos(packed(y,x));
+{I:IMILLC}232 12661 [174]     end;
+{I:IMILLC}233 12665 [174]     neighbor[neighborbase]:=p;
+{I:IMILLC}234 12672 [174] 
+{I:IMILLC}235 12680 [174]     { right }
+{I:IMILLC}236 12680 [174]     x:=low(label[position]);
+{I:IMILLC}237 12688 [174]     y:=high(label[position]);
+{I:IMILLC}238 12701 [174]     p:=-1;
+{I:IMILLC}239 12708 [174]     while (x<'7') and (p<0) do begin
+{I:IMILLC}240 12731 [174]       x:=chr(ord(x)+1);
+{I:IMILLC}241 12738 [174]       p:=findpos(packed(y,x));
+{I:IMILLC}242 12760 [174]     end;
+{I:IMILLC}243 12764 [174]     neighbor[neighborbase+1]:=p;
+{I:IMILLC}244 12774 [174] 
+{I:IMILLC}245 12782 [174]     { down }
+{I:IMILLC}246 12782 [174]     x:=low(label[position]);
+{I:IMILLC}247 12790 [174]     y:=high(label[position]);
+{I:IMILLC}248 12803 [174]     p:=-1;
+{I:IMILLC}249 12810 [174]     while (y>'A') and (p<0) do begin
+{I:IMILLC}250 12833 [174]       y:=chr(ord(y)-1);
+{I:IMILLC}251 12840 [174]       p:=findpos(packed(y,x));
+{I:IMILLC}252 12862 [174]     end;
+{I:IMILLC}253 12866 [174]     neighbor[neighborbase+2]:=p;
+{I:IMILLC}254 12876 [174] 
+{I:IMILLC}255 12884 [174]     { left }
+{I:IMILLC}256 12884 [174]     x:=low(label[position]);
+{I:IMILLC}257 12892 [174]     y:=high(label[position]);
+{I:IMILLC}258 12905 [174]     p:=-1;
+{I:IMILLC}259 12912 [174]     while (x>'1') and (p<0) do begin
+{I:IMILLC}260 12935 [174]       x:=chr(ord(x)-1);
+{I:IMILLC}261 12942 [174]       p:=findpos(packed(y,x));
+{I:IMILLC}262 12964 [174]     end;
+{I:IMILLC}263 12968 [174]     neighbor[neighborbase+3]:=p;
+{I:IMILLC}264 12978 [174] 
+{I:IMILLC}265 12986 [174]     { no cross in the center }
+{I:IMILLC}266 12986 [174]     removeneighbor(findpos('D3'),findpos('D5'));
+{I:IMILLC}267 13014 [174]     removeneighbor(findpos('D5'),findpos('D3'));
+{I:IMILLC}268 13042 [174]     removeneighbor(findpos('C4'),findpos('E4'));
+{I:IMILLC}269 13070 [174]     removeneighbor(findpos('E4'),findpos('C4'));
+{I:IMILLC}270 13098 [174] 
+{I:IMILLC}271 13098 [174]   end;
+{I:IMILLC}272 13098 [174] end;
+{I:IMILLC}273 13112 [174] 
+{I:IMILLC}274 13113 [169] func ismill(position,player: integer): boolean;
+{I:IMILLC}275 13113 [173] {****************************************}
+{I:IMILLC}276 13113 [173] var mill,millbase,i,p: integer;
+{I:IMILLC}277 13116 [177]     found: boolean;
+{I:IMILLC}278 13116 [178] begin
+{I:IMILLC}279 13116 [178]   for mill:=0 to NMILLS-1 do begin
+{I:IMILLC}280 13138 [178]     millbase:=mill*3;
+{I:IMILLC}281 13144 [178] 
+{I:IMILLC}282 13149 [178]     { is this position in the current mill? }
+{I:IMILLC}283 13149 [178]     if (mills[millbase]=position) or
+{I:IMILLC}284 13162 [178]        (mills[millbase+1]=position) or
+{I:IMILLC}285 13178 [178]        (mills[millbase+2]=position) then begin
+{I:IMILLC}286 13196 [178]       found:=true;
+{I:IMILLC}287 13201 [178]       for i:=0 to 2 do begin
+{I:IMILLC}288 13222 [178]         p:=mills[millbase+i];
+{I:IMILLC}289 13231 [178]         if board[p]<>player then found:=false;
+{I:IMILLC}290 13257 [178]       end;
+{I:IMILLC}291 13261 [178]       if found then begin
+{I:IMILLC}292 13279 [178]         ismill:=true;
+{I:IMILLC}293 13284 [178]        exit;
+{I:IMILLC}294 13289 [178]        end;
+{I:IMILLC}295 13289 [178]     end;
+{I:IMILLC}296 13289 [178]   end;
+{I:IMILLC}297 13289 [178]   ismill:=false;
+{I:IMILLC}298 13305 [178] end;
+{I:IMILLC}299 13309 [178] 
+{I:IMILLC}300 13310 [171] func otherplayer(player:integer):integer;
+{I:IMILLC}301 13310 [174] {***************************************}
+{I:IMILLC}302 13310 [174] begin
+{I:IMILLC}303 13310 [174]   if player=WHITE then
+{I:IMILLC}304 13321 [174]     otherplayer:=BLACK
+{I:IMILLC}305 13325 [174]   else
+{I:IMILLC}306 13327 [174]     otherplayer:=WHITE;
+{I:IMILLC}307 13336 [174] end;
+{I:IMILLC}308 13340 [174] 
+{I:IMILLC}309 13341 [173] proc drawreserve(player: integer);
+{I:IMILLC}310 13341 [175] {****************************}
+{I:IMILLC}311 13341 [175] var stone,x,y,color: integer;
+{I:IMILLC}312 13344 [179] begin
+{I:IMILLC}313 13344 [179]   if player=WHITE then
+{I:IMILLC}314 13352 [179]     y:=DASHWHITEY+STONEOFF
+{I:IMILLC}315 13358 [179]   else
+{I:IMILLC}316 13360 [179]     y:=DASHBLACKY+STONEOFF;
+{I:IMILLC}317 13372 [179] 
+{I:IMILLC}318 13377 [179]   for stone:=0 to 8 do begin
+{I:IMILLC}319 13394 [179]     x:=DASHX+8+stone*10;
+{I:IMILLC}320 13405 [179] 
+{I:IMILLC}321 13411 [179]     if stone<stones[player] then
+{I:IMILLC}322 13419 [179]       color:=player
+{I:IMILLC}323 13427 [179]     else
+{I:IMILLC}324 13427 [179]       color:=EMPTY;
+{I:IMILLC}325 13440 [179] 
+{I:IMILLC}326 13444 [179]     if stone>8-captured[player] then begin
+{I:IMILLC}327 13460 [179]       color:=otherplayer(player);
+{I:IMILLC}328 13475 [179]     end;
+{I:IMILLC}329 13479 [179] 
+{I:IMILLC}330 13479 [179]     if color<>EMPTY then
+{I:IMILLC}331 13485 [179]       dashstone(stone,player,color)
+{I:IMILLC}332 13497 [179]     else
+{I:IMILLC}333 13507 [179]       cleardashstone(stone, player);
+{I:IMILLC}334 13524 [179]   end;
+{I:IMILLC}335 13524 [179] end;
+{I:IMILLC}336 13538 [179] 
+{I:IMILLC}337 13539 [174] proc selectdashboard(player: integer);
+{I:IMILLC}338 13539 [176] {**********************************}
+{I:IMILLC}339 13539 [176] begin
+{I:IMILLC}340 13539 [176]   { erase both boxes }
+{I:IMILLC}341 13542 [176]   _rectangle(DASHX,DASHWHITEY,
+{I:IMILLC}342 13548 [176]              DASHWIDTH,DASHHEIGHT,BLACK);
+{I:IMILLC}343 13560 [176]   _rectangle(DASHX,DASHBLACKY,
+{I:IMILLC}344 13564 [176]              DASHWIDTH,DASHHEIGHT,BLACK);
+{I:IMILLC}345 13576 [176] 
+{I:IMILLC}346 13576 [176]   { draw box around active player }
+{I:IMILLC}347 13576 [176]   if player=WHITE then
+{I:IMILLC}348 13582 [176]     _rectangle(DASHX,DASHWHITEY,
+{I:IMILLC}349 13590 [176]                DASHWIDTH,DASHHEIGHT,WHITE)
+{I:IMILLC}350 13596 [176]   else
+{I:IMILLC}351 13602 [176]     _rectangle(DASHX,DASHBLACKY,
+{I:IMILLC}352 13609 [176]                DASHWIDTH,DASHHEIGHT,WHITE);
+{I:IMILLC}353 13621 [176] end;
+{I:IMILLC}354 13621 [176] 
+{I:IMILLC}355 13622 [175]  
+ 180 13622 [175] 
+ 181 13622 [175] func isneighbor(p1,p2: integer): boolean;
+ 182 13622 [179] {*************************************}
+ 183 13622 [179] var i,base: integer;
+ 184 13625 [181] begin
+ 185 13625 [181]   base:=p1*MAXNEIGHBORS;
+ 186 13633 [181] 
+ 187 13638 [181]   for i:=0 to MAXNEIGHBORS-1 do
+ 188 13648 [181]     if neighbor[base+i]=p2 then begin
+ 189 13676 [181]       isneighbor:=true;
+ 190 13681 [181]       exit;
+ 191 13686 [181]     end;
+ 192 13686 [181] 
+ 193 13700 [181]   isneighbor:=false;
+ 194 13702 [181] end;
+ 195 13706 [181] 
+ 196 13707 [177] proc debuglabels;
+ 197 13707 [178] {****************}
+ 198 13707 [178] var position,neighbornumber,neighborbase: integer;
+ 199 13710 [181]     nextposition: integer;
+ 200 13710 [182] begin
+ 201 13710 [182]   writeln(@DEBUG);
+ 202 13724 [182]   writeln(@DEBUG,'Board positions and neighbors');
+ 203 13766 [182]   writeln(@DEBUG);
+ 204 13778 [182] 
+ 205 13778 [182]   for position:=0 to NPOSITIONS-1 do begin
+ 206 13798 [182]     write(@DEBUG, label[position], ': ');
+ 207 13820 [182] 
+ 208 13820 [182]     neighborbase:=position*MAXNEIGHBORS;
+ 209 13826 [182] 
+ 210 13831 [182]     for neighbornumber:=0 to MAXNEIGHBORS-1 do begin
+ 211 13851 [182]       nextposition:=
+ 212 13851 [182]         neighbor[neighborbase+neighbornumber];
+ 213 13860 [182] 
+ 214 13868 [182]       if nextposition>=0 then
+ 215 13874 [182]         write(@DEBUG, label[nextposition], ' ');
+ 216 13899 [182]     end;
+ 217 13899 [182] 
+ 218 13913 [182]     writeln(@DEBUG);
+ 219 13925 [182]   end;
+ 220 13925 [182] end;
+ 221 13939 [182] 
+ 222 13940 [178] func allinmills(player: integer): boolean;
+ 223 13940 [181] {*************************************}
+ 224 13940 [181] var i: integer;
+ 225 13943 [182] begin
+ 226 13943 [182]   allinmills:=true;
+ 227 13947 [182]   for i:=0 to 23 do
+ 228 13959 [182]     if board[i]=player then
+ 229 13976 [182]       if not ismill(i,player) then begin
+ 230 14001 [182]         allinmills:=false;
+ 231 14006 [182]         exit;
+ 232 14011 [182]       end;
+ 233 14011 [182] end;
+ 234 14025 [182] 
+ 235 14026 [180] proc takestone(player: integer);
+ 236 14026 [182] {******************************}
+ 237 14026 [182] var p1,p2,opponent: integer;
+ 238 14029 [185]     valid: boolean;
+ 239 14029 [186] begin
+ 240 14029 [186]   opponent:=otherplayer(player);
+ 241 14043 [186] 
+ 242 14047 [186]   repeat
+ 243 14047 [186]     getinput(player,I_TAKE,p1,p2);
+ 244 14075 [186] 
+ 245 14075 [186]     valid:=false;
+ 246 14077 [186] 
+ 247 14081 [186]     if board[p1]<>opponent then begin
+ 248 14094 [186]       if board[p1]=EMPTY then
+ 249 14107 [186]         message(3,label[p1],player)
+ 250 14121 [186]       else
+ 251 14131 [186]         message(4,label[p1],player);
+ 252 14154 [186]     end
+ 253 14154 [186] 
+ 254 14154 [186]     else if ismill(p1,opponent) and
+ 255 14173 [186]             not allinmills(opponent) then
+ 256 14185 [186]       message(8,label[p1],player)
+ 257 14200 [186] 
+ 258 14210 [186]     else
+ 259 14210 [186]       valid:=true;
+ 260 14215 [186] 
+ 261 14219 [186]   until valid;
+ 262 14219 [186] 
+ 263 14226 [186]   board[p1]:=EMPTY;
+ 264 14232 [186]   clearstone(p1,player);
+ 265 14250 [186]   captured[player]:=captured[player]+1;
+ 266 14264 [186]   drawreserve(player);
+ 267 14279 [186] end;
+ 268 14279 [186] 
+ 269 14280 [181] proc placestone(player:integer);
+ 270 14280 [183] {*******************************}
+ 271 14280 [183] var p1, p2: integer;
+ 272 14283 [185]     valid: boolean;
+ 273 14283 [186] begin
+ 274 14283 [186]   repeat
+ 275 14283 [186]     getinput(player,I_PLACE,p1,p2);
+ 276 14313 [186] 
+ 277 14313 [186]     valid:=board[p1]=EMPTY;
+ 278 14323 [186] 
+ 279 14328 [186]     if not valid then
+ 280 14328 [186]       message(6,label[p1],player);
+ 281 14356 [186] 
+ 282 14356 [186]   until valid;
+ 283 14356 [186] 
+ 284 14363 [186]   board[p1]:=player;
+ 285 14367 [186]   stones[player]:=stones[player]-1;
+ 286 14389 [186]   drawstone(p1,player);
+ 287 14408 [186]   drawreserve(player);
+ 288 14418 [186]   protocolplace(player,p1,0,0)
+ 289 14430 [186] 
+ 290 14436 [186]   if ismill(p1,player) then
+ 291 14452 [186]     takestone(player);
+ 292 14465 [186] end;
+ 293 14465 [186] 
+ 294 14466 [182] func boardstones(player: integer): integer;
+ 295 14466 [185] {*****************************************}
+ 296 14466 [185] var i, count: integer;
+ 297 14469 [187] begin
+ 298 14469 [187]   count:=0;
+ 299 14473 [187]   for i:=0 to 23 do
+ 300 14485 [187]     if board[i]=player then count:=count+1;
+ 301 14516 [187]   boardstones:=count;
+ 302 14535 [187] end;
+ 303 14543 [187] 
+ 304 14544 [184] func islegalmove(player,p1,p2: integer): boolean;
+ 305 14544 [189] {**********************************************}
+ 306 14544 [189] begin
+ 307 14544 [189]   islegalmove:=false;
+ 308 14551 [189] 
+ 309 14555 [189]   if board[p1]<>player then
+ 310 14563 [189]     exit;
+ 311 14572 [189] 
+ 312 14572 [189]   if board[p2]<>EMPTY then
+ 313 14582 [189]     exit;
+ 314 14587 [189] 
+ 315 14587 [189]   if boardstones(player)=3 then begin
+ 316 14602 [189]     islegalmove:=true;
+ 317 14607 [189]     exit;
+ 318 14612 [189]   end;
+ 319 14612 [189] 
+ 320 14612 [189]   if isneighbor(p1,p2) then
+ 321 14628 [189]     islegalmove:=true;
+ 322 14633 [189] end;
+ 323 14637 [189] 
+ 324 14638 [186] proc movestone(player:integer);
+ 325 14638 [188] {******************************}
+ 326 14638 [188] var p1,p2: integer;
+ 327 14641 [190]     valid: boolean;
+ 328 14641 [191] 
+ 329 14641 [191] begin
+ 330 14641 [191]   repeat
+ 331 14641 [191]     getinput(player,I_MOVE,p1,p2);
+ 332 14671 [191]     valid:=false;
+ 333 14673 [191] 
+ 334 14677 [191]     if board[p1]=EMPTY then
+ 335 14687 [191]       message(3,label[p1],player)
+ 336 14701 [191] 
+ 337 14711 [191]     else if board[p1]<>player then begin
+ 338 14727 [191]       if player=WHITE then
+ 339 14736 [191]         message(5,label[p1],player)
+ 340 14750 [191]       else
+ 341 14760 [191]         message(4,label[p1],player);
+ 342 14783 [191] 
+ 343 14783 [191]     end else if board[p2]<>EMPTY then
+ 344 14796 [191]       message(6,label[p2],player)
+ 345 14810 [191] 
+ 346 14820 [191]     else if (boardstones(player)>3)
+ 347 14837 [191]                  and not isneighbor(p1,p2) then
+ 348 14854 [191]       message(7,'  ',player)
+ 349 14864 [191] 
+ 350 14874 [191]     else
+ 351 14874 [191]       valid:=true;
+ 352 14879 [191] 
+ 353 14883 [191]   until valid;
+ 354 14883 [191] 
+ 355 14890 [191]   board[p2]:=board[p1];
+ 356 14898 [191]   board[p1]:=EMPTY;
+ 357 14912 [191] 
+ 358 14916 [191]   clearstone(p1,player);
+ 359 14930 [191]   drawstone(p2,player);
+ 360 14944 [191] 
+ 361 14944 [191]   if ismill(p2,player) then
+ 362 14960 [191]     takestone(player);
+ 363 14973 [191] end;
+ 364 14973 [191] 
+ 365 14974 [187] func findlegalmove(player: integer;
+ 366 14974 [190]                    var p1,p2: integer): boolean;
+ 367 14974 [192] {***************************************************}
+ 368 14974 [192] { Enumerates all legal moves of PLAYER.
+ 369 14974 [192]   Used by gameover and by the computer player.
+ 370 14974 [192] 
+ 371 14974 [192]   Initialize, set
+ 372 14974 [192] 
+ 373 14974 [192]       p1 := 0;
+ 374 14974 [192]       p2 := -1;
+ 375 14974 [192] 
+ 376 14974 [192]   before the first call.
+ 377 14974 [192] 
+ 378 14974 [192]   Each successful call returns the next legal move
+ 379 14974 [192]   in P1,P2. FALSE indicates that there are no more
+ 380 14974 [192]   legal moves.                                      }
+ 381 14974 [192] 
+ 382 14974 [192] begin
+ 383 14974 [192]   repeat
+ 384 14977 [192]     p2:=p2+1;
+ 385 14985 [192] 
+ 386 14990 [192]     if p2>23 then begin
+ 387 14997 [192]       p2:=0;
+ 388 15002 [192]       p1:=p1+1;
+ 389 15012 [192]     end;
+ 390 15017 [192] 
+ 391 15017 [192]     if p1>23 then begin
+ 392 15024 [192]       findlegalmove:=false;
+ 393 15029 [192]       exit;
+ 394 15034 [192]     end;
+ 395 15034 [192] 
+ 396 15034 [192]   until islegalmove(player,p1,p2);
+ 397 15054 [192] 
+ 398 15057 [192]   findlegalmove:=true;
+ 399 15059 [192] end;
+ 400 15063 [192] 
+ 401 15064 [189] {$I IMILLAUTO:P}
+{I:IMILLA}  1 15064 [189] func threats(player: integer): integer;
+{I:IMILLA}  2 15064 [192] {*************************************}
+{I:IMILLA}  3 15064 [192] { Number of empty positions where PLAYER
+{I:IMILLA}  4 15064 [192]   could form a mill by placing one stone. }
+{I:IMILLA}  5 15064 [192] 
+{I:IMILLA}  6 15064 [192] var i,count: integer;
+{I:IMILLA}  7 15067 [194] begin
+{I:IMILLA}  8 15067 [194]   count:=0;
+{I:IMILLA}  9 15071 [194] 
+{I:IMILLA} 10 15075 [194]   for i:=0 to 23 do
+{I:IMILLA} 11 15083 [194]     if board[i]=EMPTY then begin
+{I:IMILLA} 12 15103 [194]       board[i]:=player;
+{I:IMILLA} 13 15110 [194] 
+{I:IMILLA} 14 15118 [194]       if ismill(i,player) then
+{I:IMILLA} 15 15134 [194]         count:=count+1;
+{I:IMILLA} 16 15143 [194] 
+{I:IMILLA} 17 15148 [194]       board[i]:=EMPTY;
+{I:IMILLA} 18 15154 [194]     end;
+{I:IMILLA} 19 15158 [194] 
+{I:IMILLA} 20 15172 [194]   threats:=count;
+{I:IMILLA} 21 15172 [194] end;
+{I:IMILLA} 22 15180 [194] 
+{I:IMILLA} 23 15181 [191] func placevalue(player,pos: integer): integer;
+{I:IMILLA} 24 15181 [195] {****************************************}
+{I:IMILLA} 25 15181 [195] var opponent,value,n: integer;
+{I:IMILLA} 26 15184 [198] begin
+{I:IMILLA} 27 15184 [198]   opponent:=otherplayer(player);
+{I:IMILLA} 28 15198 [198]   value:=0;
+{I:IMILLA} 29 15204 [198] 
+{I:IMILLA} 30 15208 [198]   if board[pos]=EMPTY then begin
+{I:IMILLA} 31 15219 [198] 
+{I:IMILLA} 32 15222 [198]     { immediate mill }
+{I:IMILLA} 33 15222 [198]     board[pos]:=player;
+{I:IMILLA} 34 15226 [198] 
+{I:IMILLA} 35 15234 [198]     if ismill(pos,player) then
+{I:IMILLA} 36 15250 [198]       value:=100
+{I:IMILLA} 37 15253 [198]     else begin
+{I:IMILLA} 38 15262 [198]       n:=threats(player);
+{I:IMILLA} 39 15274 [198] 
+{I:IMILLA} 40 15278 [198]       if n>=2 then
+{I:IMILLA} 41 15284 [198]         value:=value+30
+{I:IMILLA} 42 15292 [198]       else if n=1 then
+{I:IMILLA} 43 15308 [198]         value:=value+10;
+{I:IMILLA} 44 15318 [198]     end;
+{I:IMILLA} 45 15323 [198] 
+{I:IMILLA} 46 15323 [198]     { opponent threats after this placement }
+{I:IMILLA} 47 15323 [198]     n:=threats(opponent);
+{I:IMILLA} 48 15335 [198] 
+{I:IMILLA} 49 15339 [198]     if n>=2 then
+{I:IMILLA} 50 15345 [198]       value:=value-40
+{I:IMILLA} 51 15353 [198]     else if n=1 then
+{I:IMILLA} 52 15369 [198]       value:=value-15;
+{I:IMILLA} 53 15379 [198] 
+{I:IMILLA} 54 15384 [198]     board[pos]:=EMPTY;
+{I:IMILLA} 55 15390 [198]   end;
+{I:IMILLA} 56 15394 [198] 
+{I:IMILLA} 57 15394 [198]   placevalue:=value;
+{I:IMILLA} 58 15394 [198] end;
+{I:IMILLA} 59 15402 [198] 
+{I:IMILLA} 60 15403 [193] func computertake(player: integer):integer;
+{I:IMILLA} 61 15403 [196] {*****************************************}
+{I:IMILLA} 62 15403 [196] var p1,opponent: integer;
+{I:IMILLA} 63 15406 [198]     allinmills0: boolean;
+{I:IMILLA} 64 15406 [199] begin
+{I:IMILLA} 65 15406 [199]   opponent:=otherplayer(player);
+{I:IMILLA} 66 15420 [199]   allinmills0:=allinmills(opponent);
+{I:IMILLA} 67 15436 [199] 
+{I:IMILLA} 68 15440 [199]   repeat
+{I:IMILLA} 69 15440 [199]     p1:=_mod(_random,24);
+{I:IMILLA} 70 15456 [199]   until (board[p1]=opponent)
+{I:IMILLA} 71 15468 [199]     and (not ismill(p1,opponent)
+{I:IMILLA} 72 15479 [199]          or allinmills0);
+{I:IMILLA} 73 15495 [199] 
+{I:IMILLA} 74 15499 [199]   board[p1]:=EMPTY;
+{I:IMILLA} 75 15505 [199]   clearstone(p1,player);
+{I:IMILLA} 76 15523 [199]   captured[player]:=captured[player]+1;
+{I:IMILLA} 77 15537 [199]   drawreserve(player);
+{I:IMILLA} 78 15552 [199]   computertake:=p1;
+{I:IMILLA} 79 15552 [199] end;
+{I:IMILLA} 80 15560 [199] 
+{I:IMILLA} 81 15561 [195] proc computerplace(player: integer);
+{I:IMILLA} 82 15561 [197] {**********************************}
+{I:IMILLA} 83 15561 [197] var i,p,bestpos,bestvalue,value,tk: integer;
+{I:IMILLA} 84 15564 [203]   s: cpnt;
+{I:IMILLA} 85 15564 [204] begin
+{I:IMILLA} 86 15564 [204]   s:=_new;
+{I:IMILLA} 87 15572 [204]   debug('computerplace',player);
+{I:IMILLA} 88 15576 [204]   bestpos:=-1;
+{I:IMILLA} 89 15578 [204]   bestvalue:=-1;
+{I:IMILLA} 90 15585 [204] 
+{I:IMILLA} 91 15590 [204]   for i:=0 to 23 do
+{I:IMILLA} 92 15598 [204]     if board[i]=EMPTY then begin
+{I:IMILLA} 93 15618 [204]       value:=placevalue(player,i);
+{I:IMILLA} 94 15637 [204]       writeln(@DEBUG,'EVAL ',label[i],' ',value);
+{I:IMILLA} 95 15679 [204] 
+{I:IMILLA} 96 15679 [204]       if (bestpos<0)
+{I:IMILLA} 97 15685 [204]         or (value>bestvalue)
+{I:IMILLA} 98 15690 [204]         or ((value=bestvalue)
+{I:IMILLA} 99 15700 [204]         and (_mod(_random,2)=0))
+{I:IMILLA}100 15724 [204]       then begin
+{I:IMILLA}101 15726 [204]         bestvalue:=value;
+{I:IMILLA}102 15729 [204]         bestpos:=i;
+{I:IMILLA}103 15737 [204]       end;
+{I:IMILLA}104 15745 [204]     end;
+{I:IMILLA}105 15745 [204] 
+{I:IMILLA}106 15759 [204]   p:=bestpos;
+{I:IMILLA}107 15759 [204] 
+{I:IMILLA}108 15767 [204]   board[p]:=player;
+{I:IMILLA}109 15771 [204]   stones[player]:=stones[player]-1;
+{I:IMILLA}110 15793 [204] 
+{I:IMILLA}111 15798 [204]   drawstone(p,player);
+{I:IMILLA}112 15812 [204]   drawreserve(player);
+{I:IMILLA}113 15822 [204]   protocolplace(player,bestpos,bestvalue,elapsed10ms);
+{I:IMILLA}114 15846 [204] 
+{I:IMILLA}115 15846 [204]   if ismill(p,player) then begin
+{I:IMILLA}116 15862 [204]     tk:=computertake(player);
+{I:IMILLA}117 15877 [204]     write(@s,label[p],'/',label[tk]);
+{I:IMILLA}118 15915 [204]   end else
+{I:IMILLA}119 15915 [204]     write(@s,label[p]);
+{I:IMILLA}120 15937 [204]   strmessage(s,EMPTY);
+{I:IMILLA}121 15949 [204]   _release(s);
+{I:IMILLA}122 15959 [204] end;
+{I:IMILLA}123 15959 [204] 
+{I:IMILLA}124 15960 [196] proc computermove(player: integer);
+{I:IMILLA}125 15960 [198] {*******************************}
+{I:IMILLA}126 15960 [198] var p1,p2,tk: integer;
+{I:IMILLA}127 15963 [201] begin
+{I:IMILLA}128 15963 [201]   repeat
+{I:IMILLA}129 15963 [201]     p1:=_mod(_random,24);
+{I:IMILLA}130 15981 [201]     p2:=_mod(_random,24);
+{I:IMILLA}131 16001 [201]   until islegalmove(player,p1,p2);
+{I:IMILLA}132 16025 [201] 
+{I:IMILLA}133 16028 [201]   board[p1]:=EMPTY;
+{I:IMILLA}134 16034 [201]   board[p2]:=player;
+{I:IMILLA}135 16042 [201] 
+{I:IMILLA}136 16050 [201]   clearstone(p1,player);
+{I:IMILLA}137 16064 [201]   drawstone(p2,player);
+{I:IMILLA}138 16078 [201] 
+{I:IMILLA}139 16078 [201]   if ismill(p2,player) then
+{I:IMILLA}140 16094 [201]     tk:=computertake(player);
+{I:IMILLA}141 16109 [201] end;
+{I:IMILLA}142 16113 [201] 
+{I:IMILLA}143 16114 [197] proc computerturn(player: integer);
+{I:IMILLA}144 16114 [199] {*******************************}
+{I:IMILLA}145 16114 [199] var s:cpnt;
+{I:IMILLA}146 16117 [200] begin
+{I:IMILLA}147 16117 [200]   starttimer;
+{I:IMILLA}148 16123 [200]   if stones[player]>0 then
+{I:IMILLA}149 16133 [200]     computerplace(player)
+{I:IMILLA}150 16137 [200]   else
+{I:IMILLA}151 16147 [200]     computermove(player);
+{I:IMILLA}152 16160 [200]   s:=_new;
+{I:IMILLA}153 16166 [200]   write(@s,elapsed10ms,'0 MS');
+{I:IMILLA}154 16188 [200]   strmessage(s,player);
+{I:IMILLA}155 16202 [200]   _release(s);
+{I:IMILLA}156 16212 [200] end;
+ 402 16213 [198] 
+ 403 16213 [198] proc playerturn(player: integer);
+ 404 16213 [200] {*******************************}
+ 405 16213 [200] begin
+ 406 16213 [200]   selectdashboard(player);
+ 407 16228 [200] 
+ 408 16228 [200]   if DUALPLAYER then begin
+ 409 16230 [200]     if stones[player]>0 then
+ 410 16243 [200]       placestone(player)
+ 411 16247 [200]     else
+ 412 16257 [200]       movestone(player);
+ 413 16270 [200]   end
+ 414 16270 [200]   else begin
+ 415 16273 [200]     if player=WHITE then begin
+ 416 16280 [200]       if stones[player]>0 then
+ 417 16293 [200]         placestone(player)
+ 418 16297 [200]       else
+ 419 16307 [200]         movestone(player);
+ 420 16320 [200]     end
+ 421 16320 [200]     else begin
+ 422 16323 [200]       message(21,'  ',player);
+ 423 16338 [200]       computerturn(player);
+ 424 16348 [200]     end;
+ 425 16348 [200]   end;
+ 426 16348 [200] end;
+ 427 16348 [200] 
+ 428 16349 [199] func gameover(player: integer): boolean;
+ 429 16349 [202] {*************************************}
+ 430 16349 [202] { A player can only lose after all his stones have
+ 431 16349 [202]   been placed. He loses with fewer than three stones
+ 432 16349 [202]   or when no legal move exists. }
+ 433 16349 [202] 
+ 434 16349 [202] var p1,p2: integer;
+ 435 16352 [204] begin
+ 436 16352 [204]   if stones[player]>0 then begin
+ 437 16365 [204]     gameover:=false;
+ 438 16370 [204]     exit;
+ 439 16375 [204]   end;
+ 440 16375 [204] 
+ 441 16375 [204]   if boardstones(player)<3 then begin
+ 442 16390 [204]     gameover:=true;
+ 443 16395 [204]     exit;
+ 444 16400 [204]   end;
+ 445 16400 [204] 
+ 446 16400 [204]   p1:=0;
+ 447 16402 [204]   p2:=-1;
+ 448 16408 [204]   gameover:=not findlegalmove(player,p1,p2);
+ 449 16441 [204] end;
+ 450 16446 [204] 
+ 451 16447 [201] { main body }
+ 452 16447 [201] {***********}
+ 453 16447 [201] 
+ 454 16447 [201] begin
+ 455 16447 [201]   init_canvas;
+ 456 16454 [201]   init_common;
+ 457 16458 [201]   init_neighbors;
+ 458 16462 [201] 
+ 459 16462 [201]   writeln(@DEBUG,
+ 460 16462 [201]     '----------------------------------------------');
+ 461 16521 [201]   writeln(@DEBUG,'MILL initialized');
+ 462 16550 [201] 
+ 463 16550 [201]   drawboard;
+ 464 16554 [201]   drawlabels;
+ 465 16558 [201] 
+ 466 16558 [201]   if ARGTYPE[0]='s' then loadgame;
+ 467 16574 [201] 
+ 468 16574 [201]   drawstones;
+ 469 16578 [201]   drawreserve(WHITE);
+ 470 16586 [201]   drawreserve(BLACK);
+ 471 16594 [201]   _move(DASHX+1,DASHWHITEY+NAMEOFF);
+ 472 16610 [201]   write(@PLOTDEV,'PLAYER');
+ 473 16621 [201]   _move(DASHX+1,DASHBLACKY+NAMEOFF);
+ 474 16637 [201]   write(@PLOTDEV,'COMPUTER');
+ 475 16650 [201] 
+ 476 16650 [201]   player:=WHITE;
+ 477 16652 [201]   action:=0;
+ 478 16658 [201]   repeat
+ 479 16662 [201]     action:=action+1;
+ 480 16668 [201]     playerturn(player);
+ 481 16683 [201]     protocolboard;
+ 482 16687 [201]     player:=otherplayer(player);
+ 483 16699 [201]     if gameover(player) then begin
+ 484 16715 [201]       message(10,'  ',player);
+ 485 16733 [201]       _abort;
+ 486 16737 [201]     end;
+ 487 16737 [201]   until false;
+ 488 16739 [201] 
+ 489 16742 [201] end.
+ 490 16742 [201] 
+Code length:           16741
+Compiler stack size:   221/300
+Ident stack size:      204/350

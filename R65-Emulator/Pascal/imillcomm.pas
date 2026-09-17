@@ -10,6 +10,120 @@ var
   neighbor: array[95] of integer;
   { There is no INVERSE stone; BLACK and WHITE used }
 
+proc protocolboard;
+{*****************}
+var i,row,col,pos: integer;
+    r,c,ch: char;
+begin
+
+  { machine readable board }
+  write(@DEBUG,'BOARD ');
+  for i:=0 to 23 do begin
+    if board[i]=WHITE then
+      write(@DEBUG,'W')
+    else if board[i]=BLACK then
+      write(@DEBUG,'B')
+    else
+      write(@DEBUG,'-');
+  end;
+  writeln(@DEBUG);
+
+  { human readable board }
+  writeln(@DEBUG,'MATRIX');
+  writeln(@DEBUG,'    1 2 3 4 5 6 7');
+
+  for row:=6 downto 0 do begin
+    r:=chr(ord('A')+row);
+    write(@DEBUG,r,'   ');
+
+    for col:=0 to 6 do begin
+      c:=chr(ord('1')+col);
+      pos:=findpos(packed(r,c));
+
+      if pos<0 then
+        ch:='-'
+      else if board[pos]=WHITE then
+        ch:='W'
+      else if board[pos]=BLACK then
+        ch:='B'
+      else
+        ch:='#';
+
+      write(@DEBUG,ch);
+      if col<6 then
+        write(@DEBUG,' ');
+    end;
+
+    writeln(@DEBUG);
+  end;
+  writeln(@DEBUG);
+end;
+
+proc protocolplace(player,pos,value,
+                   elapsed: integer);
+{***********************************}
+begin
+  write(@DEBUG,'ACTION ',action,' ');
+
+  if player=WHITE then
+    write(@DEBUG,'WHITE ')
+  else
+    write(@DEBUG,'BLACK ');
+
+  write(@DEBUG,'PLACE ',label[pos]);
+  if player=BLACK then
+    write(@DEBUG,' VALUE ',value,
+                ' TIME ',elapsed,'0 MS');
+
+  writeln(@DEBUG);
+end;
+
+proc readtime(var sec,tenmillis: integer);
+{****************************************}
+var dummy: integer;
+
+  func getbcd(address: integer): integer;
+  var data: integer;
+  begin
+    data:=mem[address];
+    getbcd:=data-6*(data div 16);
+  end;
+
+begin
+  { update host clock }
+  dummy:=getbcd($17b9);
+  tenmillis:=getbcd($17b5);
+  sec:=getbcd($17b6);
+end;
+
+proc starttimer;
+{***************}
+begin
+  readtime(startsec,starttenmillis);
+end;
+
+func elapsed10ms: integer;
+{************************}
+var sec,tenmillis: integer;
+    dsec,dtenmillis: integer;
+begin
+  readtime(sec,tenmillis);
+
+  dsec:=sec-startsec;
+  dtenmillis:=tenmillis-starttenmillis;
+
+  if dtenmillis<0 then begin
+    dtenmillis:=dtenmillis+100;
+    dsec:=dsec-1;
+  end;
+
+  { wrap from 59 to 0 seconds }
+  if dsec<0 then
+    dsec:=dsec+60;
+
+  elapsed10ms:=100*dsec+dtenmillis;
+end;
+
 proc setmill(mill,p1,p2,p3: integer);
 {***********************************}
 var millbase: integer;

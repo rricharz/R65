@@ -42,9 +42,8 @@ end;
 proc message(number: integer; field: packed char;
            player: integer);
 {***********************************************}
-var  y: integer;
+var  y, dummy: integer;
 begin
-  debug('message',player,number,field);
   if player=WHITE then
     y := DASHWHITEY
   else
@@ -67,15 +66,31 @@ begin
     9: write(@PLOTDEV,'REMOVE ONE');
    10: write(@PLOTDEV,'LOST');
    20: write(@PLOTDEV,'YOUR MOVE');
-   21: write(@PLOTDEV,'COMPUTING');
-   22: write(@PLOTDEV,'WAITING');
-   23: write(@PLOTDEV,'THINKING');
+   21: write(@PLOTDEV,'THINKING');
    24: write(@PLOTDEV,'WINS');
    25: write(@PLOTDEV,'DRAW');
    26: write(@PLOTDEV,'READY');
    27: write(@PLOTDEV,'SAVED')
    else write(@PLOTDEV,'ERROR ', number)
   end;
+  {if number=21 then
+    dummy:=_syncscreen;}
+end;
+
+proc strmessage(s:cpnt; player: integer);
+{***************************************}
+var  y: integer;
+begin
+  if player=WHITE then
+    y:=DASHWHITEY
+  else if player=BLACK then
+    y:=DASHBLACKY
+  else
+    y:=2-MSGOFF;
+  _move(DASHX+1, y+MSGOFF);
+  write(@PLOTDEV,'           '); { 11 blanks }
+  _move(DASHX+1, y+MSGOFF);
+  write(@PLOTDEV,s);
 end;
 
 func findpos(labelvalue: packed char): integer;
