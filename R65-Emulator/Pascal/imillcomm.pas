@@ -14,19 +14,14 @@ proc protocolboard;
 {*****************}
 var i,row,col,pos: integer;
     r,c,ch: char;
+    state:cpnt;
 begin
 
   { machine readable board }
-  write(@DEBUG,'BOARD ');
-  for i:=0 to 23 do begin
-    if board[i]=WHITE then
-      write(@DEBUG,'W')
-    else if board[i]=BLACK then
-      write(@DEBUG,'B')
-    else
-      write(@DEBUG,'-');
-  end;
-  writeln(@DEBUG);
+  state:=_new;
+  codestate(state,player);
+  writeln(@DEBUG,state);
+  _release(state);
 
   { human readable board }
   writeln(@DEBUG,'MATRIX');
@@ -294,15 +289,6 @@ begin
     end;
   end;
   ismill:=false;
-end;
-
-func otherplayer(player:integer):integer;
-{***************************************}
-begin
-  if player=WHITE then
-    otherplayer:=BLACK
-  else
-    otherplayer:=WHITE;
 end;
 
 proc drawreserve(player: integer);

@@ -65,7 +65,7 @@ begin
    10: write(@PLOTDEV,'LOST');
    11: write(@PLOTDEV,'WINS');
    21: write(@PLOTDEV,'THINKING');
-   27: write(@PLOTDEV,'SAVE & QUIT')
+   27: write(@PLOTDEV,'SAVED')
    else write(@PLOTDEV,'ERROR ', number)
   end;
   {if number=21 then
@@ -265,6 +265,9 @@ begin { getinput }
   repeat
 
     oldrequest:=request;
+    valid:=false;
+    p1:=-1;
+    p2:=-1;
 
     editinput;
 

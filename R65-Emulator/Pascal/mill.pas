@@ -23,6 +23,15 @@ var
 
   startsec,starttenmillis: integer;
 
+func otherplayer(player:integer):integer;
+{***************************************}
+begin
+  if player=WHITE then
+    otherplayer:=BLACK
+  else
+    otherplayer:=WHITE;
+end;
+
 proc protocolhuman(player: integer);
 {***********************************}
 begin
@@ -109,12 +118,19 @@ begin
   }
 
   if _strlen(s)<>36 then begin
-    writeln('BAD STATE LENGTH');
+    writeln(INVVID,'Bad state length',NORVID);
     _abort;
   end;
 
   if not strbegins(s,'MILL2 ') then begin
-    writeln('BAD MILL STATE');
+    writeln(INVVID,'Bad MILL state',NORVID);
+    _abort;
+  end;
+
+  if not strbegins(s,'MILL2 B') then begin
+    writeln(INVVID,'Next tun is not PLAYER');
+    writeln('Paste a state starting with MILL2 B',
+        NORVID);
     _abort;
   end;
 
@@ -184,7 +200,7 @@ begin
   _strfio(filename,0,1);
   openw(f);
 
-  codestate(line, player);
+  codestate(line, otherplayer(player));
   writeln(@f,line);
 
   close(f);
