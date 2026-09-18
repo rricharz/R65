@@ -55,7 +55,6 @@ begin
   _move(DASHX+1, y+MSGOFF);
   case number of
     0: begin end;
-    1: write(@PLOTDEV,'BAD INPUT');
     2: write(@PLOTDEV,field,' INVALID');
     3: write(@PLOTDEV,field,' EMPTY');
     4: write(@PLOTDEV,field,' WHITE');
@@ -63,14 +62,10 @@ begin
     6: write(@PLOTDEV,field,' OCCUPIED');
     7: write(@PLOTDEV,'BAD MOVE');
     8: write(@PLOTDEV,field,' IS MILL');
-    9: write(@PLOTDEV,'REMOVE ONE');
    10: write(@PLOTDEV,'LOST');
-   20: write(@PLOTDEV,'YOUR MOVE');
+   11: write(@PLOTDEV,'WINS');
    21: write(@PLOTDEV,'THINKING');
-   24: write(@PLOTDEV,'WINS');
-   25: write(@PLOTDEV,'DRAW');
-   26: write(@PLOTDEV,'READY');
-   27: write(@PLOTDEV,'SAVED')
+   27: write(@PLOTDEV,'SAVE & QUIT')
    else write(@PLOTDEV,'ERROR ', number)
   end;
   {if number=21 then
@@ -86,7 +81,7 @@ begin
   else if player=BLACK then
     y:=DASHBLACKY
   else
-    y:=2-MSGOFF;
+    y:=DASHBLACKY+INPUTOFF-MSGOFF;
   _move(DASHX+1, y+MSGOFF);
   write(@PLOTDEV,'           '); { 11 blanks }
   _move(DASHX+1, y+MSGOFF);
@@ -122,7 +117,7 @@ const TOGGLE    = chr(12);
       BACKSPACE = chr(127);
 
 var s: cpnt;
-    x,y,len,maxlen, request: integer;
+    x,y,len,maxlen, request, oldrequest: integer;
     valid: boolean;
 
   proc prompt;
@@ -269,7 +264,11 @@ begin { getinput }
 
   repeat
 
+    oldrequest:=request;
+
     editinput;
+
+    writeln(@DEBUG,'COMMAND ',s);
 
     if _strcmp(s,'QUIT')=0 then
       _abort;
@@ -277,52 +276,55 @@ begin { getinput }
     if _strcmp(s,'SAVE')=0 then begin
       request:=I_NAME;
       editinput;
+      writeln(@DEBUG,'NAME ',s);
       savegame(s, player);
       message(27,'  ',player);
-      _abort;
-    end;
+      { return to the original request }
+      request:=oldrequest;
+    end else begin;
 
-    valid:=false;
-    p1:=-1;
-    p2:=-1;
+      valid:=false;
+      p1:=-1;
+      p2:=-1;
 
-    case request of
+      case request of
 
-      I_PLACE,I_TAKE:
-        begin
-          if len=2 then begin
-            p1:=findpos(packed(s[0],s[1]));
+        I_PLACE,I_TAKE:
+          begin
+            if len=2 then begin
+              p1:=findpos(packed(s[0],s[1]));
 
-            if p1>=0 then
-              valid:=true
-            else
-              message(2,packed(s[0],s[1]),player);
-          end
-          else
-            message(1,'  ',player);
-        end;
+              if p1>=0 then
+                valid:=true
+                else
+                message(2,packed(s[0],s[1]),player);
+              end else
+                message(1,'  ',player);
+              end;
 
-      I_MOVE:
-        begin
-          if (len=5) and (s[2]='-') then begin
-            p1:=findpos(packed(s[0],s[1]));
 
-            if p1<0 then
-              message(2,packed(s[0],s[1]),player)
+        I_MOVE:
+          begin
+            if (len=5) and (s[2]='-') then begin
+              p1:=findpos(packed(s[0],s[1]));
 
-            else begin
-              p2:=findpos(packed(s[3],s[4]));
+              if p1<0 then
+                message(2,packed(s[0],s[1]),player)
 
-              if p2<0 then
-                message(2,packed(s[3],s[4]),player)
+              else begin
+                p2:=findpos(packed(s[3],s[4]));
 
-              else
-                valid:=true;
+                if p2<0 then
+                  message(2,packed(s[3],s[4]),player)
+
+                else
+                  valid:=true;
+              end
             end
-          end
           else
             message(1,'  ',player)
         end
+      end;
 
     end;
 

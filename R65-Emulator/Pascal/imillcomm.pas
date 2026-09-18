@@ -56,7 +56,6 @@ begin
 
     writeln(@DEBUG);
   end;
-  writeln(@DEBUG);
 end;
 
 proc protocolplace(player,pos,value,

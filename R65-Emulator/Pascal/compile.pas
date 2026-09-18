@@ -237,7 +237,23 @@ begin
     30: write('Integer out of range');
     31: write('Indexed VAR not allowed')
   end {case};
-  writeln(' at line ', line, ', pos ', tpos, NORVID);
+  if savefno=@0 then
+   writeln(' at line ', line, ', pos ', tpos, NORVID)
+  else begin
+    write(INVVID,' in ');
+    i:=0;
+    repeat
+      write(incname[i]);
+      i:=i+1
+    until (incname[i]=' ') or (i>=15);
+    write(', line ');
+    writeln(lineinc,', pos ', tpos, NORVID);
+  end;
+  write(@lpr,' ');
+  write(@lpr,(pc+2):5,' ');
+  write(@lpr,'[',spnt:3,'] ');
+
+
   if ofno<>NOTOPEN then close(ofno);
   if chaincheckb and not makeoutput then begin
     { count error for checkbuild }
