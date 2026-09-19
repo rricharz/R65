@@ -55,6 +55,7 @@ begin
   _move(DASHX+1, y+MSGOFF);
   case number of
     0: begin end;
+    1: write(@PLOTDEV,field,' BAD POS');
     2: write(@PLOTDEV,field,' INVALID');
     3: write(@PLOTDEV,field,' EMPTY');
     4: write(@PLOTDEV,field,' WHITE');
@@ -274,7 +275,7 @@ begin { getinput }
     writeln(@DEBUG,'COMMAND ',s);
 
     if _strcmp(s,'QUIT')=0 then
-      _abort;
+      quit;
 
     if _strcmp(s,'SAVE')=0 then begin
       request:=I_NAME;

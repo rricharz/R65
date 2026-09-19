@@ -712,20 +712,33 @@ void write6502(uint16_t address, uint8_t value)
                 printf("Cannot open %s\n",s);            
         }
         else if (value == 10) {							// execute Linux shell command line
-			int pnt = memory[4] + 256 * memory[5];
-			char *s = (char *) memory + pnt;
-			printf("SHELL: %s\n", s);
-			fflush(stdout);
-			int result = system(s);
-			memory[R8_EMURES] = (result != 0);			
-			fflush(stdout);
-		}
-		else if (value == 11) {							// start raw printing
-			rawPrint = 1;
-		}
-		else if (value == 12) {							// end raw printing
-			rawPrint = 0;
-		}
+			    int pnt = memory[4] + 256 * memory[5];
+			    char *s = (char *) memory + pnt;
+			    printf("SHELL: %s\n", s);
+			    fflush(stdout);
+			    int result = system(s);
+			    memory[R8_EMURES] = (result != 0);			
+			    fflush(stdout);
+		    }
+		    else if (value == 11) {							// start raw printing
+			    rawPrint = 1;
+		    }
+		    else if (value == 12) {
+			     rawPrint = 0;
+		    }
+        else if (value == 13) {
+          if (printFile != NULL) {
+            fflush(printFile);
+            printf("printout.txt flushed\n");
+          }
+        }
+        else if (value == 14) {
+          if (printFile != NULL) {
+            fclose(printFile);
+            printFile = fopen("printout.txt","w");
+            printf("printout.txt reset\n");
+          }
+        }
         else {
             printf("Unknown emulator command %02X, pc=%04X\n", value, pc-3);
         memory[R8_EMURES] = 0X67;           // set result to 0

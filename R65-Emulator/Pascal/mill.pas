@@ -23,6 +23,29 @@ var
 
   startsec,starttenmillis: integer;
 
+proc quit;
+{********}
+var result: integer;
+const C_SHELL = 10;
+      C_FLUSHPRINT = 13;
+      C_NEWPRINT = 14;
+
+  proc shell(s: cpnt);
+  { uses flp scratch register to transfer pointer }
+  mem   str    = $0004: cpnt;
+  var result:   integer;
+  begin
+    str := s;
+    result:=_emulator(C_SHELL);
+  end;
+
+begin
+  result := _emulator(C_FLUSHPRINT);
+  shell('./backup_print mill');
+  result := _emulator(C_NEWPRINT);
+  _abort;
+end;
+
 func otherplayer(player:integer):integer;
 {***************************************}
 begin
@@ -119,19 +142,19 @@ begin
 
   if _strlen(s)<>36 then begin
     writeln(INVVID,'Bad state length',NORVID);
-    _abort;
+    quit;
   end;
 
   if not strbegins(s,'MILL2 ') then begin
     writeln(INVVID,'Bad MILL state',NORVID);
-    _abort;
+    quit;
   end;
 
   if not strbegins(s,'MILL2 B') then begin
     writeln(INVVID,'Next tun is not PLAYER');
     writeln('Paste a state starting with MILL2 B',
         NORVID);
-    _abort;
+    quit;
   end;
 
   if s[6]='W' then
@@ -140,13 +163,13 @@ begin
     player:=BLACK
   else begin
     writeln('BAD PLAYER');
-    _abort;
+    quit;
   end;
 
   if (s[8]<'0') or (s[8]>'9')
     or (s[10]<'0') or (s[10]>'9') then begin
     writeln('BAD RESERVE');
-    _abort;
+    quit;
   end;
 
   stones[WHITE]:=digit(s[8]);
@@ -162,7 +185,7 @@ begin
     else
       begin
         writeln('BAD BOARD');
-        _abort;
+        quit;
       end
     end
   end;
@@ -236,7 +259,7 @@ begin
 
   if length=0 then begin
     writeln('Empty MILL file');
-    _abort;
+    quit;
   end;
 
   decodestate(line,player);
@@ -521,11 +544,6 @@ begin
   init_canvas;
   init_common;
   init_neighbors;
-
-  writeln(@DEBUG,
-    '----------------------------------------------');
-  writeln(@DEBUG,'MILL initialized');
-
   drawboard;
   drawlabels;
 
@@ -549,7 +567,7 @@ begin
     if gameover(player) then begin
       message(10,'  ',player);
       message(11,'  ',otherplayer(player));
-      _abort;
+      quit;
     end;
   until false;
 
