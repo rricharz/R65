@@ -130,7 +130,7 @@ end;
 
 proc decodestate(s: cpnt; var player: integer);
 {*********************************************}
-var i: integer;
+var i,len: integer;
     c: char;
 
 begin
@@ -139,6 +139,12 @@ begin
     0123456789012
                 ^ board starts here
   }
+
+  len:=_strlen(s);
+  while (len>0) and (s[len-1]=' ') do begin
+    len:=len-1;
+    s[len]:=ENDMARK;
+  end;
 
   if _strlen(s)<>36 then begin
     writeln(INVVID,'Bad state length',NORVID);

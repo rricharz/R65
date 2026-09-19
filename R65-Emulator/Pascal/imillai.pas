@@ -3,6 +3,8 @@
 
 const
   V_MILL        = 100;
+  V_NEXTMILL    = 20;
+  V_REMILL      = 10;
 
   V_OWNTHREAT1  = 10;
   V_OWNTHREAT2  = 30;
@@ -12,6 +14,9 @@ const
 
   V_OWNMILL     = 20;
   V_OPPMILL     = 20;
+
+  V_OWNMOB      = 1;
+  V_OPPMOB      = 1;
 
 func threats(player: integer): integer;
 {*************************************}
@@ -47,13 +52,53 @@ begin
   millcount:=count;
 end;
 
-func boardvalue(player: integer): integer;
-{***************************************}
+func mobility(player: integer): integer;
+{*************************************}
+var p,i,n,m: integer;
+begin
+  m:=0;
+
+  for p:=0 to 23 do
+    if board[p]=player then
+      for i:=0 to MAXNEIGHBORS-1 do begin
+        n:=neighbor[p*MAXNEIGHBORS+i];
+        if n>=0 then
+          if board[n]=EMPTY then
+            m:=m+1;
+      end;
+
+  mobility:=m;
+end;
+
+func canblock(player,pos: integer): boolean;
+{*****************************************}
+var i,n: integer;
+begin
+  canblock:=false;
+
+  { with 3 stones the player can fly }
+  if stones[player]=3 then
+    canblock:=true
+  else begin
+    for i:=0 to MAXNEIGHBORS-1 do begin
+      n:=neighbor[pos*MAXNEIGHBORS+i];
+      if n>=0 then
+        if board[n]=player then
+          canblock:=true;
+    end;
+  end;
+end;
+
+func boardvalue(player,frompos,topos:integer):integer;
+{****************************************************}
 var opponent,value,n,
-    ownth,oppth,ownmill,oppmill: integer;
+    ownth,oppth,ownmill,oppmill,
+    ownmob,oppmob: integer;
+    remill: boolean;
 begin
   opponent:=otherplayer(player);
   value:=0;
+  remill:=false;
 
   ownth:=threats(player);
   if ownth>=2 then
@@ -67,15 +112,51 @@ begin
   else if oppth=1 then
     value:=value-V_OPPTHREAT1;
 
+  if oppth>0 then
+    value:=value-V_NEXTMILL;
+
   ownmill:=millcount(player);
   oppmill:=millcount(opponent);
 
   value:=value+V_OWNMILL*ownmill;
   value:=value-V_OPPMILL*oppmill;
 
+  ownmob:=mobility(player);
+  oppmob:=mobility(opponent);
+
+  value:=value+V_OWNMOB*ownmob;
+  value:=value-V_OPPMOB*oppmob;
+
+  { A MOVE may have opened a reusable mill. }
+  if frompos>=0 then begin
+
+    { Reconstruct position before move. }
+    board[topos]:=EMPTY;
+    board[frompos]:=player;
+
+    if ismill(frompos,player) then
+      remill:=true;
+
+    { Restore evaluated position. }
+    board[frompos]:=EMPTY;
+    board[topos]:=player;
+
+    { Opponent must not be able to occupy
+      the vacated mill position. }
+    if remill then
+      if canblock(opponent,frompos) then
+        remill:=false;
+
+    if remill then
+      value:=value+V_REMILL;
+  end;
+
   write(@DEBUG, 'EVAL ',
     ' T ',ownth,'/',oppth,
     ' M ',ownmill,'/',oppmill,
+    ' F ',ownmob,'/',oppmob,
+    ' N ',oppth>0,
+    ' R ',remill,
     ' V ',value, ' ');
 
   boardvalue:=value;
@@ -88,7 +169,7 @@ begin
   if ismill(pos,player) then
     placevalue:=V_MILL
   else
-    placevalue:=boardvalue(player);
+    placevalue:=boardvalue(player,-1,pos);
   board[pos]:=EMPTY;
 end;
 
@@ -98,7 +179,7 @@ var opponent: integer;
 begin
   opponent:=otherplayer(player);
   board[pos]:=EMPTY;
-  takevalue:=boardvalue(player);
+  takevalue:=boardvalue(player,-1,pos);
   board[pos]:=opponent;
 end;
 
@@ -110,7 +191,7 @@ begin
   if ismill(p2,player) then
     movevalue:=V_MILL
   else
-    movevalue:=boardvalue(player);
+    movevalue:=boardvalue(player,p1,p2);
   board[p2]:=EMPTY;
   board[p1]:=player;
 end;
