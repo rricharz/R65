@@ -386,7 +386,7 @@ begin
   stones[player]:=stones[player]-1;
   drawstone(p1,player);
   drawreserve(player);
-  protocolplace(player,p1,0,0)
+  protocolaction(player,p1,-1,0);
 
   if ismill(p1,player) then
     takestone(player);
@@ -448,6 +448,8 @@ begin
 
   clearstone(p1,player);
   drawstone(p2,player);
+
+  protocolaction(player,p1,p2,0);
 
   if ismill(p2,player) then
     takestone(player);

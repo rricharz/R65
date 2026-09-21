@@ -53,9 +53,8 @@ begin
   end;
 end;
 
-proc protocolplace(player,pos,value,
-                   elapsed: integer);
-{***********************************}
+proc protocolaction(player,pos,pos2,value);
+{*****************************************}
 begin
   write(@DEBUG,'ACTION ',action,' ');
 
@@ -64,10 +63,13 @@ begin
   else
     write(@DEBUG,'BLACK ');
 
-  write(@DEBUG,'PLACE ',label[pos]);
+  if (pos2>=0) then
+    write(@DEBUG,'MOVE ',label[pos],'-',label[pos2])
+  else
+    write(@DEBUG,'PLACE ',label[pos]);
+
   if player=BLACK then
-    write(@DEBUG,' VALUE ',value,
-                ' TIME ',elapsed,'0 MS');
+    write(@DEBUG,' VALUE ',value);
 
   writeln(@DEBUG);
 end;

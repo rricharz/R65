@@ -1,250 +1,251 @@
    1     4 {  ******************************
-   2     4    *                            *
-   3     4    *  R65 Mini Pascal Compiler  *
-   4     4    *      Pass 2  (Loader)      *
-   5     4    *                            *
-   6     4    ******************************
-   7     4 
-   8     4   03/31/2026 cleaned up printing to disk }
-   9     4 
-  10     4 program compile2;
-  11     4 uses syslib,arglib,filelib;
-  12  2092 
-  13  2092 const
-  14  2092     wrfile  = $e81b;
-  15  2095     adelete = $c80c;
-  16  2095     sblock  = $6000;
-  17  2095     eblock  = TOPMEM;
-  18  2095 
-  19  2095 mem ENDSTK=$e,
-  20  2095     stprog=$11: integer;
-  21  2095     FILERR=$db: integer&;
-  22  2095     FILSA=$031a,
-  23  2095     FILEA=$031c,
-  24  2095     FILSA1=$0331: integer;
-  25  2095     FILTYP=$0300: char&;
-  26  2095 
-  27  2095 var pointer,address,maxsize,dummy,
-  28  2095     scyclus,sdrive,offset,cdrive: integer;
-  29  2095     ch: char;
-  30  2095     source: file;
-  31  2095     stop,def: boolean;
-  32  2095     name: array[15] of char;
-  33  2095 
-  34  2095 
-  35  2095 { * error * }
-  36  2095 
-  37  2095 proc error(x:integer);
-  38  2095 begin
-  39  2095   writeln(INVVID);
-  40  2109   if x<100 then {file error, bcd}
-  41  2116     writeln('File error ',(x shr 4),(x and 15))
-  42  2146   else
-  43  2153     case x of
-  44  2156       101: writeln('Program too long');
-  45  2190       102: writeln('Data INPUT format ',ch);
-  46  2230       105: writeln('Wrong address');
-  47  2260       106: writeln('Unexpected EOF');
-  48  2291       107: writeln('Pointer not matching')
-  49  2322       else writeln('Unknown error ',x)
-  50  2346     end {case}
-  51  2359   write(NORVID);
-  52  2362   close(source);
-  53  2368   RUNERR:=x;
-  54  2368   _abort;
-  55  2380 end {error};
-  56  2380 
-  57  2381 
-  58  2381 { * testerror * }
-  59  2381 
-  60  2381 proc testerr;
-  61  2381 var i: integer;
-  62  2384 begin
-  63  2384   if FILERR<>0 then error(FILERR)
-  64  2398 end;
-  65  2404 
-  66  2405 
-  67  2405 { * blocksave * }
-  68  2405 
-  69  2405 proc blocksave(lowlim,highlim: integer);
-  70  2405 var i: integer;
-  71  2408 begin
-  72  2408   _asetfile(name,scyclus,sdrive,'R');
-  73  2432   FILSA:=lowlim;
-  74  2432   FILEA:=highlim;
-  75  2440   FILSA1:=lowlim;
-  76  2448   FILTYP:='B';
-  77  2458   call(wrfile);
-  78  2467   testerr
-  79  2467 end {blocksave};
-  80  2471 
-  81  2472 
-  82  2472 { * init * }
-  83  2472 
-  84  2472 proc init; {initialize program}
-  85  2472 
-  86  2472 var i: integer;
-  87  2475     default: boolean;
-  88  2475 
-  89  2475 begin
-  90  2475   cdrive:=FILDRV; { drive of compile program }
-  91  2484   ENDSTK:=sblock-144;   {reserve memory }
-  92  2493   scyclus:=0; sdrive:=1;
-  93  2501   _agetstring(name,default,scyclus,sdrive);
-  94  2545   _asetfile(name,scyclus,sdrive,'Q');
-  95  2567   openr(source);
-  96  2573   scyclus:=FILCYC;
-  97  2577 end {init};
-  98  2581 
-  99  2582 
- 100  2582 { * getbyte1 * }
- 101  2582 
- 102  2582 func getbyte1: integer;
- 103  2582 
- 104  2582 var byte: integer;
- 105  2585 
- 106  2585 begin
- 107  2585   if (ch<'0') or (ch>'@') then error(102);
- 108  2613   byte:=(ord(ch) and 15) shl 4;
- 109  2622   read(@source,ch);
- 110  2637   if (ch<'0') or (ch>'@') then error(102);
- 111  2664   byte:=byte + ((ord(ch) and 15));
- 112  2675   getbyte1:=byte;
- 113  2680 end {getbyte1};
- 114  2688 
- 115  2689 
- 116  2689 { * getbyte2 * }
- 117  2689 
- 118  2689 func getbyte2: integer;
- 119  2689 begin
- 120  2689   read(@source,ch); getbyte2:=getbyte1
- 121  2705 end {getbyte2};
- 122  2715 
- 123  2716 
- 124  2716 { * getbl * }
- 125  2716 
- 126  2716 proc getbl(base:integer);  {get block }
- 127  2716 
- 128  2716   proc getlib; {get library }
- 129  2719 
- 130  2719   var i: integer;
- 131  2722       savsr: file;
- 132  2722       ch1: char;
- 133  2722       lname: array[13] of char;
- 134  2722       lcyclus,ldrive: integer;
- 135  2722 
- 136  2722   begin
- 137  2722     savsr:=source;
- 138  2724     for i:=0 to 13 do begin
- 139  2749       read(@source,ch1);
- 140  2759       lname[i]:=ch1
- 141  2764     end;
- 142  2772     lcyclus:=0; ldrive:=0;
- 143  2794 
- 144  2798     { loading library from drive 0 }
- 145  2798     _asetfile(lname&'  ',
- 146  2808       lcyclus,ldrive,'T');
- 147  2824     openr(source);
- 148  2830     getbl(offset-2);
- 149  2843     close(source);
- 150  2849     source:=savsr;
- 151  2849     if (pointer+4-sblock)>maxsize then
- 152  2868       error(101);
- 153  2884     mem[pointer-1]:=43;
- 154  2893     mem[pointer]:=0;
- 155  2900     mem[pointer+1]:=3;
- 156  2910     mem[pointer+2]:=0;
- 157  2920     mem[pointer+3]:=0;
- 158  2930     pointer:=pointer+4;
- 159  2937     offset:=pointer-sblock;
- 160  2949   end {getlib};
- 161  2954 
- 162  2955 
- 163  2955 begin { * body of getbl * }
- 164  2955   stop:=false;
- 165  2959   repeat
- 166  2963     read(@source,ch);
- 167  2973     case ch of
- 168  2974 
- 169  2978       'F':  begin {fixup}
- 170  2985               address:=getbyte2+
- 171  2991                   (getbyte2 shl 8)+offset;
- 172  3001               if (address<offset) or
- 173  3019                   (address>maxsize) then begin
- 174  3029                 writeln(INVVID);
- 175  3041                 write(address,' ',offset);
- 176  3053                 error(105);
- 177  3061               end;
- 178  3061               mem[address+sblock]:=getbyte2;
- 179  3075               mem[address+sblock+1]:=getbyte2;
- 180  3093             end {fixup};
- 181  3094 
- 182  3097       'L':  getlib;
- 183  3108 
- 184  3111       'E':  stop:=true;
- 185  3120 
- 186  3127       EOF:  error(106)
- 187  3136 
- 188  3142       else begin {data}
- 189  3145         mem[pointer]:=getbyte1;
- 190  3155         pointer:=pointer+1;
- 191  3162         if (pointer-sblock)>maxsize then
- 192  3175           error(101);
- 193  3191       end {data}
- 194  3191     end {case};
- 195  3193   until stop;
- 196  3193   stop:=false;
- 197  3202   mem[sblock]:=(pointer-sblock) and 255;
- 198  3219   mem[sblock+1]:=(pointer-sblock) shr 8;
- 199  3237   address:=getbyte2+(getbyte2 shl 8)+base;
- 200  3255   if address<>(pointer-sblock) then begin
- 201  3277     writeln(INVVID, address,' ', pointer - sblock);
- 202  3305     error(107);
- 203  3313   end
- 204  3313 end {getbl};
- 205  3313 
- 206  3314 { show used bytes }
- 207  3314 
- 208  3314 proc showused;
- 209  3314 var usedbytes, maxbytes,
- 210  3317     usedpages, maxpages: integer;
- 211  3317 begin
- 212  3317   usedbytes := pointer - sblock;
- 213  3326   maxbytes  := maxsize + 2;
- 214  3337   usedpages := (usedbytes + 255) div 256;
- 215  3352   maxpages  := (maxbytes  + 255) div 256;
- 216  3367 
- 217  3372   writeln('Load area used:        ', usedpages, '/',
- 218  3403     maxpages, ' pages');
- 219  3421 end;
- 220  3421 
- 221  3422 { * main * }
- 222  3422 
- 223  3422 begin {main}
- 224  3422   init; maxsize:=eblock-sblock-2;
- 225  3437   pointer:=sblock+2; offset:=2;
- 226  3454 
- 227  3458   getbl(0);
- 228  3466 
- 229  3466   mem[pointer-1]:=0;
- 230  3475   mem[pointer]:=255;
- 231  3482   mem[pointer+1]:=255;
- 232  3492   pointer:=pointer+1;
- 233  3499 
- 234  3504   close(source);
- 235  3510   showused;
- 236  3514   blocksave(sblock,pointer);
- 237  3527 
- 238  3527   ENDSTK:=TOPMEM-144;
- 239  3532   { delete intermediate file }
- 240  3536   _asetfile(name,scyclus,sdrive,'Q');
- 241  3558   call(adelete);
- 242  3562 
- 243  3562   RUNERR:=0;
- 244  3564   { display free space available }
- 245  3568   dummy:=_freedrv(sdrive,true);
- 246  3582 end.
- 247  3586 
-Code length:            3585
-Compiler stack size:      72
-Ident stack size:        118
+   2     4 [  0]    *                            *
+   3     4 [  0]    *  R65 Mini Pascal Compiler  *
+   4     4 [  0]    *      Pass 2  (Loader)      *
+   5     4 [  0]    *                            *
+   6     4 [  0]    ******************************
+   7     4 [  0] 
+   8     4 [  0]   03/31/2026 cleaned up printing to disk }
+   9     4 [  0] 
+  10     4 [  0] program compile2;
+  11     4 [  0] uses syslib,arglib,filelib;
+  12  1700 [ 77] 
+  13  1700 [ 77] const
+  14  1700 [ 77]     wrfile  = $e81b;
+  15  1703 [ 78]     adelete = $c80c;
+  16  1703 [ 79]     sblock  = $6000;
+  17  1703 [ 80]     eblock  = TOPMEM;
+  18  1703 [ 81] 
+  19  1703 [ 81] mem ENDSTK=$e,
+  20  1703 [ 82]     stprog=$11: integer;
+  21  1703 [ 83]     FILERR=$db: integer&;
+  22  1703 [ 84]     FILSA=$031a,
+  23  1703 [ 85]     FILEA=$031c,
+  24  1703 [ 86]     FILSA1=$0331: integer;
+  25  1703 [ 87]     FILTYP=$0300: char&;
+  26  1703 [ 88] 
+  27  1703 [ 88] var pointer,address,maxsize,dummy,
+  28  1703 [ 92]     scyclus,sdrive,offset,cdrive: integer;
+  29  1703 [ 96]     ch: char;
+  30  1703 [ 97]     source: file;
+  31  1703 [ 98]     stop,def: boolean;
+  32  1703 [100]     name: array[15] of char;
+  33  1703 [101] 
+  34  1703 [101] 
+  35  1703 [101] { * error * }
+  36  1703 [101] 
+  37  1703 [101] proc error(x:integer);
+  38  1703 [103] begin
+  39  1703 [103]   writeln(INVVID);
+  40  1717 [103]   if x<100 then {file error, bcd}
+  41  1724 [103]     writeln('File error ',(x shr 4),(x and 15))
+  42  1754 [103]   else
+  43  1761 [103]     case x of
+  44  1764 [103]       101: writeln('Program too long');
+  45  1798 [103]       102: writeln('Data INPUT format ',ch);
+  46  1838 [103]       105: writeln('Wrong address');
+  47  1868 [103]       106: writeln('Unexpected EOF');
+  48  1899 [103]       107: writeln('Pointer not matching')
+  49  1930 [103]       else writeln('Unknown error ',x)
+  50  1954 [103]     end {case}
+  51  1967 [103]   write(NORVID);
+  52  1970 [103]   close(source);
+  53  1976 [103]   RUNERR:=x;
+  54  1976 [103]   _abort;
+  55  1988 [103] end {error};
+  56  1988 [103] 
+  57  1989 [102] 
+  58  1989 [102] { * testerror * }
+  59  1989 [102] 
+  60  1989 [102] proc testerr;
+  61  1989 [103] var i: integer;
+  62  1992 [104] begin
+  63  1992 [104]   if FILERR<>0 then error(FILERR)
+  64  2006 [104] end;
+  65  2012 [104] 
+  66  2013 [103] 
+  67  2013 [103] { * blocksave * }
+  68  2013 [103] 
+  69  2013 [103] proc blocksave(lowlim,highlim: integer);
+  70  2013 [106] var i: integer;
+  71  2016 [107] begin
+  72  2016 [107]   _asetfile(name,scyclus,sdrive,'R');
+  73  2040 [107]   FILSA:=lowlim;
+  74  2040 [107]   FILEA:=highlim;
+  75  2048 [107]   FILSA1:=lowlim;
+  76  2056 [107]   FILTYP:='B';
+  77  2066 [107]   call(wrfile);
+  78  2075 [107]   testerr
+  79  2075 [107] end {blocksave};
+  80  2079 [107] 
+  81  2080 [104] 
+  82  2080 [104] { * init * }
+  83  2080 [104] 
+  84  2080 [104] proc init; {initialize program}
+  85  2080 [105] 
+  86  2080 [105] var i: integer;
+  87  2083 [106]     default: boolean;
+  88  2083 [107] 
+  89  2083 [107] begin
+  90  2083 [107]   cdrive:=FILDRV; { drive of compile program }
+  91  2092 [107]   ENDSTK:=sblock-144;   {reserve memory }
+  92  2101 [107]   scyclus:=0; sdrive:=1;
+  93  2109 [107]   _agetstring(name,default,scyclus,sdrive);
+  94  2153 [107]   _asetfile(name,scyclus,sdrive,'Q');
+  95  2175 [107]   openr(source);
+  96  2181 [107]   scyclus:=FILCYC;
+  97  2185 [107] end {init};
+  98  2189 [107] 
+  99  2190 [105] 
+ 100  2190 [105] { * getbyte1 * }
+ 101  2190 [105] 
+ 102  2190 [105] func getbyte1: integer;
+ 103  2190 [107] 
+ 104  2190 [107] var byte: integer;
+ 105  2193 [108] 
+ 106  2193 [108] begin
+ 107  2193 [108]   if (ch<'0') or (ch>'@') then error(102);
+ 108  2221 [108]   byte:=(ord(ch) and 15) shl 4;
+ 109  2230 [108]   read(@source,ch);
+ 110  2245 [108]   if (ch<'0') or (ch>'@') then error(102);
+ 111  2272 [108]   byte:=byte + ((ord(ch) and 15));
+ 112  2283 [108]   getbyte1:=byte;
+ 113  2288 [108] end {getbyte1};
+ 114  2296 [108] 
+ 115  2297 [107] 
+ 116  2297 [107] { * getbyte2 * }
+ 117  2297 [107] 
+ 118  2297 [107] func getbyte2: integer;
+ 119  2297 [109] begin
+ 120  2297 [109]   read(@source,ch); getbyte2:=getbyte1
+ 121  2313 [109] end {getbyte2};
+ 122  2323 [109] 
+ 123  2324 [109] 
+ 124  2324 [109] { * getbl * }
+ 125  2324 [109] 
+ 126  2324 [109] proc getbl(base:integer);  {get block }
+ 127  2324 [111] 
+ 128  2324 [111]   proc getlib; {get library }
+ 129  2327 [112] 
+ 130  2327 [112]   var i: integer;
+ 131  2330 [113]       savsr: file;
+ 132  2330 [114]       ch1: char;
+ 133  2330 [115]       lname: array[13] of char;
+ 134  2330 [116]       lcyclus,ldrive: integer;
+ 135  2330 [118] 
+ 136  2330 [118]   begin
+ 137  2330 [118]     savsr:=source;
+ 138  2332 [118]     for i:=0 to 13 do begin
+ 139  2357 [118]       read(@source,ch1);
+ 140  2367 [118]       lname[i]:=ch1
+ 141  2372 [118]     end;
+ 142  2380 [118]     lcyclus:=0; ldrive:=0;
+ 143  2402 [118] 
+ 144  2406 [118]     { loading library from drive 0 }
+ 145  2406 [118]     _asetfile(lname&'  ',
+ 146  2416 [118]       lcyclus,ldrive,'T');
+ 147  2432 [118]     openr(source);
+ 148  2438 [118]     getbl(offset-2);
+ 149  2451 [118]     close(source);
+ 150  2457 [118]     source:=savsr;
+ 151  2457 [118]     if (pointer+4-sblock)>maxsize then
+ 152  2476 [118]       error(101);
+ 153  2492 [118]     mem[pointer-1]:=43;
+ 154  2501 [118]     mem[pointer]:=0;
+ 155  2508 [118]     mem[pointer+1]:=3;
+ 156  2518 [118]     mem[pointer+2]:=0;
+ 157  2528 [118]     mem[pointer+3]:=0;
+ 158  2538 [118]     pointer:=pointer+4;
+ 159  2545 [118]     offset:=pointer-sblock;
+ 160  2557 [118]   end {getlib};
+ 161  2562 [118] 
+ 162  2563 [112] 
+ 163  2563 [112] begin { * body of getbl * }
+ 164  2563 [112]   stop:=false;
+ 165  2567 [112]   repeat
+ 166  2571 [112]     read(@source,ch);
+ 167  2581 [112]     case ch of
+ 168  2582 [112] 
+ 169  2586 [112]       'F':  begin {fixup}
+ 170  2593 [112]               address:=getbyte2+
+ 171  2599 [112]                   (getbyte2 shl 8)+offset;
+ 172  2609 [112]               if (address<offset) or
+ 173  2627 [112]                   (address>maxsize) then begin
+ 174  2637 [112]                 writeln(INVVID);
+ 175  2649 [112]                 write(address,' ',offset);
+ 176  2661 [112]                 error(105);
+ 177  2669 [112]               end;
+ 178  2669 [112]               mem[address+sblock]:=getbyte2;
+ 179  2683 [112]               mem[address+sblock+1]:=getbyte2;
+ 180  2701 [112]             end {fixup};
+ 181  2702 [112] 
+ 182  2705 [112]       'L':  getlib;
+ 183  2716 [112] 
+ 184  2719 [112]       'E':  stop:=true;
+ 185  2728 [112] 
+ 186  2735 [112]       EOF:  error(106)
+ 187  2744 [112] 
+ 188  2750 [112]       else begin {data}
+ 189  2753 [112]         mem[pointer]:=getbyte1;
+ 190  2763 [112]         pointer:=pointer+1;
+ 191  2770 [112]         if (pointer-sblock)>maxsize then
+ 192  2783 [112]           error(101);
+ 193  2799 [112]       end {data}
+ 194  2799 [112]     end {case};
+ 195  2801 [112]   until stop;
+ 196  2801 [112]   stop:=false;
+ 197  2810 [112]   mem[sblock]:=(pointer-sblock) and 255;
+ 198  2827 [112]   mem[sblock+1]:=(pointer-sblock) shr 8;
+ 199  2845 [112]   address:=getbyte2+(getbyte2 shl 8)+base;
+ 200  2863 [112]   if address<>(pointer-sblock) then begin
+ 201  2885 [112]     writeln(INVVID, address,' ', pointer - sblock);
+ 202  2913 [112]     error(107);
+ 203  2921 [112]   end
+ 204  2921 [112] end {getbl};
+ 205  2921 [112] 
+ 206  2922 [110] { show used bytes }
+ 207  2922 [110] 
+ 208  2922 [110] proc showused;
+ 209  2922 [111] var usedbytes, maxbytes,
+ 210  2925 [113]     usedpages, maxpages: integer;
+ 211  2925 [115] begin
+ 212  2925 [115]   usedbytes := pointer - sblock;
+ 213  2934 [115]   maxbytes  := maxsize + 2;
+ 214  2945 [115]   usedpages := (usedbytes + 255) div 256;
+ 215  2960 [115]   maxpages  := (maxbytes  + 255) div 256;
+ 216  2975 [115] 
+ 217  2980 [115]   writeln('Load area used:        ', usedpages, '/',
+ 218  3011 [115]     maxpages, ' pages');
+ 219  3029 [115] end;
+ 220  3029 [115] 
+ 221  3030 [111] { * main * }
+ 222  3030 [111] 
+ 223  3030 [111] begin {main}
+ 224  3030 [111]   writeln('COMPILE2 started');
+ 225  3055 [111]   init; maxsize:=eblock-sblock-2;
+ 226  3068 [111]   pointer:=sblock+2; offset:=2;
+ 227  3085 [111] 
+ 228  3089 [111]   getbl(0);
+ 229  3097 [111] 
+ 230  3097 [111]   mem[pointer-1]:=0;
+ 231  3106 [111]   mem[pointer]:=255;
+ 232  3113 [111]   mem[pointer+1]:=255;
+ 233  3123 [111]   pointer:=pointer+1;
+ 234  3130 [111] 
+ 235  3135 [111]   close(source);
+ 236  3141 [111]   showused;
+ 237  3145 [111]   blocksave(sblock,pointer);
+ 238  3158 [111] 
+ 239  3158 [111]   ENDSTK:=TOPMEM-144;
+ 240  3163 [111]   { delete intermediate file }
+ 241  3167 [111]   _asetfile(name,scyclus,sdrive,'Q');
+ 242  3189 [111]   call(adelete);
+ 243  3193 [111] 
+ 244  3193 [111]   RUNERR:=0;
+ 245  3195 [111]   { display free space available }
+ 246  3199 [111]   dummy:=_freedrv(sdrive,true);
+ 247  3213 [111] end.
+ 248  3217 [111] 
+Code length:           3216
+Compiler stack size:   61/300
+Ident stack size:      118/350

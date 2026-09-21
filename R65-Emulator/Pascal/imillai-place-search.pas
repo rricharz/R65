@@ -166,6 +166,43 @@ begin
   boardvalue:=value;
 end;
 
+func placereply(player,pos: integer): integer;
+{********************************************}
+{ worst value after opponent PLACE response }
+var opponent,p,v,worst,count: integer;
+begin
+  opponent:=otherplayer(player);
+
+  { make root placement }
+  board[pos]:=player;
+
+  worst:=1000;
+  count:=0;
+
+  { try every opponent placement }
+  for p:=0 to 23 do begin
+    if board[p]=EMPTY then begin
+      count:=count+1;
+      board[p]:=opponent;
+
+      v:=boardvalue(player,-1,-1);
+
+      board[p]:=EMPTY;
+
+      if v<worst then
+        worst:=v;
+    end;
+  end;
+
+  { undo root placement }
+  board[pos]:=EMPTY;
+
+  writeln(@DEBUG,'REPLY ',label[pos],
+          ' COUNT ',count,' WORST ',worst);
+
+  placereply:=worst;
+end;
+
 func placevalue(player,pos: integer): integer;
 {********************************************}
 begin
@@ -242,30 +279,131 @@ begin
   computertake:=p1;
 end;
 
+func placedepth: integer;
+{************************}
+const MAXCANDIDATES=2;
+      TARGETTIME=3000;
+var empty,n,i: integer;
+    branches,cost,nextcost: integer;
+    done: boolean;
+begin
+  empty:=0;
+  for i:=0 to 23 do
+    if board[i]=EMPTY then
+      empty:=empty+1;
+
+  n:=0;
+  branches:=1;
+  cost:=empty*(17+2*empty);
+  done:=false;
+
+  while (n<empty-1) and not done do begin
+    branches:=branches*MAXCANDIDATES;
+
+    nextcost:=branches*(empty-n-1)*
+              (17+2*(empty-n-1));
+
+    if cost+nextcost<=TARGETTIME then begin
+      cost:=cost+nextcost;
+      n:=n+1;
+    end else
+      done:=true;
+  end;
+
+  placedepth:=n;
+end;
+
+proc placesearch(player: integer;
+        var bestpos, bestvalue: integer);
+{***************************************}
+const MAXCANDIDATES=2;
+var candidate: array[MAXCANDIDATES] of integer;
+    value: array[MAXCANDIDATES] of integer;
+    depth: integer;
+    p,i,j,v: integer;
+begin
+  depth:=placedepth;
+
+  writeln(@DEBUG,'PLACE SEARCH DEPTH ',depth);
+
+  { initialise candidate list }
+  for i:=0 to MAXCANDIDATES-1 do begin
+    candidate[i]:=-1;
+    value[i]:=-1000;
+  end;
+
+  { evaluate every possible placement }
+  for p:=0 to 23 do begin
+    if board[p]=EMPTY then begin
+      board[p]:=player;
+
+      v:=boardvalue(player,-1,p);
+
+      board[p]:=EMPTY;
+
+      { insert into ordered candidate list }
+      i:=0;
+      while (i<MAXCANDIDATES) and
+            (v<=value[i]) do
+        i:=i+1;
+
+      if i<MAXCANDIDATES then begin
+        j:=MAXCANDIDATES-1;
+        while j>i do begin
+          candidate[j]:=candidate[j-1];
+          value[j]:=value[j-1];
+          j:=j-1;
+        end;
+
+        candidate[i]:=p;
+        value[i]:=v;
+      end;
+    end;
+  end;
+
+  { search opponent response }
+  if depth>=1 then begin
+    for i:=0 to MAXCANDIDATES-1 do begin
+      if candidate[i]>=0 then
+        value[i]:=placereply(player,candidate[i]);
+    end;
+  end;
+
+  { protocol }
+  for i:=0 to MAXCANDIDATES-1 do
+    if candidate[i]>=0 then
+      writeln(@DEBUG,'SEARCH CANDIDATE ',
+        label[candidate[i]],' VALUE ',value[i]);
+
+  { choose best searched candidate }
+  bestvalue:=-1000;
+  bestpos:=-1;
+
+  for i:=0 to MAXCANDIDATES-1 do begin
+    if candidate[i]>=0 then begin
+      if (bestpos<0) or
+         (value[i]>bestvalue) then begin
+        bestvalue:=value[i];
+        bestpos:=candidate[i];
+      end else if value[i]=bestvalue then begin
+        if _mod(_random,2)=0 then
+          bestpos:=candidate[i];
+      end;
+    end;
+  end;
+
+end;
+
 proc computerplace(player: integer);
 {**********************************}
 var i,p,bestpos,bestvalue,value,tk: integer;
   s: cpnt;
 begin
-  writeln(@DEBUG,'COMPUTERPLACE');
+
   s:=_new;
   bestpos:=-1;
   bestvalue:=-1;
-
-  for i:=0 to 23 do
-    if board[i]=EMPTY then begin
-      value:=placevalue(player,i);
-      writeln(@DEBUG,'PLACE ',label[i],' ',value);
-
-      if (bestpos<0)
-        or (value>bestvalue)
-        or ((value=bestvalue)
-        and (_mod(_random,2)=0))
-      then begin
-        bestvalue:=value;
-        bestpos:=i;
-      end;
-    end;
+  placesearch(player,bestpos,bestvalue);
 
   p:=bestpos;
 
@@ -324,7 +462,7 @@ begin
   clearstone(p1,player);
   drawstone(p2,player);
 
-  protocolaction(player,bestp1,bestp2,bestvalue);
+  protocolaction(player,p1,p2,bestvalue);
 
   if ismill(p2,player) then begin
     tk:=computertake(player);

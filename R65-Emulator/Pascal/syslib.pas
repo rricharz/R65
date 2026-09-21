@@ -106,8 +106,11 @@ end;
 
 func _mod(x,n: integer): integer;
 {*******************************}
-{ compute modulo function of ineger }
+{ compute modulo function of integer }
 begin
+  if n=0 then
+    writeln(INVVID,
+        'SYSLIB: division by zero in _mod', NORVID);
   _mod:=x - (x div n)*n;
 end;
 

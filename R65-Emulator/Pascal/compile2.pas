@@ -221,6 +221,7 @@ end;
 { * main * }
 
 begin {main}
+  writeln('COMPILE2 started');
   init; maxsize:=eblock-sblock-2;
   pointer:=sblock+2; offset:=2;
 
