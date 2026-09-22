@@ -22,6 +22,15 @@ const
 
 var maxlevel:integer;
 
+proc init_ai;
+{***********}
+var i: integer;
+begin
+for i:=0 to 2 do
+  emptysquare[i]:=true;
+end;
+
+
 func threats(player: integer): integer;
 {*************************************}
 { Number of empty positions where PLAYER
@@ -242,30 +251,49 @@ begin
   computertake:=p1;
 end;
 
+proc tryplace(player,p: integer;
+              var bestpos,bestvalue: integer);
+{********************************************}
+var value: integer;
+begin
+  value:=placevalue(player,p);
+  writeln(@DEBUG,'PLACE ',label[p],' ',value);
+
+  if (bestpos<0)
+    or (value>bestvalue)
+    or ((value=bestvalue)
+    and (_mod(_random,2)=0))
+  then begin
+    bestvalue:=value;
+    bestpos:=p;
+  end
+end;
+
 proc computerplace(player: integer);
 {**********************************}
-var i,p,bestpos,bestvalue,value,tk: integer;
+var i,p,base,opposite,bestpos,bestvalue,tk: integer;
   s: cpnt;
 begin
   writeln(@DEBUG,'COMPUTERPLACE');
+
   s:=_new;
   bestpos:=-1;
   bestvalue:=-1;
 
-  for i:=0 to 23 do
-    if board[i]=EMPTY then begin
-      value:=placevalue(player,i);
-      writeln(@DEBUG,'PLACE ',label[i],' ',value);
+  if specialplace>=0 then begin
+    writeln(@DEBUG,'SPECIAL PLACE ',
+      label[specialplace]);
 
-      if (bestpos<0)
-        or (value>bestvalue)
-        or ((value=bestvalue)
-        and (_mod(_random,2)=0))
-      then begin
-        bestvalue:=value;
-        bestpos:=i;
-      end;
-    end;
+      base:=specialplace and $fff88;
+      opposite:=base+((specialplace+4) and 7);
+
+      for i:=base to base+7 do
+        if ((i and 1)=1) or (i=opposite) then
+          tryplace(player,i,bestpos,bestvalue)
+  end else
+    for i:=0 to 23 do
+      if board[i]=EMPTY then
+        tryplace(player,i,bestpos,bestvalue);
 
   p:=bestpos;
 
@@ -281,8 +309,11 @@ begin
     write(@s,label[p],'/',label[tk]);
   end else
     write(@s,label[p]);
+
   strmessage(s,EMPTY);
   _release(s);
+
+  emptysquare[p shr 3]:=false;
 end;
 
 proc computermove(player: integer);

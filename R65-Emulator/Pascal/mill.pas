@@ -23,6 +23,9 @@ var
 
   startsec,starttenmillis: integer;
 
+  emptysquare: array[2] of boolean;
+  lastplace, specialplace: integer;
+
 proc quit;
 {********}
 var result: integer;
@@ -390,6 +393,12 @@ begin
 
   if ismill(p1,player) then
     takestone(player);
+
+  specialplace:=-1;
+  if emptysquare[p1 shr 3] and ((p1 and 1)=0) then
+    specialplace:=p1;
+  emptysquare[p1 shr 3]:=false;
+
 end;
 
 func islegalmove(player,p1,p2: integer): boolean;
@@ -552,6 +561,7 @@ begin
   init_canvas;
   init_common;
   init_neighbors;
+  init_ai;
   drawboard;
   drawlabels;
 

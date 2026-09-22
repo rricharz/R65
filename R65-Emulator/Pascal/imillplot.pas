@@ -420,7 +420,8 @@ end;
 
 proc clearstone(stone, player: integer);
 {*************************************}
-var i, x, y: integer;
+var i, x, y, sq, base: integer;
+empty: boolean;
 begin
   x:=X0+(ord(low(label[stone]))-ord('1'))*SPACING;
   y:=Y0+(ord(high(label[stone]))-ord('A'))*SPACING;
@@ -430,6 +431,15 @@ begin
   end;
   drawboard;
   drawstones;
+
+  sq:=stone shr 3;
+  base := stone and $fff8;
+  empty:=true;
+  for i:=base to base+7 do
+    if board[i]<>EMPTY then
+      empty:=false;
+  emptysquare[sq]:=empty;
+
 end;
 
 proc drawlabels;
