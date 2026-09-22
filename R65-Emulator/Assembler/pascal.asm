@@ -331,7 +331,6 @@ MULA    JSR GETSIGN     COMPUTE SIGN OF RESULT
         CLC
         ADC MULTR
         CLI
-        AND =$7F
         STA ACCU+1
         JSR DECS2
         LDA SIGN
@@ -471,11 +470,23 @@ TNEQ    JSR TEQU
 * P-CODE 0A: TLES       (TEST LESS)
 *****************
 *
-TLES    JSR SUBA
+TLES    LDY =126
+        SEC
+        LDA (SP),Y
+        SBC ACCU
+        INY
+        LDA (SP),Y
+        SBC ACCU+1       N,V FROM HIGH BYTE
+        BVC TLES1
+        EOR =$80         BIT 7 = N XOR V
+TLES1   ASL A
         LDA =0
-        ASL ACCU+1
-        ROL A
-        BCC LOWB1       UNCOND.
+        ROL A            A = 0 OR 1
+        STA ACCU
+        JSR DECS2
+        LDA =0
+        STA ACCU+1
+        RTS
 *
 * P-CODE 0B: TGRE       (TEST GREATER OR EQUAL)
 *****************
