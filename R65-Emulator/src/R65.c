@@ -701,15 +701,17 @@ void write6502(uint16_t address, uint8_t value)
             printFile = fopen(name,"w");
             if (printFile == NULL)
                 printf("Cannot open %s\n",s);
+            memory[R8_EMURES] = 0;
         }
-        else if (value == 9) {             				// end listing
+        else if (value == 9) {         // end listing
             printf("Closing listing\n");
             if (printFile)
                 fclose(printFile);
             char *s = "printout.txt";
             printFile = fopen(s,"w");
             if (printFile == NULL)
-                printf("Cannot open %s\n",s);            
+                printf("Cannot open %s\n",s);
+            memory[R8_EMURES] = 0;
         }
         else if (value == 10) {							// execute Linux shell command line
 			    int pnt = memory[4] + 256 * memory[5];
@@ -722,15 +724,18 @@ void write6502(uint16_t address, uint8_t value)
 		    }
 		    else if (value == 11) {							// start raw printing
 			    rawPrint = 1;
+          memory[R8_EMURES] = 0;
 		    }
 		    else if (value == 12) {
 			     rawPrint = 0;
+           memory[R8_EMURES] = 0;
 		    }
         else if (value == 13) {
           if (printFile != NULL) {
             fflush(printFile);
             printf("printout.txt flushed\n");
           }
+          memory[R8_EMURES] = 0;
         }
         else if (value == 14) {
           if (printFile != NULL) {
@@ -738,10 +743,11 @@ void write6502(uint16_t address, uint8_t value)
             printFile = fopen("printout.txt","w");
             printf("printout.txt reset\n");
           }
+          memory[R8_EMURES] = 0;
         }
         else {
             printf("Unknown emulator command %02X, pc=%04X\n", value, pc-3);
-        memory[R8_EMURES] = 0X67;           // set result to 0
+        memory[R8_EMURES] = 0X67;           // unknown emulator command
         memory[R8_EMUCOM] = 0;              // and clear command
         }
         return;

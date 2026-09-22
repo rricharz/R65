@@ -546,7 +546,7 @@ end;
 
 proc setval;
 var r: real;
-    n,n1: integer;
+    iv,iv2,iv4,n,n1,d: integer;
     ems: boolean;
 
   func times10(r:real):real;
@@ -561,30 +561,46 @@ var r: real;
 
 begin
   r:=0.0;
+  iv:=0;
+
   repeat
-    r:=times10(r)+conv(ord(ch)-ord('0'));
-    getchr;
+    d:=ord(ch)-ord('0');
+
+    r:=times10(r)+conv(d);
+
+    iv2:=iv+iv;
+    iv4:=iv2+iv2;
+    iv:=iv2+iv4+iv4+d;
+
+    getchr
   until (ch<'0') or (ch>'9');
+
   if ch<>'.' then begin {numeric integer}
-    token := 'nu';
-    r := r + 0.5;
-    if r > 32767.0 then
-      error(30);
-    value[0] := trunc(r);
+    token:='nu';
+    value[0]:=iv
   end
   else begin {numeric real}
-    n:=0; getchr;
+    n:=0;
+    getchr;
     while (ch<='9') and (ch>='0') do begin
       r:=times10(r)+conv(ord(ch)-ord('0'));
-      n:=prec(n); getchr
+      n:=prec(n);
+      getchr
     end;
+
     if ch='e' then begin
-      ems:=false; getchr;
+      ems:=false;
+      getchr;
       case ch of
         '+': getchr;
-        '-': begin ems:=true; getchr end
+        '-': begin
+               ems:=true;
+               getchr
+             end
       end;
-      if (ch>'9') or (ch<'0') then error(17)
+
+      if (ch>'9') or (ch<'0') then
+        error(17)
       else begin
         n1:=ord(ch)-ord('0');
         getchr;
@@ -592,16 +608,23 @@ begin
           n1:=10*n1+ord(ch)-ord('0');
           getchr
         end;
-        if ems then n:=n-n1 else n:=n+n1
+        if ems then
+          n:=n-n1
+        else
+          n:=n+n1
       end
     end;
+
     while n>0 do begin
       n:=prec(n);
-      r:=times10(r);
+      r:=times10(r)
     end;
+
     while n<0 do begin
-      n:=succ(n); r:=0.1*r;
+      n:=succ(n);
+      r:=0.1*r
     end;
+
     splitconv(r,value);
     token:='ru'
   end
