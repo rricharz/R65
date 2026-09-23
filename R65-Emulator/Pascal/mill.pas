@@ -26,6 +26,11 @@ var
   emptysquare: array[2] of boolean;
   lastplace, specialplace: integer;
 
+
+  previousstate: cpnt;
+  previousaction: cpnt;
+  computeraction: cpnt;
+
 proc quit;
 {********}
 var result: integer;
@@ -108,6 +113,9 @@ end;
 
 proc codestate(s: cpnt; player: integer);
 {***************************************}
+{ player identifies the side whose turn has just
+  been completed.  Restartable MILL games use
+  MILL2 B, since play always resumes with WHITE. }
 var i: integer;
 begin
   s[0]:=ENDMARK;
@@ -160,7 +168,7 @@ begin
   end;
 
   if not strbegins(s,'MILL2 B') then begin
-    writeln(INVVID,'Next tun is not PLAYER');
+    writeln(INVVID,'Next turn is not PLAYER');
     writeln('Paste a state starting with MILL2 B',
         NORVID);
     quit;
@@ -232,10 +240,33 @@ begin
   _strfio(filename,0,1);
   openw(f);
 
+  if previousaction[0]<>ENDMARK then
+    writeln(@f,previousaction);
+  if computeraction[0]<>ENDMARK then
+    writeln(@f,computeraction);
+  writeln(@f,'RESUME ',action);
+
   codestate(line, otherplayer(player));
   writeln(@f,line);
 
   close(f);
+
+  if previousstate[0]<>ENDMARK then begin
+    filename[0]:=ENDMARK;
+    write(@filename,'MILL',name,'P:B');
+
+    _strfio(filename,0,1);
+    openw(f);
+    if previousaction[0]<>ENDMARK then
+      writeln(@f,previousaction);
+    if computeraction[0]<>ENDMARK then
+      writeln(@f,computeraction);
+    writeln(@f,'RESUME ',action-2);
+
+    writeln(@f,previousstate);
+    close(f);
+  end;
+
   _release(filename);
   _release(line);
 end;
@@ -243,7 +274,7 @@ end;
 proc loadgame;
 {************}
 var name,fullname,line: cpnt;
-    carg,length: integer;
+    i,carg,length: integer;
     dummy: boolean;
     f: file;
     ateof: boolean;
@@ -268,6 +299,33 @@ begin
 
   if length=0 then begin
     writeln('Empty MILL file');
+    quit;
+  end;
+
+  while strbegins(line,'ACTION ') do begin
+    writeln(line);
+    length:=_strread(f,line,ateof);
+
+    if length=0 then begin
+      writeln(INVVID,'Missing MILL state',NORVID);
+      quit;
+    end;
+  end;
+
+  if strbegins(line,'RESUME ') then begin
+    action:=0;
+    i:=7;
+    while (line[i]>='0') and (line[i]<='9') do begin
+      action:=10*action+ord(line[i])-ord('0');
+      i:=i+1;
+    end;
+    length:=_strread(f,line,ateof);
+    writeln('RESUME ',action);
+    action:=action-1;
+  end;
+
+  if not strbegins(line,'MILL2 ') then begin
+    writeln(INVVID,'Bad MILL state',NORVID);
     quit;
   end;
 
@@ -364,6 +422,11 @@ begin
 
   until valid;
 
+  if player=WHITE then
+    write(@previousaction,' TAKE ',label[p1])
+  else
+    write(@computeraction,' TAKE ',label[p1]);
+
   board[p1]:=EMPTY;
   clearstone(p1,player);
   captured[player]:=captured[player]+1;
@@ -384,6 +447,8 @@ begin
       message(6,label[p1],player);
 
   until valid;
+
+  codestate(previousstate,BLACK);
 
   board[p1]:=player;
   stones[player]:=stones[player]-1;
@@ -451,6 +516,8 @@ begin
       valid:=true;
 
   until valid;
+
+  codestate(previousstate,BLACK);
 
   board[p2]:=board[p1];
   board[p1]:=EMPTY;
@@ -558,12 +625,22 @@ end;
 {***********}
 
 begin
+  previousstate:=_new;
+  previousstate[0]:=ENDMARK;
+
+  previousaction:=_new;
+  previousaction[0]:=ENDMARK;
+
+  computeraction:=_new;
+  computeraction[0]:=ENDMARK;
   init_canvas;
   init_common;
   init_neighbors;
   init_ai;
   drawboard;
   drawlabels;
+
+  action:=0;
 
   if ARGTYPE[0]='s' then loadgame;
 
@@ -576,7 +653,6 @@ begin
   write(@PLOTDEV,'COMPUTER');
 
   player:=WHITE;
-  action:=0;
   repeat
     action:=action+1;
     playerturn(player);

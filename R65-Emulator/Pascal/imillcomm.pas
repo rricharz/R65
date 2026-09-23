@@ -55,18 +55,28 @@ end;
 
 proc protocolaction(player,pos,pos2,value);
 {*****************************************}
+var s: cpnt;
 begin
-  write(@DEBUG,'ACTION ',action,' ');
+  if player=WHITE then
+    s:=previousaction
+  else
+    s:=computeraction;
+
+  s[0]:=ENDMARK;
+
+  write(@s,'ACTION ',action,' ');
 
   if player=WHITE then
-    write(@DEBUG,'WHITE ')
+    write(@s,'WHITE ')
   else
-    write(@DEBUG,'BLACK ');
+    write(@s,'BLACK ');
 
-  if (pos2>=0) then
-    write(@DEBUG,'MOVE ',label[pos],'-',label[pos2])
+  if pos2>=0 then
+    write(@s,'MOVE ',label[pos],'-',label[pos2])
   else
-    write(@DEBUG,'PLACE ',label[pos]);
+    write(@s,'PLACE ',label[pos]);
+
+  write(@DEBUG,s);
 
   if player=BLACK then
     write(@DEBUG,' VALUE ',value);
