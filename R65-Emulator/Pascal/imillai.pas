@@ -6,7 +6,6 @@ const
   V_NEXTMILL    = 20;
   V_REMILL      = 10;
 
-  V_OWNTHREAT1  = 3;
   V_OWNTHREAT2  = 30;
 
   V_OPPTHREAT1  = 15;
@@ -23,6 +22,7 @@ const
 var maxlevel:integer;
 
 var aitime: real;
+    V_OWNTHREAT1: integer;
 
 proc init_ai;
 {***********}

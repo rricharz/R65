@@ -11,7 +11,7 @@ const
 
   SELFPLAY     = true;
   MAXACTIONS   = 80;
-  MAXGAMES     = 100;
+  MAXGAMES     = 300;
 
   EMPTY = 4;
 
@@ -30,21 +30,29 @@ var
   emptysquare: array[2] of boolean;
   lastplace, specialplace: integer;
 
-
   previousstate: cpnt;
   previousaction: cpnt;
   computeraction: cpnt;
 
-  finished: boolean;
+  i: integer;
+
+
+  test: integer;
 
 const
-  HASHBITS=10;
-  NBUCKETS=1024;  { 2^HASHBITS }
+    NTESTS=3;
+    TESTAGAINST=3;
 
-var
-  i: integer;
-  bucket: array[NBUCKETS] of integer;
-  draws, losses, wins: integer;
+var wins,losses,draws: array[NTESTS] of integer;
+    testvalue: array[NTESTS] of integer;
+
+proc init_tests;
+{**************}
+begin
+  testvalue[0]:=1;
+  testvalue[1]:=3;
+  testvalue[2]:=5
+end;
 
 proc quit;
 {********}
@@ -662,49 +670,23 @@ end;
 
 proc statistics;
 {**************}
-{var i,h,b,used,collisions,max: integer;
-begin
-  h:=statehash;
-  b:=h and (NBUCKETS-1);
-  bucket[b]:=bucket[b]+1;
-
-  used:=0;
-  collisions:=0;
-  max:=0;
-
-  for i:=0 to NBUCKETS-1 do begin
-    if bucket[i]>0 then begin
-      used:=used+1;
-      collisions:=collisions+bucket[i]-1
-    end;
-    if bucket[i]>max then
-      max:=bucket[i];
-  end;
-
-  write('GAME ',game,' ACTION ',action);
-  writeln(' AI ',trunc(aitime/conv(game)),
-          ' s/game');
-  write('BUCKETS ',used,'/',NBUCKETS,
-          ' COLL ',collisions);
-  writeln(' MAX ',max);
-end;
-}
-
+var i,v: integer;
 begin
   write('GAME ',game,' ACTION ',action);
   writeln(' AI ',trunc(aitime/conv(game)),
           ' s/game');
 
-  write('W ',100*wins div game);
-  write('% L ',100*losses div game);
-  writeln('% D ',100*draws div game,'%');
+  writeln(@SELFDEV,'GAME ',game,
+          ' ACTION ',action,
+          ' AI ',trunc(aitime/conv(game)),
+          ' s/game');
 
-  { same information to SELFDEV }
-  writeln(@SELFDEV,'GAME ',game,' ACTION ',action,
-          ' AI ',trunc(aitime/conv(game)),' s/game');
-
-  writeln(@SELFDEV,'W ',wins,
-          ' L ',losses,' D ',draws);
+  for i:=0 to NTESTS-1 do begin
+    write(@SELFDEV,'V ',testvalue[i],
+                  ' W ',wins[i]);
+    writeln(@SELFDEV,' L ',losses[i],
+                  ' D ',draws[i])
+  end
 end;
 
 { main body }
@@ -724,11 +706,14 @@ begin
   _fullview;
 
   game:=0;
-  wins:=0;
-  losses:=0;
-  draws:=0;
   aitime:=0.0;
-  aitime:=0.0;
+  init_tests;
+  for i:=0 to NTESTS-1 do begin
+    wins[i]:=0;
+    losses[i]:=0;
+    draws[i]:=0
+  end;
+
   if SELFPLAY then begin
     DEBUG:=NULLDEV;
     SELFDEV:=PRINTER
@@ -736,11 +721,11 @@ begin
     DEBUG:=PRINTER;
     SELFDEV:=NULLDEV
   end;
-  for i:=0 to NBUCKETS-1 do
-    bucket[i]:=0;
+
   writeln(@SELFDEV,
     'SELFPLAY MAXACTIONS ', MAXACTIONS);
   mem[$1781] :=mem[$1781] and $7f;
+
   repeat
     init_canvas;
     init_common;
@@ -750,6 +735,7 @@ begin
     drawlabels;
 
     action:=0;
+    test:=_mod(game,NTESTS);
 
     if not SELFPLAY and (ARGTYPE[0]='s') then
       loadgame;
@@ -771,6 +757,12 @@ begin
 
     repeat
       action:=action+1;
+
+      if player=WHITE then
+        V_OWNTHREAT1:=TESTAGAINST
+      else
+        V_OWNTHREAT1:=testvalue[test];
+
       playerturn(player);
       protocolboard;
       player:=otherplayer(player);
@@ -782,17 +774,18 @@ begin
     writeln(@DEBUG,'AI TIME ',trunc(aitime),' S');
 
     if action>=MAXACTIONS then
-      draws:=draws+1
+      draws[test]:=draws[test]+1
     else if player=WHITE then
-      losses:=losses+1
+      losses[test]:=losses[test]+1
     else
-      wins:=wins+1;
-    game:=game+1;
+      wins[test]:=wins[test]+1;
 
+    game:=game+1;
     statistics;
 
-  until not SELFPLAY or (game>MAXGAMES) or
+  until not SELFPLAY or (game>=MAXGAMES) or
     ((mem[$1781] and $80)<>0);
+    { ESCAPE flag }
 
   quit;
 
