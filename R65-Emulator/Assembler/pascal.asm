@@ -2003,7 +2003,9 @@ PRTCHR2 DEX
         JSR WRITCH
         JMP TFER
 *
-PRTCHR3 CMP =$0D        PLOT CR?
+PRTCHR3 CPX =$FF       NULL DEVICE
+        BEQ PRTCHRE
+        CMP =$0D       PLOT CR?
         BNE PRTCHR4
         LDA =0
         STA GRX

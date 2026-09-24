@@ -19,11 +19,8 @@ const
 proc init_canvas;
 {***************}
 begin
-  DEBUG := PRINTER;
-  _grinit;
-  _fullview;
   _cleargr;
-  end;
+end;
 
 proc vector(x1,y1,x2,y2, color: integer);
 {***************************************}

@@ -42,6 +42,7 @@ const
   OUTPUT   = @0;        {display output}
   KEY      = @1;        {unbuffered kb input}
   PRINTER  = @1;        {hardcopy output}
+  NULLDEV  = @255;      {null device}
 
   ECEXPORT = 1;         {emulator commands}
   ECIMPORT = 2;

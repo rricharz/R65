@@ -9,6 +9,10 @@ const
   NMILLS       = 16;
   MAXNEIGHBORS = 4;
 
+  SELFPLAY     = true;
+  MAXACTIONS   = 80;
+  MAXGAMES     = 100;
+
   EMPTY = 4;
 
 mem
@@ -18,8 +22,8 @@ var
   board: array[23] of integer;
   stones, captured: array[BLACK] of integer;
   label:    array[23] of packed char;
-  DEBUG: file;
-  player,action: integer;
+  DEBUG, SELFDEV: file;
+  player,action,game: integer;
 
   startsec,starttenmillis: integer;
 
@@ -30,6 +34,17 @@ var
   previousstate: cpnt;
   previousaction: cpnt;
   computeraction: cpnt;
+
+  finished: boolean;
+
+const
+  HASHBITS=10;
+  NBUCKETS=1024;  { 2^HASHBITS }
+
+var
+  i: integer;
+  bucket: array[NBUCKETS] of integer;
+  draws, losses, wins: integer;
 
 proc quit;
 {********}
@@ -574,13 +589,22 @@ proc playerturn(player: integer);
 begin
   selectdashboard(player);
 
-  if DUALPLAYER then begin
+  if SELFPLAY then begin
+    writeln(@DEBUG,'SELFPLAY ',player);
+    message(21,'  ',player);
+    strmessage('',EMPTY);
+    protocolcomputer(player);
+    computerturn(player);
+  end
+
+  else if DUALPLAYER then begin
     protocolhuman(player);
     if stones[player]>0 then
       placestone(player)
     else
       movestone(player);
   end
+
   else begin
     if player=WHITE then begin
       protocolhuman(player);
@@ -606,6 +630,11 @@ func gameover(player: integer): boolean;
 
 var p1,p2: integer;
 begin
+  if action>=MAXACTIONS then begin
+    gameover:=true;
+    exit;
+  end;
+
   if stones[player]>0 then begin
     gameover:=false;
     exit;
@@ -621,6 +650,63 @@ begin
   gameover:=not findlegalmove(player,p1,p2);
 end;
 
+func statehash: integer;
+{***********************}
+var i,h: integer;
+begin
+  h:=1;
+  for i:=0 to 23 do
+    h:=h*31+board[i]+1;
+  statehash:=h
+end;
+
+proc statistics;
+{**************}
+{var i,h,b,used,collisions,max: integer;
+begin
+  h:=statehash;
+  b:=h and (NBUCKETS-1);
+  bucket[b]:=bucket[b]+1;
+
+  used:=0;
+  collisions:=0;
+  max:=0;
+
+  for i:=0 to NBUCKETS-1 do begin
+    if bucket[i]>0 then begin
+      used:=used+1;
+      collisions:=collisions+bucket[i]-1
+    end;
+    if bucket[i]>max then
+      max:=bucket[i];
+  end;
+
+  write('GAME ',game,' ACTION ',action);
+  writeln(' AI ',trunc(aitime/conv(game)),
+          ' s/game');
+  write('BUCKETS ',used,'/',NBUCKETS,
+          ' COLL ',collisions);
+  writeln(' MAX ',max);
+end;
+}
+
+begin
+  write('GAME ',game,' ACTION ',action);
+  writeln(' AI ',trunc(aitime/conv(game)),
+          ' s/game');
+
+  write('W ',100*wins div game);
+  write('% L ',100*losses div game);
+  writeln('% D ',100*draws div game,'%');
+
+  { same information to SELFDEV }
+  writeln(@SELFDEV,'GAME ',game,' ACTION ',action,
+          ' AI ',trunc(aitime/conv(game)),' s/game');
+
+  writeln(@SELFDEV,'W ',wins,
+          ' L ',losses,' D ',draws);
+end;
+
 { main body }
 {***********}
 
@@ -633,36 +719,81 @@ begin
 
   computeraction:=_new;
   computeraction[0]:=ENDMARK;
-  init_canvas;
-  init_common;
-  init_neighbors;
-  init_ai;
-  drawboard;
-  drawlabels;
 
-  action:=0;
+  _grinit;
+  _fullview;
 
-  if ARGTYPE[0]='s' then loadgame;
-
-  drawstones;
-  drawreserve(WHITE);
-  drawreserve(BLACK);
-  _move(DASHX+1,DASHWHITEY+NAMEOFF);
-  write(@PLOTDEV,'PLAYER');
-  _move(DASHX+1,DASHBLACKY+NAMEOFF);
-  write(@PLOTDEV,'COMPUTER');
-
-  player:=WHITE;
+  game:=0;
+  wins:=0;
+  losses:=0;
+  draws:=0;
+  aitime:=0.0;
+  aitime:=0.0;
+  if SELFPLAY then begin
+    DEBUG:=NULLDEV;
+    SELFDEV:=PRINTER
+  end else begin
+    DEBUG:=PRINTER;
+    SELFDEV:=NULLDEV
+  end;
+  for i:=0 to NBUCKETS-1 do
+    bucket[i]:=0;
+  writeln(@SELFDEV,
+    'SELFPLAY MAXACTIONS ', MAXACTIONS);
+  mem[$1781] :=mem[$1781] and $7f;
   repeat
-    action:=action+1;
-    playerturn(player);
-    protocolboard;
-    player:=otherplayer(player);
-    if gameover(player) then begin
-      message(10,'  ',player);
-      message(11,'  ',otherplayer(player));
-      quit;
-    end;
-  until false;
+    init_canvas;
+    init_common;
+    init_neighbors;
+    init_ai;
+    drawboard;
+    drawlabels;
+
+    action:=0;
+
+    if not SELFPLAY and (ARGTYPE[0]='s') then
+      loadgame;
+
+    drawstones;
+    drawreserve(WHITE);
+    drawreserve(BLACK);
+
+    _move(DASHX+1,DASHWHITEY+NAMEOFF);
+    if SELFPLAY then
+      write(@PLOTDEV,'COMPUTER')
+    else
+      write(@PLOTDEV,'PLAYER');
+
+    _move(DASHX+1,DASHBLACKY+NAMEOFF);
+    write(@PLOTDEV,'COMPUTER');
+
+    player:=WHITE;
+
+    repeat
+      action:=action+1;
+      playerturn(player);
+      protocolboard;
+      player:=otherplayer(player);
+    until gameover(player);
+
+    message(10,'  ',player);
+    message(11,'  ',otherplayer(player));
+
+    writeln(@DEBUG,'AI TIME ',trunc(aitime),' S');
+
+    if action>=MAXACTIONS then
+      draws:=draws+1
+    else if player=WHITE then
+      losses:=losses+1
+    else
+      wins:=wins+1;
+    game:=game+1;
+
+    statistics;
+
+  until not SELFPLAY or (game>MAXGAMES) or
+    ((mem[$1781] and $80)<>0);
+
+  quit;
 
 end.

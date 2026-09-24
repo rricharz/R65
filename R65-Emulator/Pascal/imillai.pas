@@ -22,14 +22,16 @@ const
 
 var maxlevel:integer;
 
+var aitime: real;
+
 proc init_ai;
 {***********}
 var i: integer;
 begin
-for i:=0 to 2 do
-  emptysquare[i]:=true;
+  for i:=0 to 2 do
+    emptysquare[i]:=true;
+  specialplace:=-1;
 end;
-
 
 func threats(player: integer): integer;
 {*************************************}
@@ -781,6 +783,7 @@ proc computerturn(player: integer);
 {*******************************}
 var s:cpnt;
     found:boolean;
+    e: integer;
 begin
   starttimer;
   found:=false;
@@ -798,7 +801,11 @@ begin
   end;
 
   s:=_new;
-  write(@s,elapsed10ms,'0 MS');
+  e:=elapsed10ms;
+
+  aitime := aitime + conv(e) / 100.0;
+
+  write(@s,e,'0 MS');
   strmessage(s,player);
   writeln(@DEBUG,'TIME ',s);
   _release(s);
