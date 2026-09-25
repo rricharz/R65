@@ -11,7 +11,7 @@ const
 
   SELFPLAY     = true;
   MAXACTIONS   = 80;
-  MAXGAMES     = 300;
+  MAXGAMES     = 400;
 
   EMPTY = 4;
 
@@ -25,7 +25,7 @@ var
   DEBUG, SELFDEV: file;
   player,action,game: integer;
 
-  startsec,starttenmillis: integer;
+  startmin,startsec,starttenmillis: integer;
 
   emptysquare: array[2] of boolean;
   lastplace, specialplace: integer;
@@ -40,8 +40,8 @@ var
   test: integer;
 
 const
-    NTESTS=3;
-    TESTAGAINST=3;
+    NTESTS=8;
+    TESTAGAINST=40;
 
 var wins,losses,draws: array[NTESTS] of integer;
     testvalue: array[NTESTS] of integer;
@@ -49,9 +49,14 @@ var wins,losses,draws: array[NTESTS] of integer;
 proc init_tests;
 {**************}
 begin
-  testvalue[0]:=1;
-  testvalue[1]:=3;
-  testvalue[2]:=5
+  testvalue[0]:=10;
+  testvalue[1]:=20;
+  testvalue[2]:=30;
+  testvalue[3]:=35;
+  testvalue[4]:=45;
+  testvalue[5]:=50;
+  testvalue[6]:=60;
+  testvalue[7]:=80;
 end;
 
 proc quit;
@@ -668,17 +673,79 @@ begin
   statehash:=h
 end;
 
+func sqrt(n:real):real;
+{*********************}
+{ using bisection }
+const accuracy = 0.0001; {rel accuracy}
+      STOPCODE = $2010;
+      NORVID   = chr($0b);
+      INVVID   = chr($0e);
+mem   RUNERR   = $000c: integer&;
+var   lower,upper,guess:real;
+begin
+  if n=0.0 then begin sqrt:=0.0; exit end;
+  if n<0.0 then begin
+    writeln(INVVID,'sqrt: non-positive argument'
+      ,NORVID);
+    RUNERR := 54;
+    call(STOPCODE);
+    end;
+  if n<1.0 then begin
+    lower:=n; upper:=1.0
+  end else begin
+    lower:=1.0; upper:=n
+  end;
+  guess:=1.0;
+  while (upper-lower)>(accuracy*guess) do begin
+    guess:=(upper+lower)/2.0;
+    if (guess*guess)>n then upper:=guess
+    else lower:=guess
+  end;
+  sqrt:=(upper+lower)/2.0;
+end;
+
 proc statistics;
 {**************}
-var i,v: integer;
+var i,n: integer;
+    p,e: real;
 begin
   write('GAME ',game,' ACTION ',action);
-  writeln(' AI ',trunc(aitime/conv(game)),
+  writeln(' AI ',strunc(aitime/conv(game)),
           ' s/game');
+
+  for i:=0 to NTESTS-1 do begin
+    n:=wins[i]+losses[i]+draws[i];
+
+    write('V ',testvalue[i]);
+
+    if n>0 then begin
+      p:=conv(wins[i])/conv(n);
+      e:=100.0*
+         sqrt(conv(wins[i])*conv(n-wins[i]))/
+         conv(n);
+      write(' W ',strunc(100.0*p+0.5),
+            '+-',strunc(e+0.5),'%');
+
+      p:=conv(losses[i])/conv(n);
+      e:=100.0*
+         sqrt(conv(losses[i])*conv(n-losses[i]))/
+         conv(n);
+      write(' L ',strunc(100.0*p+0.5),
+            '+-',strunc(e+0.5),'%');
+
+      p:=conv(draws[i])/conv(n);
+      e:=100.0*
+         sqrt(conv(draws[i])*conv(n-draws[i]))/
+         conv(n);
+      writeln(' D ',strunc(100.0*p+0.5),
+              '+-',strunc(e+0.5),'%')
+    end else
+      writeln(' -')
+  end;
 
   writeln(@SELFDEV,'GAME ',game,
           ' ACTION ',action,
-          ' AI ',trunc(aitime/conv(game)),
+          ' AI ',strunc(aitime/conv(game)),
           ' s/game');
 
   for i:=0 to NTESTS-1 do begin
@@ -703,7 +770,10 @@ begin
   computeraction[0]:=ENDMARK;
 
   _grinit;
-  _fullview;
+  if SELFPLAY then
+    _splitview
+  else
+    _fullview;
 
   game:=0;
   aitime:=0.0;
@@ -723,7 +793,8 @@ begin
   end;
 
   writeln(@SELFDEV,
-    'SELFPLAY MAXACTIONS ', MAXACTIONS);
+    'SELFPLAY MAXACTIONS ', MAXACTIONS,
+    ' TESTAGAINST ',TESTAGAINST);
   mem[$1781] :=mem[$1781] and $7f;
 
   repeat
@@ -759,9 +830,9 @@ begin
       action:=action+1;
 
       if player=WHITE then
-        V_OWNTHREAT1:=TESTAGAINST
+        V_OPPTHREAT2:=TESTAGAINST
       else
-        V_OWNTHREAT1:=testvalue[test];
+        V_OPPTHREAT2:=testvalue[test];
 
       playerturn(player);
       protocolboard;
@@ -771,7 +842,7 @@ begin
     message(10,'  ',player);
     message(11,'  ',otherplayer(player));
 
-    writeln(@DEBUG,'AI TIME ',trunc(aitime),' S');
+    writeln(@DEBUG,'AI TIME ',strunc(aitime),' S');
 
     if action>=MAXACTIONS then
       draws[test]:=draws[test]+1

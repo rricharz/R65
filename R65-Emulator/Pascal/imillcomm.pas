@@ -10,6 +10,17 @@ var
   neighbor: array[95] of integer;
   { There is no INVERSE stone; BLACK and WHITE used }
 
+func strunc(r: real): integer;
+{*************************}
+begin
+  if r>32767.0 then
+    strunc:=32767
+  else if r< -32768.0 then
+    strunc:=-32768
+  else
+    strunc:=trunc(r);
+end;
+
 proc protocolboard;
 {*****************}
 var i,row,col,pos: integer;
@@ -84,8 +95,8 @@ begin
   writeln(@DEBUG);
 end;
 
-proc readtime(var sec,tenmillis: integer);
-{****************************************}
+proc readtime(var min,sec,tenmillis: integer);
+{********************************************}
 var dummy: integer;
 
   func getbcd(address: integer): integer;
@@ -100,21 +111,23 @@ begin
   dummy:=getbcd($17b9);
   tenmillis:=getbcd($17b5);
   sec:=getbcd($17b6);
+  min:=getbcd($17b7);
 end;
 
 proc starttimer;
 {***************}
 begin
-  readtime(startsec,starttenmillis);
+  readtime(startmin,startsec,starttenmillis);
 end;
 
 func elapsed10ms: integer;
 {************************}
-var sec,tenmillis: integer;
-    dsec,dtenmillis: integer;
+var min,sec,tenmillis: integer;
+    dmin,dsec,dtenmillis: integer;
 begin
-  readtime(sec,tenmillis);
+  readtime(min,sec,tenmillis);
 
+  dmin:=min-startmin;
   dsec:=sec-startsec;
   dtenmillis:=tenmillis-starttenmillis;
 
@@ -123,11 +136,16 @@ begin
     dsec:=dsec-1;
   end;
 
-  { wrap from 59 to 0 seconds }
-  if dsec<0 then
+  if dsec<0 then begin
     dsec:=dsec+60;
+    dmin:=dmin-1;
+  end;
 
-  elapsed10ms:=100*dsec+dtenmillis;
+  { wrap from 59 to 0 minutes }
+  if dmin<0 then
+    dmin:=dmin+60;
+
+  elapsed10ms:=6000*dmin+100*dsec+dtenmillis;
 end;
 
 proc setmill(mill,p1,p2,p3: integer);

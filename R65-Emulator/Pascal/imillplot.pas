@@ -66,8 +66,6 @@ begin
    27: write(@PLOTDEV,'SAVED')
    else write(@PLOTDEV,'ERROR ', number)
   end;
-  {if number=21 then
-    dummy:=_syncscreen;}
 end;
 
 proc strmessage(s:cpnt; player: integer);
@@ -417,7 +415,7 @@ end;
 
 proc clearstone(stone, player: integer);
 {*************************************}
-var i, x, y, sq, base: integer;
+var i, x, y, sq, base,dummy: integer;
 empty: boolean;
 begin
   x:=X0+(ord(low(label[stone]))-ord('1'))*SPACING;
@@ -426,8 +424,10 @@ begin
     _move(x-5,y+i-5);
     _draw(x+5,y+i-5, BLACK);
   end;
+  dummy:=_syncscreen;
   drawboard;
   drawstones;
+  dummy:=_syncscreen;
 
   sq:=stone shr 3;
   base := stone and $fff8;
