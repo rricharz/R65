@@ -278,7 +278,7 @@ uint8_t read6502(uint16_t address)
 {
 
 	// showtrace(address, 0x2063, "STOP");
-    
+      
     if (address < 0x1400)
         return memory[address];
     else if (address >= 0x1800)
@@ -345,27 +345,6 @@ uint8_t read6502(uint16_t address)
         else if (address == EMU_FLAGS)  {
             return(global_key_is_down); // bit 0 set if key is down           
         }
-
-        /*
-        else if (address == KIM_IFR1) {
-            printf ("Reading from KIM-1 IFR1 register, pc=%04X, value=%02X\n", pc - 3, memory[address]);
-        }
-        else if (address == KIM_IER1) {
-            printf ("Reading from KIM-1 IER1 register, pc=%04X, value=%02X\n", pc - 3, memory[address]);
-        }
-        else if (address == KIM_IFR2) {
-            printf ("Reading from KIM-1 IFR2 register, pc=%04X, value=%02X\n", pc - 3, memory[address]);
-        }
-        else if (address == KIM_IER2) {
-            printf ("Reading from KIM-1 IER2 register, pc=%04X, value=%02X\n", pc - 3, memory[address]);
-        }
-        else if (address == KIM_IFR3) {
-             printf ("Reading from KIM-1 IFR3 register, pc=%04X, value=%02X\n", pc - 3, memory[address]);
-        }
-        else if (address == KIM_IER3) {
-            printf ("Reading from KIM-1 IER3 register, pc=%04X, value=%02X\n", pc - 3, memory[address]);
-        }
-        */
     }
     
     return memory[address];
@@ -443,7 +422,7 @@ int editor()
                name,
                NULL
         };
-        printf("Running TextMate on %s, waiting for completion\n", name);
+        logmsg("Running TextMate on %s, waiting for completion\n", name);
 
 #elif defined(_WIN32)
 
@@ -453,7 +432,7 @@ int editor()
                name,
                NULL
         };
-        printf("Running VS Code on %s, waiting for completion\n", name);
+        logmsg("Running VS Code on %s, waiting for completion\n", name);
 
 #else
 
@@ -463,7 +442,7 @@ int editor()
             name,
             NULL
         };
-        printf("Running mousepad on %s, waiting for completion\n", name);
+        logmsg("Running mousepad on %s, waiting for completion\n", name);
 
 #endif
 
@@ -532,14 +511,9 @@ void write6502(uint16_t address, uint8_t value)
     }
     else if (address>=0x2000) {
         if (address>=0xe000) {
-            printf("writing into EPROM address space not allowed\n");
+            logmsg("writing into EPROM address space not allowed\n");
             return;
         }
-        //else if ((address>=0xc800) && (address<=0xd5ff)) {
-        //    printf("writing into EXDOS address space not allowed\n");
-        //    printf("pc=%04x, address=%04x\n",pc,address);
-        //    return;
-        // }
         else {
             memory[address] = value;
             return;
@@ -547,7 +521,7 @@ void write6502(uint16_t address, uint8_t value)
     }
     
     else if (address>=0x1800) {
-            printf("writing into KIM ROM address space not allowed\n");
+            logmsg("writing into KIM ROM address space not allowed\n");
             return;
         }
     
@@ -603,7 +577,6 @@ void write6502(uint16_t address, uint8_t value)
         }
         else if (value == 2) {
             memory[R8_EMURES] = import_file(); // import and set result
-            // printf("EMURES=%d\n",memory[R8_EMURES]);
             memory[R8_EMUCOM] = 0;          // and clear command
         }
         else if (value == 3) {
@@ -661,9 +634,6 @@ void write6502(uint16_t address, uint8_t value)
                 lastPrint = lastCrtSync;
 
 			if (lastCrtSync - lastPrint >= 1000000) {
-                printf("average spare time: %.1f msec\n",
-                       (double)sleepSum /
-                       (1000.0 * frameCount));
                 fflush(stdout);
 
                 frameCount = 0;
@@ -697,26 +667,23 @@ void write6502(uint16_t address, uint8_t value)
             }    
             s[end] = 0;                              	// add end of string mark
             snprintf(name, sizeof(name), "Listings/%s.txt", s);
-            printf("Writing listing to %s\n", name);
             printFile = fopen(name,"w");
             if (printFile == NULL)
-                printf("Cannot open %s\n",s);
+                logmsg("Cannot open %s\n",s);
             memory[R8_EMURES] = 0;
         }
         else if (value == 9) {         // end listing
-            printf("Closing listing\n");
             if (printFile)
                 fclose(printFile);
             char *s = "printout.txt";
             printFile = fopen(s,"w");
             if (printFile == NULL)
-                printf("Cannot open %s\n",s);
+                logmsg("Cannot open %s\n",s);
             memory[R8_EMURES] = 0;
         }
         else if (value == 10) {							// execute Linux shell command line
 			    int pnt = memory[4] + 256 * memory[5];
 			    char *s = (char *) memory + pnt;
-			    printf("SHELL: %s\n", s);
 			    fflush(stdout);
 			    int result = system(s);
 			    memory[R8_EMURES] = (result != 0);			
@@ -733,7 +700,6 @@ void write6502(uint16_t address, uint8_t value)
         else if (value == 13) {
           if (printFile != NULL) {
             fflush(printFile);
-            printf("printout.txt flushed\n");
           }
           memory[R8_EMURES] = 0;
         }
@@ -741,12 +707,11 @@ void write6502(uint16_t address, uint8_t value)
           if (printFile != NULL) {
             fclose(printFile);
             printFile = fopen("printout.txt","w");
-            printf("printout.txt reset\n");
           }
           memory[R8_EMURES] = 0;
         }
         else {
-            printf("Unknown emulator command %02X, pc=%04X\n", value, pc-3);
+            logmsg("Unknown emulator command %02X, pc=%04X\n", value, pc-3);
         memory[R8_EMURES] = 0X67;           // unknown emulator command
         memory[R8_EMUCOM] = 0;              // and clear command
         }
@@ -761,20 +726,15 @@ void write6502(uint16_t address, uint8_t value)
     }
     else if (address == R8_CRTDAT) {
         memory[address] = value;
-        // printf("Writing to CRTDAT, CRTADR=%02X, CRTDAT=%02X\n", savedCrtAdr, value);
         if (savedCrtAdr == 1) {
-            // printf("Setting chars per line to %2d, pc=%04X (not implemented)\n", value, pc-3);
         }
         else if (savedCrtAdr == 0xA) {
-            // printf("Disabling/enabling cursor %02X, pc=%04X (not implemented)\n", value, pc-3);
         }
         else if (savedCrtAdr == 0xF) {
-            // printf("curloc %02X, pc=%04X (not yet implemented)\n", value, pc-3);
-            curLocLow = value;
+          curLocLow = value;
         }
         else if (savedCrtAdr == 0xE) {
             global_curloc = (256 * value) + curLocLow;
-            // printf("Setting curloc %04X, pc=%04X\n", global_curloc, pc-3);
             global_pendingCrtUpdate = 1;
         }
         else if (savedCrtAdr == 0x6) {
@@ -796,31 +756,12 @@ void write6502(uint16_t address, uint8_t value)
         memory[address] = value;
         if (address == KIM_IER2) {
             if (value & 0x82) {
-                // printf("*** keyboard interrupt enabled, pc=%04X\n", pc - 3);
-                keyboardIrqEnabled = 1;
+              keyboardIrqEnabled = 1;
             }
             else {
-                // printf("*** keyboard interrupt disabled pc=%04X\n", pc - 3);
-                keyboardIrqEnabled = 0;
+              keyboardIrqEnabled = 0;
             }
         }
-        /*
-        if (address == KIM_IFR1) {
-            printf ("writing to KIM-1 IFR1 register, pc=%04X, value=%02X\n", pc - 3, value);
-        }
-        else if (address == KIM_IER1) {
-            printf ("writing to KIM-1 IER1 register, pc=%04X, value=%02X\n", pc - 3, value);
-        }
-        else if (address == KIM_IFR2) {
-            printf ("writing to KIM-1 IFR2 register, pc=%04X, value=%02X\n", pc - 3, value);
-        }
-        else if (address == KIM_IFR3) {
-            printf ("writing to KIM-1 IFR3 register, pc=%04X, value=%02X\n", pc - 3, value);
-        }
-        else if (address == KIM_IER3) {
-            printf ("writing to KIM-1 IER3 register, pc=%04X, value=%02X\n", pc - 3, value);
-        }
-        */
     }
     
     else
@@ -831,7 +772,7 @@ void write6502(uint16_t address, uint8_t value)
 void printRegisters()
 /*******************/
 {
-    printf("6502 registers: pc=%04X sp=%02X a=%02X, x=%02X, y=%02X, status=%2X\n", pc, sp, a, x, y, status);
+    logmsg("6502 registers: pc=%04X sp=%02X a=%02X, x=%02X, y=%02X, status=%2X\n", pc, sp, a, x, y, status);
 }
 
 /*************************/
@@ -840,7 +781,6 @@ void setKeyboardInterrupt()
 {
     pendingIRQ = 1;
     memory[KIM_IFR2] = 0x82;    // set level 2 interrupt from KIM 6522-2, keyboard interrupt
-    // printf("Keyboard interrupt set, global_char =%04X\n", global_char);
 }
 
 /******************************/
@@ -901,7 +841,6 @@ int catchSubroutine(uint16_t ea)
                 colNumber = 0;
                 return 1;
             }
-            // fprintf(printFile, ">%02X<", a);
             return 1;
         }
         else {
@@ -912,8 +851,7 @@ int catchSubroutine(uint16_t ea)
         return 1;
     }
     else if (ea == 0xE827) {    // TDELAY set to 0 in emulator
-        // printf("******** IO: TDELAY currently not implemented, should it?\n");
-        return 1;
+      return 1;
     }  
     return 0;
 }
@@ -929,7 +867,7 @@ void store(int address, int data, int storeFlag)
         if (memory[address] == 0)  // do not check empty memory
             return;
         if (memory[address] != data)
-            printf("Difference: memory[%04X] = %02X, new data = %02X\n", address, memory[address], data);
+            logmsg("Difference: memory[%04X] = %02X, new data = %02X\n", address, memory[address], data);
     }
 }
 
@@ -942,12 +880,10 @@ int loadCodeFromListing(char* s, int storeFlag)
     FILE *codeFile;
     codeFile = fopen(s,"r");
     if (codeFile == NULL) {
-	printf("Cannot open %s\n",s);
+	logmsg("Cannot open %s\n",s);
         exit(1);
 	}
-    
-    printf("Extracting code from %s\n", s);
-    
+        
     // store the codes in memory
     
     int     address;
@@ -960,7 +896,7 @@ int loadCodeFromListing(char* s, int storeFlag)
     lineBuffer = (char *) malloc(bufSize * sizeof(char));
     
     if (lineBuffer == NULL) {
-        printf("unable to allocate line buffer\n");
+        logmsg("unable to allocate line buffer\n");
         exit(1);
     }
      
@@ -971,31 +907,24 @@ int loadCodeFromListing(char* s, int storeFlag)
                 if (((lineBuffer[6] >= '0') && (lineBuffer[6] <= '9')
                             || (lineBuffer[6] >= 'A') && (lineBuffer[6] <= 'F'))
                             && (lineBuffer[10] == '-')) {       // line with address
-                    // printf("%s",lineBuffer);
-                    lineBuffer[20] = 0;                                     // ignore anything after 20
+                              lineBuffer[20] = 0;                                     // ignore anything after 20
                     sscanf(lineBuffer + 6,"%4x", &address);
-                    // printf("%04X ", address);
                     if ((lineBuffer[12] != ' ') && (numChars > 13)) {
                         sscanf(lineBuffer + 12,"%2x", &data);
-                        // printf("%02X", data);
                         store(address, data, storeFlag);
                     }
                     if ((lineBuffer[15] != ' ') && (numChars > 16)) {
                         sscanf(lineBuffer + 15,"%2x", &data);
-                           // printf(" %02X", data);
                         store(address+1, data, storeFlag);
                     }
                      if ((lineBuffer[18] != ' ') && (numChars > 19)) {
                         sscanf(lineBuffer + 18,"%2x", &data);
-                        // printf(" %02X", data);
                         store(address+2, data, storeFlag);
                     }                    
                 }
-                // printf("\n");
             }
         }
     }
-    // printf("\n");
     
     free(lineBuffer);
     fclose(codeFile);
@@ -1009,8 +938,6 @@ void r65Setup()
 {
     FILE *confFile;
     char name[24];
-    
-    printf("R65 6502 emulator\n");
     
     void reset6502();
     memset(memory, 0, 65536);
@@ -1029,12 +956,12 @@ void r65Setup()
     char *s = "printout.txt";
     printFile = fopen(s,"w");
     if (printFile == NULL)
-        printf("Cannot open %s\n",s);
+        logmsg("Cannot open %s\n",s);
         
     s = "r65.conf";           // read configuration file
     confFile = fopen(s,"r");
     if (confFile == NULL) {
-        printf("Cannot read configuration in %s\n", s);
+        logmsg("Cannot read configuration in %s\n", s);
         strcpy(floppy[0].name,"PASCAL");
         strcpy(floppy[1].name,"WORK");
     }
@@ -1046,7 +973,6 @@ void r65Setup()
                 else
                     strcpy(name,"WORK");
             }
-            // printf("disk%d=%s\n", drive+1, name);
             strcpy(floppy[drive].name, name);
         }
         fclose(confFile);
@@ -1059,65 +985,106 @@ void r65Setup()
     srand((unsigned)time(NULL));
 }
 
+/******************/
+void checkTekInput()
+/******************/
+{
+    unsigned char ch;
+
+    if (read(STDIN_FILENO, &ch, 1) == 1) {
+        switch (ch) {
+            case 0x0A: ch = 0x0D; break;    // Return
+            case 0x09: ch = 0x08; break;    // Tab
+            case 0x1B: ch = 0x00; break;    // Escape
+            case 0x08: ch = 0x7F; break;    // Backspace
+        }
+
+        global_char = ch;
+        setKeyboardInterrupt();
+      }
+  }
+  
 /***********/
 int r65Loop()
 /***********/
 {
-    printf("\nStart executing 6502 code:\n");
-    
     clearClicks();
-    
-    
-    pc = 0xF800;            // initialize the program counter, start R65 Monitor
+
+    pc = 0xF800;            // initialize program counter, start R65 Monitor
     spMin = 255;
     pascalMinFree = 0xFFFF;
     sp = 255;
-    time_t seconds;
+
+    static long lastCheckTime = 0;
+    static long lastTekInputTime = 0;
+
     do {
         if (pendingNMI) {
-            memory[M8_SFLAG] = memory[M8_SFLAG] & 0xfe; // clear pascal bit in sflag
-            memory[M8_VFLAG] = memory[M8_VFLAG] & 0x7f; // clear inverse bit in vflag
+            memory[M8_SFLAG] =
+                memory[M8_SFLAG] & 0xfe;  // clear pascal bit in sflag
+            memory[M8_VFLAG] =
+                memory[M8_VFLAG] & 0x7f;  // clear inverse bit in vflag
+
             nmi6502();
             pendingNMI = 0;
         }
         else if (pendingIRQ) {
-            if ((status & FLAG_INTERRUPT) == 0) { // execute only if irq not disabled
+            if ((status & FLAG_INTERRUPT) == 0) {
+                // execute only if irq not disabled
                 irq6502();
                 pendingIRQ = 0;
             }
         }
+
         step6502();
-        if (sp<spMin) {
+
+        if (sp < spMin) {
             spMin = sp;           // capture lowest sp value for display
             global_pendingCrtUpdate = 1;
             timeOfSpMin = time(NULL) % 86400;
-            global_pendingCrtUpdate = 1;
         }
-        
-	static long lastCheckTime = 0;
-	long now = wall_micros();
 
-	if (lastCheckTime == 0)
-		lastCheckTime = now;
+        long now = wall_micros();
 
-	if (now - lastCheckTime >= INFO_SAMPLE_US) {
-		lastCheckTime = now;
+        if (lastCheckTime == 0)
+            lastCheckTime = now;
 
-		if (isAnimation && (now - lastAnimationTime > 500000))
-			isAnimation = 0;
+        if (lastTekInputTime == 0)
+            lastTekInputTime = now;
 
-		// sample pc and sp for info display in animation loop
-		pcSample = pc;
-		int stprog = memory[0x11] + (memory[0x12] << 8);		
-		pascalPcSample = memory[0x0a] + (memory[0x0b] << 8) - stprog - 1;
+        // check Tektronix keyboard every 5 ms
+        if (tekTerminal &&
+            global_char == 0 &&
+            (now - lastTekInputTime >= 5000)) {
 
-		checkPendingEvents();
-		checkMotorTurnoff(1);
-		crtUpdate();
-		checkMinTimeout();
-		}
-    }
-    while (1);
+            lastTekInputTime = now;
+            checkTekInput();
+        }
+
+        if (now - lastCheckTime >= INFO_SAMPLE_US) {
+            lastCheckTime = now;
+
+            if (isAnimation &&
+                (now - lastAnimationTime > 500000))
+                isAnimation = 0;
+
+            // sample pc and sp for info display in animation loop
+            pcSample = pc;
+
+            int stprog =
+                memory[0x11] + (memory[0x12] << 8);
+
+            pascalPcSample =
+                memory[0x0a] + (memory[0x0b] << 8)
+                - stprog - 1;
+
+            checkPendingEvents();
+            checkMotorTurnoff(1);
+            crtUpdate();
+            checkMinTimeout();
+        }
+
+    } while (1);
 }
     
 /***********/
@@ -1126,7 +1093,6 @@ void r65Quit()
 {
     FILE *confFile;
     
-    printf("Quitting R65 emulator and closing all open files\n");
     if (sourceFile)
         fclose(sourceFile);
     if (printFile)
@@ -1135,7 +1101,7 @@ void r65Quit()
     char *s = "r65.conf";           // update configuration file
     confFile = fopen(s,"w");
     if (printFile == NULL)
-        printf("Cannot save configuration in %s\n",s);
+        logmsg("Cannot save configuration in %s\n",s);
     else {
         for (int drive = 0; drive < 2; drive++)
             fprintf(confFile, "disk=%s\n", floppy[drive].name);

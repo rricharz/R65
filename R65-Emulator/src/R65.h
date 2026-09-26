@@ -54,6 +54,11 @@
 #define M8_DATE     0x17B9
 #define M8_TIME     0x17B5
 
+#define TEK_INPUT_US 5000   // sampling for TEK input
+
+extern FILE *logFile;
+void logmsg(const char *format, ...);
+
 void r65Setup();
 int r65Loop();
 void r65Quit();

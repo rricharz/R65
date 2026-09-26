@@ -26,6 +26,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/file.h>
@@ -58,6 +59,7 @@ int cursorDisabled;
 int exDisplay;
 int fullscreen;
 int pixelated;
+int tekTerminal;
 
 struct tColor {
 	double r, g, b;
@@ -76,6 +78,24 @@ int panelSize, panelOffset;
 double panelScale;
 
 static gboolean global_hasFocus = FALSE;
+
+#include <stdarg.h>
+
+FILE *logFile = NULL;
+
+void logmsg(const char *format, ...)
+{
+    va_list args;
+
+    if (logFile == NULL)
+        return;
+
+    va_start(args, format);
+    vfprintf(logFile, format, args);
+    va_end(args);
+
+    fflush(logFile);
+}
 
 /////////////////////////////////////////////
 void Background(double r, double g, double b)
@@ -262,7 +282,7 @@ void Alert(char *s, int halt)
 		gtk_widget_destroy (dialog);
 	}
 	else
-		printf("******** Alert! %s\n", s);
+		logmsg("******** Alert! %s\n", s);
 	if (halt)
 		exit(1);
 }
@@ -271,6 +291,11 @@ void Alert(char *s, int halt)
 void Quit(void)
 ///////////////
 {
+  logmsg("Quitting R65 emulator\n");
+  if (logFile != NULL) {
+      fclose(logFile);
+      logFile = NULL;
+  }
 	gtk_main_quit();
 }
 
@@ -420,7 +445,6 @@ static gboolean clicked(GtkWidget *widget, GdkEventButton *event, gpointer user_
         global_click.x      = event->x;
         global_click.y      = event->y;
         global_click.down   = 1;
-        // printf("Clicked %d, %d\n", global_click.x, global_click.y);
         
         return TRUE;
 }
@@ -456,7 +480,6 @@ void QuitProgram(int shutDownFlag)
 static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 ///////////////////////////////////////////////////////////////////////////////////
 {
-    // printf("key pressed, state=%04X, keyval=%04X\n", event->state, event->keyval);
 
     #define LEFT_OPTION_MASK_VNC 0x80
     #define LEFT_OPTION_MASK_UTM 0x08
@@ -471,7 +494,7 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
         return;
 
     if (event->keyval == 0xFFFF) {
-        printf("Making screen shot with grim (Wayland only)\n");
+        logmsg("Making screen shot with grim (Wayland only)\n");
         system("grim");
         return;
     }
@@ -517,7 +540,6 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
     // shift special keys
     else if ((event->state & GDK_SHIFT_MASK) && ((event->keyval & 0xFF00) == 0xFF00)) {
         global_char = event->keyval & 0xFEFF;
-        // printf("Shift key %04x\n",global_char);
         if (global_char == 0xFE1B)  {    // <shift> ESC: execute NMI
             pendingNMI = 1;
             global_char = 0;
@@ -553,8 +575,7 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
 static void on_key_release(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 ////////////////////////////////////////////////////////////////////////////////////
 {
-    // printf("key released\n");
-    global_key_is_down = 0;
+  global_key_is_down = 0;
 }
 
 static int lock_fd = -1;
@@ -650,7 +671,36 @@ int main (int argc, char *argv[])
 /////////////////////////////////
 {
     GtkWidget *darea;
-	
+    
+    logFile = fopen("R65.log", "w");
+    if (logFile == NULL) {
+        fprintf(stderr, "Cannot open R65.log\n");
+    }
+    logmsg("R65 6502 emulator\n");
+    
+    char *term = getenv("TERM");
+
+    if ((term != NULL) && (strcmp(term, "tek4014") == 0)) {
+        struct termios tio;
+        int flags;
+
+        tekTerminal = 1;
+        logmsg("Started from tek4010\n");
+
+        /* Character-at-a-time input, no local echo */
+        if (tcgetattr(STDIN_FILENO, &tio) == 0) {
+            tio.c_lflag &= ~(ICANON | ECHO);
+            tio.c_cc[VMIN] = 1;
+            tio.c_cc[VTIME] = 0;
+            tcsetattr(STDIN_FILENO, TCSANOW, &tio);
+        }
+
+        /* checkTekInput() must never block */
+        flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+        if (flags != -1)
+            fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+    }
+    	
     int firstArg = 1;
     
     if (acquire_single_instance_lock() != 0) {
@@ -664,16 +714,16 @@ int main (int argc, char *argv[])
     pixelated      = FALSE;
 	
     while (firstArg < argc) {
-	if (strcmp(argv[firstArg],"-full") == 0)
-	    fullscreen = TRUE;
-	else if (strcmp(argv[firstArg],"-extern") == 0)
-	    exDisplay = TRUE;  
-	else if (strcmp(argv[firstArg],"-pixelated") == 0)
-	    pixelated = TRUE; 
-        else {
-            printf("R65: unknown argument %s\n", argv[firstArg]);
-        }
-        firstArg++;
+      if (strcmp(argv[firstArg],"-full") == 0)
+	      fullscreen = TRUE;
+	    else if (strcmp(argv[firstArg],"-extern") == 0)
+	      exDisplay = TRUE;  
+	    else if (strcmp(argv[firstArg],"-pixelated") == 0)
+	      pixelated = TRUE; 
+      else {
+            logmsg("R65: unknown argument %s\n", argv[firstArg]);
+      }
+      firstArg++;
     }
       
     gtk_init(&argc, &argv);
@@ -694,16 +744,15 @@ int main (int argc, char *argv[])
     GdkScreen *screen = gtk_window_get_screen(GTK_WINDOW(global_window));
     int screenWidth = gdk_screen_get_width(screen);
     int screenHeight = gdk_screen_get_height(screen);
-    printf("Screen dimensions: %d x %d\n", screenWidth, screenHeight);
+    logmsg("Screen dimensions: %d x %d\n", screenWidth, screenHeight);
     double aspect = (double) screenWidth / (double) (screenHeight);
     double target = 1920.0 / 1080.0;
     if (aspect > target) screenWidth =  (int)((screenHeight  * target) + 0.5 );
     if (aspect < target) screenHeight = (int)((screenWidth / target) + 0.5);
-    // printf("Aspect ratio adjusted: %d x %d\n", screenWidth, screenHeight);
     
     g_set_prgname("r65-emulator");
     g_set_application_name("R65 Emulator");
-
+    
     GError *icon_error = NULL;
     if (!gtk_window_set_icon_from_file(GTK_WINDOW(global_window),
                         "r65_icon.png", &icon_error)) {
@@ -729,7 +778,7 @@ int main (int argc, char *argv[])
 	    gtk_window_set_default_size(GTK_WINDOW(global_window),
 		windowWidth, windowHeight);
     }
-    printf("Window dimensions: %d x %d\n", windowWidth, windowHeight);
+    logmsg("Window dimensions: %d x %d\n", windowWidth, windowHeight);
     
     crtOffset = windowHeight / 15;
     crtHeight = windowHeight - (2 * crtOffset);

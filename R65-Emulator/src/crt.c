@@ -107,27 +107,22 @@ void checkInfoBarButtons()
     checkClick(&x, &y);
     
     if (x > 0) {
-        
-        // printf("Check button click at %d,%d\n",x,y);
-    
+            
         // check for Quit button
         if ((x >= quit_hpos) && (x <= quit_hpos + quit_hsize)
             && (y <= quit_vpos) && (y >= quit_vpos - quit_vsize)) {
-            printf("QUIT button clicked\n");
             QuitProgram(0);
         }
     
         // check for Stop button
         if ((x >= stop_hpos) && (x <= stop_hpos + quit_hsize)
            && (y <= quit_vpos) && (y >= quit_vpos - quit_vsize)) {        
-            printf("BREAK button clicked\n");
             pendingNMI = 1;
         }
             
         // check for Shutdown button
         if ((x >= sdown_hpos) && (x <= sdown_hpos + sdown_hsize)
            && (y <= quit_vpos) && (y >= quit_vpos - quit_vsize)) {
-            printf("SHUTDOWN button clicked\n");        
             QuitProgram(1);
         }
     }
@@ -212,7 +207,6 @@ void infoPanel()
     char s1[16], s2[16], s3[16];
     char * s;
     
-    // printf("Update info panel, pc=%4X\n", pc);
     fflush(stdout);
     // show Quit button
     SETBUTTONCOLOR;
@@ -323,9 +317,7 @@ void crtUpdate()
         csize = hcell * 2.1;       
     else
         csize = hcell * 1.7;
-        
- // printf("Cell size = %f x %d, numchr = %d\n", hcell, vcell, NUMCHAR);
-    
+            
     checkInfoBarButtons();
     
 	if (global_pendingCrtUpdate && (!isAnimation || global_forceCrtUpdate)) {
@@ -484,6 +476,5 @@ void crtUpdate()
 		global_forceCrtUpdate = 0;
         Paint();
         
-        // printf("Updating screen took %0.f msec\n", (double)((clock() - start)/1000));
     }
 }

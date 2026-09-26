@@ -29,7 +29,7 @@ extern double panelScale;
 extern int global_char;
 extern int global_key_is_down;
 extern int exDisplay;
-extern int fullscreen,pixelated;
+extern int fullscreen,pixelated,tekTerminal;
 
 // wrapper for inputs
 void clearClicks(void);
