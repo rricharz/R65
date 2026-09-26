@@ -95,6 +95,14 @@ begin
     (x shr 4),(x and 15),NORVID);
 end {error};
 
+func uge(a,b: integer): boolean;
+begin
+  if (a<0)<>(b<0) then
+    uge:=a<0
+  else
+    uge:=a>=b
+end;
+
 { **** copyfile ***** }
 
 proc copyfile;
@@ -111,12 +119,12 @@ begin
           ENDSTK:=TOPMEM-144; {_release memory}
           _abort;
         end;
-      if filea>=TOPMEM then
-        begin
-          writeln('Error: File too large');
-          ENDSTK:=TOPMEM-144; {_release memory}
-          _abort;
-        end;
+      debug(filea, TOPMEM, ENDSTK, sblock);
+      if uge(filea,TOPMEM) then begin
+        writeln('Error: File too large');
+        ENDSTK:=TOPMEM-144;
+        _abort;
+      end;
       cyclus:=FILCYC;
       FILDRV:=ddrive;
       blocksave(sblock,filea);

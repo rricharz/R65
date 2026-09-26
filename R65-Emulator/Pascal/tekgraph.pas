@@ -716,7 +716,7 @@ begin
 
   labelstr:=_new;
 
-  _starttek(T_FAST);
+  _starttek;
 
   xs:=leftborder;
   xw:=MAXX-leftborder-border;

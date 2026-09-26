@@ -607,7 +607,7 @@ var i,j,distance,s: integer;
 begin
   writeln('STARSHIP by rricharz');
   write('Initializing...');
-  _starttek(T_FAST);
+  _starttek;
   quit:=false;
   score:=0;
   shield:=true;
