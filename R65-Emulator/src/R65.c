@@ -689,14 +689,20 @@ void write6502(uint16_t address, uint8_t value)
 			    memory[R8_EMURES] = (result != 0);			
 			    fflush(stdout);
 		    }
-		    else if (value == 11) {							// start raw printing
-			    rawPrint = 1;
-          memory[R8_EMURES] = 0;
-		    }
-		    else if (value == 12) {
-			     rawPrint = 0;
-           memory[R8_EMURES] = 0;
-		    }
+        else if (value == 11) {                  // start Tektronix raw printing
+            if (tekTerminal) {
+                rawPrint = 1;
+                memory[R8_EMURES] = 0;
+            }
+            else {
+                rawPrint = 0;
+                memory[R8_EMURES] = 1;
+            }
+        }
+        else if (value == 12) {                  // end Tektronix raw printing
+            rawPrint = 0;
+            memory[R8_EMURES] = 0;
+        }
         else if (value == 13) {
           if (printFile != NULL) {
             fflush(printFile);
@@ -788,71 +794,104 @@ int catchSubroutine(uint16_t ea)
 /******************************/
 {
     if (ea == 0xE95E) {
-		/* These are R65 screen/printer controls, never write them in normal text mode */
-		if (!rawPrint) {
-			if ((a == 0x0E) ||        /* INVVID */
-				(a == 0x0B) ||        /* NORVID */
-				(a == 0x12) ||        /* PRTON */
-				(a == 0x14)) {        /* PRTOFF */
-			return 1;
-			}
-		}
 
-		/* Optional safety: PRTOFF always ends raw mode */
-		if (a == 0x14) {
-			rawPrint = 0;
-			return 1;
-		}
-		
-        if ((lastPrintedCharacter == 0x1B) && (!rawPrint)) {   
-            // ignore printer control character
+        /*
+         * Raw mode: send every R65 PRINTER byte unchanged
+         * to the Tektronix terminal.
+         */
+        if (rawPrint) {
+            fprintf(stdout, "%c", a);
+            fflush(stdout);
+            return 1;
+        }
+
+        /*
+         * Normal printer mode.
+         * These are R65 screen/printer controls and must
+         * never be written to a normal text file.
+         */
+        if ((a == 0x0E) ||        /* INVVID */
+            (a == 0x0B) ||        /* NORVID */
+            (a == 0x12) ||        /* PRTON */
+            (a == 0x14)) {        /* PRTOFF */
+            return 1;
+        }
+
+        /*
+         * Ignore the character following an ESC printer
+         * control character.
+         */
+        if (lastPrintedCharacter == 0x1B) {
             lastPrintedCharacter = 0;
             return 1;
         }
-        
-        if ((a == 0x7F) && (!rawPrint)){ 
-			// ignore del character
+
+        /* Ignore DEL in normal printer mode. */
+        if (a == 0x7F) {
             return 1;
         }
-        
-        if ((a < 0x20) && (!rawPrint) && ( a != 0x0C)) { // FF is allowed to pass
-            if (a == 0x0D) {                   // linux text files have no cr, change for windows
+
+        /*
+         * Handle control characters.
+         * Form feed (0x0C) is deliberately allowed to
+         * fall through and be written to the file.
+         */
+        if ((a < 0x20) && (a != 0x0C)) {
+
+            if (a == 0x0D) {
+                /* Linux text files need no CR. */
                 return 1;
             }
 
-            if (a == 0x1F) {                   // ignore US character
+            if (a == 0x1F) {
+                /* Ignore US character. */
                 return 1;
             }
 
-            if (a == 0x1B) {                   // ignore printer control character, also next one
+            if (a == 0x1B) {
+                /*
+                 * Ignore printer control character and
+                 * remember to ignore the following byte.
+                 */
                 lastPrintedCharacter = 0x1B;
                 return 1;
             }
-            if (a == 0x09) {                   // tab8
+
+            if (a == 0x09) {
+                /* Tab to next multiple of 8 columns. */
                 while (colNumber & 0x07) {
-                    fprintf(printFile," ");
+                    fprintf(printFile, " ");
                     colNumber++;
                 }
                 return 1;
             }
-            if (a == 0x0A) {                   // new line
+
+            if (a == 0x0A) {
+                /* New line. */
                 fprintf(printFile, "%c", a);
                 fflush(printFile);
                 colNumber = 0;
                 return 1;
             }
+
+            /* Ignore all other control characters. */
             return 1;
         }
-        else {
-            if ((a != 0x7F) || rawPrint)  fprintf(printFile, "%c", a);
-            if (rawPrint) fflush(printFile);
-            colNumber++;
-        }
+
+        /*
+         * Normal printable character or form feed.
+         */
+        fprintf(printFile, "%c", a);
+        colNumber++;
+
         return 1;
     }
-    else if (ea == 0xE827) {    // TDELAY set to 0 in emulator
-      return 1;
-    }  
+
+    else if (ea == 0xE827) {
+        /* TDELAY set to 0 in emulator. */
+        return 1;
+    }
+
     return 0;
 }
 

@@ -25,11 +25,6 @@ const MAXX = 1023; { Tektronix 4010 graphic mode }
 
       PLOTTER    = @1;
 
-      { tek4010 window modes }
-      T_FULLV    = 1;
-      T_FAST     = 2;
-      T_BOTH     = 3;
-
 var   _xs,_ys: integer;
 
 proc _delay10msec(time:integer);
@@ -48,71 +43,25 @@ begin
   write(@PLOTTER,chr(27),chr(12));
 end;
 
-proc _starttek(mode: integer);
-{ Switch R65 PRINTER device to raw mode
-  and start tek4010. All R65 system functions
-  are hidden. tek4010 is called with the following
-  arguments:
+proc _starttek;
+{ Switch R65 PRINTER output to the Tektronix terminal.
+  R65 must have been started by tek4010. }
 
-  T_HALF  start with -half, else with -fullv
-  T_FAST  start in fast mode, else 192000 baud
-  T_BOTH for both                               }
-
-const C_SHELL  = 10;
-      STOPCODE = $2010;
+const STOPCODE = $2010;
       NORVID   = chr($0b);
       INVVID   = chr($0e);
-
-mem   str    = $0004: cpnt;
-      RUNERR = $000c: integer&;
-
+mem
 {$I IHIDDENMEM:P}
 
-var dummy, res: integer;
-
-  func sh(s: cpnt): integer;
-  { uses flp scratch register to transfer pointer }
-  var result:   integer;
-  begin
-    str := s;
-    emucom := (C_SHELL);
-    sh  := emures;
-  end;
-
 begin {starttek}
-
-  res := sh('pgrep -x tek4010 >/dev/null');
-
-  if res <> 0 then begin
-
-    dummy := sh('truncate -s 0 printout.txt');
-    _delay10msec(5);
-
-    case mode of
-      0:
-          dummy := sh('./r65tek 0 &');
-      T_FULLV:
-          dummy := sh('./r65tek 1 &');
-      T_FAST:
-          dummy := sh('./r65tek 2 &');
-      T_BOTH:
-          dummy := sh('./r65tek 3 &')
-        else
-          dummy := sh('./r65tek 0 &')
-    end;
-
-    _delay10msec(50);
-    res := sh('pgrep -x tek4010 >/dev/null');
-    if res <> 0 then begin
-      writeln(INVVID,'tek4010 did not start', NORVID);
-      RUNERR := 54;
-        call(STOPCODE);
-    end;
+  emucom := 11; { start raw mode }
+  if emures <> 0 then begin
+    writeln(INVVID, 'tek4010 not running');
+    writeln('Quit R65 and restart it with "tekR65"',
+          NORVID);
+  call(STOPCODE);
   end;
-
-    emucom := 11; { start raw mode }
-    _clearscreen;
-
+   _clearscreen;
 end {starttek};
 
 proc _endtek;
