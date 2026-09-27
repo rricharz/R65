@@ -86,3 +86,4 @@ extern int isAnimation;
 extern int global_forceCrtUpdate;
 extern int pcSample;
 extern int pascalPcSample;
+extern int rawPrint;

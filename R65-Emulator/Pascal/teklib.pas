@@ -160,6 +160,16 @@ begin
   end;
 end;
 
+proc _writethrough;
+begin
+  write(@PLOTTER,chr(27),'p');
+end;
+
+proc _endwritethrough;
+begin
+  write(@PLOTTER,chr(27),chr(96));
+end;
+
 begin
 end.
 

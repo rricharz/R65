@@ -23,24 +23,6 @@ var sinetable: array[90] of integer;
     shield,quit: boolean;
     phaserrange,step: integer;
 
-proc writethrough;
-begin
-  write(@PLOTTER,chr(27),'p');
-end;
-
-proc endwritethrough;
-begin
-  write(@PLOTTER,chr(27),chr(96));
-end;
-
-proc delay10msec(time:integer);
-mem emucom=$1430: integer&;
-var i:integer;
-begin
-  for i:=1 to time do
-    emucom:=6;
-end;
-
 func atan2(x,y:integer):real;
 { this is a special fast atan function
 for thestarship coordinate system }
@@ -146,9 +128,9 @@ var i,angle: integer;
 
   proc drawsegment;
   begin
-    writethrough;
+    _writethrough;
     _drawvector(cx,cy,cx+trunc(x),cy+trunc(y));
-    endwritethrough;
+    _endwritethrough;
     _drawvector(cx+trunc(x),
       cy+trunc(y),
       cx+trunc(ticfactor*x),

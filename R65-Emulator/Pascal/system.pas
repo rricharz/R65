@@ -35,16 +35,18 @@ uses syslib, arglib, filelib, strlib, striolib;
 {$U+}
 
 const
-  MMAXSEQ  = 8;     {max no of sequential files}
-  CLRSCR   = chr($11);  {clear to end of screen}
-  NHISTORY = 4; { entries in history }
-  AUTOPR   = $08;
+  MMAXSEQ   = 8;     {max no of sequential files}
+  CLRSCR    = chr($11);  {clear to end of screen}
+  NHISTORY  = 4; { entries in history }
+  AUTOPR    = $08;
+  SAVAUTOPR = $02;
 
 mem
   BUFFPN   = $0015: integer&;
   FIDRTB   = $0339: array[8] of integer&;
   MAXSEQ   = $0336: integer&;
   VFLAG    = $1780: integer&;
+  SFLAG    = $1781: integer&;
 
   { persistent SYSTEM memory area }
   HISTMAG  = $df00: integer&; { initialized }
@@ -171,8 +173,10 @@ begin
   len := 0;
 
   oldvflag := VFLAG;
-  if (VFLAG and AUTOPR) <> 0 then
+  if (VFLAG and AUTOPR) <> 0 then begin
     VFLAG := VFLAG - AUTOPR;   { clear bit 3 }
+    SFLAG := SFLAG or SAVAUTOPR;
+  end;
 
   write(NORVID,'P*',CLRLIN);
 
@@ -274,6 +278,7 @@ begin
   if (oldvflag and AUTOPR) <> 0 then
     write(@PRINTER, 'P*', line);
   VFLAG := oldvflag;
+  SFLAG := SFLAG and not SAVAUTOPR;
 
   writeln;
 end;

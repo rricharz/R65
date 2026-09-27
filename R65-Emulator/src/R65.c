@@ -45,6 +45,7 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <sys/wait.h>
+#include <sys/select.h>
 #include "time.h"
 #include "main.h"
 #include "R65.h"
@@ -324,7 +325,7 @@ uint8_t read6502(uint16_t address)
             checkPendingEvents();
             
             if (!isAnimation)
-                usleep(10000);              // avoid 100% cpu usage during waiting for key
+                usleep(1000);              // avoid 100% cpu usage during waiting for key
             checkMotorTurnoff(1);
             // checkMinTimeout();
         }
@@ -333,9 +334,8 @@ uint8_t read6502(uint16_t address)
     else if ((address >= 0x1440) && (address <= 0x177F)) {
         if (address == KIM_PORTA2) {
             memory[address] = translateKey(global_char);
-            global_char = 0;
+            // global_char = 0; now done when IRQ handler writes to M8_CHAR
             memory[KIM_IFR2] = 0x00;    // clear level 2 interrupt from KIM 6522-2, keyboard interrupt
-            // printf ("Reading from KIM-1 PORTA2 register, pc=%04X, value=%02X\n",pc-3, memory[address]);
         }
         else if (address == EMU_RAND) {
             int rnd = (rand() & 255);
@@ -524,6 +524,11 @@ void write6502(uint16_t address, uint8_t value)
             logmsg("writing into KIM ROM address space not allowed\n");
             return;
         }
+    
+    if ((address == M8_CHAR) && (pc == 0xE03E)) {
+        // clear global_char only if IRQ handler writes 
+        global_char = 0;
+    }
     
     // video memory updated
     
@@ -800,8 +805,12 @@ int catchSubroutine(uint16_t ea)
          * to the Tektronix terminal.
          */
         if (rawPrint) {
-            fprintf(stdout, "%c", a);
-            fflush(stdout);
+            ssize_t n = write(STDOUT_FILENO, &a, 1);
+            if (n != 1) {
+                logmsg("Tek write failed: n=%ld errno=%d\n",
+                     (long)n, errno);
+
+            }
             return 1;
         }
 
@@ -1029,19 +1038,34 @@ void checkTekInput()
 /******************/
 {
     unsigned char ch;
+    fd_set readfds;
+    struct timeval timeout;
+    int result;
 
-    if (read(STDIN_FILENO, &ch, 1) == 1) {
-        switch (ch) {
-            case 0x0A: ch = 0x0D; break;    // Return
-            case 0x09: ch = 0x08; break;    // Tab
-            case 0x1B: ch = 0x00; break;    // Escape
-            case 0x08: ch = 0x7F; break;    // Backspace
+    FD_ZERO(&readfds);
+    FD_SET(STDIN_FILENO, &readfds);
+
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+
+    result = select(STDIN_FILENO + 1,
+                    &readfds, NULL, NULL, &timeout);
+
+    if ((result > 0) && FD_ISSET(STDIN_FILENO, &readfds)) {
+        if (read(STDIN_FILENO, &ch, 1) == 1) {
+          
+            switch (ch) {
+                case 0x0A: ch = 0x0D; break;    // Return
+                case 0x09: ch = 0x08; break;    // Tab
+                case 0x1B: ch = 0x00; break;    // Escape
+                case 0x08: ch = 0x7F; break;    // Backspace
+            }
+
+            global_char = ch;
+            setKeyboardInterrupt();
         }
-
-        global_char = ch;
-        setKeyboardInterrupt();
-      }
-  }
+    }
+}
   
 /***********/
 int r65Loop()
@@ -1076,7 +1100,7 @@ int r65Loop()
         }
 
         step6502();
-
+        
         if (sp < spMin) {
             spMin = sp;           // capture lowest sp value for display
             global_pendingCrtUpdate = 1;
@@ -1094,7 +1118,8 @@ int r65Loop()
         // check Tektronix keyboard every 5 ms
         if (tekTerminal &&
             global_char == 0 &&
-            (now - lastTekInputTime >= 5000)) {
+            memory[M8_CHAR] == 0 &&
+            (now - lastTekInputTime >= 500)) {
 
             lastTekInputTime = now;
             checkTekInput();

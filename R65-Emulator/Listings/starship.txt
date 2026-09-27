@@ -10,652 +10,634 @@
   10     4 [  0] 
   11     4 [  0] program starship;
   12     4 [  0] uses syslib,mathlib,teklib,writelib;
-  13  6685 [109] 
-  14  6685 [109] const
-  15  6685 [109]     maxships=8;
-  16  6688 [110] 
-  17  6688 [110] var sinetable: array[90] of integer;
-  18  6688 [111]     dshiptable: array[maxships] of integer;
-  19  6688 [112]     ashiptable: array[maxships] of integer;
-  20  6688 [113]     shipdamage: array[maxships] of integer;
-  21  6688 [114]     energy,damage: array[4] of integer;
-  22  6688 [116]     radarsize,charging,score: integer;
-  23  6688 [119]     shield,quit: boolean;
-  24  6688 [121]     phaserrange,step: integer;
-  25  6688 [123] 
-  26  6688 [123] proc writethrough;
-  27  6688 [124] begin
-  28  6688 [124]   write(@PLOTTER,chr(27),'p');
-  29  6703 [124] end;
-  30  6703 [124] 
-  31  6704 [124] proc endwritethrough;
-  32  6704 [125] begin
-  33  6704 [125]   write(@PLOTTER,chr(27),chr(96));
-  34  6721 [125] end;
-  35  6721 [125] 
-  36  6722 [125] proc delay10msec(time:integer);
-  37  6722 [127] mem emucom=$1430: integer&;
-  38  6725 [128] var i:integer;
-  39  6725 [129] begin
-  40  6725 [129]   for i:=1 to time do
-  41  6733 [129]     emucom:=6;
-  42  6748 [129] end;
-  43  6767 [129] 
-  44  6768 [126] func atan2(x,y:integer):real;
-  45  6768 [130] { this is a special fast atan function
-  46  6768 [130] for thestarship coordinate system }
-  47  6768 [130]   func atan(z:real):
-  48  6771 [133] real;
-  49  6771 [133]   const n1= 0.972394;
-  50  6774 [134]         n2=-0.191948;
-  51  6774 [135]         n3= 57.29578;
-  52  6774 [136]   begin
-  53  6774 [136]     atan:=(n1+n2*z*z)*z*n3;
-  54  6816 [136]   end;
-  55  6823 [136] 
-  56  6824 [132] func atanp(x,y:integer):real;
-  57  6824 [136]   begin
-  58  6824 [136]     if (y<>0) and (x<>0) then begin
-  59  6844 [136]       if x<y then
-  60  6851 [136]         atanp:=atan(conv(x)/conv(y))
-  61  6870 [136]       else
-  62  6878 [136]         atanp:=90.0-atan(conv(y)/conv(x))
-  63  6904 [136]     end else begin
-  64  6922 [136]       if y>0 then atanp:=0.0
-  65  6932 [136]       else if x>0 then atanp:=90.0
-  66  6957 [136]       else atanp:=0.0;
-  67  6978 [136]     end;
-  68  6984 [136] end;
-  69  6984 [136] 
-  70  6985 [134] begin
-  71  6985 [134]   if (x>=0) and (y>=0) then
-  72  7001 [134]     atan2:=atanp(x,y)
-  73  7011 [134]   else if (x>=0) and (y<0) then
-  74  7044 [134]     atan2:=180.0-atanp(x,-y)
-  75  7060 [134]   else if (x<0) and (y<0) then
-  76  7095 [134]     atan2:=atanp(-x,-y)+180.0
-  77  7117 [134]   else
-  78  7123 [134]     atan2:=360.0-atanp(-x,y)
-  79  7146 [134] end;
-  80  7163 [134] 
-  81  7164 [128] proc checkradar(angle,cx,cy,mode:integer);
-  82  7164 [133] var i,xi,yi,dist,rsize0,a:integer;
-  83  7167 [139]     x,y:real;
-  84  7167 [141] begin
-  85  7167 [141]   rsize0:=radarsize;
-  86  7169 [141]   if mode=0 then rsize0:=rsize0 div 10;
-  87  7193 [141]   for i:=0 to maxships-1 do
-  88  7208 [141]     if (ashiptable[i]>=angle) and
-  89  7231 [141]       (ashiptable[i]<angle+step) then begin
-  90  7250 [141]       if dshiptable[i]<=rsize0 then begin
-  91  7266 [141]         dist:=dshiptable[i];
-  92  7273 [141]         a:=ashiptable[i];
-  93  7285 [141]         if angle<90 then begin
-  94  7300 [141]           x:=conv(sinetable[a])*
-  95  7311 [141]             conv(dist)/32000.0;
-  96  7324 [141]           y:=conv(sinetable[89-a])*
-  97  7342 [141]             conv(dist)/32000.0
-  98  7349 [141]         end else if angle<180 then begin
-  99  7372 [141]           x:=conv(sinetable[179-a])*
- 100  7386 [141]             conv(dist)/32000.0;
- 101  7399 [141]           y:=-conv(sinetable[a-90])*
- 102  7417 [141]             conv(dist)/32000.0
- 103  7424 [141]         end else if angle<270 then begin
- 104  7449 [141]           x:=-conv(sinetable[a-180])*
- 105  7463 [141]             conv(dist)/32000.0;
- 106  7476 [141]           y:=-conv(sinetable[269-a])*
- 107  7496 [141]             conv(dist)/32000.0
- 108  7503 [141]         end else begin
- 109  7520 [141]           x:=-conv(sinetable[359-a])*
- 110  7532 [141]             conv(dist)/32000.0;
- 111  7545 [141]           y:=conv(sinetable[a-270])*
- 112  7565 [141]             conv(dist)/32000.0
- 113  7572 [141]         end;
- 114  7585 [141]         if mode=0 then begin
- 115  7592 [141]           x:=x*10.0;
- 116  7607 [141]           y:=y*10.0;
- 117  7626 [141]         end;
- 118  7633 [141]         xi:=cx+trunc(x);
- 119  7643 [141]         yi:=cy+trunc(y);
- 120  7659 [141]         _startdraw(xi-3,yi-3);
- 121  7685 [141]         _draw(xi+3,yi-3);
- 122  7705 [141]         _draw(xi,yi+2);
- 123  7722 [141]         _draw(xi-3,yi-3);
- 124  7742 [141]         _enddraw;
- 125  7746 [141]         _moveto(xi+6,yi-7);
- 126  7766 [141]         write(@PLOTTER,i+1);
- 127  7778 [141]         if shipdamage[i]<100 then
- 128  7788 [141]           write(@PLOTTER,'d');
- 129  7798 [141]         if mode=1 then begin
- 130  7805 [141]           _moveto(20,MAXY-16*i-78);
- 131  7830 [141]           write(@PLOTTER,i+1,': ');
- 132  7845 [141]           write(@PLOTTER,conv(angle):4:0);
- 133  7864 [141]           write(@PLOTTER,conv(dist)*0.1:6:1);
- 134  7890 [141]           write(@PLOTTER,' pc');
- 135  7898 [141]           if shipdamage[i]<100 then
- 136  7908 [141]             write(@PLOTTER,' d');
- 137  7919 [141]         end;
- 138  7919 [141]       end;
- 139  7919 [141]     end;
- 140  7919 [141] end;
- 141  7933 [141] 
- 142  7934 [129] proc scan(mode:integer);
- 143  7934 [131] var i,angle: integer;
- 144  7937 [133]     cx,cy: integer;
- 145  7937 [135]     x,y,csize,ticfactor,ticf1,ticf2: real;
- 146  7937 [141] 
- 147  7937 [141]   proc drawsegment;
- 148  7937 [142]   begin
- 149  7937 [142]     writethrough;
- 150  7946 [142]     _drawvector(cx,cy,cx+trunc(x),cy+trunc(y));
- 151  7984 [142]     endwritethrough;
- 152  7988 [142]     _drawvector(cx+trunc(x),
- 153  7998 [142]       cy+trunc(y),
- 154  8010 [142]       cx+trunc(ticfactor*x),
- 155  8029 [142]       cy+trunc(ticfactor*y));
- 156  8056 [142]     if mode=0 then begin
- 157  8063 [142]       _drawvector(cx+trunc(ticf1*x),
- 158  8083 [142]       cy+trunc(ticf1*y),
- 159  8102 [142]       cx+trunc(ticf2*x),
- 160  8121 [142]       cy+trunc(ticf2*y));
- 161  8148 [142]     end;
- 162  8148 [142]     angle:=angle+step;
- 163  8152 [142]   end;
- 164  8161 [142] 
- 165  8162 [142] begin
- 166  8162 [142]   _setchsize(1);
- 167  8172 [142]   if mode=0 then begin
- 168  8179 [142]     step:=6;
- 169  8184 [142]     cx:=MAXX-130;
- 170  8193 [142]     cy:=150;
- 171  8200 [142]     _moveto((MAXX div 2)-72,MAXY-25);
- 172  8225 [142]     radarsize:=100;
- 173  8227 [142]     ticfactor:=1.0+3.0/conv(radarsize);
- 174  8247 [142]     ticf1:=conv(phaserrange)/10.0;
- 175  8267 [142]     ticf2:=0.01+conv(phaserrange)/10.0;
- 176  8291 [142]     csize:=conv(radarsize)/32000.0;
- 177  8310 [142]     _moveto(cx-130,cy-radarsize-28);
- 178  8342 [142]     write(@PLOTTER,'Phaser range');
- 179  8359 [142]     write(@PLOTTER,conv(phaserrange)/10.0:4:1);
- 180  8385 [142]     write(@PLOTTER,' pc');
- 181  8393 [142]   end else begin
- 182  8396 [142]     step:=3;
- 183  8398 [142]     cx:=MAXX div 2;
- 184  8407 [142]     cy:=MAXY div 2;
- 185  8417 [142]     _moveto((MAXX div 2)-72,MAXY-25);
- 186  8443 [142]     write(@PLOTTER,'R65 Starship');
- 187  8460 [142]     radarsize:=(310*damage[0]) div 100;
- 188  8472 [142]     ticfactor:=1.0+3.0/conv(radarsize);
- 189  8493 [142]     csize:=conv(radarsize)/32000.0;
- 190  8513 [142]     _moveto(cx-150,cy-radarsize-28);
- 191  8545 [142]     write(@PLOTTER,'Long range scan');
- 192  8565 [142]     write(@PLOTTER,conv(radarsize)*0.1:5:1);
- 193  8591 [142]     write(@PLOTTER,' pc');
- 194  8599 [142]   end;
- 195  8599 [142]   angle:=0;
- 196  8601 [142]   _setlinemode(DOTTED);
- 197  8613 [142]   _setchsize(2);
- 198  8621 [142]   _drawvector(cx-radarsize,cy,cx+radarsize,cy);
- 199  8653 [142]   _drawvector(cx,cy-radarsize,cx,cy+radarsize);
- 200  8685 [142]   _setlinemode(SOLID);
- 201  8693 [142]   if (mode=1) then begin
- 202  8700 [142]     _drawrectangle(10,MAXY-200,240,MAXY-10);
- 203  8725 [142]     _moveto(20,MAXY-30);
- 204  8739 [142]     write(@PLOTTER,'SCANNER');
- 205  8751 [142]     _moveto(20,MAXY-46);
- 206  8765 [142]     write(@PLOTTER,'Objects located:');
- 207  8786 [142]     _moveto(20,MAXY-60);
- 208  8800 [142]     write(@PLOTTER,'   angle distance');
- 209  8822 [142]   end;
- 210  8822 [142]   angle:=0;
- 211  8824 [142]   i:=0
- 212  8828 [142]   repeat
- 213  8830 [142]     checkradar(angle,cx,cy,mode);
- 214  8856 [142]     x:=csize*conv(sinetable[i]);
- 215  8870 [142]     y:=csize*conv(sinetable[89-i]);
- 216  8895 [142]     drawsegment;
- 217  8907 [142]     i:=i+step;
- 218  8911 [142]   until i>=90;
- 219  8926 [142]   i:=0;
- 220  8932 [142]   repeat
- 221  8936 [142]     checkradar(angle,cx,cy,mode);
- 222  8958 [142]     x:=csize*conv(sinetable[89-i]);
- 223  8975 [142]     y:=-csize*conv(sinetable[i]);
- 224  8997 [142]     drawsegment;
- 225  9010 [142]     i:=i+step;
- 226  9014 [142]   until i>=90;
- 227  9029 [142]   i:=0;
- 228  9035 [142]   repeat
- 229  9039 [142]     checkradar(angle,cx,cy,mode);
- 230  9061 [142]     x:=-csize*conv(sinetable[i]);
- 231  9075 [142]     y:=-csize*conv(sinetable[89-i]);
- 232  9101 [142]     drawsegment;
- 233  9114 [142]     i:=i+step;
- 234  9118 [142]   until i>=90;
- 235  9133 [142]   i:=0;
- 236  9139 [142]   repeat
- 237  9143 [142]     checkradar(angle,cx,cy,mode);
- 238  9165 [142]     x:=-csize*conv(sinetable[89-i]);
- 239  9182 [142]     y:=csize*conv(sinetable[i]);
- 240  9205 [142]     drawsegment;
- 241  9217 [142]    i:=i+step;
- 242  9221 [142]   until i>=90;
- 243  9236 [142] end;
- 244  9240 [142] 
- 245  9241 [130] proc showEnergy;
- 246  9241 [131] var i: integer;
- 247  9244 [132] begin
- 248  9244 [132]   _setlinemode(SOLID);
- 249  9254 [132]   _setchsize(2);
- 250  9262 [132]   _drawrectangle(10,10,240,116);
- 251  9276 [132]   _moveto(20,90);
- 252  9286 [132]   write(@PLOTTER,'ENERGY');
- 253  9297 [132]   for i:= 0 to 3 do begin
- 254  9314 [132]     _moveto(20,74-16*i);
- 255  9332 [132]     case i of
- 256  9332 [132]       0: write(@PLOTTER,'Scanner:    ');
- 257  9360 [132]       1: write(@PLOTTER,'Shield:     ');
- 258  9387 [132]       2: write(@PLOTTER,'Phaser:     ');
- 259  9414 [132]       3: write(@PLOTTER,'Warp Engine:')
- 260  9440 [132]     end;
- 261  9443 [132]     write(@PLOTTER,conv(energy[i]):4:0);
- 262  9466 [132]     write(@PLOTTER,'%');
- 263  9472 [132]     if charging=i then
- 264  9476 [132]       write(@PLOTTER,'^');
- 265  9490 [132]   end;
- 266  9490 [132] end;
- 267  9504 [132] 
- 268  9505 [131] proc showStatus;
- 269  9505 [132] var i: integer;
- 270  9508 [133] begin
- 271  9508 [133]   _setchsize(2);
- 272  9518 [133]   _setlinemode(SOLID);
- 273  9526 [133]   _drawrectangle(MAXX-240,MAXY-116,
- 274  9537 [133]     MAXX-10,MAXY-10);
- 275  9556 [133]   _moveto(MAXX-230,MAXY-36);
- 276  9574 [133]   write(@PLOTTER,'STATUS/DAMAGE');
- 277  9592 [133]   for i:= 0 to 3 do begin
- 278  9609 [133]     _moveto(MAXX-230,MAXY-52-16*i);
- 279  9635 [133]     case i of
- 280  9635 [133]       0: write(@PLOTTER,'Scanner:    ');
- 281  9663 [133]       1: if shield then
- 282  9673 [133]            write(@PLOTTER,'Shield: Up  ')
- 283  9696 [133]          else
- 284  9697 [133]            write(@PLOTTER,'Shield: Down');
- 285  9717 [133]       2: write(@PLOTTER,'Phaser:     ');
- 286  9744 [133]       3: write(@PLOTTER,'Warp Engine:')
- 287  9770 [133]     end;
- 288  9773 [133]     write(@PLOTTER,conv(damage[i]):5:0);
- 289  9796 [133]     write(@PLOTTER,'%');
- 290  9802 [133]   end;
- 291  9802 [133] end;
- 292  9816 [133] 
- 293  9817 [132] proc setcharging;
- 294  9817 [133] var select: integer;
- 295  9820 [134]     k:      char;
- 296  9820 [135] begin
- 297  9820 [135]   writeln('Select station to charge:');
- 298  9854 [135]   writeln('1: Scanner');
- 299  9871 [135]   writeln('2: Shield');
- 300  9887 [135]   writeln('3: Phaser');
- 301  9903 [135]   writeln('4: Warp Engine');
- 302  9924 [135]   write('Which station (1..4)? ');
- 303  9947 [135]   read(@KEY,k);
- 304  9955 [135]   writeln(INVVID,k,NORVID);
- 305  9973 [135]   select := ord(k) - ord('0');
- 306  9979 [135]   if (select>=1) and (select<=4) then
- 307  9998 [135]     charging:=select-1
- 308 10006 [135]   else
- 309 10008 [135]     writeln(INVVID,'Unknown station',
- 310 10035 [135]       NORVID);
- 311 10044 [135]   write(INVVID,'Charging ');
- 312 10057 [135]   case charging of
- 313 10057 [135]     0: writeln('Scanner');
- 314 10082 [135]     1: writeln('Shield');
- 315 10105 [135]     2: writeln('Phaser');
- 316 10128 [135]     3: writeln('Warp Engine')
- 317 10150 [135]   end;
- 318 10158 [135]   write(NORVID);
- 319 10161 [135] end;
- 320 10161 [135] 
- 321 10162 [133] proc doscan;
- 322 10162 [134] begin
- 323 10162 [134]   if damage[0]<5 then
- 324 10175 [134]     writeln(INVVID,
- 325 10181 [134]       'Scanner defective',NORVID)
- 326 10202 [134]   else if energy[0]<8 then
- 327 10220 [134]     writeln(INVVID,
- 328 10226 [134]       'Not enough energy for scan',NORVID)
- 329 10256 [134]   else begin
- 330 10266 [134]     energy[0]:=energy[0]-8;
- 331 10276 [134]     if energy[0]<0 then energy[0]:=0;
- 332 10297 [134]     scan(1);
- 333 10309 [134]     scan(0);
- 334 10317 [134]   end;
- 335 10317 [134] end;
- 336 10317 [134] 
- 337 10318 [134] proc repair;
- 338 10318 [135] var select: integer;
- 339 10321 [136]     k: char;
- 340 10321 [137] begin
- 341 10321 [137]   writeln('Select station to repair:');
- 342 10355 [137]   writeln('1: Scanner');
- 343 10372 [137]   writeln('2: Shield');
- 344 10388 [137]   writeln('3: Phaser');
- 345 10404 [137]   writeln('4: Warp Engine');
- 346 10425 [137]   write('Which station (1..4)? ');
- 347 10448 [137]   read(@KEY,k);
- 348 10456 [137]   writeln(k,INVVID);
- 349 10471 [137]   select := ord(k) - ord('0');
- 350 10477 [137]   if (select>=1) and (select<=4) then begin
- 351 10497 [137]     damage[select-1]:=damage[select-1]+20;
- 352 10520 [137]     if damage[select-1]>100 then
- 353 10538 [137]       damage[select-1]:=100;
- 354 10551 [137]     write('Repairing ');
- 355 10566 [137]     case select-1 of
- 356 10572 [137]       0: write('Scanner');
- 357 10588 [137]       1: write('Shield');
- 358 10605 [137]       2: write('Phaser');
- 359 10622 [137]       3: write('Warp Engine')
- 360 10644 [137]     end
- 361 10644 [137]   end else
- 362 10646 [137]     write(INVVID,'Unknown station',NORVID);
- 363 10671 [137]   writeln;
- 364 10671 [137] end;
- 365 10677 [137] 
- 366 10678 [135] proc warp;
- 367 10678 [136] var i,angle,required:integer;
- 368 10681 [139]     distance,x,y,warpx,warpy:real;
- 369 10681 [144]     done:boolean;
- 370 10681 [145] begin
- 371 10681 [145]   if damage[3]<10 then
- 372 10691 [145]     writeln(INVVID,
- 373 10697 [145]       'Warp engine damaged',NORVID)
- 374 10720 [145]   else begin
- 375 10730 [145]     done:=false;
- 376 10732 [145]     write('Warp direction? ');
- 377 10753 [145]     read(angle);
- 378 10759 [145]     if angle<0 then angle:=360-angle;
- 379 10772 [145]     if angle>360 then angle:=360;
- 380 10795 [145]     repeat
- 381 10799 [145]       write('Warp distance in pc? ');
- 382 10821 [145]       distance:=readflo(INPUT);
- 383 10831 [145]       required:=trunc(2.0*distance);
- 384 10850 [145]       writeln('Energy required: ',required);
- 385 10884 [145]       if energy[3]<required then
- 386 10890 [145]         writeln(INVVID,'Not enough energy (',
- 387 10921 [145]           required,'% required)',NORVID)
- 388 10940 [145]       else begin
- 389 10950 [145]         done:=true;
- 390 10952 [145]         energy[3]:=energy[3]-required;
- 391 10964 [145]         write(INVVID,'Warping...');
- 392 10987 [145]         warpx:=sin(conv(angle))*distance*10.0;
- 393 11013 [145]         warpy:=cos(conv(angle))*distance*10.0;
- 394 11046 [145]         for i:=0 to 7 do begin
- 395 11070 [145]           x:=sin(conv(ashiptable[i]))*
- 396 11087 [145]             conv(dshiptable[i])-warpx;
- 397 11097 [145]           y:=cos(conv(ashiptable[i]))*
- 398 11127 [145]             conv(dshiptable[i])-warpy;
- 399 11137 [145]           ashiptable[i]:=
- 400 11154 [145]             trunc(atan2(trunc(x),trunc(y)));
- 401 11176 [145]           dshiptable[i]:=trunc(sqrt(x*x+y*y));
- 402 11220 [145]         end;
- 403 11225 [145]         writeln('done',NORVID);
- 404 11253 [145]       end
- 405 11253 [145]     until done;
- 406 11253 [145]   end;
- 407 11260 [145] end;
- 408 11260 [145] 
- 409 11261 [136] proc shoot;
- 410 11261 [137] var i,angle:integer;
- 411 11264 [139] begin
- 412 11264 [139]   if shield then begin
- 413 11270 [139]     writeln(INVVID,'Lowering shield',NORVID);
- 414 11301 [139]     shield:=false;
- 415 11303 [139]   end;
- 416 11307 [139]   if damage[2]<10 then
- 417 11315 [139]     writeln(INVVID,
- 418 11321 [139]       'Phaser damaged',NORVID)
- 419 11339 [139]   else if energy[2]<20 then
- 420 11357 [139]     writeln(INVVID,
- 421 11363 [139]       'Not enough energy for phaser',NORVID)
- 422 11395 [139]   else begin
- 423 11405 [139]     energy[2]:=energy[2]-20;
- 424 11415 [139]     write('Phaser direction? ');
- 425 11439 [139]     read(angle);
- 426 11445 [139]     if angle<0 then angle:=360-angle;
- 427 11458 [139]     if angle>360 then angle:=360;
- 428 11481 [139]     for i:=0 to 7 do begin
- 429 11502 [139]       if (_abs(angle-ashiptable[i])<4) and
- 430 11526 [139]         (dshiptable[i]<phaserrange) then begin
- 431 11540 [139]         shipdamage[i]:=shipdamage[i]-50;
- 432 11557 [139]         if shipdamage[i]>0 then begin
- 433 11573 [139]           writeln(INVVID,'Ship ',i+1,
- 434 11591 [139]           ' damaged',NORVID);
- 435 11611 [139]         score:=score+1;
- 436 11617 [139]         end else begin
- 437 11625 [139]           writeln(INVVID,'Ship ',i+1,
- 438 11640 [139]             ' destroyed',NORVID);
- 439 11662 [139]           score:=score+10;
- 440 11668 [139]           { Create new ship far away }
- 441 11673 [139]           dshiptable[i]:=20000;
- 442 11680 [139]           ashiptable[i]:=
- 443 11688 [139]             trunc(conv(_random)*360.0/256.0);
- 444 11709 [139]           shipdamage[i]:=100;
- 445 11720 [139]         end;
- 446 11724 [139]       end;
- 447 11724 [139]     end;
- 448 11724 [139]   end;
- 449 11738 [139] end;
- 450 11738 [139] 
- 451 11739 [137] proc hit(impact0:integer);
- 452 11739 [139] var impact,station: integer;
- 453 11742 [141] begin
- 454 11742 [141]   impact:=impact0;
- 455 11744 [141]   if impact<5 then impact:=5;
- 456 11764 [141]   write(INVVID,'Starship hit, ');
- 457 11786 [141]   if shield then begin
- 458 11790 [141]     if energy[1]>=impact then begin
- 459 11804 [141]       energy[1]:=energy[1]-impact;
- 460 11815 [141]       writeln('shield at ',energy[1],'%');
- 461 11850 [141]       impact:=0
- 462 11850 [141]     end else begin
- 463 11859 [141]       impact:=impact-energy[1];
- 464 11865 [141]       energy[1]:=0;
- 465 11878 [141]       writeln('shield at ',energy[1],'%');
- 466 11908 [141]     end
- 467 11908 [141]   end;
- 468 11908 [141]   if impact>0 then begin
- 469 11915 [141]     station:=_random div 64;
- 470 11926 [141]     write(INVVID);
- 471 11934 [141]     case station of
- 472 11934 [141]       0: write('Scanner');
- 473 11953 [141]       1: write('Shield generator');
- 474 11980 [141]       2: write('Phaser');
- 475 11997 [141]       3: write('Warp engine')
- 476 12019 [141]     end;
- 477 12021 [141]     damage[station]:=damage[station]-impact;
- 478 12033 [141]     if damage[station]<0 then
- 479 12052 [141]       damage[station]:=0;
- 480 12062 [141]     if energy[station]>damage[station] then
- 481 12078 [141]       energy[station]:=damage[station];
- 482 12094 [141]     writeln(' damaged (',
- 483 12113 [141]       damage[station],'%)');
- 484 12131 [141]   end;
- 485 12131 [141]   write(NORVID);
- 486 12134 [141] end;
- 487 12134 [141] 
- 488 12135 [138] proc enemy;
- 489 12135 [139] var i,dangle,distance:integer;
- 490 12138 [142] begin
- 491 12138 [142]   for i:=0 to 7 do begin
- 492 12157 [142]     if dshiptable[i]>10 then begin
- 493 12168 [142]       { warp }
- 494 12171 [142]       if _random<128 then begin
- 495 12180 [142]         distance:=_random div 2;
- 496 12191 [142]         dshiptable[i]:=dshiptable[i]-
- 497 12204 [142]           (_random div 2);
- 498 12217 [142]         if dshiptable[i]<3 then
- 499 12232 [142]           dshiptable[i]:=3;
- 500 12242 [142]         dangle:=(_random-128) div dshiptable[i];
- 501 12259 [142]         ashiptable[i]:=ashiptable[i]+
- 502 12276 [142]           dangle;
- 503 12280 [142]         if ashiptable[i]<0 then
- 504 12299 [142]           ashiptable[i]:=ashiptable[i]+360
- 505 12315 [142]         else if ashiptable[i]>=360 then
- 506 12337 [142]           ashiptable[i]:=ashiptable[i]-360;
- 507 12356 [142]       end
- 508 12361 [142]     end;
- 509 12361 [142]     if dshiptable[i]<10 then begin
- 510 12372 [142]       if _random<128 then
- 511 12383 [142]         hit(_random div 6);
- 512 12402 [142]     end;
- 513 12402 [142]   end;
- 514 12402 [142] end;
- 515 12416 [142] 
- 516 12417 [139] proc action;
- 517 12417 [140] var i,s:integer;
- 518 12420 [142]     sshield:boolean;
- 519 12420 [143]     select:char;
- 520 12420 [144] begin
- 521 12420 [144]   sshield:=shield;
- 522 12422 [144]   writeln(INVVID,'Current score: ',
- 523 12449 [144]     score,NORVID);
- 524 12463 [144]   if not shield then
- 525 12463 [144]     writeln(INVVID,'Shield is down',NORVID);
- 526 12498 [144]   writeln('Select action:');
- 527 12519 [144]   writeln('R: Repair stations');
- 528 12544 [144]   if shield then
- 529 12544 [144]     writeln('S: Lower shield')
- 530 12567 [144]   else
- 531 12573 [144]     writeln('S: Rase shield');
- 532 12597 [144]   write('P: Phaser (range ');
- 533 12615 [144]   write(conv(phaserrange)/10.0:4:1);
- 534 12637 [144]   writeln(' pc)');
- 535 12648 [144]   writeln('W: Warp');
- 536 12662 [144]   writeln('C: Choose station for fast charge');
- 537 12702 [144]   writeln('Q: Quit game');
- 538 12721 [144]   write('Which action (R,S,P,W,C,Q)? ');
- 539 12750 [144]   read(@KEY,select);
- 540 12758 [144]   writeln(INVVID,select,NORVID);
- 541 12776 [144]   case select of
- 542 12776 [144]     'R': repair;
- 543 12791 [144]     'S': shield:= not shield;
- 544 12801 [144]     'P': shoot;
- 545 12824 [144]     'W': warp;
- 546 12838 [144]     'C': setcharging;
- 547 12852 [144]     'Q': quit:=true
- 548 12862 [144]     else writeln(INVVID,'Unknown action',
- 549 12889 [144]       NORVID)
- 550 12891 [144]   end;
- 551 12900 [144]   energy[charging]:=energy[charging]+10;
- 552 12914 [144]   if energy[charging]>damage[charging] then
- 553 12931 [144]     energy[charging]:=damage[charging];
- 554 12947 [144]   for i:=0 to 3 do begin
- 555 12972 [144]     energy[i]:=energy[i]+5;
- 556 12986 [144]     if energy[i]>damage[i] then
- 557 13003 [144]       energy[i]:=damage[i];
- 558 13019 [144]   end;
- 559 13027 [144]   if shield then begin
- 560 13045 [144]     if energy[1]<10 then begin
- 561 13057 [144]        writeln(INVVID,'Not enough energy, ',
- 562 13083 [144]          'shield down',NORVID);
- 563 13104 [144]       shield:=false;
- 564 13106 [144]     end else begin
- 565 13113 [144]       energy[1]:=energy[1]-10;
- 566 13123 [144]       if energy[1]>damage[1] then
- 567 13136 [144]         energy[1]:=damage[1];
- 568 13148 [144]     end;
- 569 13156 [144]   end;
- 570 13156 [144]   if not quit then begin
- 571 13161 [144]     _clearscreen;
- 572 13168 [144]     enemy;
- 573 13172 [144]     if (select='P') and (shield<>sshield)
- 574 13183 [144]     then begin
- 575 13189 [144]       writeln(INVVID,'Raising shield',NORVID);
- 576 13219 [144]       shield:=sshield;
- 577 13219 [144]     end;
- 578 13227 [144]     phaserrange:=10*damage[2] div 100;
- 579 13238 [144]     showEnergy;
- 580 13247 [144]     showStatus;
- 581 13251 [144]     doscan;
- 582 13255 [144]     _moveto(5,MAXX-20);
- 583 13269 [144]     s:=0;
- 584 13271 [144]     for i:=1 to 3 do
- 585 13283 [144]       s:=s+damage[i];
- 586 13300 [144]     if s<30 then begin
- 587 13330 [144]       writeln('Starship heavily damaged,',
- 588 13359 [144]         ' game over!');
- 589 13377 [144]       quit:=true;
- 590 13379 [144]     end;
- 591 13383 [144]     s:=20000;
- 592 13386 [144]     for i:=0 to 7 do begin
- 593 13407 [144]       if dshiptable[i]<s then
- 594 13415 [144]         s:=dshiptable[i];
- 595 13427 [144]     end;
- 596 13435 [144]     if s>1000 then begin
- 597 13457 [144]       writeln('No nearby ships anymore,',
- 598 13485 [144]         ' game over!');
- 599 13503 [144]       quit:=true;
- 600 13505 [144]     end;
- 601 13509 [144]   end;
- 602 13509 [144] end;
- 603 13509 [144] 
- 604 13510 [140] proc initialize;
- 605 13510 [141] var i,j,distance,s: integer;
- 606 13513 [145]     v:real;
- 607 13513 [146] begin
- 608 13513 [146]   writeln('STARSHIP by rricharz');
- 609 13542 [146]   write('Initializing...');
- 610 13558 [146]   _starttek;
- 611 13562 [146]   quit:=false;
- 612 13564 [146]   score:=0;
- 613 13570 [146]   shield:=true;
- 614 13576 [146]   radarsize:=310;
- 615 13583 [146]   phaserrange:=10;
- 616 13589 [146]   for i:=0 to 89 do begin
- 617 13610 [146]     v:=32000.0*sin(conv(i));
- 618 13629 [146]     sinetable[i]:=trunc(v);
- 619 13646 [146]   end;
- 620 13651 [146]   for i:=0 to 3 do begin
- 621 13682 [146]     energy[i]:=80;
- 622 13688 [146]     damage[i]:=100;
- 623 13698 [146]   end;
- 624 13702 [146]   charging:=1;
- 625 13718 [146]   for i:=0 to maxships-1 do begin
- 626 13742 [146]     ashiptable[i]:=
- 627 13746 [146]       trunc(conv(_random)*360.0/256.0);
- 628 13767 [146]     dshiptable[i]:=_random div 2 +
- 629 13784 [146]        radarsize-128;
- 630 13792 [146]     shipdamage[i]:=100;
- 631 13803 [146]   end;
- 632 13807 [146]   for i:=0 to maxships-2 do
- 633 13831 [146]     for j:=0 to maxships-2-i do
- 634 13852 [146]       if ashiptable[j]>ashiptable[j+1]
- 635 13880 [146]       then begin
- 636 13886 [146]         s:=ashiptable[j];
- 637 13893 [146]         ashiptable[j]:=ashiptable[j+1];
- 638 13912 [146]         ashiptable[j+1]:=s;
- 639 13927 [146]         s:=dshiptable[j];
- 640 13939 [146]         dshiptable[j]:=dshiptable[j+1];
- 641 13958 [146]         dshiptable[j+1]:=s;
- 642 13973 [146]       end;
- 643 13981 [146]   writeln(' done.');
- 644 14022 [146] end;
- 645 14022 [146] 
- 646 14023 [141] begin {main}
- 647 14023 [141]   initialize;
- 648 14030 [141]   showEnergy;
- 649 14034 [141]   showStatus;
- 650 14038 [141]   scan(1);
- 651 14046 [141]   scan(0);
- 652 14054 [141]   _moveto(5,MAXX-20);
- 653 14068 [141]   repeat
- 654 14068 [141]     action;
- 655 14072 [141]   until quit;
- 656 14072 [141]   writeln(INVVID,'Final score: ',score,NORVID);
- 657 14110 [141]   _endtek;
- 658 14114 [141] end. 
-Code length:           14113
-Compiler stack size:   117/300
-Ident stack size:      146/350
+  13  6719 [111] 
+  14  6719 [111] const
+  15  6719 [111]     maxships=8;
+  16  6722 [112] 
+  17  6722 [112] var sinetable: array[90] of integer;
+  18  6722 [113]     dshiptable: array[maxships] of integer;
+  19  6722 [114]     ashiptable: array[maxships] of integer;
+  20  6722 [115]     shipdamage: array[maxships] of integer;
+  21  6722 [116]     energy,damage: array[4] of integer;
+  22  6722 [118]     radarsize,charging,score: integer;
+  23  6722 [121]     shield,quit: boolean;
+  24  6722 [123]     phaserrange,step: integer;
+  25  6722 [125] 
+  26  6722 [125] func atan2(x,y:integer):real;
+  27  6722 [129] { this is a special fast atan function
+  28  6722 [129] for thestarship coordinate system }
+  29  6722 [129]   func atan(z:real):
+  30  6725 [132] real;
+  31  6725 [132]   const n1= 0.972394;
+  32  6728 [133]         n2=-0.191948;
+  33  6728 [134]         n3= 57.29578;
+  34  6728 [135]   begin
+  35  6728 [135]     atan:=(n1+n2*z*z)*z*n3;
+  36  6770 [135]   end;
+  37  6777 [135] 
+  38  6778 [131] func atanp(x,y:integer):real;
+  39  6778 [135]   begin
+  40  6778 [135]     if (y<>0) and (x<>0) then begin
+  41  6798 [135]       if x<y then
+  42  6805 [135]         atanp:=atan(conv(x)/conv(y))
+  43  6824 [135]       else
+  44  6832 [135]         atanp:=90.0-atan(conv(y)/conv(x))
+  45  6858 [135]     end else begin
+  46  6876 [135]       if y>0 then atanp:=0.0
+  47  6886 [135]       else if x>0 then atanp:=90.0
+  48  6911 [135]       else atanp:=0.0;
+  49  6932 [135]     end;
+  50  6938 [135] end;
+  51  6938 [135] 
+  52  6939 [133] begin
+  53  6939 [133]   if (x>=0) and (y>=0) then
+  54  6955 [133]     atan2:=atanp(x,y)
+  55  6965 [133]   else if (x>=0) and (y<0) then
+  56  6998 [133]     atan2:=180.0-atanp(x,-y)
+  57  7014 [133]   else if (x<0) and (y<0) then
+  58  7049 [133]     atan2:=atanp(-x,-y)+180.0
+  59  7071 [133]   else
+  60  7077 [133]     atan2:=360.0-atanp(-x,y)
+  61  7100 [133] end;
+  62  7117 [133] 
+  63  7118 [127] proc checkradar(angle,cx,cy,mode:integer);
+  64  7118 [132] var i,xi,yi,dist,rsize0,a:integer;
+  65  7121 [138]     x,y:real;
+  66  7121 [140] begin
+  67  7121 [140]   rsize0:=radarsize;
+  68  7123 [140]   if mode=0 then rsize0:=rsize0 div 10;
+  69  7147 [140]   for i:=0 to maxships-1 do
+  70  7162 [140]     if (ashiptable[i]>=angle) and
+  71  7185 [140]       (ashiptable[i]<angle+step) then begin
+  72  7204 [140]       if dshiptable[i]<=rsize0 then begin
+  73  7220 [140]         dist:=dshiptable[i];
+  74  7227 [140]         a:=ashiptable[i];
+  75  7239 [140]         if angle<90 then begin
+  76  7254 [140]           x:=conv(sinetable[a])*
+  77  7265 [140]             conv(dist)/32000.0;
+  78  7278 [140]           y:=conv(sinetable[89-a])*
+  79  7296 [140]             conv(dist)/32000.0
+  80  7303 [140]         end else if angle<180 then begin
+  81  7326 [140]           x:=conv(sinetable[179-a])*
+  82  7340 [140]             conv(dist)/32000.0;
+  83  7353 [140]           y:=-conv(sinetable[a-90])*
+  84  7371 [140]             conv(dist)/32000.0
+  85  7378 [140]         end else if angle<270 then begin
+  86  7403 [140]           x:=-conv(sinetable[a-180])*
+  87  7417 [140]             conv(dist)/32000.0;
+  88  7430 [140]           y:=-conv(sinetable[269-a])*
+  89  7450 [140]             conv(dist)/32000.0
+  90  7457 [140]         end else begin
+  91  7474 [140]           x:=-conv(sinetable[359-a])*
+  92  7486 [140]             conv(dist)/32000.0;
+  93  7499 [140]           y:=conv(sinetable[a-270])*
+  94  7519 [140]             conv(dist)/32000.0
+  95  7526 [140]         end;
+  96  7539 [140]         if mode=0 then begin
+  97  7546 [140]           x:=x*10.0;
+  98  7561 [140]           y:=y*10.0;
+  99  7580 [140]         end;
+ 100  7587 [140]         xi:=cx+trunc(x);
+ 101  7597 [140]         yi:=cy+trunc(y);
+ 102  7613 [140]         _startdraw(xi-3,yi-3);
+ 103  7639 [140]         _draw(xi+3,yi-3);
+ 104  7659 [140]         _draw(xi,yi+2);
+ 105  7676 [140]         _draw(xi-3,yi-3);
+ 106  7696 [140]         _enddraw;
+ 107  7700 [140]         _moveto(xi+6,yi-7);
+ 108  7720 [140]         write(@PLOTTER,i+1);
+ 109  7732 [140]         if shipdamage[i]<100 then
+ 110  7742 [140]           write(@PLOTTER,'d');
+ 111  7752 [140]         if mode=1 then begin
+ 112  7759 [140]           _moveto(20,MAXY-16*i-78);
+ 113  7784 [140]           write(@PLOTTER,i+1,': ');
+ 114  7799 [140]           write(@PLOTTER,conv(angle):4:0);
+ 115  7818 [140]           write(@PLOTTER,conv(dist)*0.1:6:1);
+ 116  7844 [140]           write(@PLOTTER,' pc');
+ 117  7852 [140]           if shipdamage[i]<100 then
+ 118  7862 [140]             write(@PLOTTER,' d');
+ 119  7873 [140]         end;
+ 120  7873 [140]       end;
+ 121  7873 [140]     end;
+ 122  7873 [140] end;
+ 123  7887 [140] 
+ 124  7888 [128] proc scan(mode:integer);
+ 125  7888 [130] var i,angle: integer;
+ 126  7891 [132]     cx,cy: integer;
+ 127  7891 [134]     x,y,csize,ticfactor,ticf1,ticf2: real;
+ 128  7891 [140] 
+ 129  7891 [140]   proc drawsegment;
+ 130  7891 [141]   begin
+ 131  7891 [141]     _writethrough;
+ 132  7900 [141]     _drawvector(cx,cy,cx+trunc(x),cy+trunc(y));
+ 133  7938 [141]     _endwritethrough;
+ 134  7942 [141]     _drawvector(cx+trunc(x),
+ 135  7952 [141]       cy+trunc(y),
+ 136  7964 [141]       cx+trunc(ticfactor*x),
+ 137  7983 [141]       cy+trunc(ticfactor*y));
+ 138  8010 [141]     if mode=0 then begin
+ 139  8017 [141]       _drawvector(cx+trunc(ticf1*x),
+ 140  8037 [141]       cy+trunc(ticf1*y),
+ 141  8056 [141]       cx+trunc(ticf2*x),
+ 142  8075 [141]       cy+trunc(ticf2*y));
+ 143  8102 [141]     end;
+ 144  8102 [141]     angle:=angle+step;
+ 145  8106 [141]   end;
+ 146  8115 [141] 
+ 147  8116 [141] begin
+ 148  8116 [141]   _setchsize(1);
+ 149  8126 [141]   if mode=0 then begin
+ 150  8133 [141]     step:=6;
+ 151  8138 [141]     cx:=MAXX-130;
+ 152  8147 [141]     cy:=150;
+ 153  8154 [141]     _moveto((MAXX div 2)-72,MAXY-25);
+ 154  8179 [141]     radarsize:=100;
+ 155  8181 [141]     ticfactor:=1.0+3.0/conv(radarsize);
+ 156  8201 [141]     ticf1:=conv(phaserrange)/10.0;
+ 157  8221 [141]     ticf2:=0.01+conv(phaserrange)/10.0;
+ 158  8245 [141]     csize:=conv(radarsize)/32000.0;
+ 159  8264 [141]     _moveto(cx-130,cy-radarsize-28);
+ 160  8296 [141]     write(@PLOTTER,'Phaser range');
+ 161  8313 [141]     write(@PLOTTER,conv(phaserrange)/10.0:4:1);
+ 162  8339 [141]     write(@PLOTTER,' pc');
+ 163  8347 [141]   end else begin
+ 164  8350 [141]     step:=3;
+ 165  8352 [141]     cx:=MAXX div 2;
+ 166  8361 [141]     cy:=MAXY div 2;
+ 167  8371 [141]     _moveto((MAXX div 2)-72,MAXY-25);
+ 168  8397 [141]     write(@PLOTTER,'R65 Starship');
+ 169  8414 [141]     radarsize:=(310*damage[0]) div 100;
+ 170  8426 [141]     ticfactor:=1.0+3.0/conv(radarsize);
+ 171  8447 [141]     csize:=conv(radarsize)/32000.0;
+ 172  8467 [141]     _moveto(cx-150,cy-radarsize-28);
+ 173  8499 [141]     write(@PLOTTER,'Long range scan');
+ 174  8519 [141]     write(@PLOTTER,conv(radarsize)*0.1:5:1);
+ 175  8545 [141]     write(@PLOTTER,' pc');
+ 176  8553 [141]   end;
+ 177  8553 [141]   angle:=0;
+ 178  8555 [141]   _setlinemode(DOTTED);
+ 179  8567 [141]   _setchsize(2);
+ 180  8575 [141]   _drawvector(cx-radarsize,cy,cx+radarsize,cy);
+ 181  8607 [141]   _drawvector(cx,cy-radarsize,cx,cy+radarsize);
+ 182  8639 [141]   _setlinemode(SOLID);
+ 183  8647 [141]   if (mode=1) then begin
+ 184  8654 [141]     _drawrectangle(10,MAXY-200,240,MAXY-10);
+ 185  8679 [141]     _moveto(20,MAXY-30);
+ 186  8693 [141]     write(@PLOTTER,'SCANNER');
+ 187  8705 [141]     _moveto(20,MAXY-46);
+ 188  8719 [141]     write(@PLOTTER,'Objects located:');
+ 189  8740 [141]     _moveto(20,MAXY-60);
+ 190  8754 [141]     write(@PLOTTER,'   angle distance');
+ 191  8776 [141]   end;
+ 192  8776 [141]   angle:=0;
+ 193  8778 [141]   i:=0
+ 194  8782 [141]   repeat
+ 195  8784 [141]     checkradar(angle,cx,cy,mode);
+ 196  8810 [141]     x:=csize*conv(sinetable[i]);
+ 197  8824 [141]     y:=csize*conv(sinetable[89-i]);
+ 198  8849 [141]     drawsegment;
+ 199  8861 [141]     i:=i+step;
+ 200  8865 [141]   until i>=90;
+ 201  8880 [141]   i:=0;
+ 202  8886 [141]   repeat
+ 203  8890 [141]     checkradar(angle,cx,cy,mode);
+ 204  8912 [141]     x:=csize*conv(sinetable[89-i]);
+ 205  8929 [141]     y:=-csize*conv(sinetable[i]);
+ 206  8951 [141]     drawsegment;
+ 207  8964 [141]     i:=i+step;
+ 208  8968 [141]   until i>=90;
+ 209  8983 [141]   i:=0;
+ 210  8989 [141]   repeat
+ 211  8993 [141]     checkradar(angle,cx,cy,mode);
+ 212  9015 [141]     x:=-csize*conv(sinetable[i]);
+ 213  9029 [141]     y:=-csize*conv(sinetable[89-i]);
+ 214  9055 [141]     drawsegment;
+ 215  9068 [141]     i:=i+step;
+ 216  9072 [141]   until i>=90;
+ 217  9087 [141]   i:=0;
+ 218  9093 [141]   repeat
+ 219  9097 [141]     checkradar(angle,cx,cy,mode);
+ 220  9119 [141]     x:=-csize*conv(sinetable[89-i]);
+ 221  9136 [141]     y:=csize*conv(sinetable[i]);
+ 222  9159 [141]     drawsegment;
+ 223  9171 [141]    i:=i+step;
+ 224  9175 [141]   until i>=90;
+ 225  9190 [141] end;
+ 226  9194 [141] 
+ 227  9195 [129] proc showEnergy;
+ 228  9195 [130] var i: integer;
+ 229  9198 [131] begin
+ 230  9198 [131]   _setlinemode(SOLID);
+ 231  9208 [131]   _setchsize(2);
+ 232  9216 [131]   _drawrectangle(10,10,240,116);
+ 233  9230 [131]   _moveto(20,90);
+ 234  9240 [131]   write(@PLOTTER,'ENERGY');
+ 235  9251 [131]   for i:= 0 to 3 do begin
+ 236  9268 [131]     _moveto(20,74-16*i);
+ 237  9286 [131]     case i of
+ 238  9286 [131]       0: write(@PLOTTER,'Scanner:    ');
+ 239  9314 [131]       1: write(@PLOTTER,'Shield:     ');
+ 240  9341 [131]       2: write(@PLOTTER,'Phaser:     ');
+ 241  9368 [131]       3: write(@PLOTTER,'Warp Engine:')
+ 242  9394 [131]     end;
+ 243  9397 [131]     write(@PLOTTER,conv(energy[i]):4:0);
+ 244  9420 [131]     write(@PLOTTER,'%');
+ 245  9426 [131]     if charging=i then
+ 246  9430 [131]       write(@PLOTTER,'^');
+ 247  9444 [131]   end;
+ 248  9444 [131] end;
+ 249  9458 [131] 
+ 250  9459 [130] proc showStatus;
+ 251  9459 [131] var i: integer;
+ 252  9462 [132] begin
+ 253  9462 [132]   _setchsize(2);
+ 254  9472 [132]   _setlinemode(SOLID);
+ 255  9480 [132]   _drawrectangle(MAXX-240,MAXY-116,
+ 256  9491 [132]     MAXX-10,MAXY-10);
+ 257  9510 [132]   _moveto(MAXX-230,MAXY-36);
+ 258  9528 [132]   write(@PLOTTER,'STATUS/DAMAGE');
+ 259  9546 [132]   for i:= 0 to 3 do begin
+ 260  9563 [132]     _moveto(MAXX-230,MAXY-52-16*i);
+ 261  9589 [132]     case i of
+ 262  9589 [132]       0: write(@PLOTTER,'Scanner:    ');
+ 263  9617 [132]       1: if shield then
+ 264  9627 [132]            write(@PLOTTER,'Shield: Up  ')
+ 265  9650 [132]          else
+ 266  9651 [132]            write(@PLOTTER,'Shield: Down');
+ 267  9671 [132]       2: write(@PLOTTER,'Phaser:     ');
+ 268  9698 [132]       3: write(@PLOTTER,'Warp Engine:')
+ 269  9724 [132]     end;
+ 270  9727 [132]     write(@PLOTTER,conv(damage[i]):5:0);
+ 271  9750 [132]     write(@PLOTTER,'%');
+ 272  9756 [132]   end;
+ 273  9756 [132] end;
+ 274  9770 [132] 
+ 275  9771 [131] proc setcharging;
+ 276  9771 [132] var select: integer;
+ 277  9774 [133]     k:      char;
+ 278  9774 [134] begin
+ 279  9774 [134]   writeln('Select station to charge:');
+ 280  9808 [134]   writeln('1: Scanner');
+ 281  9825 [134]   writeln('2: Shield');
+ 282  9841 [134]   writeln('3: Phaser');
+ 283  9857 [134]   writeln('4: Warp Engine');
+ 284  9878 [134]   write('Which station (1..4)? ');
+ 285  9901 [134]   read(@KEY,k);
+ 286  9909 [134]   writeln(INVVID,k,NORVID);
+ 287  9927 [134]   select := ord(k) - ord('0');
+ 288  9933 [134]   if (select>=1) and (select<=4) then
+ 289  9952 [134]     charging:=select-1
+ 290  9960 [134]   else
+ 291  9962 [134]     writeln(INVVID,'Unknown station',
+ 292  9989 [134]       NORVID);
+ 293  9998 [134]   write(INVVID,'Charging ');
+ 294 10011 [134]   case charging of
+ 295 10011 [134]     0: writeln('Scanner');
+ 296 10036 [134]     1: writeln('Shield');
+ 297 10059 [134]     2: writeln('Phaser');
+ 298 10082 [134]     3: writeln('Warp Engine')
+ 299 10104 [134]   end;
+ 300 10112 [134]   write(NORVID);
+ 301 10115 [134] end;
+ 302 10115 [134] 
+ 303 10116 [132] proc doscan;
+ 304 10116 [133] begin
+ 305 10116 [133]   if damage[0]<5 then
+ 306 10129 [133]     writeln(INVVID,
+ 307 10135 [133]       'Scanner defective',NORVID)
+ 308 10156 [133]   else if energy[0]<8 then
+ 309 10174 [133]     writeln(INVVID,
+ 310 10180 [133]       'Not enough energy for scan',NORVID)
+ 311 10210 [133]   else begin
+ 312 10220 [133]     energy[0]:=energy[0]-8;
+ 313 10230 [133]     if energy[0]<0 then energy[0]:=0;
+ 314 10251 [133]     scan(1);
+ 315 10263 [133]     scan(0);
+ 316 10271 [133]   end;
+ 317 10271 [133] end;
+ 318 10271 [133] 
+ 319 10272 [133] proc repair;
+ 320 10272 [134] var select: integer;
+ 321 10275 [135]     k: char;
+ 322 10275 [136] begin
+ 323 10275 [136]   writeln('Select station to repair:');
+ 324 10309 [136]   writeln('1: Scanner');
+ 325 10326 [136]   writeln('2: Shield');
+ 326 10342 [136]   writeln('3: Phaser');
+ 327 10358 [136]   writeln('4: Warp Engine');
+ 328 10379 [136]   write('Which station (1..4)? ');
+ 329 10402 [136]   read(@KEY,k);
+ 330 10410 [136]   writeln(k,INVVID);
+ 331 10425 [136]   select := ord(k) - ord('0');
+ 332 10431 [136]   if (select>=1) and (select<=4) then begin
+ 333 10451 [136]     damage[select-1]:=damage[select-1]+20;
+ 334 10474 [136]     if damage[select-1]>100 then
+ 335 10492 [136]       damage[select-1]:=100;
+ 336 10505 [136]     write('Repairing ');
+ 337 10520 [136]     case select-1 of
+ 338 10526 [136]       0: write('Scanner');
+ 339 10542 [136]       1: write('Shield');
+ 340 10559 [136]       2: write('Phaser');
+ 341 10576 [136]       3: write('Warp Engine')
+ 342 10598 [136]     end
+ 343 10598 [136]   end else
+ 344 10600 [136]     write(INVVID,'Unknown station',NORVID);
+ 345 10625 [136]   writeln;
+ 346 10625 [136] end;
+ 347 10631 [136] 
+ 348 10632 [134] proc warp;
+ 349 10632 [135] var i,angle,required:integer;
+ 350 10635 [138]     distance,x,y,warpx,warpy:real;
+ 351 10635 [143]     done:boolean;
+ 352 10635 [144] begin
+ 353 10635 [144]   if damage[3]<10 then
+ 354 10645 [144]     writeln(INVVID,
+ 355 10651 [144]       'Warp engine damaged',NORVID)
+ 356 10674 [144]   else begin
+ 357 10684 [144]     done:=false;
+ 358 10686 [144]     write('Warp direction? ');
+ 359 10707 [144]     read(angle);
+ 360 10713 [144]     if angle<0 then angle:=360-angle;
+ 361 10726 [144]     if angle>360 then angle:=360;
+ 362 10749 [144]     repeat
+ 363 10753 [144]       write('Warp distance in pc? ');
+ 364 10775 [144]       distance:=readflo(INPUT);
+ 365 10785 [144]       required:=trunc(2.0*distance);
+ 366 10804 [144]       writeln('Energy required: ',required);
+ 367 10838 [144]       if energy[3]<required then
+ 368 10844 [144]         writeln(INVVID,'Not enough energy (',
+ 369 10875 [144]           required,'% required)',NORVID)
+ 370 10894 [144]       else begin
+ 371 10904 [144]         done:=true;
+ 372 10906 [144]         energy[3]:=energy[3]-required;
+ 373 10918 [144]         write(INVVID,'Warping...');
+ 374 10941 [144]         warpx:=sin(conv(angle))*distance*10.0;
+ 375 10967 [144]         warpy:=cos(conv(angle))*distance*10.0;
+ 376 11000 [144]         for i:=0 to 7 do begin
+ 377 11024 [144]           x:=sin(conv(ashiptable[i]))*
+ 378 11041 [144]             conv(dshiptable[i])-warpx;
+ 379 11051 [144]           y:=cos(conv(ashiptable[i]))*
+ 380 11081 [144]             conv(dshiptable[i])-warpy;
+ 381 11091 [144]           ashiptable[i]:=
+ 382 11108 [144]             trunc(atan2(trunc(x),trunc(y)));
+ 383 11130 [144]           dshiptable[i]:=trunc(sqrt(x*x+y*y));
+ 384 11174 [144]         end;
+ 385 11179 [144]         writeln('done',NORVID);
+ 386 11207 [144]       end
+ 387 11207 [144]     until done;
+ 388 11207 [144]   end;
+ 389 11214 [144] end;
+ 390 11214 [144] 
+ 391 11215 [135] proc shoot;
+ 392 11215 [136] var i,angle:integer;
+ 393 11218 [138] begin
+ 394 11218 [138]   if shield then begin
+ 395 11224 [138]     writeln(INVVID,'Lowering shield',NORVID);
+ 396 11255 [138]     shield:=false;
+ 397 11257 [138]   end;
+ 398 11261 [138]   if damage[2]<10 then
+ 399 11269 [138]     writeln(INVVID,
+ 400 11275 [138]       'Phaser damaged',NORVID)
+ 401 11293 [138]   else if energy[2]<20 then
+ 402 11311 [138]     writeln(INVVID,
+ 403 11317 [138]       'Not enough energy for phaser',NORVID)
+ 404 11349 [138]   else begin
+ 405 11359 [138]     energy[2]:=energy[2]-20;
+ 406 11369 [138]     write('Phaser direction? ');
+ 407 11393 [138]     read(angle);
+ 408 11399 [138]     if angle<0 then angle:=360-angle;
+ 409 11412 [138]     if angle>360 then angle:=360;
+ 410 11435 [138]     for i:=0 to 7 do begin
+ 411 11456 [138]       if (_abs(angle-ashiptable[i])<4) and
+ 412 11480 [138]         (dshiptable[i]<phaserrange) then begin
+ 413 11494 [138]         shipdamage[i]:=shipdamage[i]-50;
+ 414 11511 [138]         if shipdamage[i]>0 then begin
+ 415 11527 [138]           writeln(INVVID,'Ship ',i+1,
+ 416 11545 [138]           ' damaged',NORVID);
+ 417 11565 [138]         score:=score+1;
+ 418 11571 [138]         end else begin
+ 419 11579 [138]           writeln(INVVID,'Ship ',i+1,
+ 420 11594 [138]             ' destroyed',NORVID);
+ 421 11616 [138]           score:=score+10;
+ 422 11622 [138]           { Create new ship far away }
+ 423 11627 [138]           dshiptable[i]:=20000;
+ 424 11634 [138]           ashiptable[i]:=
+ 425 11642 [138]             trunc(conv(_random)*360.0/256.0);
+ 426 11663 [138]           shipdamage[i]:=100;
+ 427 11674 [138]         end;
+ 428 11678 [138]       end;
+ 429 11678 [138]     end;
+ 430 11678 [138]   end;
+ 431 11692 [138] end;
+ 432 11692 [138] 
+ 433 11693 [136] proc hit(impact0:integer);
+ 434 11693 [138] var impact,station: integer;
+ 435 11696 [140] begin
+ 436 11696 [140]   impact:=impact0;
+ 437 11698 [140]   if impact<5 then impact:=5;
+ 438 11718 [140]   write(INVVID,'Starship hit, ');
+ 439 11740 [140]   if shield then begin
+ 440 11744 [140]     if energy[1]>=impact then begin
+ 441 11758 [140]       energy[1]:=energy[1]-impact;
+ 442 11769 [140]       writeln('shield at ',energy[1],'%');
+ 443 11804 [140]       impact:=0
+ 444 11804 [140]     end else begin
+ 445 11813 [140]       impact:=impact-energy[1];
+ 446 11819 [140]       energy[1]:=0;
+ 447 11832 [140]       writeln('shield at ',energy[1],'%');
+ 448 11862 [140]     end
+ 449 11862 [140]   end;
+ 450 11862 [140]   if impact>0 then begin
+ 451 11869 [140]     station:=_random div 64;
+ 452 11880 [140]     write(INVVID);
+ 453 11888 [140]     case station of
+ 454 11888 [140]       0: write('Scanner');
+ 455 11907 [140]       1: write('Shield generator');
+ 456 11934 [140]       2: write('Phaser');
+ 457 11951 [140]       3: write('Warp engine')
+ 458 11973 [140]     end;
+ 459 11975 [140]     damage[station]:=damage[station]-impact;
+ 460 11987 [140]     if damage[station]<0 then
+ 461 12006 [140]       damage[station]:=0;
+ 462 12016 [140]     if energy[station]>damage[station] then
+ 463 12032 [140]       energy[station]:=damage[station];
+ 464 12048 [140]     writeln(' damaged (',
+ 465 12067 [140]       damage[station],'%)');
+ 466 12085 [140]   end;
+ 467 12085 [140]   write(NORVID);
+ 468 12088 [140] end;
+ 469 12088 [140] 
+ 470 12089 [137] proc enemy;
+ 471 12089 [138] var i,dangle,distance:integer;
+ 472 12092 [141] begin
+ 473 12092 [141]   for i:=0 to 7 do begin
+ 474 12111 [141]     if dshiptable[i]>10 then begin
+ 475 12122 [141]       { warp }
+ 476 12125 [141]       if _random<128 then begin
+ 477 12134 [141]         distance:=_random div 2;
+ 478 12145 [141]         dshiptable[i]:=dshiptable[i]-
+ 479 12158 [141]           (_random div 2);
+ 480 12171 [141]         if dshiptable[i]<3 then
+ 481 12186 [141]           dshiptable[i]:=3;
+ 482 12196 [141]         dangle:=(_random-128) div dshiptable[i];
+ 483 12213 [141]         ashiptable[i]:=ashiptable[i]+
+ 484 12230 [141]           dangle;
+ 485 12234 [141]         if ashiptable[i]<0 then
+ 486 12253 [141]           ashiptable[i]:=ashiptable[i]+360
+ 487 12269 [141]         else if ashiptable[i]>=360 then
+ 488 12291 [141]           ashiptable[i]:=ashiptable[i]-360;
+ 489 12310 [141]       end
+ 490 12315 [141]     end;
+ 491 12315 [141]     if dshiptable[i]<10 then begin
+ 492 12326 [141]       if _random<128 then
+ 493 12337 [141]         hit(_random div 6);
+ 494 12356 [141]     end;
+ 495 12356 [141]   end;
+ 496 12356 [141] end;
+ 497 12370 [141] 
+ 498 12371 [138] proc action;
+ 499 12371 [139] var i,s:integer;
+ 500 12374 [141]     sshield:boolean;
+ 501 12374 [142]     select:char;
+ 502 12374 [143] begin
+ 503 12374 [143]   sshield:=shield;
+ 504 12376 [143]   writeln(INVVID,'Current score: ',
+ 505 12403 [143]     score,NORVID);
+ 506 12417 [143]   if not shield then
+ 507 12417 [143]     writeln(INVVID,'Shield is down',NORVID);
+ 508 12452 [143]   writeln('Select action:');
+ 509 12473 [143]   writeln('R: Repair stations');
+ 510 12498 [143]   if shield then
+ 511 12498 [143]     writeln('S: Lower shield')
+ 512 12521 [143]   else
+ 513 12527 [143]     writeln('S: Rase shield');
+ 514 12551 [143]   write('P: Phaser (range ');
+ 515 12569 [143]   write(conv(phaserrange)/10.0:4:1);
+ 516 12591 [143]   writeln(' pc)');
+ 517 12602 [143]   writeln('W: Warp');
+ 518 12616 [143]   writeln('C: Choose station for fast charge');
+ 519 12656 [143]   writeln('Q: Quit game');
+ 520 12675 [143]   write('Which action (R,S,P,W,C,Q)? ');
+ 521 12704 [143]   read(@KEY,select);
+ 522 12712 [143]   writeln(INVVID,select,NORVID);
+ 523 12730 [143]   case select of
+ 524 12730 [143]     'R': repair;
+ 525 12745 [143]     'S': shield:= not shield;
+ 526 12755 [143]     'P': shoot;
+ 527 12778 [143]     'W': warp;
+ 528 12792 [143]     'C': setcharging;
+ 529 12806 [143]     'Q': quit:=true
+ 530 12816 [143]     else writeln(INVVID,'Unknown action',
+ 531 12843 [143]       NORVID)
+ 532 12845 [143]   end;
+ 533 12854 [143]   energy[charging]:=energy[charging]+10;
+ 534 12868 [143]   if energy[charging]>damage[charging] then
+ 535 12885 [143]     energy[charging]:=damage[charging];
+ 536 12901 [143]   for i:=0 to 3 do begin
+ 537 12926 [143]     energy[i]:=energy[i]+5;
+ 538 12940 [143]     if energy[i]>damage[i] then
+ 539 12957 [143]       energy[i]:=damage[i];
+ 540 12973 [143]   end;
+ 541 12981 [143]   if shield then begin
+ 542 12999 [143]     if energy[1]<10 then begin
+ 543 13011 [143]        writeln(INVVID,'Not enough energy, ',
+ 544 13037 [143]          'shield down',NORVID);
+ 545 13058 [143]       shield:=false;
+ 546 13060 [143]     end else begin
+ 547 13067 [143]       energy[1]:=energy[1]-10;
+ 548 13077 [143]       if energy[1]>damage[1] then
+ 549 13090 [143]         energy[1]:=damage[1];
+ 550 13102 [143]     end;
+ 551 13110 [143]   end;
+ 552 13110 [143]   if not quit then begin
+ 553 13115 [143]     _clearscreen;
+ 554 13122 [143]     enemy;
+ 555 13126 [143]     if (select='P') and (shield<>sshield)
+ 556 13137 [143]     then begin
+ 557 13143 [143]       writeln(INVVID,'Raising shield',NORVID);
+ 558 13173 [143]       shield:=sshield;
+ 559 13173 [143]     end;
+ 560 13181 [143]     phaserrange:=10*damage[2] div 100;
+ 561 13192 [143]     showEnergy;
+ 562 13201 [143]     showStatus;
+ 563 13205 [143]     doscan;
+ 564 13209 [143]     _moveto(5,MAXX-20);
+ 565 13223 [143]     s:=0;
+ 566 13225 [143]     for i:=1 to 3 do
+ 567 13237 [143]       s:=s+damage[i];
+ 568 13254 [143]     if s<30 then begin
+ 569 13284 [143]       writeln('Starship heavily damaged,',
+ 570 13313 [143]         ' game over!');
+ 571 13331 [143]       quit:=true;
+ 572 13333 [143]     end;
+ 573 13337 [143]     s:=20000;
+ 574 13340 [143]     for i:=0 to 7 do begin
+ 575 13361 [143]       if dshiptable[i]<s then
+ 576 13369 [143]         s:=dshiptable[i];
+ 577 13381 [143]     end;
+ 578 13389 [143]     if s>1000 then begin
+ 579 13411 [143]       writeln('No nearby ships anymore,',
+ 580 13439 [143]         ' game over!');
+ 581 13457 [143]       quit:=true;
+ 582 13459 [143]     end;
+ 583 13463 [143]   end;
+ 584 13463 [143] end;
+ 585 13463 [143] 
+ 586 13464 [139] proc initialize;
+ 587 13464 [140] var i,j,distance,s: integer;
+ 588 13467 [144]     v:real;
+ 589 13467 [145] begin
+ 590 13467 [145]   writeln('STARSHIP by rricharz');
+ 591 13496 [145]   write('Initializing...');
+ 592 13512 [145]   _starttek;
+ 593 13516 [145]   quit:=false;
+ 594 13518 [145]   score:=0;
+ 595 13524 [145]   shield:=true;
+ 596 13530 [145]   radarsize:=310;
+ 597 13537 [145]   phaserrange:=10;
+ 598 13543 [145]   for i:=0 to 89 do begin
+ 599 13564 [145]     v:=32000.0*sin(conv(i));
+ 600 13583 [145]     sinetable[i]:=trunc(v);
+ 601 13600 [145]   end;
+ 602 13605 [145]   for i:=0 to 3 do begin
+ 603 13636 [145]     energy[i]:=80;
+ 604 13642 [145]     damage[i]:=100;
+ 605 13652 [145]   end;
+ 606 13656 [145]   charging:=1;
+ 607 13672 [145]   for i:=0 to maxships-1 do begin
+ 608 13696 [145]     ashiptable[i]:=
+ 609 13700 [145]       trunc(conv(_random)*360.0/256.0);
+ 610 13721 [145]     dshiptable[i]:=_random div 2 +
+ 611 13738 [145]        radarsize-128;
+ 612 13746 [145]     shipdamage[i]:=100;
+ 613 13757 [145]   end;
+ 614 13761 [145]   for i:=0 to maxships-2 do
+ 615 13785 [145]     for j:=0 to maxships-2-i do
+ 616 13806 [145]       if ashiptable[j]>ashiptable[j+1]
+ 617 13834 [145]       then begin
+ 618 13840 [145]         s:=ashiptable[j];
+ 619 13847 [145]         ashiptable[j]:=ashiptable[j+1];
+ 620 13866 [145]         ashiptable[j+1]:=s;
+ 621 13881 [145]         s:=dshiptable[j];
+ 622 13893 [145]         dshiptable[j]:=dshiptable[j+1];
+ 623 13912 [145]         dshiptable[j+1]:=s;
+ 624 13927 [145]       end;
+ 625 13935 [145]   writeln(' done.');
+ 626 13976 [145] end;
+ 627 13976 [145] 
+ 628 13977 [140] begin {main}
+ 629 13977 [140]   initialize;
+ 630 13984 [140]   showEnergy;
+ 631 13988 [140]   showStatus;
+ 632 13992 [140]   scan(1);
+ 633 14000 [140]   scan(0);
+ 634 14008 [140]   _moveto(5,MAXX-20);
+ 635 14022 [140]   repeat
+ 636 14022 [140]     action;
+ 637 14026 [140]   until quit;
+ 638 14026 [140]   writeln(INVVID,'Final score: ',score,NORVID);
+ 639 14064 [140]   _endtek;
+ 640 14068 [140] end. 
+Code length:           14067
+Compiler stack size:   115/300
+Ident stack size:      145/350

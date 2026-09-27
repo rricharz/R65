@@ -19,10 +19,13 @@
 #define NUMYDOTS    118
 
 #define NUM_LEDS    2   // Number of leds
-#define LED_VPOS   (245 * panelScale)
+
+#define LED_VPOS   (233 * panelScale)
 #define LED_HPOS   (panelOffset + 5 * panelScale)
 #define LED_SIZE   (13 * panelScale)
-#define LED_VDIST  (50 * panelScale)
+#define LED_VDIST  (47 * panelScale)
+#define STAT_VPOS  (317 * panelScale)
+#define STAT_HDIST (25 * panelScale)
 
 #define MIN_WINDOW_WIDTH    750   // proposed minimal width of main window
 #define MIN_WINDOW_HEIGHT   420     // proposed minimal height of main window

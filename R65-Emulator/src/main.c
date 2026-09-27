@@ -694,11 +694,6 @@ int main (int argc, char *argv[])
             tio.c_cc[VTIME] = 0;
             tcsetattr(STDIN_FILENO, TCSANOW, &tio);
         }
-
-        /* checkTekInput() must never block */
-        flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-        if (flags != -1)
-            fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
     }
     	
     int firstArg = 1;

@@ -199,6 +199,21 @@ void crt_show7segmentDisplay(char* s, int y, char* label)
          SCREEN_FONT, 10 * panelScale, 0, 0);
 }
 
+/*********************************************/
+void showStatus(int num, char* label, int flag)
+/*********************************************/
+{
+    SETLEDBORDERCOLOR;
+  
+    if (flag)
+        SETLEDONCOLOR;
+    else
+        SETLEDOFFCOLOR;
+    Circle(LED_HPOS + LED_SIZE / 2 + num * STAT_HDIST, STAT_VPOS, LED_SIZE);
+    Text(LED_HPOS - LED_SIZE / 6 + num * STAT_HDIST, STAT_VPOS + 21 * panelScale,
+        label, SCREEN_FONT, 10 * panelScale, 0, 0);
+}
+
 /**************/
 void infoPanel()
 /**************/
@@ -285,19 +300,23 @@ void infoPanel()
 		sprintf(s3,"%05d %02X", pascalPc & 0xFFFF, (pascalMinFree >> 8) & 0xFF);
 	}
         
-    if ((memory[M8_SFLAG] & 1) == 0)
+  if ((memory[M8_SFLAG] & 1) == 0)
         sprintf(s3,"%05d %02X",0,0);
     
-    crt_show7segmentDisplay(s1, quit_vpos + 2 * quit_vsize + 16 * panelScale,
+  crt_show7segmentDisplay(s1, quit_vpos + 2 * quit_vsize + 13 * panelScale,
         "KIM-1 display");
-    crt_show7segmentDisplay(s2, quit_vpos + 2 * quit_vsize + 76 * panelScale,
+  crt_show7segmentDisplay(s2, quit_vpos + 2 * quit_vsize + 70 * panelScale,
         "6502 pc and s");
-    crt_show7segmentDisplay(s3, quit_vpos + 2 * quit_vsize + 136 * panelScale,
+  crt_show7segmentDisplay(s3, quit_vpos + 2 * quit_vsize + 127 * panelScale,
         "Pascal pc and free pages");
 
-    SETBUTTONCOLOR;
-    Text(panelOffset + 14 * panelScale, 340 * panelScale,
-            "R65 System 1978-1982 RR", SCREEN_FONT, 10 * panelScale, 0, 0);    
+  showStatus(0,"TEK",tekTerminal);
+  showStatus(1,"RAW",rawPrint);
+  showStatus(2,"PRT", (memory[M8_SFLAG] & 0x02)| (memory[M8_VFLAG] & 0x08));
+  showStatus(3,"ANI",isAnimation);
+  showStatus(4,"ESC",memory[M8_SFLAG] & 0x80);
+   
+  SETBUTTONCOLOR;
 }
 
 /**************/
