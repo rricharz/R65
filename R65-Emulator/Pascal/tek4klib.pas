@@ -30,6 +30,8 @@ const MAXX = 4091; { Tektronix 4010 graphic mode }
       T_FAST     = 2;
       T_BOTH     = 3; { T_FULLV or T_FAST }
 
+mem KEYPRESSED=$1785: char&;
+
 var   _xs,_ys: integer;
 
 proc _delay10msec(time:integer);
@@ -165,6 +167,172 @@ begin
     write(@PLOTTER,chr(27));
     write(@PLOTTER,chr(95+type));
   end;
+end;
+
+func _escape_pending: boolean;
+{****************************}
+begin
+  _escape_pending := ((mem[$1781] and $80)<>0);
+end;
+
+func _tekread(var c: char): boolean;
+{**********************************}
+const
+  TIMEOUT=20;                 { 200 ms }
+
+var
+  dummy,t,lastt,ticks: integer;
+
+begin
+  ticks:=0;
+
+  { sample host clock }
+  dummy:=mem[$17b9];
+  lastt:=mem[$17b5];
+
+  repeat
+    c:=KEYPRESSED;
+
+    if c<>chr(0) then begin
+      KEYPRESSED:=chr(0);
+      _tekread:=true;
+      exit;
+    end;
+
+    { update and read host clock }
+    dummy:=mem[$17b9];
+    t:=mem[$17b5];
+
+    if t<>lastt then begin
+      lastt:=t;
+      ticks:=ticks+1;
+    end;
+
+  until ticks>=TIMEOUT;
+
+  _tekread:=false;
+end;
+
+func _coordinates(var x,y: integer): boolean;
+{********************************************}
+var
+  i: integer;
+  c: char;
+  b: array[3] of integer;
+  ok,got: boolean;
+
+begin
+  ok:=true;
+
+  for i:=0 to 3 do begin
+    got:=_tekread(c);
+
+    if not got then
+      ok:=false
+    else if (ord(c)<$20) or (ord(c)>$3f) then
+      ok:=false
+    else
+      b[i]:=ord(c)-$20;
+  end;
+
+  if ok then begin
+    { adjust coordinate system to 4K resolution }
+    x:=(b[0]*32+b[1]) shl 2;
+    y:=(b[2]*32+b[3]) shl 2;
+  end;
+
+  _coordinates:=ok;
+end;
+
+func _query(var x,y,mode: integer): boolean;
+{*****************************************}
+var
+  c: char;
+  tx,ty,tmode: integer;
+  ok,got: boolean;
+
+begin
+  ok:=true;
+
+  { request terminal status and coordinates }
+  write(@PLOTTER,chr(27),chr(5));
+
+  { status byte }
+  got:=_tekread(c);
+
+  if not got then
+    ok:=false
+  else begin
+    tmode:=ord(c)-$20;
+
+    { valid values are 0,2,4,6 }
+    if (tmode<0) or (tmode>6) or
+       ((tmode and 1)<>0) then
+      ok:=false;
+  end;
+
+  { four coordinate bytes }
+  if not _coordinates(tx,ty) then
+    ok:=false;
+
+  { terminating CR }
+  got:=_tekread(c);
+
+  if not got then
+    ok:=false
+  else if c<>chr(13) then
+    ok:=false;
+
+  { modify result parameters only if the
+    complete response was valid }
+  if ok then begin
+    x:=tx;
+    y:=ty;
+    mode:=tmode;
+  end;
+
+  _query:=ok;
+end;
+
+func _getcrosshair(var c: char;
+                var x,y: integer): boolean;
+{*****************************************}
+var
+  tc,endc: char;
+  tx,ty: integer;
+  okay: boolean;
+
+begin
+  { enter GIN mode }
+  write(@PLOTTER,chr(27),chr(26));
+
+  { wait indefinitely for user selection }
+  repeat
+    tc:=KEYPRESSED;
+    if tc=chr(0) then
+      _delay10msec(1);
+  until tc<>chr(0);
+
+  KEYPRESSED:=chr(0);
+
+  { read coordinates returned by Tek4010 }
+  okay:=_coordinates(tx,ty);
+
+  { consume and validate terminating CR }
+  if not _tekread(endc) then
+    okay:=false
+  else if endc<>chr(13) then
+    okay:=false;
+
+  { return results only after a complete,
+    valid GIN response }
+  if okay then begin
+    c:=tc;
+    x:=tx;
+    y:=ty;
+  end;
+
+  _getcrosshair:=okay;
 end;
 
 begin

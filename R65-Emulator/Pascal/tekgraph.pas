@@ -4,8 +4,8 @@
 {                                     }
 
 program tekgraph;
-uses syslib,ralib,mathlib,tek4Klib,writelib,
-      strlib;
+uses  syslib,ralib,mathlib,tek4Klib,writelib,
+      filelib,strlib;
 
 const
   border = 200;
@@ -834,6 +834,118 @@ begin
   _enddraw;
 end;
 
+func xtobin(x: integer): integer;
+{******************************}
+var bin,span: integer;
+begin
+  span:=lastbin-firstbin;
+
+  bin:=firstbin+
+    trunc(conv(x-xs)*conv(span)/
+          conv(xw)+0.5);
+
+  if bin<firstbin then bin:=firstbin;
+  if bin>lastbin then bin:=lastbin;
+
+  xtobin:=bin;
+end;
+
+func bintox(bin: integer): integer;
+{********************************}
+var span: integer;
+begin
+  span:=lastbin-firstbin;
+
+  bintox:=xs+
+    trunc(conv(xw)*conv(bin-firstbin)/
+          conv(span)+0.5);
+end;
+
+proc setlimit(bin: integer; left: boolean);
+{*****************************************}
+var v, dx: real;
+begin
+  dx:=(_max-_min)/conv(_n);
+  v:=_min+conv(bin)*dx;
+
+  if _domain=DOMAIN_TIME then begin
+    strcpyn('MANUAL',psval[P_TSCALE],9);
+    if left then
+      prval[P_TMIN]:=v
+    else
+      prval[P_TMAX]:=v;
+  end
+  else begin
+    strcpyn('MANUAL',psval[P_FSCALE],9);
+    if left then
+      prval[P_FMIN]:=v
+    else
+      prval[P_FMAX]:=v;
+  end;
+
+  storeparams;
+  _chainprog('TEKGRAPH:R      ',0,1);
+end;
+
+proc interactive;
+{***************}
+const CR = chr(13);
+
+var
+  ch: char;
+  x,y,bin,span: integer;
+  okay: boolean;
+
+begin
+  span:=lastbin-firstbin;
+
+  { start at middle data point }
+  bin:=firstbin+span div 2;
+  x:=bintox(bin);
+  y:=ys+ypos(bin);
+
+  repeat
+    _moveto(x,y);
+    okay:=_getcrosshair(ch,x,y);
+
+    if okay then begin
+      bin:=xtobin(x);
+
+      { snap crosshair to actual data point }
+      x:=bintox(bin);
+      y:=ys+ypos(bin);
+
+      case ch of
+        'L': setlimit(bin,true);
+
+        'R': setlimit(bin,false);
+
+        'F':
+          begin
+            if _domain=DOMAIN_TIME then
+              strcpyn('FULL',psval[P_TSCALE],9)
+            else
+              strcpyn('FULL',psval[P_FSCALE],9);
+            storeparams;
+            _chainprog('TEKGRAPH:R      ',0,1);
+          end;
+
+        ' ':
+          writeln(
+              'X=',_min+
+                conv(bin)*(_max-_min)/conv(_n),
+              ' Y=',fvalue(bin))
+      end {case};
+    end;
+
+  until _escape_pending or
+        not okay or
+        (ch='Q') or
+        (ch=CR);
+
+  writeln;
+end;
+
 proc cleanup;
 {***********}
 begin
@@ -851,5 +963,6 @@ begin
   displayparams;
   drawaxes;
   drawdata;
+  interactive;
   cleanup;
 end.  
