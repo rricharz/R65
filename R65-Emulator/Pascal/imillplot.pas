@@ -527,3 +527,54 @@ begin
     vector(x-3, y,   x+3, y,   BLACK)
   end;
 end;
+
+proc selectdashboard(player: integer);
+{**********************************}
+begin
+  { erase both boxes }
+  _rectangle(DASHX,DASHWHITEY,
+             DASHWIDTH,DASHHEIGHT,BLACK);
+  _rectangle(DASHX,DASHBLACKY,
+             DASHWIDTH,DASHHEIGHT,BLACK);
+
+  { draw box around active player }
+  if player=WHITE then
+    _rectangle(DASHX,DASHWHITEY,
+               DASHWIDTH,DASHHEIGHT,WHITE)
+  else
+    _rectangle(DASHX,DASHBLACKY,
+               DASHWIDTH,DASHHEIGHT,WHITE);
+end;
+
+proc drawreserve(player: integer);
+{****************************}
+var stone,x,y,color: integer;
+begin
+  if player=WHITE then
+    y:=DASHWHITEY+STONEOFF
+  else
+    y:=DASHBLACKY+STONEOFF;
+
+  for stone:=0 to 8 do begin
+    x:=DASHX+8+stone*10;
+
+    if stone<stones[player] then
+      color:=player
+    else
+      color:=EMPTY;
+
+    if stone>8-captured[player] then begin
+      color:=otherplayer(player);
+    end;
+
+    if color<>EMPTY then
+      dashstone(stone,player,color)
+    else
+      cleardashstone(stone, player);
+  end;
+end;
+
+proc redraw;
+{**********}
+begin
+end;

@@ -324,52 +324,6 @@ begin
   ismill:=false;
 end;
 
-proc drawreserve(player: integer);
-{****************************}
-var stone,x,y,color: integer;
-begin
-  if player=WHITE then
-    y:=DASHWHITEY+STONEOFF
-  else
-    y:=DASHBLACKY+STONEOFF;
-
-  for stone:=0 to 8 do begin
-    x:=DASHX+8+stone*10;
-
-    if stone<stones[player] then
-      color:=player
-    else
-      color:=EMPTY;
-
-    if stone>8-captured[player] then begin
-      color:=otherplayer(player);
-    end;
-
-    if color<>EMPTY then
-      dashstone(stone,player,color)
-    else
-      cleardashstone(stone, player);
-  end;
-end;
-
-proc selectdashboard(player: integer);
-{**********************************}
-begin
-  { erase both boxes }
-  _rectangle(DASHX,DASHWHITEY,
-             DASHWIDTH,DASHHEIGHT,BLACK);
-  _rectangle(DASHX,DASHBLACKY,
-             DASHWIDTH,DASHHEIGHT,BLACK);
-
-  { draw box around active player }
-  if player=WHITE then
-    _rectangle(DASHX,DASHWHITEY,
-               DASHWIDTH,DASHHEIGHT,WHITE)
-  else
-    _rectangle(DASHX,DASHBLACKY,
-               DASHWIDTH,DASHHEIGHT,WHITE);
-end;
-
 func isneighbor(p1,p2: integer): boolean;
 {*************************************}
 var i,base: integer;
@@ -633,6 +587,8 @@ begin
       computerturn(player);
     end;
   end;
+
+  redraw;
 end;
 
 func gameover(player: integer): boolean;
@@ -667,12 +623,9 @@ proc main;
 {********}
 
 mem ARGLISTS = $0060: array[63] of char&;
-var s: cpnt;
-    dummy: boolean;
-    i: integer;
+var i: integer;
 
 begin
-  s:=_new;
   previousstate:=_new;
   previousstate[0]:=ENDMARK;
 
@@ -688,6 +641,29 @@ begin
 
   DEBUG:=NULLDEV;
 
+  carg:=0;
+  if (ARGTYPE[0]='s') and (ARGLISTS[0]<>'/')
+  then begin
+    loadgame;
+    carg:=carg+2; {cyclus, drive }
+  end;
+
+  automode:=false;
+  if ARGTYPE[carg]='s' then begin
+    i:=2*carg;
+    if ARGLISTS[i]='/' then begin
+      i:=i+1;
+      repeat
+        if ARGLISTS[i]='A' then
+          automode:=true
+        else if ARGLISTS[i]='D' then
+          DEBUG:=PRINTER;
+        i:=i+1;
+      until (ARGLISTS[i]=chr(0)) or
+            (i>=2*carg+4);
+    end;
+  end;
+
   repeat
     init_canvas;
     init_common;
@@ -698,29 +674,6 @@ begin
 
     action:=0;
     carg:=0;
-
-    if (ARGTYPE[0]='s') and (ARGLISTS[0]<>'/')
-    then begin
-      loadgame;
-      carg:=carg+2; {cyclus, drive }
-    end;
-
-    automode:=false;
-    debug(carg);
-    if ARGTYPE[carg]='s' then begin
-      _sgetstring(s,carg,dummy);
-      if s[0]='/' then begin
-        i:=1;
-        repeat
-        debug(s,i,s[i]);
-          if s[i]='A' then
-            automode:=true
-          else if s[i]='D' then
-            DEBUG:=PRINTER;
-        i:=i+1;
-        until (s[i]=chr(0)) or (i>3);
-      end;
-    end;
 
     drawstones;
     drawreserve(WHITE);
@@ -745,7 +698,6 @@ begin
   until not automode or _escape_pending;
 
   quit;
-  _release(s);
 end;
 
 
