@@ -10,6 +10,9 @@ var
   neighbor: array[95] of integer;
   { There is no INVERSE stone; BLACK and WHITE used }
 
+proc computerturn(player: integer); forward;
+proc init_ai; forward;
+
 func strunc(r: real): integer;
 {*************************}
 begin
@@ -366,5 +369,384 @@ begin
     _rectangle(DASHX,DASHBLACKY,
                DASHWIDTH,DASHHEIGHT,WHITE);
 end;
+
+func isneighbor(p1,p2: integer): boolean;
+{*************************************}
+var i,base: integer;
+begin
+  base:=p1*MAXNEIGHBORS;
+
+  for i:=0 to MAXNEIGHBORS-1 do
+    if neighbor[base+i]=p2 then begin
+      isneighbor:=true;
+      exit;
+    end;
+
+  isneighbor:=false;
+end;
+
+proc debuglabels;
+{****************}
+var position,neighbornumber,neighborbase: integer;
+    nextposition: integer;
+begin
+  writeln(@DEBUG);
+  writeln(@DEBUG,'Board positions and neighbors');
+  writeln(@DEBUG);
+
+  for position:=0 to NPOSITIONS-1 do begin
+    write(@DEBUG, label[position], ': ');
+
+    neighborbase:=position*MAXNEIGHBORS;
+
+    for neighbornumber:=0 to MAXNEIGHBORS-1 do begin
+      nextposition:=
+        neighbor[neighborbase+neighbornumber];
+
+      if nextposition>=0 then
+        write(@DEBUG, label[nextposition], ' ');
+    end;
+
+    writeln(@DEBUG);
+  end;
+end;
+
+func allinmills(player: integer): boolean;
+{*************************************}
+var i: integer;
+begin
+  allinmills:=true;
+  for i:=0 to 23 do
+    if board[i]=player then
+      if not ismill(i,player) then begin
+        allinmills:=false;
+        exit;
+      end;
+end;
+
+proc takestone(player: integer);
+{******************************}
+var p1,p2,opponent: integer;
+    valid: boolean;
+begin
+  opponent:=otherplayer(player);
+
+  repeat
+    getinput(player,I_TAKE,p1,p2);
+
+    valid:=false;
+
+    if board[p1]<>opponent then begin
+      if board[p1]=EMPTY then
+        message(3,label[p1],player)
+      else
+        message(4,label[p1],player);
+    end
+
+    else if ismill(p1,opponent) and
+            not allinmills(opponent) then
+      message(8,label[p1],player)
+
+    else
+      valid:=true;
+
+  until valid;
+
+  if player=WHITE then
+    write(@previousaction,' TAKE ',label[p1])
+  else
+    write(@computeraction,' TAKE ',label[p1]);
+
+  board[p1]:=EMPTY;
+  clearstone(p1,player);
+  captured[player]:=captured[player]+1;
+  drawreserve(player);
+end;
+
+proc placestone(player:integer);
+{*******************************}
+var p1, p2: integer;
+    valid: boolean;
+begin
+  repeat
+    getinput(player,I_PLACE,p1,p2);
+
+    valid:=board[p1]=EMPTY;
+
+    if not valid then
+      message(6,label[p1],player);
+
+  until valid;
+
+  codestate(previousstate,BLACK);
+
+  board[p1]:=player;
+  stones[player]:=stones[player]-1;
+  drawstone(p1,player);
+  drawreserve(player);
+  protocolaction(player,p1,-1,0);
+
+  if ismill(p1,player) then
+    takestone(player);
+
+  specialplace:=-1;
+  if emptysquare[p1 shr 3] and ((p1 and 1)=0) then
+    specialplace:=p1;
+  emptysquare[p1 shr 3]:=false;
+
+end;
+
+func islegalmove(player,p1,p2: integer): boolean;
+{**********************************************}
+begin
+  islegalmove:=false;
+
+  if board[p1]<>player then
+    exit;
+
+  if board[p2]<>EMPTY then
+    exit;
+
+  if boardstones(player)=3 then begin
+    islegalmove:=true;
+    exit;
+  end;
+
+  if isneighbor(p1,p2) then
+    islegalmove:=true;
+end;
+
+proc movestone(player:integer);
+{******************************}
+var p1,p2: integer;
+    valid: boolean;
+
+begin
+  repeat
+    getinput(player,I_MOVE,p1,p2);
+    valid:=false;
+
+    if board[p1]=EMPTY then
+      message(3,label[p1],player)
+
+    else if board[p1]<>player then begin
+      if player=WHITE then
+        message(5,label[p1],player)
+      else
+        message(4,label[p1],player);
+
+    end else if board[p2]<>EMPTY then
+      message(6,label[p2],player)
+
+    else if (boardstones(player)>3)
+                 and not isneighbor(p1,p2) then
+      message(7,'  ',player)
+
+    else
+      valid:=true;
+
+  until valid;
+
+  codestate(previousstate,BLACK);
+
+  board[p2]:=board[p1];
+  board[p1]:=EMPTY;
+
+  clearstone(p1,player);
+  drawstone(p2,player);
+
+  protocolaction(player,p1,p2,0);
+
+  if ismill(p2,player) then
+    takestone(player);
+end;
+
+func findlegalmove(player: integer;
+                   var p1,p2: integer): boolean;
+{***************************************************}
+{ Enumerates all legal moves of PLAYER.
+  Used by gameover and by the computer player.
+
+  Initialize, set
+
+      p1 := 0;
+      p2 := -1;
+
+  before the first call.
+
+  Each successful call returns the next legal move
+  in P1,P2. FALSE indicates that there are no more
+  legal moves.                                      }
+
+begin
+  repeat
+    p2:=p2+1;
+
+    if p2>23 then begin
+      p2:=0;
+      p1:=p1+1;
+    end;
+
+    if p1>23 then begin
+      findlegalmove:=false;
+      exit;
+    end;
+
+  until islegalmove(player,p1,p2);
+
+  findlegalmove:=true;
+end;
+
+proc playerturn(player: integer);
+{*******************************}
+begin
+  selectdashboard(player);
+
+  if automode then begin
+    writeln(@DEBUG,'SELFPLAY ',player);
+    message(21,'  ',player);
+    strmessage('',EMPTY);
+    protocolcomputer(player);
+    computerturn(player);
+  end
+
+  else if DUALPLAYER then begin
+    protocolhuman(player);
+    if stones[player]>0 then
+      placestone(player)
+    else
+      movestone(player);
+  end
+
+  else begin
+    if player=WHITE then begin
+      protocolhuman(player);
+      if stones[player]>0 then
+        placestone(player)
+      else
+        movestone(player);
+    end
+    else begin
+      message(21,'  ',player);
+      strmessage('',EMPTY);
+      protocolcomputer(player);
+      computerturn(player);
+    end;
+  end;
+end;
+
+func gameover(player: integer): boolean;
+{*************************************}
+{ A player can only lose after all his stones have
+  been placed. He loses with fewer than three stones
+  or when no legal move exists. }
+
+var p1,p2: integer;
+begin
+
+  if _escape_pending then begin
+    gameover:=true;
+    exit;
+  end;
+  if stones[player]>0 then begin
+    gameover:=false;
+    exit;
+  end;
+
+  if boardstones(player)<3 then begin
+    gameover:=true;
+    exit;
+  end;
+
+  p1:=0;
+  p2:=-1;
+  gameover:=not findlegalmove(player,p1,p2);
+end;
+
+proc main;
+{********}
+
+mem ARGLISTS = $0060: array[63] of char&;
+var s: cpnt;
+    dummy: boolean;
+    i: integer;
+
+begin
+  s:=_new;
+  previousstate:=_new;
+  previousstate[0]:=ENDMARK;
+
+  previousaction:=_new;
+  previousaction[0]:=ENDMARK;
+
+  computeraction:=_new;
+  computeraction[0]:=ENDMARK;
+
+  init_graphics;
+
+  aitime:=0.0;
+
+  DEBUG:=NULLDEV;
+
+  repeat
+    init_canvas;
+    init_common;
+    init_neighbors;
+    init_ai;
+    drawboard;
+    drawlabels;
+
+    action:=0;
+    carg:=0;
+
+    if (ARGTYPE[0]='s') and (ARGLISTS[0]<>'/')
+    then begin
+      loadgame;
+      carg:=carg+2; {cyclus, drive }
+    end;
+
+    automode:=false;
+    debug(carg);
+    if ARGTYPE[carg]='s' then begin
+      _sgetstring(s,carg,dummy);
+      if s[0]='/' then begin
+        i:=1;
+        repeat
+        debug(s,i,s[i]);
+          if s[i]='A' then
+            automode:=true
+          else if s[i]='D' then
+            DEBUG:=PRINTER;
+        i:=i+1;
+        until (s[i]=chr(0)) or (i>3);
+      end;
+    end;
+
+    drawstones;
+    drawreserve(WHITE);
+    drawreserve(BLACK);
+
+    player:=WHITE;
+
+    repeat
+      action:=action+1;
+      playerturn(player);
+      protocolboard;
+      player:=otherplayer(player);
+    until gameover(player);
+
+    if not _escape_pending then begin
+      message(10,'  ',player);
+      message(11,'  ',otherplayer(player));
+    end;
+
+    writeln(@DEBUG,'AI TIME ',strunc(aitime),' S');
+
+  until not automode or _escape_pending;
+
+  quit;
+  _release(s);
+end;
+
 
  

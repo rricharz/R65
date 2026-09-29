@@ -16,10 +16,31 @@ const
     STONEOFF   = 29;
     NAMEOFF    = 37;
 
+    I_PLACE  = 1;
+    I_MOVE   = 2;
+    I_TAKE   = 3;
+    I_NAME   = 4;
+
+proc init_graphics;
+{*****************}
+begin
+  _grinit;
+  _fullview;
+end;
+
 proc init_canvas;
 {***************}
 begin
   _cleargr;
+  _move(DASHX+1,DASHWHITEY+NAMEOFF);
+  if automode then
+    write(@PLOTDEV,'COMPUTER')
+  else
+    write(@PLOTDEV,'PLAYER');
+
+  _move(DASHX+1,DASHBLACKY+NAMEOFF);
+  write(@PLOTDEV,'COMPUTER');
+
 end;
 
 proc vector(x1,y1,x2,y2, color: integer);
@@ -98,12 +119,6 @@ begin
   else
     findpos:=-1;
 end;
-
-const
-  I_PLACE  = 1;
-  I_MOVE   = 2;
-  I_TAKE   = 3;
-  I_NAME   = 4;
 
 proc getinput(player, request0: integer;
               var p1,p2: integer);

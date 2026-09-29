@@ -299,5 +299,10 @@ begin
   _draw(x, y, mode);
 end;
 
+func _escape_pending: boolean;
+begin
+  _escape_pending := ((mem[$1781] and $80)<>0);
+end;
+
 begin {initialization}
 end.

@@ -10,7 +10,7 @@ const
   V_OWNTHREAT2  = 30;
 
   V_OPPTHREAT1  = 15;
-  { V_OPPTHREAT2  = 40; }
+  V_OPPTHREAT2  = 40;
 
   V_OWNMILL     = 20;
   V_OPPMILL     = 20;
@@ -21,9 +21,6 @@ const
   MAXLEVEL      = 2;
 
 var maxlevel:integer;
-
-var aitime: real;
-    V_OPPTHREAT2: integer;
 
 proc init_ai;
 {***********}
