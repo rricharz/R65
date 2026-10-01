@@ -657,7 +657,7 @@ begin
         if ARGLISTS[i]='A' then
           automode:=true
         else if ARGLISTS[i]='D' then
-          DEBUG:=PRINTER;
+          DEBUG:=OUTPUT;
         i:=i+1;
       until (ARGLISTS[i]=chr(0)) or
             (i>=2*carg+4);

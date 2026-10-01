@@ -906,6 +906,7 @@ begin
 
   repeat
     _moveto(x,y);
+    _purgeinput;
     okay:=_getcrosshair(ch,x,y);
 
     if okay then begin

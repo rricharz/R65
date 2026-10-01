@@ -236,9 +236,8 @@ begin
   end;
 
   if ok then begin
-    { adjust coordinate system to 4K resolution }
-    x:=(b[0]*32+b[1]) shl 2;
-    y:=(b[2]*32+b[3]) shl 2;
+    x:=b[0]*32+b[1];
+    y:=b[2]*32+b[3];
   end;
 
   _coordinates:=ok;
@@ -294,9 +293,19 @@ begin
   _query:=ok;
 end;
 
+proc _purgeinput;
+{***************}
+begin
+  repeat
+    KEYPRESSED:=chr(0);
+    _delay10msec(1);
+  until KEYPRESSED=chr(0);
+end;
+
 func _getcrosshair(var c: char;
                 var x,y: integer): boolean;
 {*****************************************}
+mem SFLAG=$1781: integer&;
 var
   tc,endc: char;
   tx,ty: integer;
@@ -309,8 +318,15 @@ begin
   { wait indefinitely for user selection }
   repeat
     tc:=KEYPRESSED;
-    if tc=chr(0) then
+
+    if tc=chr(0) then begin
+      if _escape_pending then begin
+        _purgeinput;
+        _getcrosshair:=false;
+        exit;
+      end;
       _delay10msec(1);
+    end;
   until tc<>chr(0);
 
   KEYPRESSED:=chr(0);
@@ -328,9 +344,12 @@ begin
     valid GIN response }
   if okay then begin
     c:=tc;
-    x:=tx;
-    y:=ty;
+    x:=tx shl 2;
+    y:=ty shl 2;
   end;
+
+  if tc=chr(27) then
+    SFLAG:=SFLAG or $80;
 
   _getcrosshair:=okay;
 end;

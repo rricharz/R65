@@ -1057,7 +1057,6 @@ void checkTekInput()
             switch (ch) {
                 case 0x0A: ch = 0x0D; break;    // Return
                 case 0x09: ch = 0x08; break;    // Tab
-                case 0x1B: ch = 0x00; break;    // Escape
                 case 0x08: ch = 0x7F; break;    // Backspace
             }
 

@@ -10,22 +10,21 @@ const
     RESTOP  = 690;
     RESPACE = 60;
 
-    DASHX      = 125;
-    DASHWHITEY = 63;
-    DASHBLACKY = 15;
-    DASHWIDTH  = 95;
-    DASHHEIGHT = 48;
-    MSGOFF     = 3;
-    INPUTOFF   = 13;
-    STONEOFF   = 29;
-    NAMEOFF    = 37;
+    LEFTMSGX   = 250;
+    RIGHTMSGX  = 650;
+    MSGY       = 50;
+    INPUTHEIGHT = 16;
+    NAMEHEIGHT  = 32;
 
     I_PLACE  = 1;
     I_MOVE   = 2;
     I_TAKE   = 3;
     I_NAME   = 4;
 
+proc redraw; forward;
+
 proc init_graphics;
+{*****************}
 begin
   _starttek;
 end;
@@ -77,7 +76,31 @@ end;
 
 proc message(number: integer; field: packed char;
              player: integer);
+{***********************************************}
 begin
+  _setchsize(1);
+
+  if player=WHITE then
+    _moveto(LEFTMSGX,MSGY)
+  else
+    _moveto(RIGHTMSGX,MSGY);
+
+  case number of
+    0: begin end;
+    1: write(@PLOTTER,field,' BAD POS');
+    2: write(@PLOTTER,field,' INVALID');
+    3: write(@PLOTTER,field,' EMPTY');
+    4: write(@PLOTTER,field,' WHITE');
+    5: write(@PLOTTER,field,' BLACK');
+    6: write(@PLOTTER,field,' OCCUPIED');
+    7: write(@PLOTTER,'BAD MOVE');
+    8: write(@PLOTTER,field,' IS MILL');
+   10: write(@PLOTTER,'LOST');
+   11: write(@PLOTTER,'WINS');
+   21: write(@PLOTTER,'THINKING');
+   27: write(@PLOTTER,'SAVED')
+   else write(@PLOTTER,'ERROR ',number)
+  end;
 end;
 
 proc strmessage(s:cpnt; player: integer);
@@ -85,16 +108,187 @@ begin
 end;
 
 func findpos(labelvalue: packed char): integer;
+{*********************************************}
+var position: integer;
 begin
-  findpos:=-1;
+  position:=0;
+  while (position<NPOSITIONS) and
+        (labelvalue<>label[position]) do
+    position:=position+1;
+
+  if position<NPOSITIONS then
+    findpos:=position
+  else
+    findpos:=-1;
 end;
 
-proc getinput(player,request0: integer;
+
+proc getinput(player, request0: integer;
               var p1,p2: integer);
-begin
-  writeln('abort: getinput not yet implemented');
-  _moveto(0,0);
-  _abort;
+{**************************************}
+
+const BACKSPACE = chr(127);
+
+var s: cpnt;
+    len,maxlen,request,oldrequest: integer;
+    valid: boolean;
+
+  proc prompt;
+  var px,py: integer;
+  begin
+    if player=WHITE then
+      px:=LEFTMSGX
+    else
+      px:=RIGHTMSGX;
+
+    if request=I_NAME then
+      py:=MSGY+NAMEHEIGHT
+    else
+      py:=MSGY+INPUTHEIGHT;
+
+    _moveto(px,py);
+
+    case request of
+      I_PLACE: write(@PLOTTER,'PLACE?');
+      I_MOVE:  write(@PLOTTER,'MOVE?');
+      I_TAKE:  write(@PLOTTER,'TAKE?');
+      I_NAME:  write(@PLOTTER,'NAME?')
+    end;
+  end;
+
+  proc editinput;
+  var c: char;
+  begin
+    len:=0;
+    s[0]:=ENDMARK;
+
+    if request=I_MOVE then
+      maxlen:=5
+    else
+      maxlen:=4;       { enough for QUIT }
+
+    prompt;
+
+    repeat
+      read(@KEY,c);
+
+      if c=BACKSPACE then begin
+        if len>0 then begin
+          len:=len-1;
+          s[len]:=ENDMARK;
+          write(@PLOTTER,BACKSPACE);
+        end
+      end
+
+      else if c<>CR then begin
+        if len<maxlen then begin
+          s[len]:=c;
+          len:=len+1;
+          s[len]:=ENDMARK;
+          write(@PLOTTER,c);
+        end
+      end
+
+    until c=CR;
+  end;
+
+begin { getinput }
+
+  request:=request0;
+  s:=_new;
+  s[0]:=ENDMARK;
+
+  repeat
+
+    oldrequest:=request;
+    valid:=false;
+    p1:=-1;
+    p2:=-1;
+
+    editinput;
+
+    writeln(@DEBUG,'COMMAND ',s);
+
+    if _strcmp(s,'QUIT')=0 then
+      quit;
+
+    if _strcmp(s,'SAVE')=0 then begin
+      request:=I_NAME;
+
+      { put NAME input on the following line }
+      editinput;
+
+      writeln(@DEBUG,'NAME ',s);
+
+      redraw;
+      savegame(s,player);
+      message(27,'  ',player);
+
+      { return to the original request }
+      request:=oldrequest;
+
+    end
+
+    else begin
+
+      { redraw before validation, so any error
+        message is written onto the new screen }
+
+      writeln(@DEBUG,'COMMAND ',s,' LEN ',len);
+      redraw;
+      writeln(@DEBUG,'AFTER REDRAW');
+
+      valid:=false;
+      p1:=-1;
+      p2:=-1;
+
+      case request of
+
+        I_PLACE,I_TAKE:
+          begin
+            if len=2 then begin
+              writeln(@DEBUG,'CHARS ',
+                    ord(s[0]),' ',ord(s[1]));
+              p1:=findpos(packed(s[0],s[1]));
+              writeln(@DEBUG,'FINDPOS ',p1);
+              if p1>=0 then
+                valid:=true
+              else
+                message(2,packed(s[0],s[1]),player);
+            end
+            else
+              message(1,'  ',player);
+          end;
+
+        I_MOVE:
+          begin
+            if (len=5) and (s[2]='-') then begin
+              p1:=findpos(packed(s[0],s[1]));
+
+              if p1<0 then
+                message(2,packed(s[0],s[1]),player)
+
+              else begin
+                p2:=findpos(packed(s[3],s[4]));
+
+                if p2<0 then
+                  message(2,packed(s[3],s[4]),player)
+                else
+                  valid:=true;
+              end
+            end
+            else
+              message(1,'  ',player);
+          end
+      end;
+
+    end;
+
+  writeln(@DEBUG,'VALID ',valid);
+  until valid;
+
+  message(0,'  ',player);
+  _release(s);
 end;
 
 proc tekstone(x,y,player: integer);
@@ -287,5 +481,5 @@ begin
   drawstones;
   drawreserve(WHITE);
   drawreserve(BLACK);
-  okay:=_query(x,y,mode);
+  { okay:=_query(x,y,mode); }
 end;
