@@ -34,16 +34,16 @@ begin
   { machine readable board }
   state:=_new;
   codestate(state,player);
-  writeln(@DEBUG,state);
+  writeln(@PROTOCOL,state);
   _release(state);
 
   { human readable board }
-  writeln(@DEBUG,'MATRIX');
-  writeln(@DEBUG,'    1 2 3 4 5 6 7');
+  writeln(@PROTOCOL,'MATRIX');
+  writeln(@PROTOCOL,'    1 2 3 4 5 6 7');
 
   for row:=6 downto 0 do begin
     r:=chr(ord('A')+row);
-    write(@DEBUG,r,'   ');
+    write(@PROTOCOL,r,'   ');
 
     for col:=0 to 6 do begin
       c:=chr(ord('1')+col);
@@ -58,12 +58,12 @@ begin
       else
         ch:='#';
 
-      write(@DEBUG,ch);
+      write(@PROTOCOL,ch);
       if col<6 then
-        write(@DEBUG,' ');
+        write(@PROTOCOL,' ');
     end;
 
-    writeln(@DEBUG);
+    writeln(@PROTOCOL);
   end;
 end;
 
@@ -90,12 +90,12 @@ begin
   else
     write(@s,'PLACE ',label[pos]);
 
-  write(@DEBUG,s);
+  write(@PROTOCOL,s);
 
   if player=BLACK then
-    write(@DEBUG,' VALUE ',value);
+    write(@PROTOCOL,' VALUE ',value);
 
-  writeln(@DEBUG);
+  writeln(@PROTOCOL);
 end;
 
 proc readtime(var min,sec,tenmillis: integer);
@@ -344,12 +344,12 @@ proc debuglabels;
 var position,neighbornumber,neighborbase: integer;
     nextposition: integer;
 begin
-  writeln(@DEBUG);
-  writeln(@DEBUG,'Board positions and neighbors');
-  writeln(@DEBUG);
+  writeln(@PROTOCOL);
+  writeln(@PROTOCOL,'Board positions and neighbors');
+  writeln(@PROTOCOL);
 
   for position:=0 to NPOSITIONS-1 do begin
-    write(@DEBUG, label[position], ': ');
+    write(@PROTOCOL, label[position], ': ');
 
     neighborbase:=position*MAXNEIGHBORS;
 
@@ -358,10 +358,10 @@ begin
         neighbor[neighborbase+neighbornumber];
 
       if nextposition>=0 then
-        write(@DEBUG, label[nextposition], ' ');
+        write(@PROTOCOL, label[nextposition], ' ');
     end;
 
-    writeln(@DEBUG);
+    writeln(@PROTOCOL);
   end;
 end;
 
@@ -425,13 +425,18 @@ begin
   repeat
     getinput(player,I_PLACE,p1,p2);
 
+    writeln(@DEBUG,'PLACESTONE P1 ',p1,
+                   ' BOARD ',board[p1],
+                   ' EMPTY ',EMPTY);
+
     valid:=board[p1]=EMPTY;
+
+    writeln(@DEBUG,'PLACE VALID ',valid);
 
     if not valid then
       message(6,label[p1],player);
 
   until valid;
-
   codestate(previousstate,BLACK);
 
   board[p1]:=player;
@@ -557,7 +562,7 @@ begin
   selectdashboard(player);
 
   if automode then begin
-    writeln(@DEBUG,'SELFPLAY ',player);
+    writeln(@PROTOCOL,'SELFPLAY ',player);
     message(21,'  ',player);
     strmessage('',EMPTY);
     protocolcomputer(player);
@@ -639,8 +644,6 @@ begin
 
   aitime:=0.0;
 
-  DEBUG:=NULLDEV;
-
   carg:=0;
   if (ARGTYPE[0]='s') and (ARGLISTS[0]<>'/')
   then begin
@@ -649,6 +652,8 @@ begin
   end;
 
   automode:=false;
+  PROTOCOL:=NULLDEV;
+  DEBUG:=NULLDEV
   if ARGTYPE[carg]='s' then begin
     i:=2*carg;
     if ARGLISTS[i]='/' then begin
@@ -657,10 +662,12 @@ begin
         if ARGLISTS[i]='A' then
           automode:=true
         else if ARGLISTS[i]='D' then
-          DEBUG:=OUTPUT;
+          DEBUG:=PRINTER
+        else if ARGLISTS[i]='P' then
+          PROTOCOL:=PRINTER;
         i:=i+1;
       until (ARGLISTS[i]=chr(0)) or
-            (i>=2*carg+4);
+            (i>=2*carg+5);
     end;
   end;
 
@@ -693,7 +700,7 @@ begin
       message(11,'  ',otherplayer(player));
     end;
 
-    writeln(@DEBUG,'AI TIME ',strunc(aitime),' S');
+    writeln(@PROTOCOL,'AI TIME ',strunc(aitime),' S');
 
   until not automode or _escape_pending;
 

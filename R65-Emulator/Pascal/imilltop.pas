@@ -13,7 +13,7 @@ var
   board: array[23] of integer;
   stones, captured: array[BLACK] of integer;
   label:    array[23] of packed char;
-  DEBUG: file;
+  DEBUG,PROTOCOL: file;
   player,action: integer;
 
   startmin,startsec,starttenmillis: integer;
@@ -47,7 +47,7 @@ const C_SHELL = 10;
   end;
 
 begin
-  if DEBUG<>NULLDEV then begin
+  if PROTOCOL<>NULLDEV then begin
     result := _emulator(C_FLUSHPRINT);
     shell('./backup_print mill');
     result := _emulator(C_NEWPRINT);
@@ -67,14 +67,14 @@ end;
 proc protocolhuman(player: integer);
 {***********************************}
 begin
-  writeln(@DEBUG);
-  writeln(@DEBUG,
+  writeln(@PROTOCOL);
+  writeln(@PROTOCOL,
     '==============================================');
 
   if player=WHITE then
-    writeln(@DEBUG,'HUMAN TURN WHITE')
+    writeln(@PROTOCOL,'HUMAN TURN WHITE')
   else
-    writeln(@DEBUG,'HUMAN TURN BLACK');
+    writeln(@PROTOCOL,'HUMAN TURN BLACK');
 
   { later: write canonical STATE line here }
 end;
@@ -82,12 +82,12 @@ end;
 proc protocolcomputer(player: integer);
 {**************************************}
 begin
-  writeln(@DEBUG);
+  writeln(@PROTOCOL);
 
   if player=WHITE then
-    writeln(@DEBUG,'COMPUTER TURN WHITE')
+    writeln(@PROTOCOL,'COMPUTER TURN WHITE')
   else
-    writeln(@DEBUG,'COMPUTER TURN BLACK');
+    writeln(@PROTOCOL,'COMPUTER TURN BLACK');
 end;
 
 func strbegins(s,prefix:cpnt):boolean;

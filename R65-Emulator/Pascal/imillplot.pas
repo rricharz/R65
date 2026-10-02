@@ -282,7 +282,7 @@ begin { getinput }
 
     editinput;
 
-    writeln(@DEBUG,'COMMAND ',s);
+    writeln(@PROTOCOL,'COMMAND ',s);
 
     if _strcmp(s,'QUIT')=0 then
       quit;
@@ -290,7 +290,7 @@ begin { getinput }
     if _strcmp(s,'SAVE')=0 then begin
       request:=I_NAME;
       editinput;
-      writeln(@DEBUG,'NAME ',s);
+      writeln(@PROTOCOL,'NAME ',s);
       savegame(s, player);
       message(27,'  ',player);
       { return to the original request }

@@ -39,6 +39,9 @@ begin
   _clearscreen;
   _setchsize(1);
 
+  PROTOCOL:=NULLDEV;
+  if DEBUG=PRINTER then DEBUG:=OUTPUT;
+
   charwidth:=(MAXX+1) div MAXCOLUMNS;
 
   if automode then begin
@@ -104,7 +107,26 @@ begin
 end;
 
 proc strmessage(s:cpnt; player: integer);
+{***************************************}
 begin
+  _setchsize(1);
+
+  if s[0]<>ENDMARK then begin
+
+    if player=WHITE then
+      { WHITE message field }
+      _moveto(LEFTMSGX,MSGY)
+
+    else if player=BLACK then
+      { BLACK message field }
+      _moveto(RIGHTMSGX,MSGY)
+
+    else
+      { computer action/input field }
+      _moveto(RIGHTMSGX,MSGY+INPUTHEIGHT);
+
+    write(@PLOTTER,s);
+  end;
 end;
 
 func findpos(labelvalue: packed char): integer;
@@ -121,7 +143,6 @@ begin
   else
     findpos:=-1;
 end;
-
 
 proc getinput(player, request0: integer;
               var p1,p2: integer);
@@ -207,7 +228,7 @@ begin { getinput }
 
     editinput;
 
-    writeln(@DEBUG,'COMMAND ',s);
+    writeln(@PROTOCOL,'COMMAND ',s);
 
     if _strcmp(s,'QUIT')=0 then
       quit;
@@ -218,7 +239,7 @@ begin { getinput }
       { put NAME input on the following line }
       editinput;
 
-      writeln(@DEBUG,'NAME ',s);
+      writeln(@PROTOCOL,'NAME ',s);
 
       redraw;
       savegame(s,player);
@@ -284,7 +305,7 @@ begin { getinput }
 
     end;
 
-  writeln(@DEBUG,'VALID ',valid);
+    writeln(@DEBUG,'VALID ',valid);
   until valid;
 
   message(0,'  ',player);
@@ -426,14 +447,6 @@ begin
   end;
 end;
 
-proc cleardashstone(stone,player: integer);
-begin
-end;
-
-proc dashstone(stone,player,color: integer);
-begin
-end;
-
 proc selectdashboard(player: integer);
 begin
 end;
@@ -474,6 +487,7 @@ proc redraw;
 var x,y,mode: integer;
     okay: boolean;
 begin
+  writeln(@DEBUG,'REDRAW');
   _clearscreen;
   init_canvas;
   drawboard;
@@ -481,5 +495,7 @@ begin
   drawstones;
   drawreserve(WHITE);
   drawreserve(BLACK);
-  { okay:=_query(x,y,mode); }
+
+  _purgeinput;
+  okay:=_query(x,y,mode);
 end;

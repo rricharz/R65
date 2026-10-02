@@ -164,7 +164,7 @@ begin
       value:=value+V_REMILL;
   end;
 
-  write(@DEBUG, 'EVAL ',
+  write(@PROTOCOL, 'EVAL ',
     ' T ',ownth,'/',oppth,
     ' M ',ownmill,'/',oppmill,
     ' F ',ownmob,'/',oppmob,
@@ -215,7 +215,7 @@ var p1,bestpos,bestvalue,value,
     opponent: integer;
     allinmills0: boolean;
 begin
-  writeln(@DEBUG,'COMPUTERTAKE');
+  writeln(@PROTOCOL,'COMPUTERTAKE');
   opponent:=otherplayer(player);
   allinmills0:=allinmills(opponent);
 
@@ -228,7 +228,7 @@ begin
 
         value:=takevalue(player,p1);
 
-        writeln(@DEBUG,
+        writeln(@PROTOCOL,
           'TAKE  ',label[p1],' ',value);
 
         if (bestpos<0)
@@ -257,7 +257,7 @@ proc tryplace(player,p: integer;
 var value: integer;
 begin
   value:=placevalue(player,p);
-  writeln(@DEBUG,'PLACE ',label[p],' ',value);
+  writeln(@PROTOCOL,'PLACE ',label[p],' ',value);
 
   if (bestpos<0)
     or (value>bestvalue)
@@ -274,14 +274,14 @@ proc computerplace(player: integer);
 var i,p,base,opposite,bestpos,bestvalue,tk: integer;
   s: cpnt;
 begin
-  writeln(@DEBUG,'COMPUTERPLACE');
+  writeln(@PROTOCOL,'COMPUTERPLACE');
 
   s:=_new;
   bestpos:=-1;
   bestvalue:=-1;
 
   if specialplace>=0 then begin
-    writeln(@DEBUG,'SPECIAL PLACE ',
+    writeln(@PROTOCOL,'SPECIAL PLACE ',
       label[specialplace]);
 
       base:=specialplace and $fff88;
@@ -321,7 +321,7 @@ proc computermove(player: integer);
 var p1,p2,tk,bestp1,bestp2,bestvalue,value: integer;
     s: cpnt;
 begin
-  writeln(@DEBUG,'COMPUTERMOVE');
+  writeln(@PROTOCOL,'COMPUTERMOVE');
   s:=_new;
 
   bestp1:=-1;
@@ -331,7 +331,7 @@ begin
   while findlegalmove(player,p1,p2) do begin
 
     value:=movevalue(player,p1,p2);
-    writeln(@DEBUG,'MOVE ',
+    writeln(@PROTOCOL,'MOVE ',
             label[p1],'-',label[p2],' ',value);
 
     if (bestp1<0)
@@ -389,7 +389,7 @@ begin
             if ismill(p2,player) then begin
               found:=true;
               canbridge:=true;
-              writeln(@DEBUG,'  BRIDGE',label[n]);
+              writeln(@PROTOCOL,'  BRIDGE',label[n]);
 
             end;
 
@@ -415,7 +415,7 @@ begin
             if ismill(n,player) then begin
               found:=true;
               canbridge:=true;
-              writeln(@DEBUG,'  BRIDGE ',label[n]);
+              writeln(@PROTOCOL,'  BRIDGE ',label[n]);
 
             end;
 
@@ -447,7 +447,7 @@ func iterate(player,frompos,topos;
 var opponent,p1,p2,i,n: integer;
     reply,good: boolean;
 begin
-  writeln(@DEBUG,'LEVEL ',level,
+  writeln(@PROTOCOL,'LEVEL ',level,
           ' TRY ',label[frompos],'-',label[topos]);
 
   opponent:=otherplayer(player);
@@ -466,7 +466,7 @@ begin
           if board[p2]=EMPTY then begin
             reply:=true;
 
-            writeln(@DEBUG,'  TEST USER REPLY ',
+            writeln(@PROTOCOL,'  TEST USER REPLY ',
               label[p1],'-',label[p2]);
 
             { make opponent move }
@@ -474,18 +474,18 @@ begin
             board[p2]:=opponent;
 
             if ismill(p2,opponent) then begin
-              writeln(@DEBUG,'  OPPONENT BRIDGE');
+              writeln(@PROTOCOL,'  OPPONENT BRIDGE');
               good:=false;
             end else if canbridge(player) then begin
               { immediate bridge possible }
             end else if level<maxlevel then begin
               if not nextlevel(player,level+1) then
               begin
-                writeln(@DEBUG,'  NO BRIDGE');
+                writeln(@PROTOCOL,'  NO BRIDGE');
                 good:=false;
               end;
             end else begin
-              writeln(@DEBUG,'  NO BRIDGE');
+              writeln(@PROTOCOL,'  NO BRIDGE');
               good:=false;
             end;
 
@@ -507,7 +507,7 @@ begin
           if (n>=0) and (board[n]=EMPTY) then begin
             reply:=true;
 
-            writeln(@DEBUG,'  TEST USER REPLY ',
+            writeln(@PROTOCOL,'  TEST USER REPLY ',
               label[p1],'-',label[n]);
 
             { make opponent move }
@@ -515,18 +515,18 @@ begin
             board[n]:=opponent;
 
             if ismill(n,opponent) then begin
-              writeln(@DEBUG,'  OPPONENT BRIDGE');
+              writeln(@PROTOCOL,'  OPPONENT BRIDGE');
               good:=false;
             end else if canbridge(player) then begin
               { immediate bridge possible }
             end else if level<maxlevel then begin
               if not nextlevel(player,level+1) then
               begin
-                writeln(@DEBUG,'  NO BRIDGE');
+                writeln(@PROTOCOL,'  NO BRIDGE');
                 good:=false;
               end;
             end else begin
-              writeln(@DEBUG,'  NO BRIDGE');
+              writeln(@PROTOCOL,'  NO BRIDGE');
               good:=false;
             end;
 
@@ -633,7 +633,7 @@ var p1,p2,i,n,tk,
     found: boolean;
     s: cpnt;
 begin
-  writeln(@DEBUG,'SEARCHLEVEL');
+  writeln(@PROTOCOL,'SEARCHLEVEL');
 
   searchlevel:=false;
   found:=false;
@@ -721,7 +721,7 @@ begin
   end;
 
   if found then begin
-    writeln(@DEBUG,'SUCCESS ',
+    writeln(@PROTOCOL,'SUCCESS ',
                 label[bestp1],'-',label[bestp2]);
 
     { Execute the selected first action. }
@@ -750,7 +750,7 @@ begin
     searchlevel:=true;
 
   end else
-    writeln(@DEBUG,
+    writeln(@PROTOCOL,
       'SEARCHLEVEL: NO BRIDGE FOUND');
 end;
 
@@ -767,7 +767,7 @@ begin
 
   maxlevel:=1;
   while maxlevel<=MAXLEVEL do begin
-    writeln(@DEBUG,'SEARCH LEVEL ',maxlevel);
+    writeln(@PROTOCOL,'SEARCH LEVEL ',maxlevel);
     if searchlevel(player) then begin
       searchbridge:=true;
       exit;
@@ -805,6 +805,6 @@ begin
 
   write(@s,e,'0 MS');
   strmessage(s,player);
-  writeln(@DEBUG,'TIME ',s);
+  writeln(@PROTOCOL,'TIME ',s);
   _release(s);
 end;

@@ -261,10 +261,14 @@ end;
 
 func _query(var x,y,mode: integer): boolean;
 {*****************************************}
+const
+  QUERYTIMEOUT=500;          { 5 seconds }
+
 var
   c: char;
   tx,ty,tmode: integer;
   ok,got: boolean;
+  ticks: integer;
 
 begin
   ok:=true;
@@ -272,9 +276,24 @@ begin
   { request terminal status and coordinates }
   write(@PLOTTER,chr(27),chr(5));
 
-  { status byte }
-  got:=_tekread(c);
+  { the terminal may still be processing a
+    large amount of preceding graphics output }
+  ticks:=0;
+  repeat
+    c:=KEYPRESSED;
 
+    if c=chr(0) then begin
+      _delay10msec(1);
+      ticks:=ticks+1;
+    end;
+  until (c<>chr(0)) or (ticks>=QUERYTIMEOUT);
+
+  got:=c<>chr(0);
+
+  if got then
+    KEYPRESSED:=chr(0);
+
+  { status byte }
   if not got then
     ok:=false
   else begin
