@@ -684,11 +684,10 @@ begin
     player:=otherplayer(player);
   until gameover(player);
 
-  message(10,'  ',player);
-  message(11,'  ',otherplayer(player));
-
   writeln(@PROTOCOL,'AI TIME ',strunc(aitime),' S');
   quit;
+  message(10,'  ',player);
+  message(11,'  ',otherplayer(player));
 end;
 
 

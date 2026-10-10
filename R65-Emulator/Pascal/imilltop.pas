@@ -30,30 +30,7 @@ var
   carg: integer;
   firstredraw: boolean;
 
-proc quit;
-{********}
-var result: integer;
-const C_SHELL = 10;
-      C_FLUSHPRINT = 13;
-      C_NEWPRINT = 14;
-
-  proc shell(s: cpnt);
-  { uses flp scratch register to transfer pointer }
-  mem   str    = $0004: cpnt;
-  var result:   integer;
-  begin
-    str := s;
-    result:=_emulator(C_SHELL);
-  end;
-
-begin
-  if PROTOCOL<>NULLDEV then begin
-    result := _emulator(C_FLUSHPRINT);
-    shell('./backup_print mill');
-    result := _emulator(C_NEWPRINT);
-  end;
-  _abort;
-end;
+proc quit;forward;
 
 func otherplayer(player:integer):integer;
 {***************************************}
@@ -155,11 +132,13 @@ begin
   if _strlen(s)<>36 then begin
     writeln(INVVID,'Bad state length',NORVID);
     quit;
+    _abort;
   end;
 
   if not strbegins(s,'MILL2 ') then begin
     writeln(INVVID,'Bad MILL state',NORVID);
     quit;
+    _abort;
   end;
 
   if not strbegins(s,'MILL2 B') then begin
@@ -167,6 +146,7 @@ begin
     writeln('Paste a state starting with MILL2 B',
         NORVID);
     quit;
+    _abort;
   end;
 
   if s[6]='W' then
@@ -176,6 +156,7 @@ begin
   else begin
     writeln('BAD PLAYER');
     quit;
+    _abort;
   end;
 
   player:=otherplayer(player);
@@ -184,6 +165,7 @@ begin
     or (s[10]<'0') or (s[10]>'9') then begin
     writeln('BAD RESERVE');
     quit;
+    _abort;
   end;
 
   stones[WHITE]:=digit(s[8]);
@@ -200,6 +182,7 @@ begin
       begin
         writeln('BAD BOARD');
         quit;
+        _abort;
       end
     end
   end;
@@ -295,6 +278,7 @@ begin
   if length=0 then begin
     writeln('Empty MILL file');
     quit;
+    _abort;
   end;
 
   while strbegins(line,'ACTION ') do begin
@@ -304,6 +288,7 @@ begin
     if length=0 then begin
       writeln(INVVID,'Missing MILL state',NORVID);
       quit;
+      _abort;
     end;
   end;
 
@@ -322,6 +307,7 @@ begin
   if not strbegins(line,'MILL2 ') then begin
     writeln(INVVID,'Bad MILL state',NORVID);
     quit;
+    _abort;
   end;
 
   decodestate(line,player);

@@ -125,6 +125,7 @@ proc getinput(player, request0: integer;
 
 const TOGGLE    = chr(12);
       BACKSPACE = chr(127);
+      STOPCODE=$2010;
 
 var s: cpnt;
     x,y,len,maxlen, request, oldrequest: integer;
@@ -286,6 +287,7 @@ begin { getinput }
     if _strcmp(s,'QUIT')=0 then begin
       message(12,'  ',player);
       quit;
+      call(STOPCODE);
     end;
 
     if _strcmp(s,'SAVE')=0 then begin
@@ -572,5 +574,29 @@ begin
       dashstone(stone,player,color)
     else
       cleardashstone(stone, player);
+  end;
+end;
+
+proc quit;
+{********}
+var result: integer;
+const C_SHELL = 10;
+      C_FLUSHPRINT = 13;
+      C_NEWPRINT = 14;
+
+  proc shell(s: cpnt);
+  { uses flp scratch register to transfer pointer }
+  mem   str    = $0004: cpnt;
+  var result:   integer;
+  begin
+    str := s;
+    result:=_emulator(C_SHELL);
+  end;
+
+begin
+  if PROTOCOL<>NULLDEV then begin
+    result := _emulator(C_FLUSHPRINT);
+    shell('./backup_print mill');
+    result := _emulator(C_NEWPRINT);
   end;
 end;

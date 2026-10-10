@@ -17,5 +17,6 @@ const
 
 begin
   main;
+  _moveto(0,0);
 end.
  

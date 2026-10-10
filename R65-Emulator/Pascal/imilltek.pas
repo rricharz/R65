@@ -135,6 +135,7 @@ proc getinput(player, request0: integer;
 {**************************************}
 
 const BACKSPACE = chr(127);
+      STOPCODE  = $2010;
 
 var s: cpnt;
     len,maxlen,request,oldrequest: integer;
@@ -220,10 +221,11 @@ begin { getinput }
     writeln(@PROTOCOL,'COMMAND ',s);
 
     if _strcmp(s,'QUIT')=0 then begin
-      redraw;
-      message(12,'  ',player);
-      _moveto(0,0);
+
       quit;
+      message(12,'  ',WHITE);
+      _moveto(0,0);
+      call(STOPCODE);
     end;
 
     if _strcmp(s,'SAVE')=0 then begin
@@ -507,4 +509,30 @@ begin
 
   _purgeinput;
   okay:=_query(x,y,mode);
+end;
+
+proc quit;
+{********}
+var result: integer;
+const C_SHELL = 10;
+      C_FLUSHPRINT = 13;
+      C_NEWPRINT = 14;
+
+  proc shell(s: cpnt);
+  { uses flp scratch register to transfer pointer }
+  mem   str    = $0004: cpnt;
+  var result:   integer;
+  begin
+    str := s;
+    result:=_emulator(C_SHELL);
+  end;
+
+begin
+  redraw;
+  _moveto(0,0);
+  if PROTOCOL<>NULLDEV then begin
+    result := _emulator(C_FLUSHPRINT);
+    shell('./backup_print mill');
+    result := _emulator(C_NEWPRINT);
+  end;
 end;
