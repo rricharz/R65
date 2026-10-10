@@ -21,12 +21,19 @@ const
     I_TAKE   = 3;
     I_NAME   = 4;
 
+var
+    savedinput: cpnt;       { EMPTY = 4 }
+    drawsuppressed: boolean;
+
 proc redraw; forward;
 
 proc init_graphics;
 {*****************}
 begin
   _starttek;
+  savedinput:=_new;
+  savedinput[0]:=ENDMARK;
+  drawsuppressed:=false;
 end;
 
 proc init_canvas;
@@ -87,18 +94,21 @@ proc strmessage(s:cpnt; player: integer);
 begin
   _setchsize(1);
 
+  { save persistent computer information }
+  if player=EMPTY then
+    _strcpy(s,savedinput);
+
+  { an empty string changes the saved state,
+    but writes nothing on the Tek screen }
   if s[0]<>ENDMARK then begin
 
     if player=WHITE then
-      { WHITE message field }
       _moveto(LEFTMSGX,MSGY)
 
     else if player=BLACK then
-      { BLACK message field }
       _moveto(RIGHTMSGX,MSGY)
 
     else
-      { computer action/input field }
       _moveto(RIGHTMSGX,MSGY+INPUTHEIGHT);
 
     write(@PLOTTER,s);
@@ -210,6 +220,7 @@ begin { getinput }
     writeln(@PROTOCOL,'COMMAND ',s);
 
     if _strcmp(s,'QUIT')=0 then begin
+      redraw;
       message(12,'  ',player);
       _moveto(0,0);
       quit;
@@ -295,6 +306,7 @@ begin { getinput }
   until valid;
 
   message(0,'  ',player);
+  drawsuppressed:=true;
   _release(s);
 end;
 
@@ -331,6 +343,7 @@ proc drawstone(pos,player: integer);
 {*********************************}
 var x,y: integer;
 begin
+  if drawsuppressed then exit;
   x:=CX+
     (ord(low(label[pos]))-ord('4'))*SPACE;
   y:=CY+
@@ -402,6 +415,7 @@ begin
 end;
 
 proc clearstone(stone,player: integer);
+{*************************************}
 begin
 end;
 
@@ -434,6 +448,7 @@ begin
 end;
 
 proc selectdashboard(player: integer);
+{************************************}
 begin
 end;
 
@@ -447,6 +462,7 @@ const
 var
   stone,x,y,color: integer;
 begin
+  if drawsuppressed then exit;
   if player=WHITE then
     x:=LEFTX
   else
@@ -475,6 +491,7 @@ var x,y,mode: integer;
 begin
   writeln(@DEBUG,'REDRAW');
 
+  drawsuppressed:=false;
   _clearscreen;
   init_canvas;
   drawboard;
@@ -482,6 +499,11 @@ begin
   drawstones;
   drawreserve(WHITE);
   drawreserve(BLACK);
+
+  if savedinput[0]<>ENDMARK then begin
+    _moveto(RIGHTMSGX,MSGY+INPUTHEIGHT);
+    write(@PLOTTER,savedinput);
+  end;
 
   _purgeinput;
   okay:=_query(x,y,mode);
