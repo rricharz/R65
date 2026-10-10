@@ -27,8 +27,8 @@ var
   aitime: real;
   i: integer;
   test: integer;
-  automode: boolean;
   carg: integer;
+  firstredraw: boolean;
 
 proc quit;
 {********}
@@ -68,22 +68,16 @@ proc protocolhuman(player: integer);
 {***********************************}
 begin
   writeln(@PROTOCOL);
-  writeln(@PROTOCOL,
-    '==============================================');
-
   if player=WHITE then
     writeln(@PROTOCOL,'HUMAN TURN WHITE')
   else
     writeln(@PROTOCOL,'HUMAN TURN BLACK');
-
-  { later: write canonical STATE line here }
 end;
 
 proc protocolcomputer(player: integer);
 {**************************************}
 begin
   writeln(@PROTOCOL);
-
   if player=WHITE then
     writeln(@PROTOCOL,'COMPUTER TURN WHITE')
   else
@@ -183,6 +177,8 @@ begin
     writeln('BAD PLAYER');
     quit;
   end;
+
+  player:=otherplayer(player);
 
   if (s[8]<'0') or (s[8]>'9')
     or (s[10]<'0') or (s[10]>'9') then begin

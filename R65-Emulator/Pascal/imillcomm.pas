@@ -561,15 +561,7 @@ proc playerturn(player: integer);
 begin
   selectdashboard(player);
 
-  if automode then begin
-    writeln(@PROTOCOL,'SELFPLAY ',player);
-    message(21,'  ',player);
-    strmessage('',EMPTY);
-    protocolcomputer(player);
-    computerturn(player);
-  end
-
-  else if DUALPLAYER then begin
+  if DUALPLAYER then begin
     protocolhuman(player);
     if stones[player]>0 then
       placestone(player)
@@ -592,8 +584,6 @@ begin
       computerturn(player);
     end;
   end;
-
-  redraw;
 end;
 
 func gameover(player: integer): boolean;
@@ -640,7 +630,37 @@ begin
   computeraction:=_new;
   computeraction[0]:=ENDMARK;
 
+  firstredraw:=true;
+
+  carg:=0;
+  if (ARGTYPE[0]='s') and (ARGLISTS[0]<>'/')
+  then  carg:=10; { name/8, cyclus, drive }
+
+  PROTOCOL:=NULLDEV;
+  DEBUG:=NULLDEV
+  if ARGTYPE[carg]='s' then begin
+    i:=2*carg;
+    if ARGLISTS[i]='/' then begin
+      i:=i+1;
+      repeat
+        if ARGLISTS[i]='D' then
+          DEBUG:=PRINTER
+        else if ARGLISTS[i]='P' then
+          PROTOCOL:=PRINTER;
+        i:=i+1;
+      until (ARGLISTS[i]=chr(0)) or
+            (i>=2*carg+4);
+    end;
+  end;
+
   init_graphics;
+  init_canvas;
+  init_common;
+  init_neighbors;
+  init_ai;
+
+  action:=0;
+  player:=WHITE;
 
   aitime:=0.0;
 
@@ -651,59 +671,23 @@ begin
     carg:=carg+2; {cyclus, drive }
   end;
 
-  automode:=false;
-  PROTOCOL:=NULLDEV;
-  DEBUG:=NULLDEV
-  if ARGTYPE[carg]='s' then begin
-    i:=2*carg;
-    if ARGLISTS[i]='/' then begin
-      i:=i+1;
-      repeat
-        if ARGLISTS[i]='A' then
-          automode:=true
-        else if ARGLISTS[i]='D' then
-          DEBUG:=PRINTER
-        else if ARGLISTS[i]='P' then
-          PROTOCOL:=PRINTER;
-        i:=i+1;
-      until (ARGLISTS[i]=chr(0)) or
-            (i>=2*carg+5);
-    end;
-  end;
+  drawboard;
+  drawlabels;
+  drawstones;
+  drawreserve(WHITE);
+  drawreserve(BLACK);
 
   repeat
-    init_canvas;
-    init_common;
-    init_neighbors;
-    init_ai;
-    drawboard;
-    drawlabels;
+    action:=action+1;
+    playerturn(player);
+    protocolboard;
+    player:=otherplayer(player);
+  until gameover(player);
 
-    action:=0;
-    carg:=0;
+  message(10,'  ',player);
+  message(11,'  ',otherplayer(player));
 
-    drawstones;
-    drawreserve(WHITE);
-    drawreserve(BLACK);
-
-    player:=WHITE;
-
-    repeat
-      action:=action+1;
-      playerturn(player);
-      protocolboard;
-      player:=otherplayer(player);
-    until gameover(player);
-
-    if not _escape_pending then begin
-      message(10,'  ',player);
-      message(11,'  ',otherplayer(player));
-    end;
-
-    writeln(@PROTOCOL,'AI TIME ',strunc(aitime),' S');
-
-  until not automode or _escape_pending;
-
+  writeln(@PROTOCOL,'AI TIME ',strunc(aitime),' S');
   quit;
 end;
 

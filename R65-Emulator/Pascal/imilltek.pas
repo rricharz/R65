@@ -44,37 +44,12 @@ begin
 
   charwidth:=(MAXX+1) div MAXCOLUMNS;
 
-  if automode then begin
-    _moveto(LEFTX-4*charwidth,NAMEY);
-    write(@PLOTTER,'COMPUTER');
-  end
-  else begin
-    _moveto(LEFTX-3*charwidth,NAMEY);
-    write(@PLOTTER,'PLAYER');
-  end;
+
+  _moveto(LEFTX-3*charwidth,NAMEY);
+   write(@PLOTTER,'PLAYER');
 
   _moveto(RIGHTX-4*charwidth,NAMEY);
   write(@PLOTTER,'COMPUTER');
-end;
-
-proc _rectangle(x, y, sx, sy, mode: integer);
-begin
-  if (mode=WHITE) then begin
-    _startdraw(x, y);
-    _draw(x + sx, y);
-    _draw(x + sx, y + sy);
-    _draw(x, y + sy);
-    _draw(x, y);
-    _enddraw;
-    end;
-end;
-
-proc vector(x1,y1,x2,y2,color: integer);
-begin
-end;
-
-proc endpoints(x1,y1,x2,y2: integer);
-begin
 end;
 
 proc message(number: integer; field: packed char;
@@ -90,19 +65,20 @@ begin
 
   case number of
     0: begin end;
-    1: write(@PLOTTER,field,' BAD POS');
-    2: write(@PLOTTER,field,' INVALID');
-    3: write(@PLOTTER,field,' EMPTY');
-    4: write(@PLOTTER,field,' WHITE');
-    5: write(@PLOTTER,field,' BLACK');
-    6: write(@PLOTTER,field,' OCCUPIED');
-    7: write(@PLOTTER,'BAD MOVE');
-    8: write(@PLOTTER,field,' IS MILL');
-   10: write(@PLOTTER,'LOST');
-   11: write(@PLOTTER,'WINS');
-   21: write(@PLOTTER,'THINKING');
-   27: write(@PLOTTER,'SAVED')
-   else write(@PLOTTER,'ERROR ',number)
+    1: write(@PLOTTER,'Invalid input');
+    2: write(@PLOTTER,field,' is not a position');
+    3: write(@PLOTTER,field,' is empty');
+    4: write(@PLOTTER,field,' is white');
+    5: write(@PLOTTER,field,' is black');
+    6: write(@PLOTTER,field,' is occupied');
+    7: write(@PLOTTER,'Invalid move');
+    8: write(@PLOTTER,field,' is in a mill');
+   10: write(@PLOTTER,'Loser');
+   11: write(@PLOTTER,'Winner');
+   12: write(@PLOTTER,'Game aborted');
+   21: write(@PLOTTER,'Thinking...');
+   27: write(@PLOTTER,'Game saved')
+   else write(@PLOTTER,'Error ',number)
   end;
 end;
 
@@ -214,7 +190,10 @@ var s: cpnt;
   end;
 
 begin { getinput }
-
+  if firstredraw then
+    firstredraw:=false
+  else
+    redraw;
   request:=request0;
   s:=_new;
   s[0]:=ENDMARK;
@@ -230,8 +209,11 @@ begin { getinput }
 
     writeln(@PROTOCOL,'COMMAND ',s);
 
-    if _strcmp(s,'QUIT')=0 then
+    if _strcmp(s,'QUIT')=0 then begin
+      message(12,'  ',player);
+      _moveto(0,0);
       quit;
+    end;
 
     if _strcmp(s,'SAVE')=0 then begin
       request:=I_NAME;
@@ -247,17 +229,11 @@ begin { getinput }
 
       { return to the original request }
       request:=oldrequest;
+      redraw;
 
     end
 
     else begin
-
-      { redraw before validation, so any error
-        message is written onto the new screen }
-
-      writeln(@DEBUG,'COMMAND ',s,' LEN ',len);
-      redraw;
-      writeln(@DEBUG,'AFTER REDRAW');
 
       valid:=false;
       p1:=-1;
@@ -272,13 +248,18 @@ begin { getinput }
                     ord(s[0]),' ',ord(s[1]));
               p1:=findpos(packed(s[0],s[1]));
               writeln(@DEBUG,'FINDPOS ',p1);
+
               if p1>=0 then
                 valid:=true
-              else
+              else begin
+                redraw;
                 message(2,packed(s[0],s[1]),player);
+              end;
             end
-            else
+            else begin
+              redraw;
               message(1,'  ',player);
+            end;
           end;
 
         I_MOVE:
@@ -286,23 +267,28 @@ begin { getinput }
             if (len=5) and (s[2]='-') then begin
               p1:=findpos(packed(s[0],s[1]));
 
-              if p1<0 then
-                message(2,packed(s[0],s[1]),player)
+              if p1<0 then begin
+                redraw;
+                message(2,packed(s[0],s[1]),player);
+              end
 
               else begin
                 p2:=findpos(packed(s[3],s[4]));
 
-                if p2<0 then
-                  message(2,packed(s[3],s[4]),player)
+                if p2<0 then begin
+                  redraw;
+                  message(2,packed(s[3],s[4]),player);
+                end
                 else
                   valid:=true;
               end
             end
-            else
+            else begin
+              redraw;
               message(1,'  ',player);
+            end;
           end
       end;
-
     end;
 
     writeln(@DEBUG,'VALID ',valid);
@@ -488,6 +474,7 @@ var x,y,mode: integer;
     okay: boolean;
 begin
   writeln(@DEBUG,'REDRAW');
+
   _clearscreen;
   init_canvas;
   drawboard;

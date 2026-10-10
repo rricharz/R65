@@ -33,10 +33,8 @@ proc init_canvas;
 begin
   _cleargr;
   _move(DASHX+1,DASHWHITEY+NAMEOFF);
-  if automode then
-    write(@PLOTDEV,'COMPUTER')
-  else
-    write(@PLOTDEV,'PLAYER');
+
+  write(@PLOTDEV,'PLAYER');
 
   _move(DASHX+1,DASHBLACKY+NAMEOFF);
   write(@PLOTDEV,'COMPUTER');
@@ -73,7 +71,7 @@ begin
   _move(DASHX+1, y+MSGOFF);
   case number of
     0: begin end;
-    1: write(@PLOTDEV,field,' BAD POS');
+    1: write(@PLOTDEV,'INVALID');
     2: write(@PLOTDEV,field,' INVALID');
     3: write(@PLOTDEV,field,' EMPTY');
     4: write(@PLOTDEV,field,' WHITE');
@@ -81,8 +79,9 @@ begin
     6: write(@PLOTDEV,field,' OCCUPIED');
     7: write(@PLOTDEV,'BAD MOVE');
     8: write(@PLOTDEV,field,' IS MILL');
-   10: write(@PLOTDEV,'LOST');
-   11: write(@PLOTDEV,'WINS');
+   10: write(@PLOTDEV,'LOOSER');
+   11: write(@PLOTDEV,'WINNER');
+   12: write(@PLOTDEV,'ABORTED');
    21: write(@PLOTDEV,'THINKING');
    27: write(@PLOTDEV,'SAVED')
    else write(@PLOTDEV,'ERROR ', number)
@@ -284,8 +283,10 @@ begin { getinput }
 
     writeln(@PROTOCOL,'COMMAND ',s);
 
-    if _strcmp(s,'QUIT')=0 then
+    if _strcmp(s,'QUIT')=0 then begin
+      message(12,'  ',player);
       quit;
+    end;
 
     if _strcmp(s,'SAVE')=0 then begin
       request:=I_NAME;
@@ -572,9 +573,4 @@ begin
     else
       cleardashstone(stone, player);
   end;
-end;
-
-proc redraw;
-{**********}
-begin
 end;
