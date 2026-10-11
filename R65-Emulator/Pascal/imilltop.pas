@@ -32,6 +32,23 @@ var
 
 proc quit;forward;
 
+proc setemptysquares;
+{*******************}
+var sq,i,base: integer;
+    empty: boolean;
+begin
+  for sq:=0 to 2 do begin
+    base:=sq shl 3;
+    empty:=true;
+
+    for i:=base to base+7 do
+      if board[i]<>EMPTY then
+        empty:=false;
+
+    emptysquare[sq]:=empty;
+  end;
+end;
+
 func otherplayer(player:integer):integer;
 {***************************************}
 begin
@@ -311,6 +328,7 @@ begin
   end;
 
   decodestate(line,player);
+  setemptysquares;
 
   close(f);
   _release(line);

@@ -284,7 +284,7 @@ begin
     writeln(@PROTOCOL,'SPECIAL PLACE ',
       label[specialplace]);
 
-      base:=specialplace and $fff88;
+      base:=specialplace and $fff8;
       opposite:=base+((specialplace+4) and 7);
 
       for i:=base to base+7 do
