@@ -98,6 +98,8 @@ begin
   if player=EMPTY then
     _strcpy(s,savedinput);
 
+  if player=BLACK then exit;
+
   { an empty string changes the saved state,
     but writes nothing on the Tek screen }
   if s[0]<>ENDMARK then begin
@@ -136,10 +138,35 @@ proc getinput(player, request0: integer;
 
 const BACKSPACE = chr(127);
       STOPCODE  = $2010;
+      GAP       = 20;
 
 var s: cpnt;
     len,maxlen,request,oldrequest: integer;
     valid: boolean;
+
+  func findtekpos(x,y: integer): integer;
+  var p,px,py,result: integer;
+  begin
+    result:=-1;
+
+    p:=0;
+    while (p<NPOSITIONS) and
+          (result<0) do begin
+
+      px:=CX+
+        (ord(low(label[p]))-ord('4'))*SPACE;
+      py:=CY+
+        (ord(high(label[p]))-ord('D'))*SPACE;
+
+      if (x>=px-GAP) and (x<=px+GAP) and
+         (y>=py-GAP) and (y<=py+GAP) then
+        result:=p;
+
+      p:=p+1;
+    end;
+
+    findtekpos:=result;
+  end;
 
   proc prompt;
   var px,py: integer;
@@ -166,6 +193,8 @@ var s: cpnt;
 
   proc editinput;
   var c: char;
+      x,y,p: integer;
+      ok: boolean;
   begin
     len:=0;
     s[0]:=ENDMARK;
@@ -176,28 +205,86 @@ var s: cpnt;
       maxlen:=4;       { enough for QUIT }
 
     prompt;
+    _purgeinput;
 
     repeat
-      read(@KEY,c);
+      _moveto(0,0);
+      ok:=_getcrosshair(c,x,y);
 
-      if c=BACKSPACE then begin
-        if len>0 then begin
-          len:=len-1;
-          s[len]:=ENDMARK;
-          write(@PLOTTER,BACKSPACE);
+      if ok then begin
+
+        prompt;
+        write(@PLOTTER,s);
+
+        { capitalize like read(@KEY,c) }
+        if (c>='a') and (c<='z') then
+          c:=chr(ord(c)-ord('a')+ord('A'));
+
+        { mouse input }
+        if c=' ' then begin
+          p:=findtekpos(x,y);
+
+          if p>=0 then begin
+
+            case request of
+
+              I_PLACE,I_TAKE:
+                begin
+                  s[0]:=high(label[p]);
+                  s[1]:=low(label[p]);
+                  s[2]:=ENDMARK;
+                  len:=2;
+                  write(@PLOTTER,s);
+                  c:=CR;
+                end;
+
+              I_MOVE:
+                begin
+                  if len=0 then begin
+                    s[0]:=high(label[p]);
+                    s[1]:=low(label[p]);
+                    s[2]:='-';
+                    s[3]:=ENDMARK;
+                    len:=3;
+                    write(@PLOTTER,s);
+                  end
+                  else if len=3 then begin
+                    s[3]:=high(label[p]);
+                    s[4]:=low(label[p]);
+                    s[5]:=ENDMARK;
+                    len:=5;
+                    write(@PLOTTER,low(label[p]));
+                    write(@PLOTTER,high(label[p]));
+                    c:=CR;
+                  end;
+                end
+            end
+          end
         end
-      end
 
-      else if c<>CR then begin
-        if len<maxlen then begin
-          s[len]:=c;
-          len:=len+1;
-          s[len]:=ENDMARK;
-          write(@PLOTTER,c);
+        { normal keyboard input }
+        else if c=BACKSPACE then begin
+          if len>0 then begin
+            len:=len-1;
+            s[len]:=ENDMARK;
+            write(@PLOTTER,BACKSPACE);
+          end
         end
-      end
 
-    until c=CR;
+        else if c<>CR then begin
+          if len<maxlen then begin
+            s[len]:=c;
+            len:=len+1;
+            s[len]:=ENDMARK;
+            write(@PLOTTER,c);
+          end
+        end
+
+      end;
+
+    until (c=CR) or not ok;
+
+    _purgeinput;
   end;
 
 begin { getinput }

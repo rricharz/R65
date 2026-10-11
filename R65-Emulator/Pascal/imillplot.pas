@@ -125,7 +125,6 @@ proc getinput(player, request0: integer;
 
 const TOGGLE    = chr(12);
       BACKSPACE = chr(127);
-      STOPCODE=$2010;
 
 var s: cpnt;
     x,y,len,maxlen, request, oldrequest: integer;
@@ -287,7 +286,7 @@ begin { getinput }
     if _strcmp(s,'QUIT')=0 then begin
       message(12,'  ',player);
       quit;
-      call(STOPCODE);
+      _abort;
     end;
 
     if _strcmp(s,'SAVE')=0 then begin
@@ -600,3 +599,4 @@ begin
     result := _emulator(C_NEWPRINT);
   end;
 end;
+
