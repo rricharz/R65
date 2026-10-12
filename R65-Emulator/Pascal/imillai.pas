@@ -248,6 +248,7 @@ begin
   captured[player]:=captured[player]+1;
   drawreserve(player);
 
+  marktake:=p1;
   computertake:=p1;
 end;
 
@@ -303,6 +304,7 @@ begin
   drawstone(p,player);
   drawreserve(player);
   protocolaction(player,bestpos,-1,bestvalue);
+  markplace:=p;
 
   if ismill(p,player) then begin
     tk:=computertake(player);
@@ -354,6 +356,9 @@ begin
 
   clearstone(p1,player);
   drawstone(p2,player);
+
+  markmove1:=p1;
+  markmove2:=p2;
 
   protocolaction(player,bestp1,bestp2,bestvalue);
 

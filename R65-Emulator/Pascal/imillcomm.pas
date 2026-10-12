@@ -637,13 +637,16 @@ begin
   then  carg:=10; { name/8, cyclus, drive }
 
   PROTOCOL:=NULLDEV;
-  DEBUG:=NULLDEV
+  DEBUG:=NULLDEV;
+  marks:=true;
   if ARGTYPE[carg]='s' then begin
     i:=2*carg;
     if ARGLISTS[i]='/' then begin
       i:=i+1;
       repeat
-        if ARGLISTS[i]='D' then
+        if ARGLISTS[i]='M' then
+          marks:=false
+        else if ARGLISTS[i]='D' then
           DEBUG:=PRINTER
         else if ARGLISTS[i]='P' then
           PROTOCOL:=PRINTER;

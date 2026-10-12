@@ -25,6 +25,8 @@ var
     savedinput: cpnt;       { EMPTY = 4 }
     drawsuppressed: boolean;
 
+    markplace,marktake,markmove1,markmove2: integer;
+
 proc redraw; forward;
 
 proc init_graphics;
@@ -34,6 +36,10 @@ begin
   savedinput:=_new;
   savedinput[0]:=ENDMARK;
   drawsuppressed:=false;
+  markplace:=-1;
+  marktake:=-1;
+  markmove1:=-1;
+  markmove2:=-1;
 end;
 
 proc init_canvas;
@@ -132,6 +138,65 @@ begin
     findpos:=-1;
 end;
 
+proc square(pos: integer);
+{************************}
+const SIZE=18;
+var   x,y:integer;
+begin
+  if drawsuppressed then exit;
+  x:=CX+
+    (ord(low(label[pos]))-ord('4'))*SPACE;
+  y:=CY+
+    (ord(high(label[pos]))-ord('D'))*SPACE;
+  _startdraw(x-SIZE,y-SIZE);
+  _draw(x+SIZE,y-SIZE);
+  _draw(x+SIZE,y+SIZE);
+  _draw(x-SIZE,y+SIZE);
+  _draw(x-SIZE,y-SIZE);
+  _enddraw;
+end;
+
+proc rect(pos1,pos2: integer);
+{*****************************}
+const SIZE=18;
+var x1,y1,x2,y2,xmin,xmax,ymin,ymax: integer;
+begin
+  if drawsuppressed then exit;
+
+  x1:=CX+
+    (ord(low(label[pos1]))-ord('4'))*SPACE;
+  y1:=CY+
+    (ord(high(label[pos1]))-ord('D'))*SPACE;
+
+  x2:=CX+
+    (ord(low(label[pos2]))-ord('4'))*SPACE;
+  y2:=CY+
+    (ord(high(label[pos2]))-ord('D'))*SPACE;
+
+  if x1<x2 then begin
+    xmin:=x1-SIZE;
+    xmax:=x2+SIZE;
+  end else begin
+    xmin:=x2-SIZE;
+    xmax:=x1+SIZE;
+  end;
+
+  if y1<y2 then begin
+    ymin:=y1-SIZE;
+    ymax:=y2+SIZE;
+  end else begin
+    ymin:=y2-SIZE;
+    ymax:=y1+SIZE;
+  end;
+
+  _startdraw(xmin,ymin);
+  _draw(xmax,ymin);
+  _draw(xmax,ymax);
+  _draw(xmin,ymax);
+  _draw(xmin,ymin);
+  _enddraw;
+end;
+
 proc getinput(player, request0: integer;
               var p1,p2: integer);
 {**************************************}
@@ -218,7 +283,7 @@ var s: cpnt;
 
         { capitalize like read(@KEY,c) }
         if (c>='a') and (c<='z') then
-          c:=chr(ord(c)-ord('a')+ord('A'));
+            c:=chr(ord(c)-ord('a')+ord('A'));
 
         { mouse input }
         if c=' ' then begin
@@ -245,16 +310,18 @@ var s: cpnt;
                     s[1]:=low(label[p]);
                     s[2]:='-';
                     s[3]:=ENDMARK;
-                    len:=3;
+                      len:=3;
                     write(@PLOTTER,s);
-                  end
-                  else if len=3 then begin
+
+                    _setlinemode(SHORTDASH);
+                    square(p);
+                    _setlinemode(SOLID);
+                  end else if len=3 then begin
                     s[3]:=high(label[p]);
                     s[4]:=low(label[p]);
                     s[5]:=ENDMARK;
                     len:=5;
-                    write(@PLOTTER,low(label[p]));
-                    write(@PLOTTER,high(label[p]));
+                    write(@PLOTTER,label[p]);
                     c:=CR;
                   end;
                 end
@@ -264,19 +331,37 @@ var s: cpnt;
 
         { normal keyboard input }
         else if c=BACKSPACE then begin
-          if len>0 then begin
+
+          { cancel completed FROM position }
+          if (request=I_MOVE) and (len=3) then begin
+            len:=0;
+            s[0]:=ENDMARK;
+            redraw;
+            prompt;
+
+          end else if len>0 then begin
             len:=len-1;
             s[len]:=ENDMARK;
             write(@PLOTTER,BACKSPACE);
           end
-        end
 
-        else if c<>CR then begin
+        end else if c<>CR then begin
           if len<maxlen then begin
             s[len]:=c;
             len:=len+1;
             s[len]:=ENDMARK;
             write(@PLOTTER,c);
+
+            { mark keyboard-entered FROM position }
+            if (request=I_MOVE) and
+                 (len=3) and (s[2]='-') then begin
+              p:=findpos(packed(s[0],s[1]));
+              if p>=0 then begin
+                _setlinemode(SHORTDASH);
+                square(p);
+                _setlinemode(SOLID);
+              end
+            end
           end
         end
 
@@ -501,6 +586,18 @@ begin
   for position:=0 to NPOSITIONS-1 do
     if board[position]<>EMPTY then
       drawstone(position,board[position]);
+  if marks then begin
+    _setlinemode(SHORTDASH);
+    if markplace>=0 then square(markplace);
+    markplace:=-1;
+    if marktake>=0 then square(marktake);
+    marktake:=-1;
+    if (markmove1>=0) and (markmove2>=0) then
+      rect(markmove1,markmove2);
+    markmove1:=-1;
+    markmove2:=-1;
+    _setlinemode(SOLID);
+  end;
 end;
 
 proc clearstone(stone,player: integer);

@@ -21,11 +21,17 @@ const
     I_TAKE   = 3;
     I_NAME   = 4;
 
+var  markplace,marktake,markmove1,markmove2: integer;
+
 proc init_graphics;
 {*****************}
 begin
   _grinit;
   _fullview;
+  markplace:=-1;
+  marktake:=-1;
+  markmove1:=-1;
+  markmove2:=-1;
 end;
 
 proc init_canvas;

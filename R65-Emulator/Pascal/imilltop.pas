@@ -29,6 +29,7 @@ var
   test: integer;
   carg: integer;
   firstredraw: boolean;
+  marks:boolean;
 
 proc quit;forward;
 
