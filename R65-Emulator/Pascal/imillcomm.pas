@@ -655,6 +655,8 @@ begin
             (i>=2*carg+4);
     end;
   end;
+  if (PROTOCOL=PRINTER) and (DEBUG=PRINTER) then
+    DEBUG:=OUTPUT;
 
   init_graphics;
   init_canvas;

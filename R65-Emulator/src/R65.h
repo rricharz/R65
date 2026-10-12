@@ -27,6 +27,7 @@
 #define KIM_IFR3    0x146D  // irq flag register
 #define KIM_IER3    0x146E  // irq enable register
 #define KIM_PORTA2  0x1451  // 6552-2 Port A (keyboard)
+#define KIM_HOSTOUT 0x1700  // output to stdout
 #define EMU_RAND    0x1706  // KIM timer, rand() in emulator
 
 #define EMU_FLAGS   0x1707  // emulator flags (bit 0: kex down)
@@ -86,4 +87,3 @@ extern int isAnimation;
 extern int global_forceCrtUpdate;
 extern int pcSample;
 extern int pascalPcSample;
-extern int rawPrint;

@@ -52,9 +52,6 @@ begin
   _clearscreen;
   _setchsize(1);
 
-  PROTOCOL:=NULLDEV;
-  if DEBUG=PRINTER then DEBUG:=OUTPUT;
-
   charwidth:=(MAXX+1) div MAXCOLUMNS;
 
 

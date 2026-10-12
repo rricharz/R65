@@ -81,8 +81,6 @@ time_t timeOfPascalMin;
 int spMin;              // minimum value of sp during execution
 int pascalMinFree;      // minimal value of pascalFreeStack
 
-int rawPrint = 0;       // for Tektronix plotter
-
 static int in_quote = 0;  // static means it is only visible in this module
 
 // source input file
@@ -694,19 +692,16 @@ void write6502(uint16_t address, uint8_t value)
 			    memory[R8_EMURES] = (result != 0);			
 			    fflush(stdout);
 		    }
-        else if (value == 11) {                  // start Tektronix raw printing
+        else if (value == 11) {                  // Check presense of Tektronix terminal
             if (tekTerminal) {
-                rawPrint = 1;
                 memory[R8_EMURES] = 0;
             }
             else {
-                rawPrint = 0;
                 memory[R8_EMURES] = 1;
             }
         }
-        else if (value == 12) {                  // end Tektronix raw printing
-            rawPrint = 0;
-            memory[R8_EMURES] = 0;
+        else if (value == 12) {                  // not implemented
+            memory[R8_EMURES] = 1;
         }
         else if (value == 13) {
           if (printFile != NULL) {
@@ -762,19 +757,23 @@ void write6502(uint16_t address, uint8_t value)
     }
         
     // KIM-1 registers
-    
+
     else if ((address >= 0x1440) && (address <= 0x177F)) {
         memory[address] = value;
+
+        if (address == KIM_HOSTOUT) {
+            putc(value, stdout);
+        }
+
         if (address == KIM_IER2) {
             if (value & 0x82) {
-              keyboardIrqEnabled = 1;
+                keyboardIrqEnabled = 1;
             }
             else {
-              keyboardIrqEnabled = 0;
+                keyboardIrqEnabled = 0;
             }
         }
-    }
-    
+    }    
     else
         memory[address] = value;
 }
@@ -799,20 +798,6 @@ int catchSubroutine(uint16_t ea)
 /******************************/
 {
     if (ea == 0xE95E) {
-
-        /*
-         * Raw mode: send every R65 PRINTER byte unchanged
-         * to the Tektronix terminal.
-         */
-        if (rawPrint) {
-            ssize_t n = write(STDOUT_FILENO, &a, 1);
-            if (n != 1) {
-                logmsg("Tek write failed: n=%ld errno=%d\n",
-                     (long)n, errno);
-
-            }
-            return 1;
-        }
 
         /*
          * Normal printer mode.

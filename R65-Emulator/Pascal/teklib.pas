@@ -23,7 +23,7 @@ const MAXX = 1023; { Tektronix 4010 graphic mode }
       SHORTDASH  = 4;
       LONGDASH   = 5;
 
-      PLOTTER    = @1;
+      PLOTTER    = @254;
 
 mem KEYPRESSED=$1785: char&;
 
@@ -49,8 +49,8 @@ end;
 
 proc _starttek;
 {*************}
-{ Switch R65 PRINTER output to the Tektronix terminal.
-  R65 must have been started by tek4010. }
+{  Check presense of Tektronix terminal and
+   clear screen}
 
 const STOPCODE = $2010;
       NORVID   = chr($0b);
@@ -59,7 +59,7 @@ mem
 {$I IHIDDENMEM:P}
 
 begin {starttek}
-  emucom := 11; { start raw mode }
+  emucom := 11;
   if emures <> 0 then begin
     writeln(INVVID, 'tek4010 not running');
     writeln('Quit R65 and restart it with "tekR65"',
@@ -71,12 +71,9 @@ end {starttek};
 
 proc _endtek;
 {***********}
-{ switch R65 PRINTER device to normal mode
-  tek4010 window is not closed }
-mem
-{$I IHIDDENMEM:P}
+{ Kept for compatibility with existing programs.
+  Tektronix window is not closed. }
 begin
-  emucom := 12; { end raw mode }
 end;
 
 proc _startdraw(x1,y1:integer);

@@ -23,7 +23,7 @@ const MAXX = 4091; { Tektronix 4010 graphic mode }
       SHORTDASH  = 4;
       LONGDASH   = 5;
 
-      PLOTTER    = @1;
+      PLOTTER    = @254;
 
       { tek4010 window modes }
       T_FULLV    = 1;

@@ -311,10 +311,9 @@ void infoPanel()
         "Pascal pc and free pages");
 
   showStatus(0,"TEK",tekTerminal);
-  showStatus(1,"RAW",rawPrint);
-  showStatus(2,"PRT", (memory[M8_SFLAG] & 0x02)| (memory[M8_VFLAG] & 0x08));
-  showStatus(3,"ANI",isAnimation);
-  showStatus(4,"ESC",memory[M8_SFLAG] & 0x80);
+  showStatus(1,"PRT", (memory[M8_SFLAG] & 0x02)| (memory[M8_VFLAG] & 0x08));
+  showStatus(2,"ANI",isAnimation);
+  showStatus(3,"ESC",memory[M8_SFLAG] & 0x80);
    
   SETBUTTONCOLOR;
 }

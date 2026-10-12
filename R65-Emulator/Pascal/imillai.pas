@@ -21,6 +21,7 @@ const
   MAXLEVEL      = 2;
 
 var maxlevel:integer;
+    safeplace: array[23] of boolean;
 
 proc init_ai;
 {***********}
@@ -270,54 +271,6 @@ begin
   end
 end;
 
-proc computerplace(player: integer);
-{**********************************}
-var i,p,base,opposite,bestpos,bestvalue,tk: integer;
-  s: cpnt;
-begin
-  writeln(@PROTOCOL,'COMPUTERPLACE');
-
-  s:=_new;
-  bestpos:=-1;
-  bestvalue:=-1;
-
-  if specialplace>=0 then begin
-    writeln(@PROTOCOL,'SPECIAL PLACE ',
-      label[specialplace]);
-
-      base:=specialplace and $fff8;
-      opposite:=base+((specialplace+4) and 7);
-
-      for i:=base to base+7 do
-        if ((i and 1)=1) or (i=opposite) then
-          tryplace(player,i,bestpos,bestvalue)
-  end else
-    for i:=0 to 23 do
-      if board[i]=EMPTY then
-        tryplace(player,i,bestpos,bestvalue);
-
-  p:=bestpos;
-
-  board[p]:=player;
-  stones[player]:=stones[player]-1;
-
-  drawstone(p,player);
-  drawreserve(player);
-  protocolaction(player,bestpos,-1,bestvalue);
-  markplace:=p;
-
-  if ismill(p,player) then begin
-    tk:=computertake(player);
-    write(@s,label[p],'/',label[tk]);
-  end else
-    write(@s,label[p]);
-
-  strmessage(s,EMPTY);
-  _release(s);
-
-  emptysquare[p shr 3]:=false;
-end;
-
 proc computermove(player: integer);
 {*******************************}
 var p1,p2,tk,bestp1,bestp2,bestvalue,value: integer;
@@ -371,12 +324,12 @@ begin
   _release(s);
 end;
 
-func canbridge(player: integer): boolean;
+func canbridge(player: integer): integer;
 {****************************************}
 var p1,p2,i,n: integer;
   found: boolean;
 begin
-  canbridge:=false;
+  canbridge:=-1;
   found:=false;
 
   p1:=0;
@@ -393,8 +346,8 @@ begin
 
             if ismill(p2,player) then begin
               found:=true;
-              canbridge:=true;
-              writeln(@PROTOCOL,'  BRIDGE',label[n]);
+              canbridge:=p2;
+              writeln(@PROTOCOL,'  BRIDGE',label[p2]);
 
             end;
 
@@ -419,7 +372,7 @@ begin
 
             if ismill(n,player) then begin
               found:=true;
-              canbridge:=true;
+              canbridge:=n;
               writeln(@PROTOCOL,'  BRIDGE ',label[n]);
 
             end;
@@ -452,100 +405,150 @@ func iterate(player,frompos,topos;
 var opponent,p1,p2,i,n: integer;
     reply,good: boolean;
 begin
-  writeln(@PROTOCOL,'LEVEL ',level,
+  if frompos<0 then
+    writeln(@PROTOCOL,'LEVEL ',level,
+          ' TRY PLACE ',label[topos])
+  else
+    writeln(@PROTOCOL,'LEVEL ',level,
           ' TRY ',label[frompos],'-',label[topos]);
 
   opponent:=otherplayer(player);
   good:=true;
   reply:=false;
 
-  p1:=0;
-  while (p1<24) and good do begin
-    if board[p1]=opponent then begin
+  if stones[opponent]>0 then begin
+    { opponent PLACE }
 
-      if stones[opponent]=3 then begin
-        { opponent FLY }
+    p2:=0;
+    while (p2<24) and good do begin
+      if board[p2]=EMPTY then begin
+        reply:=true;
 
-        p2:=0;
-        while (p2<24) and good do begin
-          if board[p2]=EMPTY then begin
-            reply:=true;
+        writeln(@PROTOCOL,'  TEST USER REPLY PLACE ',
+          label[p2]);
 
-            writeln(@PROTOCOL,'  TEST USER REPLY ',
-              label[p1],'-',label[p2]);
+        { make opponent placement }
+        board[p2]:=opponent;
+        stones[opponent]:=stones[opponent]-1;
 
-            { make opponent move }
-            board[p1]:=EMPTY;
-            board[p2]:=opponent;
-
-            if ismill(p2,opponent) then begin
-              writeln(@PROTOCOL,'  OPPONENT BRIDGE');
-              good:=false;
-            end else if canbridge(player) then begin
-              { immediate bridge possible }
-            end else if level<maxlevel then begin
-              if not nextlevel(player,level+1) then
-              begin
-                writeln(@PROTOCOL,'  NO BRIDGE');
-                good:=false;
-              end;
-            end else begin
-              writeln(@PROTOCOL,'  NO BRIDGE');
-              good:=false;
-            end;
-
-            { undo opponent move }
-            board[p2]:=EMPTY;
-            board[p1]:=opponent;
+        if ismill(p2,opponent) then begin
+          writeln(@PROTOCOL,'  OPPONENT BRIDGE');
+          good:=false;
+          good:=false;
+        end
+        else if canbridge(player)>=0 then begin
+          { immediate bridge possible }
+        end else if level<maxlevel then begin
+          if not nextlevel(player,level+1) then
+          begin
+            writeln(@PROTOCOL,'  NO BRIDGE');
+            good:=false;
           end;
-
-          p2:=p2+1;
+        end else begin
+          writeln(@PROTOCOL,'  NO BRIDGE');
+          good:=false;
         end;
 
-      end else begin
-        { opponent MOVE }
-
-        i:=0;
-        while (i<MAXNEIGHBORS) and good do begin
-          n:=neighbor[p1*MAXNEIGHBORS+i];
-
-          if (n>=0) and (board[n]=EMPTY) then begin
-            reply:=true;
-
-            writeln(@PROTOCOL,'  TEST USER REPLY ',
-              label[p1],'-',label[n]);
-
-            { make opponent move }
-            board[p1]:=EMPTY;
-            board[n]:=opponent;
-
-            if ismill(n,opponent) then begin
-              writeln(@PROTOCOL,'  OPPONENT BRIDGE');
-              good:=false;
-            end else if canbridge(player) then begin
-              { immediate bridge possible }
-            end else if level<maxlevel then begin
-              if not nextlevel(player,level+1) then
-              begin
-                writeln(@PROTOCOL,'  NO BRIDGE');
-                good:=false;
-              end;
-            end else begin
-              writeln(@PROTOCOL,'  NO BRIDGE');
-              good:=false;
-            end;
-
-            { undo opponent move }
-            board[n]:=EMPTY;
-            board[p1]:=opponent;
-          end;
-
-          i:=i+1;
-        end;
+        { undo opponent placement }
+        stones[opponent]:=stones[opponent]+1;
+        board[p2]:=EMPTY;
       end;
+
+      p2:=p2+1;
     end;
 
-    p1:=p1+1;
+  end else begin
+
+    p1:=0;
+    while (p1<24) and good do begin
+      if board[p1]=opponent then begin
+
+        if captured[player]=6 then begin
+          { opponent FLY }
+
+          p2:=0;
+          while (p2<24) and good do begin
+            if board[p2]=EMPTY then begin
+              reply:=true;
+
+              writeln(@PROTOCOL,'  TEST USER REPLY ',
+                label[p1],'-',label[p2]);
+
+              { make opponent move }
+              board[p1]:=EMPTY;
+              board[p2]:=opponent;
+
+              if ismill(p2,opponent) then begin
+               writeln(@PROTOCOL,'  OPPONENT BRIDGE');
+                good:=false;
+              end
+              else if canbridge(player)>=0 then begin
+                { immediate bridge possible }
+              end else if level<maxlevel then begin
+                if not nextlevel(player,level+1) then
+                begin
+                  writeln(@PROTOCOL,'  NO BRIDGE');
+                  good:=false;
+                end;
+              end else begin
+                writeln(@PROTOCOL,'  NO BRIDGE');
+                good:=false;
+              end;
+
+              { undo opponent move }
+              board[p2]:=EMPTY;
+              board[p1]:=opponent;
+            end;
+
+            p2:=p2+1;
+          end;
+
+        end else begin
+          { opponent MOVE }
+
+          i:=0;
+          while (i<MAXNEIGHBORS) and good do begin
+            n:=neighbor[p1*MAXNEIGHBORS+i];
+
+            if (n>=0) and (board[n]=EMPTY) then begin
+              reply:=true;
+
+              writeln(@PROTOCOL,'  TEST USER REPLY ',
+                label[p1],'-',label[n]);
+
+              { make opponent move }
+              board[p1]:=EMPTY;
+              board[n]:=opponent;
+
+              if ismill(n,opponent) then begin
+               writeln(@PROTOCOL,'  OPPONENT BRIDGE');
+                good:=false;
+              end
+              else if canbridge(player)>=0 then begin
+                { immediate bridge possible }
+              end else if level<maxlevel then begin
+                if not nextlevel(player,level+1) then
+                begin
+                  writeln(@PROTOCOL,'  NO BRIDGE');
+                  good:=false;
+                end;
+              end else begin
+                writeln(@PROTOCOL,'  NO BRIDGE');
+                good:=false;
+              end;
+
+              { undo opponent move }
+              board[n]:=EMPTY;
+              board[p1]:=opponent;
+            end;
+
+            i:=i+1;
+          end;
+        end;
+      end;
+
+      p1:=p1+1;
+    end;
   end;
 
   iterate:=good and reply;
@@ -553,76 +556,107 @@ end;
 
 func nextlevel(player,level: integer): boolean;
 {********************************************}
-{ Try all legal moves for PLAYER at LEVEL.
-  TRUE if one move leads to a forced bridge.
+{ Try all legal actions for PLAYER at LEVEL.
+  TRUE if one action leads to a forced bridge.
   Board is unchanged on return. }
-var p1,p2,i,n: integer;
+var opponent,p1,p2,i,n: integer;
     found: boolean;
 begin
   found:=false;
+  opponent:=otherplayer(player);
 
-  p1:=0;
-  while (p1<24) and not found do begin
+  if stones[player]>0 then begin
 
-    if board[p1]=player then begin
+    { PLACE }
 
-      if stones[player]=3 then begin
+    p2:=0;
+    while (p2<24) and not found do begin
 
-        { FLY }
+      if board[p2]=EMPTY then begin
 
-        p2:=0;
-        while (p2<24) and not found do begin
+        { make trial placement }
+        board[p2]:=player;
+        stones[player]:=stones[player]-1;
 
-          if board[p2]=EMPTY then begin
+        if ismill(p2,player) then
+          found:=true
+        else if iterate(player,-1,p2,level) then
+          found:=true;
 
-            { make trial move }
-            board[p1]:=EMPTY;
-            board[p2]:=player;
-
-            if ismill(p2,player) then
-              found:=true
-            else if iterate(player,p1,p2,level) then
-              found:=true;
-
-            { always undo trial move }
-            board[p2]:=EMPTY;
-            board[p1]:=player;
-          end;
-
-          p2:=p2+1;
-        end;
-
-      end else begin
-
-        { MOVE }
-
-        i:=0;
-        while (i<MAXNEIGHBORS) and not found do begin
-          n:=neighbor[p1*MAXNEIGHBORS+i];
-
-          if (n>=0) and (board[n]=EMPTY) then begin
-
-            { make trial move }
-            board[p1]:=EMPTY;
-            board[n]:=player;
-
-            if ismill(n,player) then
-              found:=true
-            else if iterate(player,p1,n,level) then
-              found:=true;
-
-            { always undo trial move }
-            board[n]:=EMPTY;
-            board[p1]:=player;
-          end;
-
-          i:=i+1;
-        end;
-
+        { always undo trial placement }
+        stones[player]:=stones[player]+1;
+        board[p2]:=EMPTY;
       end;
+
+      p2:=p2+1;
     end;
 
-    p1:=p1+1;
+  end else begin
+
+    p1:=0;
+    while (p1<24) and not found do begin
+
+      if board[p1]=player then begin
+
+        if captured[opponent]=6 then begin
+
+          { FLY }
+
+          p2:=0;
+          while (p2<24) and not found do begin
+
+            if board[p2]=EMPTY then begin
+
+              { make trial move }
+              board[p1]:=EMPTY;
+              board[p2]:=player;
+
+              if ismill(p2,player) then
+                found:=true
+              else if iterate(player,p1,p2,level) then
+                found:=true;
+
+              { always undo trial move }
+              board[p2]:=EMPTY;
+              board[p1]:=player;
+            end;
+
+            p2:=p2+1;
+          end;
+
+        end else begin
+
+          { MOVE }
+
+          i:=0;
+          while (i<MAXNEIGHBORS) and not found
+                                            do begin
+            n:=neighbor[p1*MAXNEIGHBORS+i];
+
+            if (n>=0) and (board[n]=EMPTY) then begin
+
+              { make trial move }
+              board[p1]:=EMPTY;
+              board[n]:=player;
+
+              if ismill(n,player) then
+                found:=true
+              else if iterate(player,p1,n,level) then
+                found:=true;
+
+              { always undo trial move }
+              board[n]:=EMPTY;
+              board[p1]:=player;
+            end;
+
+            i:=i+1;
+          end;
+
+        end;
+      end;
+
+      p1:=p1+1;
+    end;
   end;
 
   nextlevel:=found;
@@ -633,7 +667,7 @@ func searchlevel(player): boolean;
 { Search for a forced bridge.
   TRUE  = first action found and executed.
   FALSE = board unchanged. }
-var p1,p2,i,n,tk,
+var opponent,p1,p2,i,n,tk,
     bestp1,bestp2: integer;
     found: boolean;
     s: cpnt;
@@ -644,113 +678,183 @@ begin
   found:=false;
   bestp1:=-1;
   bestp2:=-1;
+  opponent:=otherplayer(player);
 
-  p1:=0;
-  while (p1<24) and not found do begin
+  if stones[player]>0 then begin
 
-    if board[p1]=player then begin
+    { PLACE }
 
-      if stones[player]=3 then begin
+    p2:=0;
+    while (p2<24) and not found do begin
 
-        { FLY }
+      if board[p2]=EMPTY then begin
 
-        p2:=0;
-        while (p2<24) and not found do begin
+        { make trial placement }
+        board[p2]:=player;
+        stones[player]:=stones[player]-1;
 
-          if board[p2]=EMPTY then begin
+        if ismill(p2,player) then begin
+          bestp1:=-1;
+          bestp2:=p2;
+          found:=true;
+        end
 
-            { make trial move }
-            board[p1]:=EMPTY;
-            board[p2]:=player;
-
-            if ismill(p2,player) then begin
-              bestp1:=p1;
-              bestp2:=p2;
-              found:=true;
-            end
-
-            else if maxlevel>0 then
-              if iterate(player,p1,p2,1) then begin
-              bestp1:=p1;
-              bestp2:=p2;
-              found:=true;
-            end;
-
-            { always undo trial move }
-            board[p2]:=EMPTY;
-            board[p1]:=player;
+        else if maxlevel>0 then
+          if iterate(player,-1,p2,1) then begin
+            bestp1:=-1;
+            bestp2:=p2;
+            found:=true;
           end;
 
-          p2:=p2+1;
-        end;
-
-      end else begin
-
-        { MOVE }
-
-        i:=0;
-        while (i<MAXNEIGHBORS) and not found do begin
-          n:=neighbor[p1*MAXNEIGHBORS+i];
-
-          if (n>=0) and (board[n]=EMPTY) then begin
-
-            { make trial move }
-            board[p1]:=EMPTY;
-            board[n]:=player;
-
-            if ismill(n,player) then begin
-              bestp1:=p1;
-              bestp2:=n;
-              found:=true;
-            end
-
-            else if maxlevel>0 then
-              if iterate(player,p1,n,1) then begin
-              bestp1:=p1;
-              bestp2:=n;
-              found:=true;
-            end;
-
-            { always undo trial move }
-            board[n]:=EMPTY;
-            board[p1]:=player;
-          end;
-
-          i:=i+1;
-        end;
-
+        { always undo trial placement }
+        stones[player]:=stones[player]+1;
+        board[p2]:=EMPTY;
       end;
+
+      p2:=p2+1;
     end;
 
-    p1:=p1+1;
+  end else begin
+
+    { no first placement in MOVE/FLY phase }
+
+    p1:=0;
+    while (p1<24) and not found do begin
+
+      if board[p1]=player then begin
+
+        if captured[opponent]=6 then begin
+
+          { FLY }
+
+          p2:=0;
+          while (p2<24) and not found do begin
+
+            if board[p2]=EMPTY then begin
+
+              { make trial move }
+              board[p1]:=EMPTY;
+              board[p2]:=player;
+
+              if ismill(p2,player) then begin
+                bestp1:=p1;
+                bestp2:=p2;
+                found:=true;
+              end
+
+              else if maxlevel>0 then
+                if iterate(player,p1,p2,1) then begin
+                  bestp1:=p1;
+                  bestp2:=p2;
+                  found:=true;
+                end;
+
+              { always undo trial move }
+              board[p2]:=EMPTY;
+              board[p1]:=player;
+            end;
+
+            p2:=p2+1;
+          end;
+
+        end else begin
+
+          { MOVE }
+
+          i:=0;
+          while (i<MAXNEIGHBORS) and not found
+                                            do begin
+            n:=neighbor[p1*MAXNEIGHBORS+i];
+
+            if (n>=0) and (board[n]=EMPTY) then begin
+
+              { make trial move }
+              board[p1]:=EMPTY;
+              board[n]:=player;
+
+              if ismill(n,player) then begin
+                bestp1:=p1;
+                bestp2:=n;
+                found:=true;
+              end
+
+              else if maxlevel>0 then
+                if iterate(player,p1,n,1) then begin
+                  bestp1:=p1;
+                  bestp2:=n;
+                  found:=true;
+                end;
+
+              { always undo trial move }
+              board[n]:=EMPTY;
+              board[p1]:=player;
+            end;
+
+            i:=i+1;
+          end;
+
+        end;
+      end;
+
+      p1:=p1+1;
+    end;
   end;
 
   if found then begin
-    writeln(@PROTOCOL,'SUCCESS ',
-                label[bestp1],'-',label[bestp2]);
+
+    if bestp1<0 then
+      writeln(@PROTOCOL,'SUCCESS PLACE ',
+        label[bestp2])
+    else
+      writeln(@PROTOCOL,'SUCCESS ',
+        label[bestp1],'-',label[bestp2]);
 
     { Execute the selected first action. }
 
-    p1:=bestp1;
     p2:=bestp2;
 
-    board[p1]:=EMPTY;
-    board[p2]:=player;
+    if bestp1<0 then begin
 
-    clearstone(p1,player);
-    drawstone(p2,player);
+      { PLACE }
+      board[p2]:=player;
+      stones[player]:=stones[player]-1;
 
-    s:=_new;
+      drawstone(p2,player);
 
-    if ismill(p2,player) then begin
-      tk:=computertake(player);
-      write(@s,label[p1],'-',label[p2],
-        '/',label[tk]);
-    end else
-      write(@s,label[p1],'-',label[p2]);
+      s:=_new;
 
-    strmessage(s,EMPTY);
-    _release(s);
+      if ismill(p2,player) then begin
+        tk:=computertake(player);
+        write(@s,label[p2],'/',label[tk]);
+      end else
+        write(@s,label[p2]);
+
+      strmessage(s,EMPTY);
+      _release(s);
+
+    end else begin
+
+      { MOVE or FLY }
+      p1:=bestp1;
+
+      board[p1]:=EMPTY;
+      board[p2]:=player;
+
+      clearstone(p1,player);
+      drawstone(p2,player);
+
+      s:=_new;
+
+      if ismill(p2,player) then begin
+        tk:=computertake(player);
+        write(@s,label[p1],'-',label[p2],
+          '/',label[tk]);
+      end else
+        write(@s,label[p1],'-',label[p2]);
+
+      strmessage(s,EMPTY);
+      _release(s);
+    end;
 
     searchlevel:=true;
 
@@ -761,11 +865,13 @@ end;
 
 func searchbridge(player: integer): boolean;
 {******************************************}
+var i:integer;
 begin
   searchbridge:=false;
 
   maxlevel:=0;
   if searchlevel(player) then begin
+    writeln('SEARCHBRIDGE SUCCESS LEVEL ',maxlevel);
     searchbridge:=true;
     exit;
   end;
@@ -774,12 +880,120 @@ begin
   while maxlevel<=MAXLEVEL do begin
     writeln(@PROTOCOL,'SEARCH LEVEL ',maxlevel);
     if searchlevel(player) then begin
+      writeln('SEARCHBRIDGE SUCCESS LEVEL ',maxlevel);
       searchbridge:=true;
       exit;
     end;
 
     maxlevel:=maxlevel+1;
   end;
+end;
+
+func survive(player: integer): boolean;
+{***********************************}
+{ With three stones, block an
+  immediate opponent bridge if
+  this avoids immediate loss. }
+var opponent,threat,p1: integer;
+    found: boolean;
+begin
+  survive:=false;
+  opponent:=otherplayer(player);
+
+  if captured[opponent]<>6 then exit;
+
+  threat:=canbridge(opponent);
+
+  if threat<0 then exit;
+
+  found:=false;
+  p1:=0;
+
+  while (p1<24) and not found do begin
+    if board[p1]=player then begin
+
+      { try flying to threatened position }
+      board[p1]:=EMPTY;
+      board[threat]:=player;
+
+      if canbridge(opponent)<0 then
+        found:=true;
+
+      { undo trial move }
+      board[threat]:=EMPTY;
+      board[p1]:=player;
+    end;
+
+    if not found then
+      p1:=p1+1;
+  end;
+
+  if found then begin
+    writeln(@PROTOCOL,'SURVIVE ',
+      label[p1],'-',label[threat]);
+
+    board[p1]:=EMPTY;
+    board[threat]:=player;
+
+    clearstone(p1,player);
+    drawstone(threat,player);
+
+    protocolaction(player,p1,threat,0);
+
+    { same message/mark handling as an ordinary
+      computer move will be needed here }
+
+    survive:=true;
+  end;
+end;
+
+proc computerplace(player: integer);
+{**********************************}
+var i,p,base,opposite,bestpos,bestvalue,tk: integer;
+  s: cpnt;
+begin
+  writeln(@PROTOCOL,'COMPUTERPLACE');
+
+  s:=_new;
+  bestpos:=-1;
+  bestvalue:=-1;
+
+  if specialplace>=0 then begin
+    writeln(@PROTOCOL,'SPECIAL PLACE ',
+      label[specialplace]);
+
+      base:=specialplace and $fff8;
+      opposite:=base+((specialplace+4) and 7);
+
+      for i:=base to base+7 do
+        if (board[i]=EMPTY) and
+           (((i and 1)=1) or (i=opposite)) then
+          tryplace(player,i,bestpos,bestvalue)
+  end else
+    for i:=0 to 23 do
+      if board[i]=EMPTY then
+        tryplace(player,i,bestpos,bestvalue);
+
+  p:=bestpos;
+
+  board[p]:=player;
+  stones[player]:=stones[player]-1;
+
+  drawstone(p,player);
+  drawreserve(player);
+  protocolaction(player,bestpos,-1,bestvalue);
+  markplace:=p;
+
+  if ismill(p,player) then begin
+    tk:=computertake(player);
+    write(@s,label[p],'/',label[tk]);
+  end else
+    write(@s,label[p]);
+
+  strmessage(s,EMPTY);
+  _release(s);
+
+  emptysquare[p shr 3]:=false;
 end;
 
 proc computerturn(player: integer);
@@ -791,9 +1005,21 @@ begin
   starttimer;
   found:=false;
 
-  { Search only in MOVE/FLY phase. }
+  writeln(@PROTOCOL,'STONES W/B ',stones[WHITE],' ',
+      stones[BLACK], ' CAPTURED W/B ',captured[WHITE],
+      ' ',captured[BLACK]);
+
+  { With only three stones left, first try
+    to block an immediate losing bridge. }
   if stones[player]=0 then
-    found:=searchbridge(player);
+    found:=survive(player);
+
+  { Search for a forced bridge.
+    In PLACE phase only search late in the phase. }
+  if not found then
+    if (stones[player]=0) or
+          ((stones[WHITE]+stones[BLACK])<6) then
+      found:=searchbridge(player);
 
   { Fall back to current evaluation strategy. }
   if not found then begin
