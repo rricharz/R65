@@ -20,8 +20,11 @@ const
 
   MAXLEVEL      = 2;
 
+  SEARCHTIME = 700; { 7 seconds }
+
 var maxlevel:integer;
     safeplace: array[23] of boolean;
+    searchtimeout: boolean;
 
 proc init_ai;
 {***********}
@@ -670,7 +673,14 @@ begin
 
     p2:=0;
     while (p2<24) and good do begin
-      if board[p2]=EMPTY then begin
+
+      { Check time between opponent replies. }
+      if elapsed10ms>=SEARCHTIME then begin
+        searchtimeout:=true;
+        good:=false;
+      end
+
+      else if board[p2]=EMPTY then begin
         reply:=true;
 
         writeln(@PROTOCOL,'  TEST USER REPLY PLACE ',
@@ -682,7 +692,6 @@ begin
 
         if ismill(p2,opponent) then begin
           writeln(@PROTOCOL,'  OPPONENT BRIDGE');
-          good:=false;
           good:=false;
         end
         else if canbridge(player)>=0 then begin
@@ -717,7 +726,14 @@ begin
 
           p2:=0;
           while (p2<24) and good do begin
-            if board[p2]=EMPTY then begin
+
+            { Check time between opponent replies. }
+            if elapsed10ms>=SEARCHTIME then begin
+              searchtimeout:=true;
+              good:=false;
+            end
+
+            else if board[p2]=EMPTY then begin
               reply:=true;
 
               writeln(@PROTOCOL,'  TEST USER REPLY ',
@@ -728,7 +744,8 @@ begin
               board[p2]:=opponent;
 
               if ismill(p2,opponent) then begin
-               writeln(@PROTOCOL,'  OPPONENT BRIDGE');
+                writeln(@PROTOCOL,'  OPPONENT BRIDGE')
+;
                 good:=false;
               end
               else if canbridge(player)>=0 then begin
@@ -757,41 +774,51 @@ begin
 
           i:=0;
           while (i<MAXNEIGHBORS) and good do begin
-            n:=neighbor[p1*MAXNEIGHBORS+i];
 
-            if (n>=0) and (board[n]=EMPTY) then begin
-              reply:=true;
+            { Check time between opponent replies. }
+            if elapsed10ms>=SEARCHTIME then begin
+              searchtimeout:=true;
+              good:=false;
+            end else begin
+
+              n:=neighbor[p1*MAXNEIGHBORS+i];
+
+              if (n>=0)and(board[n]=EMPTY) then begin
+                reply:=true;
 
               writeln(@PROTOCOL,'  TEST USER REPLY ',
-                label[p1],'-',label[n]);
+                            label[p1],'-',label[n]);
 
-              { make opponent move }
-              board[p1]:=EMPTY;
-              board[n]:=opponent;
+                { make opponent move }
+                board[p1]:=EMPTY;
+                board[n]:=opponent;
 
-              if ismill(n,opponent) then begin
-               writeln(@PROTOCOL,'  OPPONENT BRIDGE');
-                good:=false;
-              end
-              else if canbridge(player)>=0 then begin
-                { immediate bridge possible }
-              end else if level<maxlevel then begin
-                if not nextlevel(player,level+1) then
+                if ismill(n,opponent) then begin
+                  writeln(@PROTOCOL,
+                    '  OPPONENT BRIDGE');
+                  good:=false;
+                end
+                else if canbridge(player)>=0 then
                 begin
+                  { immediate bridge possible }
+                end else if level<maxlevel then begin
+                  if not nextlevel(player,level+1)
+                  then begin
+                    writeln(@PROTOCOL,'  NO BRIDGE');
+                    good:=false;
+                  end;
+                end else begin
                   writeln(@PROTOCOL,'  NO BRIDGE');
                   good:=false;
                 end;
-              end else begin
-                writeln(@PROTOCOL,'  NO BRIDGE');
-                good:=false;
+
+                { undo opponent move }
+                board[n]:=EMPTY;
+                board[p1]:=opponent;
               end;
 
-              { undo opponent move }
-              board[n]:=EMPTY;
-              board[p1]:=opponent;
+              i:=i+1;
             end;
-
-            i:=i+1;
           end;
         end;
       end;
@@ -936,6 +963,13 @@ begin
     p2:=0;
     while (p2<24) and not found do begin
 
+      { Check search time between candidates. }
+      if elapsed10ms>=SEARCHTIME then begin
+        searchtimeout:=true;
+        writeln(@PROTOCOL,'SEARCH TIMEOUT');
+        exit;
+      end;
+
       if board[p2]=EMPTY then begin
 
         { make trial placement }
@@ -969,6 +1003,13 @@ begin
 
     p1:=0;
     while (p1<24) and not found do begin
+
+      { Check search time between candidates. }
+      if elapsed10ms>=SEARCHTIME then begin
+        searchtimeout:=true;
+        writeln(@PROTOCOL,'SEARCH TIMEOUT');
+        exit;
+      end;
 
       if board[p1]=player then begin
 
@@ -1133,15 +1174,25 @@ begin
     exit;
   end;
 
+  { Do not continue after a timeout. }
+  if searchtimeout then
+    exit;
+
   maxlevel:=1;
   while maxlevel<=MAXLEVEL do begin
     writeln(@PROTOCOL,'SEARCH LEVEL ',maxlevel);
+
     if searchlevel(player) then begin
       writeln(@PROTOCOL,'SEARCHBRIDGE SUCCESS LEVEL ',
                                             maxlevel);
       searchbridge:=true;
       exit;
     end;
+
+    { Do not start another search level
+      after a timeout. }
+    if searchtimeout then
+      exit;
 
     maxlevel:=maxlevel+1;
   end;
@@ -1263,6 +1314,7 @@ var s:cpnt;
     e: integer;
 begin
   starttimer;
+  searchtimeout:=false;
   markplace:=-1;
   marktake:=-1;
   markmove1:=-1;

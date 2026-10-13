@@ -13,7 +13,7 @@ uses syslib,arglib,filelib;
 const
     wrfile  = $e81b;
     adelete = $c80c;
-    sblock  = $6000;
+    sblock  = $5c00;
     eblock  = TOPMEM;
 
 mem ENDSTK=$e,
@@ -221,7 +221,6 @@ end;
 { * main * }
 
 begin {main}
-  writeln('COMPILE2 started');
   init; maxsize:=eblock-sblock-2;
   pointer:=sblock+2; offset:=2;
 
