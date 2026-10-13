@@ -1,4 +1,4 @@
-{ IMILLAI - Artificial intelligence for MILL game }
+{ IMILLAI - Artificial intelligence for MILL/TEKMILL }
 { 2026 rricharz and ChatGPT }
 
 const

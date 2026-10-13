@@ -97,6 +97,7 @@ begin
     findond('BASIC           ',0);
     findond('HELP            ',0);
     findond('PSOURCE         ',0);
+    findond('ARCHIVE         ',0);
     { PASCAL must be last entry }
     findond('PASCAL          ',0);
   end;

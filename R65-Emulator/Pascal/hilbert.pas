@@ -7,9 +7,11 @@ program hilbert;
   {adapted to P8RTS using TEK:, 81-12-06 JTE}
   {adapted to R65 Pascal, 2019/12/30 RR }
 
+  uses syslib,teklib;
+
   const
     {place in center of tek 4015 - 1 scope}
-    xoffset = 256 ;
+    xoffset = 256;
     yoffset = 128;
     h0 = 512    {size factor - -  power of 2};
     {character codes for plotting}
@@ -21,36 +23,14 @@ program hilbert;
     FF = 12     {ascii form feed};
     CR = 13     {ascii carriage return};
 
-    tek = @1;
-
   var
     i, h, x, y, x0, y0, n : integer;
     erase : boolean;
 
-  proc startplot {clear the screen};
+  proc _plot;
   begin
-    write(@tek,chr(17)); { raw mode }
-    write(@tek,chr(esc),chr(FF))
+    _draw(x+xoffset,y+yoffset);
   end;
-
-  proc _plot {_plot a vector};
-  begin
-    write(@tek,
-      chr(sp + (y + yoffset) div 32),
-      chr(bq + (y + yoffset) and 31),
-      chr(sp + (x + xoffset) div 32),
-      chr(at + (x + xoffset) and 31))
-  end {_plot};
-
-  proc _move;
-  {_move the pen to (x,y) - -  dark vector}
-  begin write(@tek, chr(gs)); _plot end{_move};
-
-  proc endplot {leave graph mode};
-  begin
-    write(@tek, chr(CR))
-    write(@tek,chr(18)); { end raw mode }
-  end {endplot};
 
   proc b(i: integer); forward;
   proc c(i: integer); forward;
@@ -101,13 +81,11 @@ program hilbert;
   end {d};
 
 begin {Hilbert}
-  writeln('Requires an attached',
-          ' Tektronix 4010 terminal');
-  write('Enter n of levels: ');
+  write('Number of levels (2-7)? ');
   read(n);
-  erase := n<0;
-  if erase then n :=  - n;
-  startplot;
+  if (n<2) or (n>7) then _abort;
+  erase := true;
+  _starttek;
   i := 0;   h := h0;
   x0 :=  h div 2; y0 := x0;
   if erase then
@@ -124,8 +102,11 @@ begin {Hilbert}
     h := h div 2;
     x0 := x0 + (h div 2);
     y0 := y0 + (h div 2);
-    x := x0;   y := y0;   _move;
-    a(i)
+    x := x0;   y := y0;
+    _startdraw(x+xoffset,y+yoffset);
+    a(i);
+    _enddraw;
   until i = n;
-  endplot
+  _moveto(0,0);
+  _endtek;
 end {Hilbert}.

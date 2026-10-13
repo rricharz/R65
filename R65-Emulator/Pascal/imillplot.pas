@@ -1,5 +1,4 @@
-{ section for MILL on onbard screen (plotlib) }
-{ ############################################}
+{ IMILLPLOT:P Include file for MILL (graphics) }
 
 const
     SPACING = 16;

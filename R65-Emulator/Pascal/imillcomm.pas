@@ -1,5 +1,4 @@
-{ common section for MILL and TEKMILL }
-{#####################################}
+{ IMILLCOMM:P Common include file for MILL/TEKMILL }
 
 const
   LABELS =
@@ -339,32 +338,6 @@ begin
   isneighbor:=false;
 end;
 
-proc debuglabels;
-{****************}
-var position,neighbornumber,neighborbase: integer;
-    nextposition: integer;
-begin
-  writeln(@PROTOCOL);
-  writeln(@PROTOCOL,'Board positions and neighbors');
-  writeln(@PROTOCOL);
-
-  for position:=0 to NPOSITIONS-1 do begin
-    write(@PROTOCOL, label[position], ': ');
-
-    neighborbase:=position*MAXNEIGHBORS;
-
-    for neighbornumber:=0 to MAXNEIGHBORS-1 do begin
-      nextposition:=
-        neighbor[neighborbase+neighbornumber];
-
-      if nextposition>=0 then
-        write(@PROTOCOL, label[nextposition], ' ');
-    end;
-
-    writeln(@PROTOCOL);
-  end;
-end;
-
 func allinmills(player: integer): boolean;
 {*************************************}
 var i: integer;
@@ -425,13 +398,12 @@ begin
   repeat
     getinput(player,I_PLACE,p1,p2);
 
-    writeln(@DEBUG,'PLACESTONE P1 ',p1,
-                   ' BOARD ',board[p1],
-                   ' EMPTY ',EMPTY);
+    debug('PLACESTONE',p1,
+                   board[p1],EMPTY);
 
     valid:=board[p1]=EMPTY;
 
-    writeln(@DEBUG,'PLACE VALID ',valid);
+    debug('PLACE',valid);
 
     if not valid then
       message(6,label[p1],player);
@@ -637,7 +609,6 @@ begin
   then  carg:=10; { name/8, cyclus, drive }
 
   PROTOCOL:=NULLDEV;
-  DEBUG:=NULLDEV;
   marks:=true;
   if ARGTYPE[carg]='s' then begin
     i:=2*carg;
@@ -646,8 +617,6 @@ begin
       repeat
         if ARGLISTS[i]='M' then
           marks:=false
-        else if ARGLISTS[i]='D' then
-          DEBUG:=PRINTER
         else if ARGLISTS[i]='P' then
           PROTOCOL:=PRINTER;
         i:=i+1;
@@ -655,8 +624,6 @@ begin
             (i>=2*carg+4);
     end;
   end;
-  if (PROTOCOL=PRINTER) and (DEBUG=PRINTER) then
-    DEBUG:=OUTPUT;
 
   init_graphics;
   init_canvas;

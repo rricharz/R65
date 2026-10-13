@@ -1,4 +1,4 @@
-{ IMILLTEK: include file for TEKMILL }
+{ IMILLTEK: include file for TEKMILL (graphics) }
 
 const
     CX    = 536;
@@ -51,6 +51,8 @@ var
 begin
   _clearscreen;
   _setchsize(1);
+
+  PROTOCOL:=NULLDEV;
 
   charwidth:=(MAXX+1) div MAXCOLUMNS;
 
@@ -426,10 +428,8 @@ begin { getinput }
         I_PLACE,I_TAKE:
           begin
             if len=2 then begin
-              writeln(@DEBUG,'CHARS ',
-                    ord(s[0]),' ',ord(s[1]));
               p1:=findpos(packed(s[0],s[1]));
-              writeln(@DEBUG,'FINDPOS ',p1);
+              debug('FINDPOS',p1);
 
               if p1>=0 then
                 valid:=true
@@ -473,7 +473,7 @@ begin { getinput }
       end;
     end;
 
-    writeln(@DEBUG,'VALID ',valid);
+    debug('VALID',valid);
   until valid;
 
   message(0,'  ',player);
@@ -672,7 +672,7 @@ proc redraw;
 var x,y,mode: integer;
     okay: boolean;
 begin
-  writeln(@DEBUG,'REDRAW');
+  debug('REDRAW');
 
   drawsuppressed:=false;
   _clearscreen;

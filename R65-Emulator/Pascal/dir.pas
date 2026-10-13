@@ -37,7 +37,7 @@ The last currently used entry has filtyp=TEND
 {$U+}
 
 program dir;
-uses syslib, arglib, filelib, strlib, striolib;
+uses syslib,arglib,filelib,strlib,striolib,writelib;
 
 const aprepdo =$f4a7;
       agetentx=$f63a;
@@ -52,6 +52,8 @@ mem   filtyp  = $0300: char&;
       filloc  = $0313: integer;
       filsiz  = $0315: integer;
       fildat  = $0317: array[2] of integer&;
+      filsa   = $031a: integer;
+      filea   = $031c: integer;
       fillnk  = $031e: integer;
       scyfc   = $037c: integer&;
 
@@ -234,6 +236,7 @@ begin {main}
           write(@s,' ',day shr 4, day and 15);
           write(@s,'/',month shr 4, month and 15);
           write(@s,'/',year shr 4,year and 15);
+          write(@s,((filea-filsa+1) shr 8):4);
         end;
         if entry_deleted then
           write(@s, ']')

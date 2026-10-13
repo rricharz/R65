@@ -1,3 +1,5 @@
+{ IMILLTOP:P Common include file for MILL/TEKMILL }
+
 const
   DUALPLAYER   = false;
   NPOSITIONS   = 24;
@@ -13,7 +15,7 @@ var
   board: array[23] of integer;
   stones, captured: array[BLACK] of integer;
   label:    array[23] of packed char;
-  DEBUG,PROTOCOL: file;
+  PROTOCOL: file;
   player,action: integer;
 
   startmin,startsec,starttenmillis: integer;
