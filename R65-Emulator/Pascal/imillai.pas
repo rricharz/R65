@@ -457,11 +457,9 @@ begin
 
   if stones[player]=0 then begin
     if captured[opponent]=6 then begin
-      writeln('DOUBLE THREAT FLY NOT IMPLEMENTED');
       writeln(@PROTOCOL,
               'DOUBLE THREAT FLY NOT IMPLEMENTED')
     end else begin
-      writeln('DOUBLE THREAT MOVE NOT IMPLEMENTED');
       writeln(@PROTOCOL,
               'DOUBLE THREAT MOVE NOT IMPLEMENTED');
     end;
@@ -1265,6 +1263,10 @@ var s:cpnt;
     e: integer;
 begin
   starttimer;
+  markplace:=-1;
+  marktake:=-1;
+  markmove1:=-1;
+  markmove2:=-1;
   found:=false;
 
   writeln(@PROTOCOL,'STONES W/B ',stones[WHITE],' ',

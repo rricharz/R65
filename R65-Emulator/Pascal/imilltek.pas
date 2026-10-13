@@ -581,15 +581,12 @@ begin
   for position:=0 to NPOSITIONS-1 do
     if board[position]<>EMPTY then
       drawstone(position,board[position]);
-  debug(marks,markplace,marktake,markmove1,markmove2);
   if marks then begin
     _setlinemode(SHORTDASH);
 
     if markplace>=0 then square(markplace);
-    markplace:=-1;
 
     if marktake>=0 then square(marktake);
-    marktake:=-1;
 
     if (markmove1>=0) and (markmove2>=0) then
       if isneighbor(markmove1,markmove2) then
@@ -599,9 +596,6 @@ begin
         square(markmove1);
         square(markmove2);
       end;
-
-    markmove1:=-1;
-    markmove2:=-1;
 
     _setlinemode(SOLID);
   end;
