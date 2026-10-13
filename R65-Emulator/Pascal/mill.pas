@@ -12,9 +12,9 @@
   TEKLIB: TEKLIB and IMILLTEK
 
   Command line options:
-  /P  Make a protocol at the Linux level
-      In printout.txt during the game
-      In Print/timestamps after a game
+  /P  Do not make a protocol at the Linux level
+      in printout.txt during the game
+      in Print/timestamps after a game
   /M  No marks (TEKMILL only)
 
   2026 rricharz and ChatGPT                 }

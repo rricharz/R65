@@ -608,7 +608,7 @@ begin
   if (ARGTYPE[0]='s') and (ARGLISTS[0]<>'/')
   then  carg:=10; { name/8, cyclus, drive }
 
-  PROTOCOL:=NULLDEV;
+  PROTOCOL:=PRINTER;
   marks:=true;
   if ARGTYPE[carg]='s' then begin
     i:=2*carg;
@@ -617,15 +617,15 @@ begin
       repeat
         if ARGLISTS[i]='M' then
           marks:=false
-        else if ARGLISTS[i]='P' then begin
-          PROTOCOL:=PRINTER;
-          dummy:=_emulator(14); { reset printout.txt }
-        end;
+        else if ARGLISTS[i]='P' then
+          PROTOCOL:=NULLDEV;
         i:=i+1;
       until (ARGLISTS[i]=chr(0)) or
             (i>=2*carg+4);
     end;
   end;
+  if PROTOCOL=PRINTER then
+    dummy:=_emulator(14); { reset printout.txt }
 
   init_graphics;
   init_canvas;

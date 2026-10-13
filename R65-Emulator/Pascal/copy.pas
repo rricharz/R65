@@ -20,7 +20,7 @@ uses syslib, arglib, wildlib, filelib;
 const MAXLINES = 13;
       rdfile=$e815;
       wrfile=$eb2c; {keep date}
-      sblock=$6000;
+      sblock=$5e00;
       eblock=TOPMEM;
 
 mem   filsa=$031a,

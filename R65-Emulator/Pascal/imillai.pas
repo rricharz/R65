@@ -50,6 +50,174 @@ begin
   threats:=count;
 end;
 
+func reachablethreats(player: integer): integer;
+{***********************************************}
+var p1,p2,i,n,count,t: integer;
+    reachable: boolean;
+    opponent: integer;
+begin
+  t:=threats(player);
+
+  { No need for further checking if fewer
+    than two threats exist. }
+  if t<2 then begin
+    reachablethreats:=t;
+    exit;
+  end;
+
+  opponent:=otherplayer(player);
+
+  { In PLACE and FLY every empty position
+    can be reached. }
+  if (stones[player]>0) or
+     (captured[opponent]=6) then begin
+    reachablethreats:=t;
+    exit;
+  end;
+
+  { MOVE: count distinct threat positions
+    which can actually be reached. }
+  count:=0;
+
+  p2:=0;
+  while (p2<24) and (count<2) do begin
+    if board[p2]=EMPTY then begin
+      reachable:=false;
+
+      p1:=0;
+      while (p1<24) and not reachable do begin
+        if board[p1]=player then begin
+          i:=0;
+          while (i<MAXNEIGHBORS) and
+                not reachable do begin
+            n:=neighbor[p1*MAXNEIGHBORS+i];
+
+            if n=p2 then begin
+              { Try the actual move. }
+              board[p1]:=EMPTY;
+              board[p2]:=player;
+
+              if ismill(p2,player) then
+                reachable:=true;
+
+              board[p2]:=EMPTY;
+              board[p1]:=player;
+            end;
+
+            i:=i+1;
+          end;
+        end;
+        p1:=p1+1;
+      end;
+
+      if reachable then
+        count:=count+1;
+    end;
+
+    p2:=p2+1;
+  end;
+
+  reachablethreats:=count;
+end;
+
+func doublethreat(player: integer): boolean;
+{******************************************}
+var p1,p2,i,n,opponent: integer;
+    found: boolean;
+begin
+  found:=false;
+  opponent:=otherplayer(player);
+
+  if stones[player]>0 then begin
+    { PLACE }
+    p2:=0;
+    while p2<24 do begin
+      if board[p2]=EMPTY then begin
+        board[p2]:=player;
+        stones[player]:=stones[player]-1;
+
+        if reachablethreats(player)>=2 then begin
+          found:=true;
+        end;
+
+        stones[player]:=stones[player]+1;
+        board[p2]:=EMPTY;
+
+        if found then begin
+          doublethreat:=true;
+          exit;
+        end;
+      end;
+      p2:=p2+1;
+    end;
+
+  end else if captured[opponent]=6 then begin
+    { FLY }
+    p1:=0;
+    while p1<24 do begin
+      if board[p1]=player then begin
+        p2:=0;
+        while p2<24 do begin
+          if board[p2]=EMPTY then begin
+            board[p1]:=EMPTY;
+            board[p2]:=player;
+
+            if reachablethreats(player)>=2 then begin
+              found:=true;
+            end;
+
+            board[p2]:=EMPTY;
+            board[p1]:=player;
+
+            if found then begin
+              doublethreat:=true;
+              exit;
+            end;
+          end;
+          p2:=p2+1;
+        end;
+      end;
+      p1:=p1+1;
+    end;
+
+  end else begin
+    { MOVE }
+    p1:=0;
+    while p1<24 do begin
+      if board[p1]=player then begin
+        i:=0;
+        while i<MAXNEIGHBORS do begin
+          n:=neighbor[p1*MAXNEIGHBORS+i];
+
+          if (n>=0) and (board[n]=EMPTY) then begin
+            board[p1]:=EMPTY;
+            board[n]:=player;
+
+            if reachablethreats(player)>=2 then begin
+              writeln(@PROTOCOL,'DOUBLE MOVE ',
+                    label[p1],'-',label[n]);
+              found:=true;
+            end;
+
+            board[n]:=EMPTY;
+            board[p1]:=player;
+
+            if found then begin
+              doublethreat:=true;
+              exit;
+            end;
+          end;
+
+          i:=i+1;
+        end;
+      end;
+      p1:=p1+1;
+    end;
+  end;
+
+  doublethreat:=false;
+end;
+
 func millcount(player: integer): integer;
 {***************************************}
 var i,j,count: integer;
@@ -86,12 +254,12 @@ end;
 
 func canblock(player,pos: integer): boolean;
 {*****************************************}
-var i,n: integer;
+var i,n,opponent: integer;
 begin
   canblock:=false;
-
+  opponent:=otherplayer(player);
   { with 3 stones the player can fly }
-  if stones[player]=3 then
+  if captured[opponent]=6 then
     canblock:=true
   else begin
     for i:=0 to MAXNEIGHBORS-1 do begin
@@ -271,6 +439,87 @@ begin
   end
 end;
 
+func blockdouble(player: integer): boolean;
+{****************************************}
+{ Block a double mill threat during PLACE.
+  MOVE and FLY may be added if needed. }
+var p,bestpos,bestvalue,opponent,tk: integer;
+    s: cpnt;
+begin
+  blockdouble:=false;
+  opponent:=otherplayer(player);
+
+  if not doublethreat(opponent) then
+    exit;
+
+  bestpos:=-1;
+  bestvalue:=-32767;
+
+  if stones[player]=0 then begin
+    if captured[opponent]=6 then begin
+      writeln('DOUBLE THREAT FLY NOT IMPLEMENTED');
+      writeln(@PROTOCOL,
+              'DOUBLE THREAT FLY NOT IMPLEMENTED')
+    end else begin
+      writeln('DOUBLE THREAT MOVE NOT IMPLEMENTED');
+      writeln(@PROTOCOL,
+              'DOUBLE THREAT MOVE NOT IMPLEMENTED');
+    end;
+    exit;
+  end;
+
+  { PLACE }
+  p:=0;
+  while p<24 do begin
+    if board[p]=EMPTY then begin
+      { Try this position. }
+      board[p]:=player;
+      stones[player]:=stones[player]-1;
+
+      if not doublethreat(opponent) then begin
+        writeln(@PROTOCOL,
+            'BLOCK DOUBLE PLACE ',label[p]);
+
+        { Restore before evaluating. }
+        stones[player]:=stones[player]+1;
+        board[p]:=EMPTY;
+
+        tryplace(player,p,bestpos,bestvalue);
+      end else begin
+        stones[player]:=stones[player]+1;
+        board[p]:=EMPTY;
+      end;
+    end;
+
+    p:=p+1;
+  end;
+
+  if bestpos>=0 then begin
+    p:=bestpos;
+    blockdouble:=true;
+
+    board[p]:=player;
+    stones[player]:=stones[player]-1;
+
+    drawstone(p,player);
+    drawreserve(player);
+    protocolaction(player,p,-1,bestvalue);
+    markplace:=p;
+
+    s:=_new;
+    if ismill(p,player) then begin
+      tk:=computertake(player);
+      write(@s,label[p],'/',label[tk]);
+    end else
+      write(@s,label[p]);
+
+    strmessage(s,EMPTY);
+    _release(s);
+
+    emptysquare[p shr 3]:=false;
+  end;
+end;
+
 proc computermove(player: integer);
 {*******************************}
 var p1,p2,tk,bestp1,bestp2,bestvalue,value: integer;
@@ -326,17 +575,18 @@ end;
 
 func canbridge(player: integer): integer;
 {****************************************}
-var p1,p2,i,n: integer;
+var p1,p2,i,n,opponent: integer;
   found: boolean;
 begin
   canbridge:=-1;
   found:=false;
+  opponent:=otherplayer(player);
 
   p1:=0;
   while p1<24 do begin
     if board[p1]=player then begin
 
-      if stones[player]=3 then begin
+      if captured[opponent]=6 then begin
         { FLY }
         p2:=0;
         while p2<24 do begin
@@ -871,7 +1121,8 @@ begin
 
   maxlevel:=0;
   if searchlevel(player) then begin
-    writeln('SEARCHBRIDGE SUCCESS LEVEL ',maxlevel);
+    writeln(@PROTOCOL,'SEARCHBRIDGE SUCCESS LEVEL ',
+                                          maxlevel);
     searchbridge:=true;
     exit;
   end;
@@ -880,7 +1131,8 @@ begin
   while maxlevel<=MAXLEVEL do begin
     writeln(@PROTOCOL,'SEARCH LEVEL ',maxlevel);
     if searchlevel(player) then begin
-      writeln('SEARCHBRIDGE SUCCESS LEVEL ',maxlevel);
+      writeln(@PROTOCOL,'SEARCHBRIDGE SUCCESS LEVEL ',
+                                            maxlevel);
       searchbridge:=true;
       exit;
     end;
@@ -1021,7 +1273,11 @@ begin
           ((stones[WHITE]+stones[BLACK])<6) then
       found:=searchbridge(player);
 
-  { Fall back to current evaluation strategy. }
+  { Block a double mill threat. }
+  if not found then
+    found:=blockdouble(player);
+
+  { else fall back to heuristic turn selection. }
   if not found then begin
     if stones[player]>0 then
       computerplace(player)
