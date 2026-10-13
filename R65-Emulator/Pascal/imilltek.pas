@@ -52,8 +52,6 @@ begin
   _clearscreen;
   _setchsize(1);
 
-  PROTOCOL:=NULLDEV;
-
   charwidth:=(MAXX+1) div MAXCOLUMNS;
 
 

@@ -37,7 +37,7 @@ begin
   _release(state);
 
   { human readable board }
-  writeln(@PROTOCOL,'MATRIX');
+  {writeln(@PROTOCOL,'MATRIX');
   writeln(@PROTOCOL,'    1 2 3 4 5 6 7');
 
   for row:=6 downto 0 do begin
@@ -63,7 +63,7 @@ begin
     end;
 
     writeln(@PROTOCOL);
-  end;
+  end; }
 end;
 
 proc protocolaction(player,pos,pos2,value);
@@ -590,7 +590,7 @@ proc main;
 {********}
 
 mem ARGLISTS = $0060: array[63] of char&;
-var i: integer;
+var i,dummy: integer;
 
 begin
   previousstate:=_new;
@@ -617,8 +617,10 @@ begin
       repeat
         if ARGLISTS[i]='M' then
           marks:=false
-        else if ARGLISTS[i]='P' then
+        else if ARGLISTS[i]='P' then begin
           PROTOCOL:=PRINTER;
+          dummy:=_emulator(14); { reset printout.txt }
+        end;
         i:=i+1;
       until (ARGLISTS[i]=chr(0)) or
             (i>=2*carg+4);
