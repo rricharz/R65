@@ -6,7 +6,6 @@ const
 
 var
   mills:    array[47] of integer;
-  neighbor: array[95] of integer;
   { There is no INVERSE stone; BLACK and WHITE used }
 
 proc computerturn(player: integer); forward;
@@ -321,21 +320,6 @@ begin
     end;
   end;
   ismill:=false;
-end;
-
-func isneighbor(p1,p2: integer): boolean;
-{*************************************}
-var i,base: integer;
-begin
-  base:=p1*MAXNEIGHBORS;
-
-  for i:=0 to MAXNEIGHBORS-1 do
-    if neighbor[base+i]=p2 then begin
-      isneighbor:=true;
-      exit;
-    end;
-
-  isneighbor:=false;
 end;
 
 func allinmills(player: integer): boolean;

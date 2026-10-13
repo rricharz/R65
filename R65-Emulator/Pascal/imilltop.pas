@@ -32,6 +32,7 @@ var
   carg: integer;
   firstredraw: boolean;
   marks:boolean;
+  neighbor: array[95] of integer;
 
 proc quit;forward;
 
@@ -338,4 +339,20 @@ begin
   _release(fullname);
   _release(name);
 end;
+
+func isneighbor(p1,p2: integer): boolean;
+{*************************************}
+var i,base: integer;
+begin
+  base:=p1*MAXNEIGHBORS;
+
+  for i:=0 to MAXNEIGHBORS-1 do
+    if neighbor[base+i]=p2 then begin
+      isneighbor:=true;
+      exit;
+    end;
+
+  isneighbor:=false;
+end;
+
  

@@ -500,6 +500,7 @@ begin
 
     board[p]:=player;
     stones[player]:=stones[player]-1;
+    markplace:=p;
 
     drawstone(p,player);
     drawreserve(player);
@@ -1059,6 +1060,13 @@ begin
       writeln(@PROTOCOL,'SUCCESS ',
         label[bestp1],'-',label[bestp2]);
 
+    if bestp1<0 then
+      markplace:=bestp2
+    else begin
+      markmove1:=bestp1;
+      markmove2:=bestp2;
+    end;
+
     { Execute the selected first action. }
 
     p2:=bestp2;
@@ -1183,6 +1191,8 @@ begin
   if found then begin
     writeln(@PROTOCOL,'SURVIVE ',
       label[p1],'-',label[threat]);
+    markmove1:=p1;
+    markmove2:=threat;
 
     board[p1]:=EMPTY;
     board[threat]:=player;
