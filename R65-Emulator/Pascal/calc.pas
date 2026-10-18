@@ -12,14 +12,25 @@
    Written 2019-2023 by rricharz  }
 
 program calc;
-uses syslib,mathlib,strlib,ledlib,writelib;
+uses syslib,mathlib,strlib,writelib;
+
+const
+  M_FLOAT=0;
+  M_WORD=1;
+  M_BYTE=2;
+  M_BOOL=3;
+
+  F_AUTO=0;
+  F_FIX2=1;
 
 mem vidpnt=$00e9:integer;
     BUFFPN   = $0015: integer&;
 
 var ch: char;
-    r,lastr: real;
-    stop,dotused,firsterror: boolean;
+    r, lastr: real;
+    stop, dotused, firsterror, dummy: boolean;
+    line: cpnt;
+    pos, n, mode, format: integer;
 
 proc clearinput;
 {**************}
@@ -38,8 +49,12 @@ end;
 proc readch;
 {**********}
 begin
-  if firsterror then read(@INPUT,ch)
-  else ch:=CR;
+  if firsterror then begin
+    ch := line[pos];
+    if ch<>ENDMARK then pos := pos + 1
+    else ch := CR;
+  end else
+    ch := CR;
 end;
 
 func fix(rf: real): integer;
@@ -87,139 +102,63 @@ begin
   isnumber:=(cn>='0') and (cn<='9');
 end;
 
-proc writehex(f:file; r: integer);
-{********************************}
-var mask, m, n, r1: integer;
+proc writebinary(f:file; r,bits:integer);
+{***************************************}
+var mask,i:integer;
 begin
-  write(@f,'$'); mask := $f000; n := 12;
-  while mask <>0 do begin
-    r1 := (r and mask) shr n;
-    if r1 < 10 then write(@f,r1)
-    else  write(@f,chr(ord(r1)+ord('A')-10));
-    mask := mask shr 4; n := n - 4;
-  end;
-end;
+  write(@f,'%');
+  if bits=8 then mask:=$0080
+  else mask:=$8000;
 
-proc writebinary(f:file; r: integer);
-{***********************************}
-var mask: integer;
-begin
-  write(@f,'% '); mask := $8000;
-  while mask <> 0 do begin
-   if (r and mask) <> 0 then write(@f,'1')
-   else write(@f,'0');
-   mask := mask shr 1;
-   if mask = $0800 then write(@f,' ');
-   if mask = $0080 then write(@f,' ');
-   if mask = $0008 then write(@f,' ');
-  end;
-end;
+  i:=0;
+  while mask<>0 do begin
+    if (r and mask)<>0 then write(@f,'1')
+    else write(@f,'0');
 
-proc showled(s1:cpnt);
-{********************}
-var s2:cpnt;
-    pos,i,l:integer;
-begin
-  s2:=_new;
-  _strcpy(s1,s2);
-  { remove any space }
-  pos:=_strpos(' ',s2,0);
-  while pos>=0 do begin
-    _strdelc(pos,s2);
-    pos:=_strpos(' ',s2,0);
-  end;
-  { remove any plus sign }
-  pos:=_strpos('+',s2,0);
-  while pos>=0 do begin
-    _strdelc(pos,s2);
-    pos:=_strpos('+',s2,0);
-  end;
-  { convert point to bit 8 }
-  pos:=_strpos('.',s2,0);
-  while pos>0 do begin
-    _strdelc(pos,s2);
-    s2[pos-1]:=chr(ord(s2[pos-1]) or 128);
-    pos:=_strpos('.',s2,0);
-  end;
-  { remove unnecessary 0 in exponent, if necessary }
-  l:=_strlen(s2);
-  if (l>8) and (s2[l-2]='0') and
-    (_strpos('e',s2,0)>0) then _strdelc(l-2,s2);
-  { remove e as a last resort (exp is negative) }
-  if _strlen(s2)>8 then begin
-    pos:=_strpos('e',s2,0);
-    if pos>0 then _strdelc(pos,s2);
-  end;
-  { right justify }
-  while _strlen(s2)<8 do _strinsc(' ',0,s2);
-  { show converted string }
-  _ledstring(s2);
-  _release(s2);
-end;
-
-proc writeauto(f:file;r:real);
-{****************************}
-{ outputs 5 digits }
-var m,m1,max,rnd: real;
-    i1,d1:integer;
-    sign: char;
-begin
-  sign:=' '; m:=r;
-  if m<0. then begin
-    sign:='-'; m:=-m;
-  end;
-  if dotused and (m>=10000.0) then write(@f,r:11:3)
-  else if m=0. then write(@f,' 0')
-  else if r=conv($8000) then write(@f,'-32768 ')
-  else if m>=32767.5 then write(@f,r:12:3)
-  else if m<0.01 then write(@f,r:12:3)
-  else begin
-    if m>=10000. then begin
-      d1:=0; rnd:=0.5
-    end else if m>=1000. then begin
-      d1:=1; rnd:=0.05
-    end else if m>=100. then begin
-      d1:=2; rnd:=0.005
-    end else if m>=10. then begin
-      d1:=3; rnd:=0.0005
-    end else if m>=1. then begin
-      d1:=4; rnd:=0.00005
-    end else if m>=0.1 then begin
-      d1:=5; rnd:=0.000005
-    end else begin
-      d1:=6; rnd:=0.0000005
-    end;
-    m:=m+rnd; { round }
-    write(@f,sign,trunc(m));
-    m1:=m-conv(trunc(m));
-    if m1<=rnd then begin
-      for i1:=1 to d1+1 do write(@f,' ');
-      d1:=0;
-    end;
-    if d1>0 then write(@f,'.');
-    for i1:=1 to d1 do begin
-      m1:=10.*m1; write(@f,trunc(m1));
-      m1:=m1-conv(trunc(m1));
-    end;
+    mask:=mask shr 1;
+    i:=i+1;
+    if (mask<>0) and (_mod(i,4)=0) then
+      write(@f,' ');
   end;
 end;
 
 proc showresult;
 {**************}
-var s1: cpnt;
-    rnd: real;
+var i:integer;
 begin
-  s1:=_new;
-  writeauto(@s1,r);
-  write(s1);
-  if (r>-32768.5) and (r<32767.5) then begin
-    if r>=0.0 then rnd:=0.5 else rnd:=-0.5;
-    _tab(16); writehex(OUTPUT,fix(r));
-    _tab(24); writebinary(OUTPUT,fix(r));
+  case mode of
+    M_FLOAT:
+      if format=F_AUTO then
+        write(r:12)
+      else
+        write(r:12:2);
+
+    M_WORD:
+      if (r < -32768.5) or (r >= 32767.5) then
+        write('OVERFLOW')
+      else begin
+        i:=fix(r);
+        write(i:12,'  $',hexw(i),'  ');
+        writebinary(OUTPUT,i,16);
+      end;
+
+    M_BYTE:
+      if (r < -0.5) or (r >= 255.5) then
+        write('OVERFLOW')
+      else begin
+        i:=fix(r);
+        write(i:12,'    $',hexb(i),'  ');
+        write('          ');
+        writebinary(OUTPUT,i,8);
+      end;
+
+    M_BOOL:
+      if r=0.0 then
+        write('false')
+      else
+        write('true')
   end;
   writeln;
-  showled(s1);
-  _release(s1);
 end;
 
 func express:real;
@@ -328,13 +267,15 @@ end;
 func factor:real;
 {***************}
 var negative:boolean;
-    rf,rt: real;
-    i,iv: integer;
+    rf,rt:real;
+    iv:integer;
 begin
-  negative:=false; rf:=0.;  readch;
+  negative:=false; rf:=0.0; readch;
+
   if ch='-' then begin
     negative:=true; readch;
   end;
+
   if ch='(' then begin
     stop:=false; rf:=express;
     checkfor(')'); readch;
@@ -350,32 +291,38 @@ begin
       iv:=(iv shl 4)+hexval; readch;
     end;
     rf:=conv(iv);
-  end else if isletter(ch) then rf:=function
+  end else if isletter(ch) then
+    rf:=function
   else if ch<>chr(0) then begin
     if ch<>CR then begin
-      if ch<>CR then stop:=false;
+      stop:=false;
       if ch='+' then readch;
-      {if ch='-' then begin
-        negative:=true; readch;
-      end;}
+
       if not isnumber(ch) then
         error('Expected','number');
+
       while isnumber(ch) do begin
         rt:=rf+rf; rt:=rt+rt;
-        rf:=rt+rt+rf+rf+conv(ord(ch)-ord('0'));
+        rf:=rt+rt+rf+rf+
+            conv(ord(ch)-ord('0'));
         readch;
       end;
+
       if ch='.' then begin
         dotused:=true; readch; rt:=0.1;
         while isnumber(ch) do begin
           rf:=rf+conv(ord(ch)-ord('0'))*rt;
-          rt:=rt/10.; readch;
+          rt:=rt/10.0; readch;
         end;
       end;
-      if ch='E' then begin readch; exponent(rf) end;
+
+      if ch='E' then begin
+        readch; exponent(rf);
+      end;
     end;
-    if negative then rf:=-rf;
   end;
+
+  if negative then rf:=-rf;
   factor:=rf;
 end;
 
@@ -426,38 +373,68 @@ begin
   express:=re;
 end;
 
+func command:boolean;
+{*******************}
+begin
+  command:=true;
+  if _strcmp(line,'FLOAT')=0 then
+    mode:=M_FLOAT
+  else if _strcmp(line,'WORD')=0 then
+    mode:=M_WORD
+  else if _strcmp(line,'BYTE')=0 then
+    mode:=M_BYTE
+  else if _strcmp(line,'BOOL')=0 then
+    mode:=M_BOOL
+  else if _strcmp(line,'AUTO')=0 then
+    format:=F_AUTO
+  else if _strcmp(line,'FIX2')=0 then
+    format:=F_FIX2
+  else
+    command:=false;
+end;
+
 {*********main body********}
 begin
+  line := _new;
+
   write(INVVID);
-  writeln('Enter an expression, for example:        ')
-;
-  writeln('32767      INPUT decimal number          ')
-;
-  writeln('$FFF       INPUT hex number              ')
-;
-  writeln('%1101      INPUT binary number           ')
-;
-  writeln('-55.35     INPUT negative number         ')
-;
-  writeln('2*(5+28)   math expression               ')
-;
-  writeln('R*3        last result                   ')
-;
-  writeln('<return>,<esc>    exit                   ')
-;
-  writeln('Operators: +,-,*,/,^,(),&,|,<<,>>        ')
-;
-  writeln('Functions: SQRT(),SQR(),SIN(),COS()      ')
-;
-  writeln('           TAN(),EXP(),LN(),LOG()        ')
-;
+  writeln('Enter an expression, for example:');
+  writeln('32767      INPUT decimal number');
+  writeln('$FFF       INPUT hex number');
+  writeln('%1101      INPUT binary number');
+  writeln('-55.35     INPUT negative number');
+  writeln('2*(5+28)   math expression');
+  writeln('R*3        last result');
+  writeln('<return>,<esc>    exit');
+  writeln('Operators: +,-,*,/,^,(),&,|,<<,>>');
+  writeln('Functions: SQRT(),SQR(),SIN(),COS()');
+  writeln('           TAN(),EXP(),LN(),LOG()');
+  writeln('Modes:     FLOAT,WORD,BYTE,BOOL');
+  writeln('Format:    AUTO,FIX2');
   writeln(NORVID);
-  r:=0.0; lastr:=0.0; dotused:=false;
+
+  r := 0.0;
+  lastr := 0.0;
+  mode := M_FLOAT;
+  format := F_AUTO;
+  showresult;
+
   repeat
     firsterror:=true;
-    clearinput;
-    stop:=true; showresult;
-    dotused:=false; lastr:=r; r:=express; checkfor(CR)
-;
+    n := _strread(INPUT, line, dummy);
+    pos := 0;
+    stop := true;
+
+    if not command then begin
+      dotused := false;
+      lastr := r;
+      r := express;
+      checkfor(CR);
+    end else
+      stop := false;
+
+    if not stop then showresult;
   until stop;
+
+  _release(line);
 end.
