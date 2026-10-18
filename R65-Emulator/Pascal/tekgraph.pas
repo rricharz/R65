@@ -294,8 +294,8 @@ begin
       (xpos+width>conv(MAXX)) then
     exit;
 
-  _moveto(trunc(xpos + XOFFSET + 0.5),
-          trunc(conv(y) + YOFFSET + 0.5));
+  _moveto(floor(xpos + XOFFSET + 0.5),
+          floor(conv(y) + YOFFSET + 0.5));
   write(@PLOTTER,s);
 end;
 
@@ -318,7 +318,7 @@ begin
 
   r:=min/daxis;
   if (r<=32767.0) and (r>=-32768.0) then begin
-    axis:=daxis*conv(trunc(r));
+    axis:=daxis*conv(floor(r));
     if axis>min+eps*daxis then
       axis:=axis-daxis;
   end
@@ -329,7 +329,7 @@ begin
 
   r:=max/daxis;
   if (r<=32767.0) and (r>=-32768.0) then begin
-    nmax:=daxis*conv(trunc(r));
+    nmax:=daxis*conv(floor(r));
     if nmax<max-eps*daxis then
       nmax:=nmax+daxis;
     max:=nmax;
@@ -368,7 +368,7 @@ begin
   r:=xleft/xaxis;
 
   if (r<=32767.0) and (r>=-32768.0) then begin
-    xsaxis:=xaxis*conv(trunc(r));
+    xsaxis:=xaxis*conv(floor(r));
     if xsaxis<xleft-eps*xaxis then
       xsaxis:=xsaxis+xaxis;
   end
@@ -596,9 +596,9 @@ else
         _abortwith('Time limits outside data range');
 
       firstbin:=
-        trunc((x1-_min)/dx+0.5);
+        floor((x1-_min)/dx+0.5);
       lastbin:=
-        trunc((x2-_min)/dx+0.5);
+        floor((x2-_min)/dx+0.5);
 
       if firstbin<0 then
         firstbin:=0;
@@ -641,9 +641,9 @@ else
           'Frequency limits outside data range');
 
       firstbin:=
-        trunc((x1-_min)/dx+0.5);
+        floor((x1-_min)/dx+0.5);
       lastbin:=
-        trunc((x2-_min)/dx+0.5);
+        floor((x2-_min)/dx+0.5);
 
       if firstbin<0 then
         firstbin:=0;
@@ -741,7 +741,7 @@ begin
   repeat
     labelstr[0]:=chr(0);
 
-    y:=trunc((axis-min)/
+    y:=floor((axis-min)/
              (max-min)*conv(yw)+0.5);
 
     if (y>0) and (y<yw) then
@@ -771,7 +771,7 @@ begin
   repeat
     labelstr[0]:=chr(0);
 
-    x:=trunc((xsaxis-xleft)/
+    x:=floor((xsaxis-xleft)/
              (xright-xleft)*conv(xw)+0.5);
 
     if (x>0) and (x<xw) then
@@ -788,7 +788,7 @@ begin
 
     _plotstr(labelstr,
              xs+x,
-             ys-trunc(0.4*conv(border)),
+             ys-floor(0.4*conv(border)),
              CENTER);
 
     xsaxis:=xsaxis+xaxis;
@@ -805,7 +805,7 @@ begin
   else if v > max then
     valtoy := yw
   else
-    valtoy := trunc((v-min)/(max-min)*conv(yw)+0.5);
+    valtoy := floor((v-min)/(max-min)*conv(yw)+0.5);
 end;
 
 
@@ -825,7 +825,7 @@ begin
   span:=lastbin-firstbin;
   _startdraw(xs,ys+ypos(firstbin));
   for i:=firstbin+1 to lastbin do begin
-    x:=trunc(
+    x:=floor(
          conv(xw) *
          conv(i-firstbin) /
          conv(span) + 0.5);
@@ -841,7 +841,7 @@ begin
   span:=lastbin-firstbin;
 
   bin:=firstbin+
-    trunc(conv(x-xs)*conv(span)/
+    floor(conv(x-xs)*conv(span)/
           conv(xw)+0.5);
 
   if bin<firstbin then bin:=firstbin;
@@ -857,7 +857,7 @@ begin
   span:=lastbin-firstbin;
 
   bintox:=xs+
-    trunc(conv(xw)*conv(bin-firstbin)/
+    floor(conv(xw)*conv(bin-firstbin)/
           conv(span)+0.5);
 end;
 

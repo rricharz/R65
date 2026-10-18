@@ -232,7 +232,7 @@ var x0,f,res:real;
 begin
   { reduce to range -ln2 .. +ln2 }
   x0:=fabs(x)/ln2;
-  e2:=trunc(x0);
+  e2:=floor(x0);
   x0:=(x0-conv(e2))*ln2;
   { compute e-function }
   res:=1.0; f:=1.0;

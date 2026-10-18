@@ -50,22 +50,22 @@ begin
   vstart:=y1;
 
   for i:=x1 to x2-1 do begin
-    if trunc(v)<=mask[i] then begin
+    if floor(v)<=mask[i] then begin
       { hidden point }
       if dodraw then begin
         { _draw up to here }
         if ((i-x1)>1) and visible then
-          drawvec(start,vstart,i,trunc(v));
+          drawvec(start,vstart,i,floor(v));
       end;
       dodraw:=false;
     end
     else begin
       { visible point }
-      mask[i]:=trunc(v);
+      mask[i]:=floor(v);
       if not dodraw then begin
         { _draw from here }
         start:=i;
-        vstart:=trunc(v);
+        vstart:=floor(v);
       end;
       dodraw:=true;
     end;
@@ -73,22 +73,22 @@ begin
   end;
 
   for i:=x1 downto x2+1 do begin
-    if trunc(v)<=mask[i] then begin
+    if floor(v)<=mask[i] then begin
       { hidden point }
       if dodraw then begin
         { _draw up to here }
         if ((x1-i)>1) and visible then
-          drawvec(start,vstart,i,trunc(v));
+          drawvec(start,vstart,i,floor(v));
       end;
       dodraw:=false;
     end
     else begin
       { visible point }
-      mask[i]:=trunc(v);
+      mask[i]:=floor(v);
       if not dodraw then begin
         { _draw from here }
         start:=i;
-        vstart:=trunc(v);
+        vstart:=floor(v);
       end;
       dodraw:=true;
     end;
@@ -132,8 +132,8 @@ begin
   while x<max do begin
     x2:=dx*x-dx*y;
     y2:=dy*x+dy*y+f1(x,y)*scale;
-    drawmasked(trunc(x1+sx),trunc(y1+sy)-1,
-      trunc(x2+sx),trunc(y2+sy)-1,false);
+    drawmasked(floor(x1+sx),floor(y1+sy)-1,
+      floor(x2+sx),floor(y2+sy)-1,false);
     x1:=x2;
     y1:=y2;
     x:=x+step;
@@ -149,8 +149,8 @@ begin
       y:=y+step;
       x2:=dx*x-dx*y;
       y2:=dy*x+dy*y+f1(x,y)*scale;
-      drawmasked(trunc(x1+sx),trunc(y1+sy)-1,
-        trunc(x2+sx),trunc(y2+sy)-1,true);
+      drawmasked(floor(x1+sx),floor(y1+sy)-1,
+        floor(x2+sx),floor(y2+sy)-1,true);
       x1:=x2;
       y1:=y2;
     end;
@@ -168,8 +168,8 @@ begin
   while y<max do begin
     x2:=dx*x-dx*y;
     y2:=dy*x+dy*y+f1(x,y)*scale;
-    drawmasked(trunc(x1+sx),trunc(y1+sy)-1,
-      trunc(x2+sx),trunc(y2+sy)-1,false);
+    drawmasked(floor(x1+sx),floor(y1+sy)-1,
+      floor(x2+sx),floor(y2+sy)-1,false);
     x1:=x2;
     y1:=y2;
     y:=y+step;
@@ -185,8 +185,8 @@ begin
       x:=x+step;
       x2:=dx*x-dx*y;
       y2:=dy*x+dy*y+f1(x,y)*scale;
-      drawmasked(trunc(x1+sx),trunc(y1+sy)-1,
-        trunc(x2+sx),trunc(y2+sy)-1,true);
+      drawmasked(floor(x1+sx),floor(y1+sy)-1,
+        floor(x2+sx),floor(y2+sy)-1,true);
       x1:=x2;
       y1:=y2;
     end;
@@ -219,8 +219,8 @@ begin
     x2:=dx*x-dx*y;
     y2:=dy*x+dy*y+
       f2(x-max/2.0,y-max/2.0)*scale;
-    drawmasked(trunc(x1+sx),trunc(y1+sy)-1,
-      trunc(x2+sx),trunc(y2+sy)-1,false);
+    drawmasked(floor(x1+sx),floor(y1+sy)-1,
+      floor(x2+sx),floor(y2+sy)-1,false);
     x1:=x2;
     y1:=y2;
     x:=x+step;
@@ -238,8 +238,8 @@ begin
       x2:=dx*x-dx*y;
       y2:=dy*x+dy*y+
         f2(x-max/2.0,y-max/2.0)*scale;
-      drawmasked(trunc(x1+sx),trunc(y1+sy)-1,
-        trunc(x2+sx),trunc(y2+sy)-1,true);
+      drawmasked(floor(x1+sx),floor(y1+sy)-1,
+        floor(x2+sx),floor(y2+sy)-1,true);
       x1:=x2;
       y1:=y2;
     end;
@@ -259,8 +259,8 @@ begin
     x2:=dx*x-dx*y;
     y2:=dy*x+dy*y+
       f2(x-max/2.0,y-max/2.0)*scale;
-    drawmasked(trunc(x1+sx),trunc(y1+sy)-1,
-      trunc(x2+sx),trunc(y2+sy)-1,false);
+    drawmasked(floor(x1+sx),floor(y1+sy)-1,
+      floor(x2+sx),floor(y2+sy)-1,false);
     x1:=x2;
     y1:=y2;
     y:=y+step;
@@ -278,8 +278,8 @@ begin
       x2:=dx*x-dx*y;
       y2:=dy*x+dy*y+
         f2(x-max/2.0,y-max/2.0)*scale;
-      drawmasked(trunc(x1+sx),trunc(y1+sy)-1,
-        trunc(x2+sx),trunc(y2+sy)-1,true);
+      drawmasked(floor(x1+sx),floor(y1+sy)-1,
+        floor(x2+sx),floor(y2+sy)-1,true);
       x1:=x2;
       y1:=y2;
     end;

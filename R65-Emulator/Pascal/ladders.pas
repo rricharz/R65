@@ -53,7 +53,7 @@ var bx,bxspeed,bxs:               integer;
     by, bys, fx,fxs:              real;
     byspeed,fxstep,lastfxstep:    real;
     jump,jumpspeed:               real;
-    floor,ffloor,fy,fys,fyspeed:  integer;
+    flr,ffloor,fy,fys,fyspeed:  integer;
     score,loopcounter,level:      integer;
     lastfxtimes, pause:           integer;
     demomode:                     boolean;
@@ -77,7 +77,7 @@ end;
 func onupladder(f:integer;x:real):boolean;
 var xi,center:integer;
 begin
-  xi:=trunc(x);
+  xi:=floor(x);
   if (f<0) or (f>=NFLOORS) then
     onupladder:=false
   else begin
@@ -90,7 +90,7 @@ end;
 func ondownladder(f:integer;x:real):boolean;
 var xi,center:integer;
 begin
-  xi:=trunc(x);
+  xi:=floor(x);
   if (f<=0) or (f>NFLOORS) then
     ondownladder:=false
   else begin
@@ -103,7 +103,7 @@ end;
 func onhole(f:integer;x:real):boolean;
 var xc: integer;
 begin
-  xc := trunc(x) + 4;  { center of 8-pixel sprite }
+  xc := floor(x) + 4;  { center of 8-pixel sprite }
   onhole := (xc >= holes[f]) and
             (xc <= holes[f] + HOLESIZE);
 end;
@@ -254,7 +254,7 @@ proc showplayer;
 var fysum, frame, spriteindex:integer;
 begin
   frame := loopcounter div LOOPSPERFRAME;
-  fysum:=fy+trunc(jump);
+  fysum:=fy+floor(jump);
 
   if jump > 0.0 then begin
     if fxstep > 0.0 then
@@ -271,9 +271,9 @@ begin
     spriteindex := S_RIGHT + frame
   else
     spriteindex := S_LEFT + frame;
-  _showsprite(trunc(fxs),fys,S_CLEAR);
-  _showsprite(trunc(fx),fysum, spriteindex);
-  repair(ffloor, trunc(fxs), trunc(fx));
+  _showsprite(floor(fxs),fys,S_CLEAR);
+  _showsprite(floor(fx),fysum, spriteindex);
+  repair(ffloor, floor(fxs), floor(fx));
   fxs:=fx; fys:=fysum;
   loopcounter := loopcounter + 1;
   if loopcounter >= (3 * LOOPSPERFRAME) then
@@ -307,12 +307,12 @@ proc flashplayer;
 var i,j,f,time: integer;
 begin
   for i:=1 to 4 do begin
-    _showsprite(trunc(fxs),fys,S_STANDING);
-    repair(ffloor,trunc(fxs), trunc(fxs));
+    _showsprite(floor(fxs),fys,S_STANDING);
+    repair(ffloor,floor(fxs), floor(fxs));
     for j:= 0 to 2 do
         time:=_syncscreen;
-    _showsprite(trunc(fxs),fys,S_CLEAR);
-    repair(ffloor,trunc(fxs), trunc(fxs));
+    _showsprite(floor(fxs),fys,S_CLEAR);
+    repair(ffloor,floor(fxs), floor(fxs));
     for j:= 0 to 2 do
         time:=_syncscreen;
   end;
@@ -346,7 +346,7 @@ begin
   if (ffloor>0) and (ffloor<>efloor+1) and
      ondownladder(ffloor,fx)
   then begin
-    floor:=ffloor-1;
+    flr:=ffloor-1;
     fx:=conv(ladders[ffloor-1]+1);
     fyspeed:=-1;
     fxstep:=0.0;
@@ -356,22 +356,22 @@ end;
 
 proc showball;
 begin
-  _plotmap(bxs,trunc(bys),ERASE);
-  _plotmap(bx,trunc(by),BALL);
-  repair(floor,bxs,bx);
+  _plotmap(bxs,floor(bys),ERASE);
+  _plotmap(bx,floor(by),BALL);
+  repair(flr,bxs,bx);
 end;
 
 proc eraseball;
 begin
-  _plotmap(bxs,trunc(bys),ERASE);
-  repair(floor,bxs,bx);
+  _plotmap(bxs,floor(bys),ERASE);
+  repair(flr,bxs,bx);
 end;
 
 proc newball;
 begin
   bx:=2;
-  floor:=NFLOORS;
-  by:=conv((floor+1)*VFLOORS-6);
+  flr:=NFLOORS;
+  by:=conv((flr+1)*VFLOORS-6);
   showball;
   bxs:=bx;
   bys:=by;
@@ -466,8 +466,8 @@ var f,distx,fxt:integer;
     if xstep = 0.0 then
       holeahead:=false
     else begin
-      xc:=trunc(x)+4;
-      nextxc:=trunc(x + 3.0*xstep)+4;
+      xc:=floor(x)+4;
+      nextxc:=floor(x + 3.0*xstep)+4;
       if xstep > 0.0 then
         holeahead:=(xc < holes[f]) and
                     (nextxc >= holes[f])
@@ -489,7 +489,7 @@ begin
   if  demomode and (jump<0.01) then begin
     if valgem[ffloor]>0 then begin
       { first collect gem }
-      if xgem[ffloor]<trunc(fx) then
+      if xgem[ffloor]<floor(fx) then
         fxstep := -FXSTEPSIZE
       else
         fxstep := FXSTEPSIZE;
@@ -499,7 +499,7 @@ begin
                             onupladder(ffloor,fx)
       then tryladderup
       else if onfloor(ffloor,fy) then  begin
-        if (trunc(fx)>=ladders[ffloor]+1) then begin
+        if (floor(fx)>=ladders[ffloor]+1) then begin
           if fxstep>1.0 then fxstep:=0.0
           else fxstep:=-FXSTEPSIZE;
         end else begin
@@ -536,7 +536,7 @@ begin
   end;
   { check for exit on top floor }
   if (ffloor=NFLOORS) and
-     (trunc(fx) >= xdoor[1]) then begin
+     (floor(fx) >= xdoor[1]) then begin
     score:=score+100;
     { align player with door before flashing/reset }
     fx:=conv(xdoor[0]+XDOORSIZE-8);
@@ -585,7 +585,7 @@ begin
       fx:=1.0; fxstep:=-0.0;
     end;
     { check for player hitting gem }
-    distx:=_abs(trunc(fx)-xgem[ffloor]);
+    distx:=_abs(floor(fx)-xgem[ffloor]);
     if (distx<8) then begin
       score:=score+valgem[ffloor];
       showresult;
@@ -622,18 +622,18 @@ begin
     bx:=1; bxspeed:=-bxspeed;
   end;
   { check for reflection on ceiling }
-  yline := conv((floor+1)*VFLOORS-4);
+  yline := conv((flr+1)*VFLOORS-4);
   if crossup(yline) then begin
     by := yline;
     byspeed := REFLECTION*byspeed
   end;
   { check for reflection on the floor }
-  yline := conv(floor*VFLOORS+1);
-  if (balloverlap(holes[floor],
-          holes[floor]+HOLESIZE-1))
+  yline := conv(flr*VFLOORS+1);
+  if (balloverlap(holes[flr],
+          holes[flr]+HOLESIZE-1))
           and (by<=yline) then begin
     { fall through hole hole }
-    if floor>0 then floor:=floor-1;
+    if flr>0 then flr:=flr-1;
   end else if (by<yline) or crossdown(yline) then
   begin
     { reflection on floor }
@@ -652,8 +652,8 @@ begin
   end;
 
   { *** check for hit *** }
-  if (bx>=trunc(fx)-4) and (bx<=trunc(fx)+8) and
-     (trunc(by)>=fy-4) and (trunc(by)<=fy+8)
+  if (bx>=floor(fx)-4) and (bx<=floor(fx)+8) and
+     (floor(by)>=fy-4) and (floor(by)<=fy+8)
     then begin
       nextround;
       { avoid endless loop in demo mode }
@@ -669,8 +669,8 @@ begin
   showball;
   { paint player }
   if fyspeed<>0 then
-    if trunc(fx)<>ladders[ffloor]+1 then
-      writeln('bad climb x ',trunc(fx),
+    if floor(fx)<>ladders[ffloor]+1 then
+      writeln('bad climb x ',floor(fx),
               ' should ',ladders[ffloor]+1,
               ' floor ',ffloor);
   showplayer;
@@ -829,26 +829,26 @@ begin
   { make and show holes }
   holes[0]:=-50;
   _move(0,0); _draw(XSIZE,0,WHITE);
-  for floor:=1 to NFLOORS do begin
-    holes[floor]:=
+  for flr:=1 to NFLOORS do begin
+    holes[flr]:=
       irandom(XDOORSIZE+4+HOLEMARGIN,
               XSIZE-HOLESIZE-3-XDOORSIZE-HOLEMARGIN);
-    showfloor(floor);
+    showfloor(flr);
   end;
   { make ladders }
-  for floor:=0 to NFLOORS-1 do begin
+  for flr:=0 to NFLOORS-1 do begin
     repeat
-      ladders[floor]:=irandom(2,XSIZE-LADDERSIZE-2);
+      ladders[flr]:=irandom(2,XSIZE-LADDERSIZE-2);
 
-      if floor=0 then
+      if flr=0 then
         if ladders[0] < XDOORSIZE+10 then
           ladders[0]:=XDOORSIZE+10;
 
-    until ladderok(floor,ladders[floor]) and
-          not nearladder(floor,ladders[floor]);
+    until ladderok(flr,ladders[flr]) and
+          not nearladder(flr,ladders[flr]);
   end;
   ladders[NFLOORS]:=-LADDERSIZE;
-  floor:=NFLOORS;
+  flr:=NFLOORS;
   ffloor:=0;
   { make and show doors }
   xdoor[0]:=2;

@@ -301,8 +301,8 @@ begin
       (xpos+width>conv(MAXX)) then
     exit;
 
-  _move(trunc(xpos + XOFFSET + 0.5),
-          trunc(conv(y) + YOFFSET + 0.5));
+  _move(floor(xpos + XOFFSET + 0.5),
+          floor(conv(y) + YOFFSET + 0.5));
   write(@PLOTDEV,s);
 end;
 
@@ -325,7 +325,7 @@ while daxis<0.1*daxis0 do
 { round lower limit down to a tick }
 r:=min/daxis;
 if (r<=32767.0) and (r>=-32768.0) then begin
-  axis:=daxis*conv(trunc(r));
+  axis:=daxis*conv(floor(r));
   if axis>min+eps*daxis then
     axis:=axis-daxis;
 end
@@ -336,7 +336,7 @@ min:=axis;
 { round upper limit up to a tick }
 r:=max/daxis;
 if (r<=32767.0) and (r>=-32768.0) then begin
-  nmax:=daxis*conv(trunc(r));
+  nmax:=daxis*conv(floor(r));
   if nmax<max-eps*daxis then
     nmax:=nmax+daxis;
   max:=nmax;
@@ -362,7 +362,7 @@ end;
 
   r := _min/xaxis;
   if (r<=32767.0) and (r>=-32768.0) then begin
-    xsaxis := xaxis*conv(trunc(r));
+    xsaxis := xaxis*conv(floor(r));
     if xsaxis<_min-eps*xaxis then
       xsaxis := xsaxis+xaxis;
   end
@@ -600,9 +600,9 @@ begin
         _abortwith('Time limits outside data range');
 
       firstbin:=
-        trunc((x1-_min)/dx+0.5);
+        floor((x1-_min)/dx+0.5);
       lastbin:=
-        trunc((x2-_min)/dx+0.5);
+        floor((x2-_min)/dx+0.5);
 
       if firstbin<0 then
         firstbin:=0;
@@ -645,9 +645,9 @@ begin
           'Frequency limits outside data range');
 
       firstbin:=
-        trunc((x1-_min)/dx+0.5);
+        floor((x1-_min)/dx+0.5);
       lastbin:=
-        trunc((x2-_min)/dx+0.5);
+        floor((x2-_min)/dx+0.5);
 
       if firstbin<0 then
         firstbin:=0;
@@ -702,7 +702,7 @@ begin
   else if v > max then
     valtoy := yw
   else
-    valtoy := trunc((v-min)/(max-min)*conv(yw)+0.5);
+    valtoy := floor((v-min)/(max-min)*conv(yw)+0.5);
 end;
 
 func ypos(i: integer): integer;
@@ -722,7 +722,7 @@ begin
   _move(xs,ys+ypos(firstbin));
 
   for i:=firstbin+1 to lastbin do begin
-    x:=trunc(
+    x:=floor(
          conv(xw) *
          conv(i-firstbin) /
          conv(span) + 0.5);
@@ -747,7 +747,7 @@ begin
     if span = 0 then
       i := firstbin
     else
-      i := firstbin + trunc((conv(xi) * rspan
+      i := firstbin + floor((conv(xi) * rspan
           + rxsizehalf) / rxsize + 0.5);
     j := dataindex(i);
     { x coordinate }

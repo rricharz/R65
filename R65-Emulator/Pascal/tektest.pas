@@ -12,8 +12,8 @@ begin
   _startdraw(x+r,y);
   for i:=0 to r do begin
     arg:=conv(i)*360.0/conv(r);
-    x2:=x+trunc(conv(r)*cos(arg));
-    y2:=y+trunc(conv(r)*sin(arg));
+    x2:=x+floor(conv(r)*cos(arg));
+    y2:=y+floor(conv(r)*sin(arg));
     _draw(x2,y2);
   end;
   _enddraw;
@@ -37,9 +37,9 @@ begin
   _startdraw(xcenter+radius,ycenter);
   for ii:=1 to 360 do begin
     _draw(xcenter+
-         trunc(cos(conv(3*ii))*conv(radius)),
+         floor(cos(conv(3*ii))*conv(radius)),
          ycenter+
-         trunc(sin(conv(4*ii))*conv(radius)));
+         floor(sin(conv(4*ii))*conv(radius)));
   end;
   _enddraw;
   _moveto(10,10);

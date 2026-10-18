@@ -47,23 +47,23 @@ begin
   case mode of
     1: begin
          x:=2.5; y:=conv(YSIZE)/2.0;
-         xl:=trunc(x); yl:=trunc(y);
+         xl:=floor(x); yl:=floor(y);
        end;
     2: begin
          x:=2.5; y:=conv(YSIZE)/2.0;
-         xl:=trunc(x); yl:=trunc(y);
+         xl:=floor(x); yl:=floor(y);
          xc:=conv(XSIZE) * 0.5;
          yc:=conv(YSIZE) * 0.5;
          rc:=conv(YSIZE) * 0.25;
-         _circle(trunc(xc),trunc(yc),trunc(rc),WHITE);
+         _circle(floor(xc),floor(yc),floor(rc),WHITE);
        end;
     3: begin
          x:=conv(XSIZE)/2.0; y:=conv(YSIZE)/2.0;
-         xl:=trunc(x); yl:=trunc(y);
+         xl:=floor(x); yl:=floor(y);
          xc:=conv(XSIZE) * 0.5;
          yc:=conv(YSIZE) * 0.5;
          rc:=conv(YSIZE) * 0.5 - 5.0;
-         _circle(trunc(xc),trunc(yc),trunc(rc),WHITE);
+         _circle(floor(xc),floor(yc),floor(rc),WHITE);
        end
     end {case};
 end;
@@ -150,8 +150,8 @@ begin
          >= (rc-ballr)*(rc-ballr) then reflect
     end {case};
 
-  xi := trunc(x);
-  yi := trunc(y);
+  xi := floor(x);
+  yi := floor(y);
   _plotmap(xl-1,yl-1,erase);
   _plotmap(xi-1,yi-1,ball);
   xl := xi;

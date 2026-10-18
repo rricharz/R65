@@ -248,12 +248,12 @@ begin
   for i := 1 to n do wrt(' ');
 
   wrt(sign);
-  wrti(trunc(m));
+  wrti(floor(m));
   wrt('.');
 
   for i := 1 to 4 do begin
-    m := 10. * (m - conv(trunc(m)));
-    wrti(trunc(m));
+    m := 10. * (m - conv(floor(m)));
+    wrti(floor(m));
   end;
 
   wrt('e');
@@ -335,7 +335,7 @@ begin
     p:=10000.;
     started:=false;
     for i1:=1 to 5 do begin
-      digit:=trunc(m/p);
+      digit:=floor(m/p);
       if (digit<>0) or started or (i1=5) then begin
         write(digit);
         started:=true;
@@ -348,7 +348,7 @@ begin
 
     for i1:=1 to d1 do begin
       m:=10.*m;
-      digit:=trunc(m);
+      digit:=floor(m);
       write(digit);
       m:=m-conv(digit);
     end;

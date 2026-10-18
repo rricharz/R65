@@ -138,7 +138,7 @@ begin
     s := s+1;
   until (FILTYP = DEND) or (s >= MAXENT);
   r := conv(DSECTORS  -filloc);
-  s := trunc(100.0*r/conv(DSECTORS)+0.5);
+  s := floor(100.0*r/conv(DSECTORS)+0.5);
   _freedrv := s; { return no of free sectors }
   call(aenddo);
   if printit then begin

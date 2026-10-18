@@ -97,8 +97,8 @@ begin
           x:=x*10.0;
           y:=y*10.0;
         end;
-        xi:=cx+trunc(x);
-        yi:=cy+trunc(y);
+        xi:=cx+floor(x);
+        yi:=cy+floor(y);
         _startdraw(xi-3,yi-3);
         _draw(xi+3,yi-3);
         _draw(xi,yi+2);
@@ -129,17 +129,17 @@ var i,angle: integer;
   proc drawsegment;
   begin
     _writethrough;
-    _drawvector(cx,cy,cx+trunc(x),cy+trunc(y));
+    _drawvector(cx,cy,cx+floor(x),cy+floor(y));
     _endwritethrough;
-    _drawvector(cx+trunc(x),
-      cy+trunc(y),
-      cx+trunc(ticfactor*x),
-      cy+trunc(ticfactor*y));
+    _drawvector(cx+floor(x),
+      cy+floor(y),
+      cx+floor(ticfactor*x),
+      cy+floor(ticfactor*y));
     if mode=0 then begin
-      _drawvector(cx+trunc(ticf1*x),
-      cy+trunc(ticf1*y),
-      cx+trunc(ticf2*x),
-      cy+trunc(ticf2*y));
+      _drawvector(cx+floor(ticf1*x),
+      cy+floor(ticf1*y),
+      cx+floor(ticf2*x),
+      cy+floor(ticf2*y));
     end;
     angle:=angle+step;
   end;
@@ -362,7 +362,7 @@ begin
     repeat
       write('Warp distance in pc? ');
       distance:=readflo(INPUT);
-      required:=trunc(2.0*distance);
+      required:=floor(2.0*distance);
       writeln('Energy required: ',required);
       if energy[3]<required then
         writeln(INVVID,'Not enough energy (',
@@ -379,8 +379,8 @@ begin
           y:=cos(conv(ashiptable[i]))*
             conv(dshiptable[i])-warpy;
           ashiptable[i]:=
-            trunc(atan2(trunc(x),trunc(y)));
-          dshiptable[i]:=trunc(sqrt(x*x+y*y));
+            floor(atan2(floor(x),floor(y)));
+          dshiptable[i]:=floor(sqrt(x*x+y*y));
         end;
         writeln('done',NORVID);
       end
@@ -422,7 +422,7 @@ begin
           { Create new ship far away }
           dshiptable[i]:=20000;
           ashiptable[i]:=
-            trunc(conv(_random)*360.0/256.0);
+            floor(conv(_random)*360.0/256.0);
           shipdamage[i]:=100;
         end;
       end;
@@ -597,7 +597,7 @@ begin
   phaserrange:=10;
   for i:=0 to 89 do begin
     v:=32000.0*sin(conv(i));
-    sinetable[i]:=trunc(v);
+    sinetable[i]:=floor(v);
   end;
   for i:=0 to 3 do begin
     energy[i]:=80;
@@ -606,7 +606,7 @@ begin
   charging:=1;
   for i:=0 to maxships-1 do begin
     ashiptable[i]:=
-      trunc(conv(_random)*360.0/256.0);
+      floor(conv(_random)*360.0/256.0);
     dshiptable[i]:=_random div 2 +
        radarsize-128;
     shipdamage[i]:=100;

@@ -70,7 +70,7 @@ begin
       error('Integer value exceeds',
         ' lower limit, set to -32768');
       fix:=$8000;
-    end else fix:=trunc(rf+rnd);
+    end else fix:=floor(rf+rnd);
 end;
 
 proc checkfor(c: char);

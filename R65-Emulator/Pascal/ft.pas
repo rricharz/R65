@@ -96,7 +96,7 @@ var
   var i,j,bits: integer;
       t: real;
   begin
-    bits := trunc(log(conv(_n))/log(2.0)+0.5);
+    bits := floor(log(conv(_n))/log(2.0)+0.5);
 
     for i := 0 to _n - 1 do begin
       j := bitreverse(i, bits);

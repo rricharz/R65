@@ -32,8 +32,8 @@ var i,ypaddle,lastypaddle:integer;
 
 proc showball;
 begin
-  _plotmap(trunc(lastxball),trunc(lastyball),erase);
-  _plotmap(trunc(xball),trunc(yball),ball);
+  _plotmap(floor(lastxball),floor(lastyball),erase);
+  _plotmap(floor(xball),floor(yball),ball);
   lastxball:=xball;
   lastyball:=yball;
 end;

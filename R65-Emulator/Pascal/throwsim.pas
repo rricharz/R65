@@ -19,11 +19,11 @@ begin
     yspeed:=speed*sin(angle);
     x:=0.; y:=0.;
     repeat
-      if (trunc(y)<YSIZE) then
-        _plot(trunc(x),trunc(y),WHITE);
+      if (floor(y)<YSIZE) then
+        _plot(floor(x),floor(y),WHITE);
       x:=x+xspeed;
       y:=y+yspeed;
       yspeed:=yspeed-0.005;
-    until (trunc(x)>XSIZE) or (trunc(y)<0);
+    until (floor(x)>XSIZE) or (floor(y)<0);
   end;
 end.

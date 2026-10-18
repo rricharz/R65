@@ -8,962 +8,963 @@
    8     4 [  0] 
    9     4 [  0] program ladders;
   10     4 [  0] uses  syslib,plotlib,ledlib,arglib,strlib,
-  11  4500 [110]       spritelib, striolib, writelib;
-  12  8457 [154] 
-  13  8457 [154] const ERASE         = 0;
-  14  8460 [155]       BALL          = $6ff6;
-  15  8460 [156] 
-  16  8460 [156]       NFLOORS       = 5;
-  17  8460 [157]       VFLOORS       = 20;
-  18  8460 [158]       MAXBYSPEED    = 19.0;
-  19  8460 [159]       HOLESIZE      = 22;
-  20  8460 [160]       HOLEMARGIN    = 4;
-  21  8460 [161] 
-  22  8460 [161]       GRAVITY       = -0.25;
-  23  8460 [162]       REFLECTION    = -0.85;
-  24  8460 [163] 
-  25  8460 [163]       FXSTEPSIZE    = 2.0;
-  26  8460 [164] 
-  27  8460 [164]       LADDERSIZE    = 9;  { should be odd }
-  28  8460 [165]       MINDIST       = 12; { distance between ladders }
-  29  8460 [166]       SNAPWIDTH     = 6.0; { keep walking to ladder }
-  30  8460 [167]       LADDTOL       = 2;
-  31  8460 [168]       SETPAUSE      = 8; { frames to pause at ladder }
-  32  8460 [169] 
-  33  8460 [169]       LOOPSPERFRAME = 2;
-  34  8460 [170]       LASTXTIME     = 4; { frames }
-  35  8460 [171]       JUMPOFFSPEED  = 2.0;
-  36  8460 [172] 
-  37  8460 [172]       XDOORSIZE     = 9; { should be odd }
-  38  8460 [173]       YDOORSIZE     = 12;
-  39  8460 [174] 
-  40  8460 [174]       EWAIT         = 20; { wait tics at bottom/top }
-  41  8460 [175]       ETICS         = 4;  { tics per verical step }
-  42  8460 [176] 
-  43  8460 [176]       MAXNGEMS      = 10;
-  44  8460 [177] 
-  45  8460 [177]       CLEFT         = chr($03);
-  46  8460 [178]       CRIGHT        = chr($16);
-  47  8460 [179]       CUP           = chr($1a);
-  48  8460 [180]       CDOWN         = chr($18);
-  49  8460 [181]       JUMPKEY       = ' ';
-  50  8460 [182]       ESC           = chr(0);
-  51  8460 [183] 
-  52  8460 [183] var bx,bxspeed,bxs:               integer;
-  53  8460 [186]     by, bys, fx,fxs:              real;
-  54  8460 [190]     byspeed,fxstep,lastfxstep:    real;
-  55  8460 [193]     jump,jumpspeed:               real;
-  56  8460 [195]     floor,ffloor,fy,fys,fyspeed:  integer;
-  57  8460 [200]     score,loopcounter,level:      integer;
-  58  8460 [203]     lastfxtimes, pause:           integer;
-  59  8460 [205]     demomode:                     boolean;
-  60  8460 [206] 
-  61  8460 [206]     efloor,ex,ey,eys,ecount:      integer;
-  62  8460 [211]     ewait,eybottom,eytop,edir:    integer;
-  63  8460 [215]     on_elev:                      boolean;
-  64  8460 [216] 
-  65  8460 [216]     xdoor,ydoor:          array[2] of integer;
-  66  8460 [218]     holes,ladders:        array[NFLOORS] of integer;
-  67  8460 [220]     xgem, valgem:         array[NFLOORS] of integer;
-  68  8460 [222] 
-  69  8460 [222] 
-  70  8460 [222] {$I IRANDOM:P}
-{I:IRANDO}  1  8460 [222] { irandom: real and integer _random functions
-{I:IRANDO}  2  8460 [222]            with limits min and max
-{I:IRANDO}  3  8460 [222] }
-{I:IRANDO}  4  8460 [222] 
-{I:IRANDO}  5  8460 [222] func rrandom(min,max:real):real;
-{I:IRANDO}  6  8460 [226] begin
-{I:IRANDO}  7  8460 [226]   rrandom := min + (conv(_random)/255.0) * (max - min);
-{I:IRANDO}  8  8498 [226] end;
-{I:IRANDO}  9  8506 [226] 
-{I:IRANDO} 10  8507 [224] func irandom(min,max:integer):integer;
-{I:IRANDO} 11  8507 [228] begin
-{I:IRANDO} 12  8507 [228]   irandom := trunc(rrandom(conv(min),conv(max)));
-{I:IRANDO} 13  8530 [228] end;
-{I:IRANDO} 14  8535 [228] 
-  71  8536 [226] 
-  72  8536 [226] func onfloor(f,y:integer):boolean;
-  73  8536 [230] begin
-  74  8536 [230]   onfloor:=(f*VFLOORS+1=y);
-  75  8556 [230] end;
-  76  8560 [230] 
-  77  8561 [228] func onupladder(f:integer;x:real):boolean;
-  78  8561 [232] var xi,center:integer;
-  79  8564 [234] begin
-  80  8564 [234]   xi:=trunc(x);
-  81  8572 [234]   if (f<0) or (f>=NFLOORS) then
-  82  8591 [234]     onupladder:=false
-  83  8595 [234]   else begin
-  84  8604 [234]     center:=ladders[f]+LADDERSIZE-8;
-  85  8617 [234]     onupladder:=(xi>=center-LADDTOL) and
-  86  8634 [234]                 (xi<=center+LADDTOL);
-  87  8646 [234]   end;
-  88  8651 [234] end;
-  89  8651 [234] 
-  90  8652 [230] func ondownladder(f:integer;x:real):boolean;
-  91  8652 [234] var xi,center:integer;
-  92  8655 [236] begin
-  93  8655 [236]   xi:=trunc(x);
-  94  8663 [236]   if (f<=0) or (f>NFLOORS) then
-  95  8682 [236]     ondownladder:=false
-  96  8686 [236]   else begin
-  97  8695 [236]     center:=ladders[f-1]+LADDERSIZE-8;
-  98  8711 [236]     ondownladder:=(xi>=center-LADDTOL) and
-  99  8728 [236]                   (xi<=center+LADDTOL);
- 100  8740 [236]   end;
- 101  8745 [236] end;
- 102  8745 [236] 
- 103  8746 [232] func onhole(f:integer;x:real):boolean;
- 104  8746 [236] var xc: integer;
- 105  8749 [237] begin
- 106  8749 [237]   xc := trunc(x) + 4;  { center of 8-pixel sprite }
- 107  8765 [237]   onhole := (xc >= holes[f]) and
- 108  8778 [237]             (xc <= holes[f] + HOLESIZE);
- 109  8794 [237] end;
- 110  8799 [237] 
- 111  8800 [234] func balloverlap(x1,x2: integer): boolean;
- 112  8800 [238] begin
- 113  8800 [238]   { ball is bx..bx+3 }
- 114  8803 [238]   { require more than 1 pixel overlap }
- 115  8803 [238]   balloverlap := (bx+2 >= x1) and (bx+1 <= x2)
- 116  8824 [238] end;
- 117  8834 [238] 
- 118  8835 [236] proc showfloor(f:integer);
- 119  8835 [238] var y:integer;
- 120  8838 [239] begin
- 121  8838 [239]   y:=f*VFLOORS;
- 122  8846 [239]   _move(0,y);
- 123  8863 [239]   _draw(holes[f]-HOLEMARGIN,y,WHITE);
- 124  8886 [239]   _move(holes[f]+HOLESIZE+HOLEMARGIN,y);
- 125  8910 [239]   _draw(XSIZE,y,WHITE);
- 126  8924 [239] end;
- 127  8924 [239] 
- 128  8925 [237] proc showladder(f:integer);
- 129  8925 [239] var i,x1,x2,y1,y2:integer;
- 130  8928 [244] begin
- 131  8928 [244]   if f<NFLOORS then begin
- 132  8937 [244]     x1:=ladders[f];
- 133  8944 [244]     x2:=x1+LADDERSIZE;
- 134  8958 [244]     y1:=f*VFLOORS+1;
- 135  8972 [244]     y2:=y1+VFLOORS-1;
- 136  8986 [244]     _move(x1,y1);
- 137  9005 [244]     _draw(x1,y2,WHITE);
- 138  9021 [244]     _move(x2,y1);
- 139  9035 [244]     _draw(x2,y2,WHITE);
- 140  9051 [244]     for i:=1 to 5 do begin
- 141  9068 [244]       _move(x1,y1+4*i-1);
- 142  9093 [244]       _draw(x2,y1+4*i-1,WHITE);
- 143  9120 [244]     end;
- 144  9120 [244]   end;
- 145  9134 [244] end;
- 146  9134 [244] 
- 147  9135 [238] proc showshaft;
- 148  9135 [239] begin
- 149  9135 [239]   _move(ex,eybottom);
- 150  9154 [239]   _draw(ex,eytop,WHITE);
- 151  9170 [239]   _move(ex+LADDERSIZE,eybottom);
- 152  9187 [239]   _draw(ex+LADDERSIZE,eytop,WHITE);
- 153  9206 [239] end;
- 154  9206 [239] 
- 155  9207 [239] proc showelevator;
- 156  9207 [240] begin
- 157  9207 [240]   if eys>eybottom then begin
- 158  9221 [240]     _move(ex+1,eys);
- 159  9241 [240]     _draw(ex+LADDERSIZE-1,eys,BLACK);
- 160  9263 [240]   end;
- 161  9263 [240]   _move(ex+1,ey);
- 162  9280 [240]   _draw(ex+LADDERSIZE-1,ey,WHITE);
- 163  9302 [240]   eys:=ey;
- 164  9302 [240]   { show floor element above }
- 165  9310 [240]   _move(ex,(efloor+1)*VFLOORS);
- 166  9330 [240]   _draw(ex+LADDERSIZE,(efloor+1)*VFLOORS,WHITE);
- 167  9355 [240] end;
- 168  9355 [240] 
- 169  9356 [240] proc showdoor(i: integer);
- 170  9356 [242] var x1, y1,x2,y2: integer;
- 171  9359 [246] begin
- 172  9359 [246]   x1:=xdoor[i];
- 173  9365 [246]   x2:=x1+XDOORSIZE;
- 174  9379 [246]   y1:=ydoor[i];
- 175  9388 [246]   y2:=y1+YDOORSIZE;
- 176  9402 [246]   _move(x1,y1);
- 177  9421 [246]   _draw(x1,y2,WHITE);
- 178  9437 [246]   _draw(x2,y2,WHITE);
- 179  9453 [246]   _draw(x2,y1,WHITE);
- 180  9469 [246]   _plot(x2-2,y1+5,WHITE);
- 181  9491 [246] end;
- 182  9491 [246] 
- 183  9492 [241] proc showgem(f: integer);
- 184  9492 [243] var sprite: integer;
- 185  9495 [244] begin
- 186  9495 [244]   if valgem[f]=0 then sprite:=S_CLEAR
- 187  9511 [244]   else if
- 188  9520 [244]     valgem[f]=30 then sprite:=S_GEMS+2
- 189  9536 [244]   else
- 190  9538 [244]     sprite:=S_GEMS+1;
- 191  9550 [244]   _showsprite(xgem[f],f*VFLOORS+1,sprite);
- 192  9583 [244] end;
- 193  9583 [244] 
- 194  9584 [242] proc repairladder(f, xmin, xmax: integer);
- 195  9584 [246] begin
- 196  9584 [246]   if (ladders[f] < xmax) and
- 197  9602 [246]          (ladders[f] + LADDERSIZE > xmin) then begin
- 198  9619 [246]     if f <> efloor then
- 199  9626 [246]       showladder(f)
- 200  9634 [246]     else
- 201  9644 [246]       showshaft;
- 202  9651 [246]   end;
- 203  9651 [246] end;
- 204  9651 [246] 
- 205  9652 [243] proc repairdoor(f,xmin,xmax: integer);
- 206  9652 [247] var i,x1,x2: integer;
- 207  9655 [250] begin
- 208  9655 [250]   if f=0 then
- 209  9663 [250]     i:=0
- 210  9667 [250]   else if f=NFLOORS then
- 211  9682 [250]     i:=1
- 212  9686 [250]   else
- 213  9688 [250]     exit;
- 214  9696 [250]   x1:=xdoor[i];
- 215  9700 [250]   x2:=x1+XDOORSIZE;
- 216  9714 [250]   if (x1 <= xmax) and (x2 >= xmin) then
- 217  9737 [250]     showdoor(i);
- 218  9751 [250] end;
- 219  9751 [250] 
- 220  9752 [244] proc cleargem(f: integer);
- 221  9752 [246] begin
- 222  9752 [246]   if (f>=0) and (f<=NFLOORS) then
- 223  9771 [246]     _showsprite(xgem[f],f*VFLOORS+1,S_CLEAR);
- 224  9801 [246] end;
- 225  9801 [246] 
- 226  9802 [245] proc repairgem(f,xmin,xmax: integer);
- 227  9802 [249] var gx1,gx2: integer;
- 228  9805 [251] begin
- 229  9805 [251]   if (f>=0) and (f<=NFLOORS) then
- 230  9821 [251]     if valgem[f]<>0 then begin
- 231  9836 [251]       gx1:=xgem[f];
- 232  9843 [251]       gx2:=gx1+7;
- 233  9857 [251]       if (gx1 <= xmax) and (gx2 >= xmin) then
- 234  9880 [251]         showgem(f);
- 235  9894 [251]     end;
- 236  9894 [251] end;
- 237  9894 [251] 
- 238  9895 [246] proc repair(f,x1,x2: integer);
- 239  9895 [250] var xmin,xmax: integer;
- 240  9898 [252] begin
- 241  9898 [252]   if x1 < x2 then begin
- 242  9909 [252]     xmin := x1 - 1;
- 243  9918 [252]     xmax := x2 + 8;
- 244  9929 [252]   end else begin
- 245  9937 [252]     xmin := x2 - 1;
- 246  9943 [252]     xmax := x1 + 8;
- 247  9954 [252]   end;
- 248  9959 [252]   repairladder(f, xmin, xmax);
- 249  9977 [252]   repairdoor(f, xmin, xmax);
- 250  9995 [252]   repairgem(f, xmin, xmax);
- 251 10013 [252] end;
- 252 10013 [252] 
- 253 10014 [247] proc showplayer;
- 254 10014 [248] var fysum, frame, spriteindex:integer;
- 255 10017 [251] begin
- 256 10017 [251]   frame := loopcounter div LOOPSPERFRAME;
- 257 10025 [251]   fysum:=fy+trunc(jump);
- 258 10040 [251] 
- 259 10046 [251]   if jump > 0.0 then begin
- 260 10059 [251]     if fxstep > 0.0 then
- 261 10074 [251]       spriteindex := S_JUMPR + frame
- 262 10080 [251]     else
- 263 10080 [251]       spriteindex := S_JUMPL + frame
- 264 10094 [251]   end else if fyspeed > 0 then
- 265 10112 [251]     spriteindex := S_UP + frame
- 266 10118 [251]   else if fyspeed < 0 then
- 267 10136 [251]     spriteindex := S_DOWN + frame
- 268 10142 [251]   else if fxstep = 0.0 then
- 269 10166 [251]     spriteindex := S_STANDING
- 270 10170 [251]   else if fxstep >0.0 then
- 271 10191 [251]     spriteindex := S_RIGHT + frame
- 272 10197 [251]   else
- 273 10197 [251]     spriteindex := S_LEFT + frame;
- 274 10211 [251]   _showsprite(trunc(fxs),fys,S_CLEAR);
- 275 10239 [251]   _showsprite(trunc(fx),fysum, spriteindex);
- 276 10260 [251]   repair(ffloor, trunc(fxs), trunc(fx));
- 277 10284 [251]   fxs:=fx; fys:=fysum;
- 278 10296 [251]   loopcounter := loopcounter + 1;
- 279 10310 [251]   if loopcounter >= (3 * LOOPSPERFRAME) then
- 280 10324 [251]     loopcounter := 0;
- 281 10330 [251] end;
- 282 10334 [251] 
- 283 10335 [248] proc moveelevator;
- 284 10335 [249] begin
- 285 10335 [249]   if ewait > 0 then begin
- 286 10347 [249]     ewait:=ewait-1;
- 287 10356 [249]     exit
- 288 10361 [249]   end;
- 289 10362 [249]   ecount:=ecount+1;
- 290 10368 [249]   if ecount >= ETICS then begin
- 291 10380 [249]     ecount := 0;
- 292 10385 [249]     ey := ey + edir;
- 293 10393 [249]     if ey >= eytop then begin
- 294 10411 [249]       ey := eytop;
- 295 10414 [249]       edir := -1;
- 296 10424 [249]       ewait := EWAIT
- 297 10429 [249]     end
- 298 10431 [249]     else if ey <= eybottom then begin
- 299 10447 [249]       ey := eybottom;
- 300 10450 [249]       edir := 1;
- 301 10460 [249]       ewait := EWAIT
- 302 10464 [249]     end
- 303 10466 [249]   end;
- 304 10470 [249] end;
- 305 10470 [249] 
- 306 10471 [249] proc flashplayer;
- 307 10471 [250] var i,j,f,time: integer;
- 308 10474 [254] begin
- 309 10474 [254]   for i:=1 to 4 do begin
- 310 10493 [254]     _showsprite(trunc(fxs),fys,S_STANDING);
- 311 10512 [254]     repair(ffloor,trunc(fxs), trunc(fxs));
- 312 10536 [254]     for j:= 0 to 2 do
- 313 10544 [254]         time:=_syncscreen;
- 314 10559 [254]     _showsprite(trunc(fxs),fys,S_CLEAR);
- 315 10596 [254]     repair(ffloor,trunc(fxs), trunc(fxs));
- 316 10620 [254]     for j:= 0 to 2 do
- 317 10628 [254]         time:=_syncscreen;
- 318 10643 [254]   end;
- 319 10661 [254] end;
- 320 10675 [254] 
- 321 10676 [250] proc init; forward;
- 322 10679 [251] 
- 323 10679 [251] proc showresult;
- 324 10679 [252] var s:cpnt;
- 325 10682 [253] begin
- 326 10682 [253]   s:=_new;
- 327 10690 [253]   write(@s,level:1,score:7);
- 328 10724 [253]   _ledstring(s);
- 329 10734 [253]   _release(s);
- 330 10744 [253] end;
- 331 10744 [253] 
- 332 10745 [252] proc tryladderup;
- 333 10745 [253] begin
- 334 10745 [253]   if (ffloor<NFLOORS) and (ffloor<>efloor) and
- 335 10766 [253]      onupladder(ffloor,fx)
- 336 10773 [253]   then begin
- 337 10786 [253]     fx:=conv(ladders[ffloor]+1);
- 338 10800 [253]     fyspeed:=1;
- 339 10809 [253]     fxstep:=0.0;
- 340 10819 [253]     lastfxstep:=0.0;
- 341 10831 [253]   end;
- 342 10837 [253] end;
- 343 10837 [253] 
- 344 10838 [253] proc tryladderdown;
- 345 10838 [254] begin
- 346 10838 [254]   if (ffloor>0) and (ffloor<>efloor+1) and
- 347 10862 [254]      ondownladder(ffloor,fx)
- 348 10869 [254]   then begin
- 349 10882 [254]     floor:=ffloor-1;
- 350 10891 [254]     fx:=conv(ladders[ffloor-1]+1);
- 351 10910 [254]     fyspeed:=-1;
- 352 10919 [254]     fxstep:=0.0;
- 353 10930 [254]     lastfxstep:=0.0;
- 354 10942 [254]   end;
- 355 10948 [254] end;
- 356 10948 [254] 
- 357 10949 [254] proc showball;
- 358 10949 [255] begin
- 359 10949 [255]   _plotmap(bxs,trunc(bys),ERASE);
- 360 10973 [255]   _plotmap(bx,trunc(by),BALL);
- 361 10993 [255]   repair(floor,bxs,bx);
- 362 11011 [255] end;
- 363 11011 [255] 
- 364 11012 [255] proc eraseball;
- 365 11012 [256] begin
- 366 11012 [256]   _plotmap(bxs,trunc(bys),ERASE);
- 367 11036 [256]   repair(floor,bxs,bx);
- 368 11054 [256] end;
- 369 11054 [256] 
- 370 11055 [256] proc newball;
- 371 11055 [257] begin
- 372 11055 [257]   bx:=2;
- 373 11062 [257]   floor:=NFLOORS;
- 374 11068 [257]   by:=conv((floor+1)*VFLOORS-6);
- 375 11085 [257]   showball;
- 376 11096 [257]   bxs:=bx;
- 377 11096 [257]   bys:=by;
- 378 11104 [257]   bxspeed:=2; byspeed:=0.0
- 379 11122 [257] end;
- 380 11134 [257] 
- 381 11135 [257] func crossup(yline: real): boolean;
- 382 11135 [260] begin
- 383 11135 [260]   crossup := (bys < yline) and (by >= yline)
- 384 11159 [260] end;
- 385 11171 [260] 
- 386 11172 [259] func crossdown(yline: real): boolean;
- 387 11172 [262] begin
- 388 11172 [262]   crossdown := (bys > yline) and (by <= yline)
- 389 11196 [262] end;
- 390 11208 [262] 
- 391 11209 [261] proc hreflect(xline: integer);
- 392 11209 [263] begin
- 393 11209 [263]   if (bxs < xline) and (bx >= xline) then begin
- 394 11233 [263]     bx := xline - 1;
- 395 11242 [263]     bxspeed := -bxspeed
- 396 11247 [263]   end
- 397 11247 [263]   else if (bxs > xline) and (bx <= xline) then begin
- 398 11278 [263]     bx := xline + 1;
- 399 11287 [263]     bxspeed := -bxspeed
- 400 11292 [263]   end
- 401 11292 [263] end;
- 402 11301 [263] 
- 403 11302 [262] proc nextround;
- 404 11302 [263] begin
- 405 11302 [263]   eraseball;
- 406 11311 [263]   flashplayer;
- 407 11315 [263]   fx:=conv(xdoor[0]+XDOORSIZE-8);
- 408 11327 [263]   fy:=ydoor[0];
- 409 11336 [263]   fxstep:=0.0;
- 410 11350 [263]   ffloor:=0;
- 411 11358 [263]   fyspeed:=0;
- 412 11364 [263]   showresult;
- 413 11372 [263]   newball;
- 414 11376 [263] end;
- 415 11376 [263] 
- 416 11377 [263] func airborne(f:integer; fy:integer): boolean;
- 417 11377 [267] begin
- 418 11377 [267]   airborne := (not onfloor(f, fy)) or (jump > 0.01);
- 419 11412 [267] end;
- 420 11417 [267] 
- 421 11418 [265] proc checkcrossing(f: integer; var x: real);
- 422 11418 [268] var center: real;
- 423 11421 [269] 
- 424 11421 [269]   proc checkcenter(c: real);
- 425 11421 [271]   begin
- 426 11421 [271]     if fxstep > 0.0 then begin
- 427 11439 [271]       if (x < c) and (x + fxstep >= c) then begin
- 428 11476 [271]         x := c;
- 429 11479 [271]         fxstep := 0.0;
- 430 11497 [271]         pause := SETPAUSE;
- 431 11505 [271]       end;
- 432 11509 [271]     end else if fxstep < 0.0 then begin
- 433 11525 [271]       if (x > c) and (x + fxstep <= c) then begin
- 434 11562 [271]         x := c;
- 435 11565 [271]         fxstep := 0.0;
- 436 11583 [271]         pause := SETPAUSE;
- 437 11591 [271]       end;
- 438 11595 [271]     end;
- 439 11595 [271]   end;
- 440 11595 [271] 
- 441 11596 [270] begin
- 442 11596 [270]   if pause > 0 then
- 443 11604 [270]     pause := pause - 1
- 444 11612 [270]   else begin
- 445 11622 [270]     if (f >= 0) and (f < NFLOORS) then begin
- 446 11637 [270]       center := conv(ladders[f] + LADDERSIZE - 8);
- 447 11654 [270]       checkcenter(center);
- 448 11673 [270]     end;
- 449 11673 [270] 
- 450 11673 [270]     if (pause = 0) and (f > 0) then begin
- 451 11688 [270]       center := conv(ladders[f-1] + LADDERSIZE - 8);
- 452 11708 [270]       checkcenter(center);
- 453 11727 [270]     end;
- 454 11727 [270]   end;
- 455 11727 [270] end;
- 456 11727 [270] 
- 457 11728 [266] func expaint: boolean;
- 458 11728 [268] { paint picture and apply motion }
- 459 11728 [268] var f,distx,fxt:integer;
- 460 11731 [271]     yline:real;
- 461 11731 [272]     s:cpnt;
- 462 11731 [273] 
- 463 11731 [273]   func holeahead(f:integer; x,xstep:real):boolean;
- 464 11731 [278]   var xc,nextxc: integer;
- 465 11734 [280]   begin
- 466 11734 [280]     if xstep = 0.0 then
- 467 11748 [280]       holeahead:=false
- 468 11752 [280]     else begin
- 469 11761 [280]       xc:=trunc(x)+4;
- 470 11770 [280]       nextxc:=trunc(x + 3.0*xstep)+4;
- 471 11798 [280]       if xstep > 0.0 then
- 472 11815 [280]         holeahead:=(xc < holes[f]) and
- 473 11832 [280]                     (nextxc >= holes[f])
- 474 11840 [280]       else
- 475 11845 [280]          holeahead:=(xc > holes[f]+HOLESIZE) and
- 476 11869 [280]                     (nextxc <= holes[f]+HOLESIZE);
- 477 11885 [280]     end;
- 478 11890 [280]   end;
- 479 11890 [280] 
- 480 11891 [275] begin
- 481 11891 [275]   if score>=10000 then begin
- 482 11901 [275]     expaint:=true;
- 483 11906 [275]     exit;
- 484 11911 [275]   end;
- 485 11911 [275]   expaint:=false;
- 486 11913 [275] 
- 487 11917 [275]   { ***** HANDLE DEMO MODE ***** }
- 488 11917 [275] 
- 489 11917 [275]   if  demomode and (jump<0.01) then begin
- 490 11935 [275]     if valgem[ffloor]>0 then begin
- 491 11949 [275]       { first collect gem }
- 492 11952 [275]       if xgem[ffloor]<trunc(fx) then
- 493 11966 [275]         fxstep := -FXSTEPSIZE
- 494 11971 [275]       else
- 495 11977 [275]         fxstep := FXSTEPSIZE;
- 496 11993 [275]     end else begin
- 497 12002 [275]       if ffloor=NFLOORS then fxstep := FXSTEPSIZE
- 498 12012 [275]       else if (ffloor<NFLOORS) and
- 499 12034 [275]                             onupladder(ffloor,fx)
- 500 12040 [275]       then tryladderup
- 501 12053 [275]       else if onfloor(ffloor,fy) then  begin
- 502 12079 [275]         if (trunc(fx)>=ladders[ffloor]+1) then begin
- 503 12101 [275]           if fxstep>1.0 then fxstep:=0.0
- 504 12120 [275]           else fxstep:=-FXSTEPSIZE;
- 505 12141 [275]         end else begin
- 506 12151 [275]           if fxstep<-1.0 then fxstep:=0.0
- 507 12168 [275]           else fxstep := FXSTEPSIZE
- 508 12183 [275]         end;
- 509 12195 [275]       end;
- 510 12195 [275]     end;
- 511 12195 [275]     if (jump < 0.01) and onfloor(ffloor,fy) then
- 512 12224 [275]       if holeahead(ffloor,fx,fxstep) then begin
- 513 12252 [275]         jumpspeed := JUMPOFFSPEED;
- 514 12261 [275]         jump := 0.01;
- 515 12273 [275]       end;
- 516 12279 [275]     if pause > 0 then fxstep := 0.0;
- 517 12295 [275]   end;
- 518 12301 [275] 
- 519 12301 [275]   { ***** HANDLE MOOVING OBJECTS ***** }
- 520 12301 [275] 
- 521 12301 [275]   moveelevator;
- 522 12305 [275] 
- 523 12305 [275]   { ***** HANDLE THE PLAYER ***** }
- 524 12305 [275] 
- 525 12305 [275]   { remember fxstep for airborne state }
- 526 12305 [275]   if not airborne(ffloor, fy) then begin
- 527 12322 [275]     if fxstep <> 0.0 then begin
- 528 12338 [275]       lastfxstep := fxstep;
- 529 12341 [275]       lastfxtimes := LASTXTIME;
- 530 12355 [275]     end else begin
- 531 12362 [275]       if lastfxtimes > 0 then
- 532 12368 [275]         lastfxtimes := lastfxtimes - 1
- 533 12376 [275]       else
- 534 12378 [275]         lastfxstep := 0.0;
- 535 12392 [275]     end;
- 536 12398 [275]   end;
- 537 12398 [275]   { check for exit on top floor }
- 538 12398 [275]   if (ffloor=NFLOORS) and
- 539 12405 [275]      (trunc(fx) >= xdoor[1]) then begin
- 540 12420 [275]     score:=score+100;
- 541 12429 [275]     { align player with door before flashing/reset }
- 542 12434 [275]     fx:=conv(xdoor[0]+XDOORSIZE-8);
- 543 12446 [275]     fy:=ydoor[1];
- 544 12455 [275]     nextround;
- 545 12467 [275]     init;
- 546 12471 [275]     exit;
- 547 12472 [275]   end;
- 548 12472 [275]   { check for next floor on ladder }
- 549 12472 [275]   if ffloor<NFLOORS then
- 550 12478 [275]     if onfloor(ffloor+1,fy) then begin
- 551 12501 [275]       ffloor:=ffloor+1; fyspeed:=0;
- 552 12517 [275]     end;
- 553 12521 [275]   if ffloor>0 then
- 554 12527 [275]     if onfloor(ffloor-1,fy) then begin
- 555 12550 [275]       ffloor:=ffloor-1; fyspeed:=0;
- 556 12566 [275]     end;
- 557 12570 [275]   { ride elevator }
- 558 12570 [275]   if on_elev then begin
- 559 12574 [275]     fx:=conv(ex+1);
- 560 12584 [275]     fy:=ey+1;
- 561 12597 [275]     if (ey<>eytop) and (ey<>eybottom) then
- 562 12620 [275]       fxstep:=0.0
- 563 12624 [275]     else if fxstep<>0.0 then begin
- 564 12652 [275]       on_elev:=false;
- 565 12657 [275]       fx:=fx+fxstep; { move off already a bit }
- 566 12680 [275]     end;
- 567 12680 [275]     fyspeed:=0;
- 568 12682 [275]     if ey=eytop then
- 569 12690 [275]       ffloor:=efloor+1
- 570 12702 [275]     else if ey=eybottom then
- 571 12716 [275]       ffloor:=efloor
- 572 12724 [275]       end;
- 573 12732 [275]   if not on_elev then begin
- 574 12737 [275]     { move player }
- 575 12740 [275]     checkcrossing(ffloor, fx);
- 576 12762 [275]     if airborne(ffloor, fy) then
- 577 12778 [275]       fx := fx + lastfxstep
- 578 12787 [275]     else
- 579 12787 [275]       fx := fx + fxstep;
- 580 12809 [275]     fy:=fy+fyspeed;
- 581 12826 [275]     if fx>conv(XSIZE-8) then begin { right wall }
- 582 12851 [275]       fx:=conv(XSIZE-8); fxstep:=0.0;
- 583 12869 [275]     end;
- 584 12875 [275]     if (fx<1.0) then begin { left wall }
- 585 12891 [275]       fx:=1.0; fxstep:=-0.0;
- 586 12909 [275]     end;
- 587 12916 [275]     { check for player hitting gem }
- 588 12916 [275]     distx:=_abs(trunc(fx)-xgem[ffloor]);
- 589 12940 [275]     if (distx<8) then begin
- 590 12951 [275]       score:=score+valgem[ffloor];
- 591 12962 [275]       showresult;
- 592 12975 [275]       cleargem(ffloor);
- 593 12985 [275]       valgem[ffloor]:=0;
- 594 12991 [275]     end;
- 595 12995 [275]     { jump }
- 596 12995 [275]     jump:=jump+jumpspeed;
- 597 13001 [275]     jumpspeed:=jumpspeed+GRAVITY;
- 598 13026 [275]     if jump <= 0.0 then begin
- 599 13046 [275]       if onhole(ffloor,fx) then begin
- 600 13067 [275]         { continue falling to next floor }
- 601 13070 [275]         ffloor := ffloor - 1;
- 602 13076 [275]         jump := jump + conv(VFLOORS);
- 603 13089 [275]         fy := ffloor * VFLOORS + 1;
- 604 13106 [275]       end
- 605 13111 [275]       else begin
- 606 13114 [275]         { normal landing }
- 607 13114 [275]         jump := 0.0;
- 608 13120 [275]         jumpspeed := 0.0;
- 609 13132 [275]       end;
- 610 13138 [275]     end;
- 611 13138 [275]   end;
- 612 13138 [275] 
- 613 13138 [275]   { ***** HANDLE THE BALL ***** }
- 614 13138 [275] 
- 615 13138 [275]   { move ball }
- 616 13138 [275]   bxs:=bx; bys:=by;
- 617 13146 [275]   bx:=bx+bxspeed; by:=by+byspeed;
- 618 13177 [275]   { check for wall }
- 619 13190 [275]   if bx>=XSIZE-4 then begin
- 620 13200 [275]     bx:=XSIZE-4; bxspeed:=-bxspeed;
- 621 13212 [275]   end else if bx<1 then begin
- 622 13231 [275]     bx:=1; bxspeed:=-bxspeed;
- 623 13240 [275]   end;
- 624 13249 [275]   { check for reflection on ceiling }
- 625 13249 [275]   yline := conv((floor+1)*VFLOORS-4);
- 626 13262 [275]   if crossup(yline) then begin
- 627 13283 [275]     by := yline;
- 628 13286 [275]     byspeed := REFLECTION*byspeed
- 629 13304 [275]   end;
- 630 13317 [275]   { check for reflection on the floor }
- 631 13317 [275]   yline := conv(floor*VFLOORS+1);
- 632 13327 [275]   if (balloverlap(holes[floor],
- 633 13340 [275]           holes[floor]+HOLESIZE-1))
- 634 13364 [275]           and (by<=yline) then begin
- 635 13378 [275]     { fall through hole hole }
- 636 13381 [275]     if floor>0 then floor:=floor-1;
- 637 13397 [275]   end else if (by<yline) or crossdown(yline) then
- 638 13432 [275]   begin
- 639 13433 [275]     { reflection on floor }
- 640 13436 [275]     by:=yline+1.0; { jump a bit }
- 641 13455 [275]     byspeed:=REFLECTION*byspeed;
- 642 13461 [275]   end;
- 643 13474 [275]   byspeed:=byspeed+GRAVITY;
- 644 13486 [275]   if byspeed > MAXBYSPEED then
- 645 13505 [275]     byspeed := MAXBYSPEED
- 646 13509 [275]   else if byspeed < -MAXBYSPEED then
- 647 13536 [275]     byspeed := -MAXBYSPEED;
- 648 13547 [275]   { check for border on bottom floor }
- 649 13554 [275]   if (by<8.0) and ((bx<=2) or (bx>=XSIZE-4))
- 650 13584 [275]   then begin
- 651 13586 [275]     newball;
- 652 13593 [275]   end;
- 653 13593 [275] 
- 654 13593 [275]   { *** check for hit *** }
- 655 13593 [275]   if (bx>=trunc(fx)-4) and (bx<=trunc(fx)+8) and
- 656 13623 [275]      (trunc(by)>=fy-4) and (trunc(by)<=fy+8)
- 657 13653 [275]     then begin
- 658 13656 [275]       nextround;
- 659 13663 [275]       { avoid endless loop in demo mode }
- 660 13663 [275]       if demomode then begin
- 661 13667 [275]         init;
- 662 13674 [275]         exit;
- 663 13675 [275]       end;
- 664 13675 [275]     end;
- 665 13675 [275] 
- 666 13675 [275]   { ***** paint ***** }
- 667 13675 [275] 
- 668 13675 [275]   { paint ball }
- 669 13675 [275]   showball;
- 670 13679 [275]   { paint player }
- 671 13679 [275]   if fyspeed<>0 then
- 672 13685 [275]     if trunc(fx)<>ladders[ffloor]+1 then
- 673 13706 [275]       writeln('bad climb x ',trunc(fx),
- 674 13730 [275]               ' should ',ladders[ffloor]+1,
- 675 13751 [275]               ' floor ',ffloor);
- 676 13772 [275]   showplayer;
- 677 13776 [275]   { paint moving elevator }
- 678 13776 [275]   showelevator;
- 679 13780 [275]   { ride elevator }
- 680 13780 [275]   if not on_elev then begin
- 681 13785 [275]     if (ffloor=efloor) and (ey=eybottom) and
- 682 13806 [275]        onupladder(ffloor,fx) then begin
- 683 13826 [275]       on_elev:=true;
- 684 13831 [275]       fxstep:=0.0;
- 685 13841 [275]       fyspeed:=0;
- 686 13849 [275]     end
- 687 13853 [275]   end;
- 688 13853 [275]   fyspeed:=0;
- 689 13855 [275]   if not airborne(ffloor,fy) then
- 690 13875 [275]     if pause = 0 then
- 691 13885 [275]       fxstep := 0.0;
- 692 13895 [275] end;
- 693 13901 [275] 
- 694 13902 [268] proc savescore;
- 695 13902 [269] var f:file;
- 696 13905 [270] begin
- 697 13905 [270]   _strfio('LADDERSCORE:B',0,1);
- 698 13933 [270]   openw(f);
- 699 13939 [270]   writeln(@f,score);
- 700 13956 [270]   close(f);
- 701 13962 [270] end;
- 702 13962 [270] 
- 703 13963 [269] proc loadscore;
- 704 13963 [270] var f:file;
- 705 13966 [271] begin
- 706 13966 [271]   IOCHECK := false;
- 707 13970 [271]   FILERR := 0;
- 708 13976 [271]   _strfio('LADDERSCORE:B',0,1);
- 709 14006 [271]   openr(f);
- 710 14012 [271]   if (FILERR<>0) then
- 711 14018 [271]   writeln(INVVID,'No stored score available',NORVID)
- 712 14052 [271]   else if not _readint(f,score) then score:=0;
- 713 14088 [271]   close(f);
- 714 14098 [271]   IOCHECK := true;
- 715 14100 [271] end;
- 716 14104 [271] 
- 717 14105 [270] func exkey(key:char):boolean;
- 718 14105 [273] { check for key typed }
- 719 14105 [273] 
- 720 14105 [273]   func canwalk:boolean;
- 721 14108 [275]   begin
- 722 14108 [275]     canwalk := (pause = 0) and onfloor(ffloor,fy)
- 723 14126 [275]                and (jump<=0.01)
- 724 14149 [275]   end;
- 725 14155 [275] 
- 726 14156 [275] begin
- 727 14156 [275]   exkey := (key = ESC);
- 728 14165 [275]   case key of
- 729 14169 [275]     CUP:      tryladderup;
- 730 14184 [275]     CDOWN:    tryladderdown;
- 731 14198 [275]     CLEFT:    if canwalk then
- 732 14214 [275]                 fxstep := -FXSTEPSIZE;
- 733 14223 [275]     CRIGHT:   if canwalk then
- 734 14246 [275]                fxstep := FXSTEPSIZE;
- 735 14255 [275]     JUMPKEY:  begin
- 736 14271 [275]                 if (not airborne(ffloor, fy)) and
- 737 14288 [275]                   (not onhole(ffloor, fx)) then begin
- 738 14308 [275]                   jumpspeed := JUMPOFFSPEED;
- 739 14317 [275]                   { jump a bit further }
- 740 14323 [275]                   fxstep := lastfxstep;
- 741 14323 [275]                 end;
- 742 14335 [275]               end;
- 743 14335 [275]     'L':    begin
- 744 14345 [275]               loadscore;
- 745 14349 [275]               showresult;
- 746 14353 [275]             end;
- 747 14353 [275]     '!':    begin
- 748 14363 [275]               score:=score+500; { cheat key }
- 749 14375 [275]               showresult;
- 750 14379 [275]               init;
- 751 14383 [275]             end
- 752 14383 [275]    end {case};
- 753 14385 [275] end;
- 754 14385 [275] 
- 755 14386 [272] proc init;
- 756 14386 [272] var f:integer;
- 757 14389 [273] 
- 758 14389 [273]   func nearladder(f,x:integer):boolean;
- 759 14389 [277]   begin
- 760 14389 [277]     if f<=0 then
- 761 14400 [277]       nearladder:=false
- 762 14404 [277]     else
- 763 14406 [277]       nearladder:=_abs(x-ladders[f-1]) <= MINDIST;
- 764 14439 [277]   end;
- 765 14444 [277] 
- 766 14445 [275]   func nearhole(f,x:integer):boolean;
- 767 14445 [279]   begin
- 768 14445 [279]     nearhole :=
- 769 14450 [279]       (x + LADDERSIZE >= holes[f] - HOLEMARGIN) and
- 770 14469 [279]       (x <= holes[f] + HOLESIZE + HOLEMARGIN);
- 771 14488 [279]   end;
- 772 14493 [279] 
- 773 14494 [277]   func ladderok(f,x:integer):boolean;
- 774 14494 [281]   begin
- 775 14494 [281]     ladderok := not nearhole(f,x) and
- 776 14515 [281]                 not nearhole(f+1,x);
- 777 14535 [281]   end;
- 778 14541 [281] 
- 779 14542 [279]   func gemok(f,x:integer):boolean;
- 780 14542 [283]   begin
- 781 14542 [283]     gemok:=true;
- 782 14549 [283] 
- 783 14553 [283]     { avoid upward ladder starting on this floor }
- 784 14553 [283]     if f<NFLOORS then
- 785 14559 [283]       if _abs(x-ladders[f]) <= 9 then
- 786 14586 [283]         gemok:=false;
- 787 14592 [283] 
- 788 14596 [283]     { avoid downward ladder arriving on this floor }
- 789 14596 [283]     if f>0 then
- 790 14602 [283]       if _abs(x-ladders[f-1]) <= 9 then
- 791 14632 [283]         gemok:=false;
- 792 14638 [283] 
- 793 14642 [283]     { avoid visible hole on this floor }
- 794 14642 [283]     if f>0 then
- 795 14648 [283]       if (x >= holes[f]-HOLEMARGIN-8) and
- 796 14671 [283]          (x <= holes[f]+HOLESIZE+HOLEMARGIN) then
- 797 14690 [283]         gemok:=false;
- 798 14696 [283] 
- 799 14700 [283]     { avoid bottom door }
- 800 14700 [283]     if f=0 then
- 801 14706 [283]       if x < XDOORSIZE+10 then
- 802 14718 [283]         gemok:=false;
- 803 14725 [283] 
- 804 14729 [283]     { avoid top door }
- 805 14729 [283]     if f=NFLOORS then
- 806 14735 [283]       if x > XSIZE-XDOORSIZE-10 then
- 807 14750 [283]         gemok:=false;
- 808 14757 [283]   end;
- 809 14761 [283] 
- 810 14762 [281] begin
- 811 14762 [281]   pause := 0;
- 812 14766 [281]   on_elev:=false;
- 813 14772 [281]   _cleargr;
- 814 14780 [281]   level:=score div 1000+1;
- 815 14790 [281]   if level>9 then level:=9;
- 816 14807 [281]   showresult;
- 817 14815 [281]   if (level>2) and (not demomode) then begin
- 818 14828 [281]     savescore;
- 819 14835 [281]     writeln('Level 2 Complete');
- 820 14858 [281]     _abort;
- 821 14862 [281]   end;
- 822 14862 [281]   { initialize ball }
- 823 14862 [281]   bxs:=2; bys:=conv(NFLOORS*VFLOORS-10);
- 824 14876 [281]   newball;
- 825 14887 [281]   { initialize player }
- 826 14887 [281]   fx:=3.0; fy:=1; jump:=0.0;  jumpspeed:=0.0;
- 827 14923 [281]   fxs:=fx; fys:=fy;
- 828 14941 [281]   fxstep:=0.0; fyspeed:=0;
- 829 14963 [281]   { make and show holes }
- 830 14967 [281]   holes[0]:=-50;
- 831 14971 [281]   _move(0,0); _draw(XSIZE,0,WHITE);
- 832 14998 [281]   for floor:=1 to NFLOORS do begin
- 833 15015 [281]     holes[floor]:=
- 834 15019 [281]       irandom(XDOORSIZE+4+HOLEMARGIN,
- 835 15028 [281]               XSIZE-HOLESIZE-3-XDOORSIZE-HOLEMARGIN);
- 836 15049 [281]     showfloor(floor);
- 837 15063 [281]   end;
- 838 15063 [281]   { make ladders }
- 839 15077 [281]   for floor:=0 to NFLOORS-1 do begin
- 840 15097 [281]     repeat
- 841 15097 [281]       ladders[floor]:=irandom(2,XSIZE-LADDERSIZE-2);
- 842 15119 [281] 
- 843 15123 [281]       if floor=0 then
- 844 15129 [281]         if ladders[0] < XDOORSIZE+10 then
- 845 15143 [281]           ladders[0]:=XDOORSIZE+10;
- 846 15154 [281] 
- 847 15159 [281]     until ladderok(floor,ladders[floor]) and
- 848 15179 [281]           not nearladder(floor,ladders[floor]);
- 849 15199 [281]   end;
- 850 15204 [281]   ladders[NFLOORS]:=-LADDERSIZE;
- 851 15222 [281]   floor:=NFLOORS;
- 852 15229 [281]   ffloor:=0;
- 853 15235 [281]   { make and show doors }
- 854 15239 [281]   xdoor[0]:=2;
- 855 15243 [281]   ydoor[0]:=1;
- 856 15251 [281]   xdoor[1]:=XSIZE-XDOORSIZE-2;
- 857 15264 [281]   ydoor[1]:=VFLOORS*NFLOORS+1;
- 858 15278 [281]   showdoor(0);
- 859 15291 [281]   showdoor(1);
- 860 15299 [281]   { make gems }
- 861 15299 [281]   for f:=0 to NFLOORS do begin
- 862 15316 [281]     repeat
- 863 15316 [281]       xgem[f]:=irandom(1,XSIZE-9);
- 864 15335 [281]     until gemok(f,xgem[f]);
- 865 15359 [281]     valgem[f]:=10;
- 866 15368 [281]   end;
- 867 15372 [281]   { one coin worth 30 points }
- 868 15386 [281]   valgem[irandom(0,NFLOORS)]:=30;
- 869 15400 [281]   { make elevator for level 2 }
- 870 15404 [281]   ecount:=0;
- 871 15406 [281] 
- 872 15410 [281]   if level>=2 then begin
- 873 15417 [281]     efloor:=irandom(0,NFLOORS-1);
- 874 15435 [281]     ex:=ladders[efloor];
- 875 15443 [281]   end else begin
- 876 15454 [281]     efloor:=NFLOORS+1; { move off floors }
- 877 15463 [281]     ex:=300;           { move off screen }
- 878 15470 [281]   end;
- 879 15470 [281]   eybottom:=efloor*VFLOORS;
- 880 15476 [281]   eytop:=eybottom+VFLOORS;
- 881 15487 [281]   ey:=eybottom;
- 882 15492 [281]   eys:=eytop;
- 883 15500 [281]   edir:=1;
- 884 15510 [281]   ewait:=EWAIT;
- 885 15516 [281]   { show ladders, elevator and gems }
- 886 15520 [281]   for f:=0 to NFLOORS-1 do begin
- 887 15540 [281]     if f<>efloor then
- 888 15544 [281]       showladder(f);
- 889 15562 [281]     showgem(f);
- 890 15572 [281]   end;
- 891 15572 [281]   showshaft;
- 892 15590 [281]   showgem(NFLOORS);
- 893 15598 [281] end;
- 894 15598 [281] 
- 895 15599 [272] {$I IANIMATE:P}
-{I:IANIMA}  1 15599 [272] { ianimate - run animation in loop                  }
-{I:IANIMA}  2 15599 [272] {  proc expaint;                                    }
-{I:IANIMA}  3 15599 [272] {    Called to paint one picture and apply motion.  }
-{I:IANIMA}  4 15599 [272] {  func exkey(ch:char):boolean;                     }
-{I:IANIMA}  5 15599 [272] {    Called to check for KEY and stop loop if true  }
-{I:IANIMA}  6 15599 [272] 
-{I:IANIMA}  7 15599 [272] proc animate(arepeat:boolean);
-{I:IANIMA}  8 15599 [274] { arepeat: auto repeat cursor keys without _delay }
-{I:IANIMA}  9 15599 [274] const toggle=chr($0c);
-{I:IANIMA} 10 15602 [275]       cleft=chr($03); cright=chr($16);
-{I:IANIMA} 11 15602 [277]       cup=chr($1a); cdown=chr($18); esc=chr(0);
-{I:IANIMA} 12 15602 [280] mem   sflag=$1781:integer&;
-{I:IANIMA} 13 15602 [281]       emuflags=$1707:integer&;
-{I:IANIMA} 14 15602 [282] var   ch:char;
-{I:IANIMA} 15 15602 [283]       dummy0:integer;
-{I:IANIMA} 16 15602 [284]       stop:boolean;
-{I:IANIMA} 17 15602 [285] begin
-{I:IANIMA} 18 15602 [285]   repeat
-{I:IANIMA} 19 15602 [285]     repeat
-{I:IANIMA} 20 15604 [285]       stop:=expaint;
-{I:IANIMA} 21 15610 [285]       dummy0:=_syncscreen; { sleep for up to 30 msec }
-{I:IANIMA} 22 15624 [285]       ch:=KEYPRESSED; { sleep for 10 msec }
-{I:IANIMA} 23 15632 [285]       { sflag bit 8 is escape flag. Pass it through }
-{I:IANIMA} 24 15632 [285]     until (ord(ch)<>0) or ((sflag and $80)<>0)
-{I:IANIMA} 25 15648 [285]       or stop;
-{I:IANIMA} 26 15650 [285]     if not(((ch=cup) or (ch=cdown) or (ch=cleft) or
-{I:IANIMA} 27 15680 [285]        (ch=cright)) and
-{I:IANIMA} 28 15689 [285]        ((emuflags and 1)<>0) and arepeat) then
-{I:IANIMA} 29 15705 [285]        { cursor keys auto repeat without _delay }
-{I:IANIMA} 30 15706 [285]        KEYPRESSED := chr(0);
-{I:IANIMA} 31 15711 [285]     sflag:=sflag and $7f; { clear escape flag }
-{I:IANIMA} 32 15729 [285]     if ch=toggle then write(toggle);
-{I:IANIMA} 33 15742 [285]   until exkey(ch) or stop;
-{I:IANIMA} 34 15754 [285] end;
-{I:IANIMA} 35 15762 [285] 
- 896 15763 [273] 
- 897 15763 [273] begin
- 898 15763 [273]   score:=0;
- 899 15768 [273]   level:=1;
- 900 15774 [273]   loopcounter:=0;
- 901 15780 [273]   if option('H') then begin
- 902 15794 [273]     writeln('/D   endless demo mode');
- 903 15826 [273]     exit;
- 904 15827 [273]   end;
- 905 15827 [273]   demomode:=option('D');
- 906 15837 [273]   if demomode then writeln('Demo mode');
- 907 15864 [273]   _grinit; _fullview;
- 908 15872 [273]   writeln('Reach the exit on the top floor.');
- 909 15911 [273]   writeln('Collect gems and avoid the ball.');
- 910 15950 [273]   writeln('L load saved score, <arrow> move player');
- 911 15996 [273]   init;
- 912 16000 [273]   animate(true);
- 913 16008 [273]   _splitview;
- 914 16012 [273]   showresult;
- 915 16016 [273]   writeln('Final score ',score);
- 916 16040 [273]   savescore;
- 917 16044 [273] end.
-Code length:           16043
-Compiler stack size:   249
-Ident stack size:      285/300
+  11  4863 [117]       spritelib, striolib, writelib;
+  12  8820 [161] 
+  13  8820 [161] const ERASE         = 0;
+  14  8823 [162]       BALL          = $6ff6;
+  15  8823 [163] 
+  16  8823 [163]       NFLOORS       = 5;
+  17  8823 [164]       VFLOORS       = 20;
+  18  8823 [165]       MAXBYSPEED    = 19.0;
+  19  8823 [166]       HOLESIZE      = 22;
+  20  8823 [167]       HOLEMARGIN    = 4;
+  21  8823 [168] 
+  22  8823 [168]       GRAVITY       = -0.25;
+  23  8823 [169]       REFLECTION    = -0.85;
+  24  8823 [170] 
+  25  8823 [170]       FXSTEPSIZE    = 2.0;
+  26  8823 [171] 
+  27  8823 [171]       LADDERSIZE    = 9;  { should be odd }
+  28  8823 [172]       MINDIST       = 12; { distance between ladders }
+  29  8823 [173]       SNAPWIDTH     = 6.0; { keep walking to ladder }
+  30  8823 [174]       LADDTOL       = 2;
+  31  8823 [175]       SETPAUSE      = 8; { frames to pause at ladder }
+  32  8823 [176] 
+  33  8823 [176]       LOOPSPERFRAME = 2;
+  34  8823 [177]       LASTXTIME     = 4; { frames }
+  35  8823 [178]       JUMPOFFSPEED  = 2.0;
+  36  8823 [179] 
+  37  8823 [179]       XDOORSIZE     = 9; { should be odd }
+  38  8823 [180]       YDOORSIZE     = 12;
+  39  8823 [181] 
+  40  8823 [181]       EWAIT         = 20; { wait tics at bottom/top }
+  41  8823 [182]       ETICS         = 4;  { tics per verical step }
+  42  8823 [183] 
+  43  8823 [183]       MAXNGEMS      = 10;
+  44  8823 [184] 
+  45  8823 [184]       CLEFT         = chr($03);
+  46  8823 [185]       CRIGHT        = chr($16);
+  47  8823 [186]       CUP           = chr($1a);
+  48  8823 [187]       CDOWN         = chr($18);
+  49  8823 [188]       JUMPKEY       = ' ';
+  50  8823 [189]       ESC           = chr(0);
+  51  8823 [190] 
+  52  8823 [190] var bx,bxspeed,bxs:               integer;
+  53  8823 [193]     by, bys, fx,fxs:              real;
+  54  8823 [197]     byspeed,fxstep,lastfxstep:    real;
+  55  8823 [200]     jump,jumpspeed:               real;
+  56  8823 [202]     flr,ffloor,fy,fys,fyspeed:  integer;
+  57  8823 [207]     score,loopcounter,level:      integer;
+  58  8823 [210]     lastfxtimes, pause:           integer;
+  59  8823 [212]     demomode:                     boolean;
+  60  8823 [213] 
+  61  8823 [213]     efloor,ex,ey,eys,ecount:      integer;
+  62  8823 [218]     ewait,eybottom,eytop,edir:    integer;
+  63  8823 [222]     on_elev:                      boolean;
+  64  8823 [223] 
+  65  8823 [223]     xdoor,ydoor:          array[2] of integer;
+  66  8823 [225]     holes,ladders:        array[NFLOORS] of integer;
+  67  8823 [227]     xgem, valgem:         array[NFLOORS] of integer;
+  68  8823 [229] 
+  69  8823 [229] 
+  70  8823 [229] {$I IRANDOM:P}
+{I:IRANDO}  1  8823 [229] { irandom: real and integer _random functions
+{I:IRANDO}  2  8823 [229]            with limits min and max
+{I:IRANDO}  3  8823 [229] }
+{I:IRANDO}  4  8823 [229] 
+{I:IRANDO}  5  8823 [229] func rrandom(min,max:real):real;
+{I:IRANDO}  6  8823 [233] begin
+{I:IRANDO}  7  8823 [233]   rrandom := min + (conv(_random)/255.0) * (max - min)
+{I:IRANDO}  8  8854 [233] ;
+{I:IRANDO}  9  8861 [233] end;
+{I:IRANDO} 10  8869 [233] 
+{I:IRANDO} 11  8870 [231] func irandom(min,max:integer):integer;
+{I:IRANDO} 12  8870 [235] begin
+{I:IRANDO} 13  8870 [235]   irandom := floor(rrandom(conv(min),conv(max)));
+{I:IRANDO} 14  8893 [235] end;
+{I:IRANDO} 15  8898 [235] 
+  71  8899 [233] 
+  72  8899 [233] func onfloor(f,y:integer):boolean;
+  73  8899 [237] begin
+  74  8899 [237]   onfloor:=(f*VFLOORS+1=y);
+  75  8919 [237] end;
+  76  8923 [237] 
+  77  8924 [235] func onupladder(f:integer;x:real):boolean;
+  78  8924 [239] var xi,center:integer;
+  79  8927 [241] begin
+  80  8927 [241]   xi:=floor(x);
+  81  8935 [241]   if (f<0) or (f>=NFLOORS) then
+  82  8954 [241]     onupladder:=false
+  83  8958 [241]   else begin
+  84  8967 [241]     center:=ladders[f]+LADDERSIZE-8;
+  85  8980 [241]     onupladder:=(xi>=center-LADDTOL) and
+  86  8997 [241]                 (xi<=center+LADDTOL);
+  87  9009 [241]   end;
+  88  9014 [241] end;
+  89  9014 [241] 
+  90  9015 [237] func ondownladder(f:integer;x:real):boolean;
+  91  9015 [241] var xi,center:integer;
+  92  9018 [243] begin
+  93  9018 [243]   xi:=floor(x);
+  94  9026 [243]   if (f<=0) or (f>NFLOORS) then
+  95  9045 [243]     ondownladder:=false
+  96  9049 [243]   else begin
+  97  9058 [243]     center:=ladders[f-1]+LADDERSIZE-8;
+  98  9074 [243]     ondownladder:=(xi>=center-LADDTOL) and
+  99  9091 [243]                   (xi<=center+LADDTOL);
+ 100  9103 [243]   end;
+ 101  9108 [243] end;
+ 102  9108 [243] 
+ 103  9109 [239] func onhole(f:integer;x:real):boolean;
+ 104  9109 [243] var xc: integer;
+ 105  9112 [244] begin
+ 106  9112 [244]   xc := floor(x) + 4;  { center of 8-pixel sprite }
+ 107  9128 [244]   onhole := (xc >= holes[f]) and
+ 108  9141 [244]             (xc <= holes[f] + HOLESIZE);
+ 109  9157 [244] end;
+ 110  9162 [244] 
+ 111  9163 [241] func balloverlap(x1,x2: integer): boolean;
+ 112  9163 [245] begin
+ 113  9163 [245]   { ball is bx..bx+3 }
+ 114  9166 [245]   { require more than 1 pixel overlap }
+ 115  9166 [245]   balloverlap := (bx+2 >= x1) and (bx+1 <= x2)
+ 116  9187 [245] end;
+ 117  9197 [245] 
+ 118  9198 [243] proc showfloor(f:integer);
+ 119  9198 [245] var y:integer;
+ 120  9201 [246] begin
+ 121  9201 [246]   y:=f*VFLOORS;
+ 122  9209 [246]   _move(0,y);
+ 123  9226 [246]   _draw(holes[f]-HOLEMARGIN,y,WHITE);
+ 124  9249 [246]   _move(holes[f]+HOLESIZE+HOLEMARGIN,y);
+ 125  9273 [246]   _draw(XSIZE,y,WHITE);
+ 126  9287 [246] end;
+ 127  9287 [246] 
+ 128  9288 [244] proc showladder(f:integer);
+ 129  9288 [246] var i,x1,x2,y1,y2:integer;
+ 130  9291 [251] begin
+ 131  9291 [251]   if f<NFLOORS then begin
+ 132  9300 [251]     x1:=ladders[f];
+ 133  9307 [251]     x2:=x1+LADDERSIZE;
+ 134  9321 [251]     y1:=f*VFLOORS+1;
+ 135  9335 [251]     y2:=y1+VFLOORS-1;
+ 136  9349 [251]     _move(x1,y1);
+ 137  9368 [251]     _draw(x1,y2,WHITE);
+ 138  9384 [251]     _move(x2,y1);
+ 139  9398 [251]     _draw(x2,y2,WHITE);
+ 140  9414 [251]     for i:=1 to 5 do begin
+ 141  9431 [251]       _move(x1,y1+4*i-1);
+ 142  9456 [251]       _draw(x2,y1+4*i-1,WHITE);
+ 143  9483 [251]     end;
+ 144  9483 [251]   end;
+ 145  9497 [251] end;
+ 146  9497 [251] 
+ 147  9498 [245] proc showshaft;
+ 148  9498 [246] begin
+ 149  9498 [246]   _move(ex,eybottom);
+ 150  9517 [246]   _draw(ex,eytop,WHITE);
+ 151  9533 [246]   _move(ex+LADDERSIZE,eybottom);
+ 152  9550 [246]   _draw(ex+LADDERSIZE,eytop,WHITE);
+ 153  9569 [246] end;
+ 154  9569 [246] 
+ 155  9570 [246] proc showelevator;
+ 156  9570 [247] begin
+ 157  9570 [247]   if eys>eybottom then begin
+ 158  9584 [247]     _move(ex+1,eys);
+ 159  9604 [247]     _draw(ex+LADDERSIZE-1,eys,BLACK);
+ 160  9626 [247]   end;
+ 161  9626 [247]   _move(ex+1,ey);
+ 162  9643 [247]   _draw(ex+LADDERSIZE-1,ey,WHITE);
+ 163  9665 [247]   eys:=ey;
+ 164  9665 [247]   { show floor element above }
+ 165  9673 [247]   _move(ex,(efloor+1)*VFLOORS);
+ 166  9693 [247]   _draw(ex+LADDERSIZE,(efloor+1)*VFLOORS,WHITE);
+ 167  9718 [247] end;
+ 168  9718 [247] 
+ 169  9719 [247] proc showdoor(i: integer);
+ 170  9719 [249] var x1, y1,x2,y2: integer;
+ 171  9722 [253] begin
+ 172  9722 [253]   x1:=xdoor[i];
+ 173  9728 [253]   x2:=x1+XDOORSIZE;
+ 174  9742 [253]   y1:=ydoor[i];
+ 175  9751 [253]   y2:=y1+YDOORSIZE;
+ 176  9765 [253]   _move(x1,y1);
+ 177  9784 [253]   _draw(x1,y2,WHITE);
+ 178  9800 [253]   _draw(x2,y2,WHITE);
+ 179  9816 [253]   _draw(x2,y1,WHITE);
+ 180  9832 [253]   _plot(x2-2,y1+5,WHITE);
+ 181  9854 [253] end;
+ 182  9854 [253] 
+ 183  9855 [248] proc showgem(f: integer);
+ 184  9855 [250] var sprite: integer;
+ 185  9858 [251] begin
+ 186  9858 [251]   if valgem[f]=0 then sprite:=S_CLEAR
+ 187  9874 [251]   else if
+ 188  9883 [251]     valgem[f]=30 then sprite:=S_GEMS+2
+ 189  9899 [251]   else
+ 190  9901 [251]     sprite:=S_GEMS+1;
+ 191  9913 [251]   _showsprite(xgem[f],f*VFLOORS+1,sprite);
+ 192  9946 [251] end;
+ 193  9946 [251] 
+ 194  9947 [249] proc repairladder(f, xmin, xmax: integer);
+ 195  9947 [253] begin
+ 196  9947 [253]   if (ladders[f] < xmax) and
+ 197  9965 [253]          (ladders[f] + LADDERSIZE > xmin) then begin
+ 198  9982 [253]     if f <> efloor then
+ 199  9989 [253]       showladder(f)
+ 200  9997 [253]     else
+ 201 10007 [253]       showshaft;
+ 202 10014 [253]   end;
+ 203 10014 [253] end;
+ 204 10014 [253] 
+ 205 10015 [250] proc repairdoor(f,xmin,xmax: integer);
+ 206 10015 [254] var i,x1,x2: integer;
+ 207 10018 [257] begin
+ 208 10018 [257]   if f=0 then
+ 209 10026 [257]     i:=0
+ 210 10030 [257]   else if f=NFLOORS then
+ 211 10045 [257]     i:=1
+ 212 10049 [257]   else
+ 213 10051 [257]     exit;
+ 214 10059 [257]   x1:=xdoor[i];
+ 215 10063 [257]   x2:=x1+XDOORSIZE;
+ 216 10077 [257]   if (x1 <= xmax) and (x2 >= xmin) then
+ 217 10100 [257]     showdoor(i);
+ 218 10114 [257] end;
+ 219 10114 [257] 
+ 220 10115 [251] proc cleargem(f: integer);
+ 221 10115 [253] begin
+ 222 10115 [253]   if (f>=0) and (f<=NFLOORS) then
+ 223 10134 [253]     _showsprite(xgem[f],f*VFLOORS+1,S_CLEAR);
+ 224 10164 [253] end;
+ 225 10164 [253] 
+ 226 10165 [252] proc repairgem(f,xmin,xmax: integer);
+ 227 10165 [256] var gx1,gx2: integer;
+ 228 10168 [258] begin
+ 229 10168 [258]   if (f>=0) and (f<=NFLOORS) then
+ 230 10184 [258]     if valgem[f]<>0 then begin
+ 231 10199 [258]       gx1:=xgem[f];
+ 232 10206 [258]       gx2:=gx1+7;
+ 233 10220 [258]       if (gx1 <= xmax) and (gx2 >= xmin) then
+ 234 10243 [258]         showgem(f);
+ 235 10257 [258]     end;
+ 236 10257 [258] end;
+ 237 10257 [258] 
+ 238 10258 [253] proc repair(f,x1,x2: integer);
+ 239 10258 [257] var xmin,xmax: integer;
+ 240 10261 [259] begin
+ 241 10261 [259]   if x1 < x2 then begin
+ 242 10272 [259]     xmin := x1 - 1;
+ 243 10281 [259]     xmax := x2 + 8;
+ 244 10292 [259]   end else begin
+ 245 10300 [259]     xmin := x2 - 1;
+ 246 10306 [259]     xmax := x1 + 8;
+ 247 10317 [259]   end;
+ 248 10322 [259]   repairladder(f, xmin, xmax);
+ 249 10340 [259]   repairdoor(f, xmin, xmax);
+ 250 10358 [259]   repairgem(f, xmin, xmax);
+ 251 10376 [259] end;
+ 252 10376 [259] 
+ 253 10377 [254] proc showplayer;
+ 254 10377 [255] var fysum, frame, spriteindex:integer;
+ 255 10380 [258] begin
+ 256 10380 [258]   frame := loopcounter div LOOPSPERFRAME;
+ 257 10388 [258]   fysum:=fy+floor(jump);
+ 258 10403 [258] 
+ 259 10409 [258]   if jump > 0.0 then begin
+ 260 10422 [258]     if fxstep > 0.0 then
+ 261 10437 [258]       spriteindex := S_JUMPR + frame
+ 262 10443 [258]     else
+ 263 10443 [258]       spriteindex := S_JUMPL + frame
+ 264 10457 [258]   end else if fyspeed > 0 then
+ 265 10475 [258]     spriteindex := S_UP + frame
+ 266 10481 [258]   else if fyspeed < 0 then
+ 267 10499 [258]     spriteindex := S_DOWN + frame
+ 268 10505 [258]   else if fxstep = 0.0 then
+ 269 10529 [258]     spriteindex := S_STANDING
+ 270 10533 [258]   else if fxstep >0.0 then
+ 271 10554 [258]     spriteindex := S_RIGHT + frame
+ 272 10560 [258]   else
+ 273 10560 [258]     spriteindex := S_LEFT + frame;
+ 274 10574 [258]   _showsprite(floor(fxs),fys,S_CLEAR);
+ 275 10602 [258]   _showsprite(floor(fx),fysum, spriteindex);
+ 276 10623 [258]   repair(ffloor, floor(fxs), floor(fx));
+ 277 10647 [258]   fxs:=fx; fys:=fysum;
+ 278 10659 [258]   loopcounter := loopcounter + 1;
+ 279 10673 [258]   if loopcounter >= (3 * LOOPSPERFRAME) then
+ 280 10687 [258]     loopcounter := 0;
+ 281 10693 [258] end;
+ 282 10697 [258] 
+ 283 10698 [255] proc moveelevator;
+ 284 10698 [256] begin
+ 285 10698 [256]   if ewait > 0 then begin
+ 286 10710 [256]     ewait:=ewait-1;
+ 287 10719 [256]     exit
+ 288 10724 [256]   end;
+ 289 10725 [256]   ecount:=ecount+1;
+ 290 10731 [256]   if ecount >= ETICS then begin
+ 291 10743 [256]     ecount := 0;
+ 292 10748 [256]     ey := ey + edir;
+ 293 10756 [256]     if ey >= eytop then begin
+ 294 10774 [256]       ey := eytop;
+ 295 10777 [256]       edir := -1;
+ 296 10787 [256]       ewait := EWAIT
+ 297 10792 [256]     end
+ 298 10794 [256]     else if ey <= eybottom then begin
+ 299 10810 [256]       ey := eybottom;
+ 300 10813 [256]       edir := 1;
+ 301 10823 [256]       ewait := EWAIT
+ 302 10827 [256]     end
+ 303 10829 [256]   end;
+ 304 10833 [256] end;
+ 305 10833 [256] 
+ 306 10834 [256] proc flashplayer;
+ 307 10834 [257] var i,j,f,time: integer;
+ 308 10837 [261] begin
+ 309 10837 [261]   for i:=1 to 4 do begin
+ 310 10856 [261]     _showsprite(floor(fxs),fys,S_STANDING);
+ 311 10875 [261]     repair(ffloor,floor(fxs), floor(fxs));
+ 312 10899 [261]     for j:= 0 to 2 do
+ 313 10907 [261]         time:=_syncscreen;
+ 314 10922 [261]     _showsprite(floor(fxs),fys,S_CLEAR);
+ 315 10959 [261]     repair(ffloor,floor(fxs), floor(fxs));
+ 316 10983 [261]     for j:= 0 to 2 do
+ 317 10991 [261]         time:=_syncscreen;
+ 318 11006 [261]   end;
+ 319 11024 [261] end;
+ 320 11038 [261] 
+ 321 11039 [257] proc init; forward;
+ 322 11042 [258] 
+ 323 11042 [258] proc showresult;
+ 324 11042 [259] var s:cpnt;
+ 325 11045 [260] begin
+ 326 11045 [260]   s:=_new;
+ 327 11053 [260]   write(@s,level:1,score:7);
+ 328 11087 [260]   _ledstring(s);
+ 329 11097 [260]   _release(s);
+ 330 11107 [260] end;
+ 331 11107 [260] 
+ 332 11108 [259] proc tryladderup;
+ 333 11108 [260] begin
+ 334 11108 [260]   if (ffloor<NFLOORS) and (ffloor<>efloor) and
+ 335 11129 [260]      onupladder(ffloor,fx)
+ 336 11136 [260]   then begin
+ 337 11149 [260]     fx:=conv(ladders[ffloor]+1);
+ 338 11163 [260]     fyspeed:=1;
+ 339 11172 [260]     fxstep:=0.0;
+ 340 11182 [260]     lastfxstep:=0.0;
+ 341 11194 [260]   end;
+ 342 11200 [260] end;
+ 343 11200 [260] 
+ 344 11201 [260] proc tryladderdown;
+ 345 11201 [261] begin
+ 346 11201 [261]   if (ffloor>0) and (ffloor<>efloor+1) and
+ 347 11225 [261]      ondownladder(ffloor,fx)
+ 348 11232 [261]   then begin
+ 349 11245 [261]     flr:=ffloor-1;
+ 350 11254 [261]     fx:=conv(ladders[ffloor-1]+1);
+ 351 11273 [261]     fyspeed:=-1;
+ 352 11282 [261]     fxstep:=0.0;
+ 353 11293 [261]     lastfxstep:=0.0;
+ 354 11305 [261]   end;
+ 355 11311 [261] end;
+ 356 11311 [261] 
+ 357 11312 [261] proc showball;
+ 358 11312 [262] begin
+ 359 11312 [262]   _plotmap(bxs,floor(bys),ERASE);
+ 360 11336 [262]   _plotmap(bx,floor(by),BALL);
+ 361 11356 [262]   repair(flr,bxs,bx);
+ 362 11374 [262] end;
+ 363 11374 [262] 
+ 364 11375 [262] proc eraseball;
+ 365 11375 [263] begin
+ 366 11375 [263]   _plotmap(bxs,floor(bys),ERASE);
+ 367 11399 [263]   repair(flr,bxs,bx);
+ 368 11417 [263] end;
+ 369 11417 [263] 
+ 370 11418 [263] proc newball;
+ 371 11418 [264] begin
+ 372 11418 [264]   bx:=2;
+ 373 11425 [264]   flr:=NFLOORS;
+ 374 11431 [264]   by:=conv((flr+1)*VFLOORS-6);
+ 375 11448 [264]   showball;
+ 376 11459 [264]   bxs:=bx;
+ 377 11459 [264]   bys:=by;
+ 378 11467 [264]   bxspeed:=2; byspeed:=0.0
+ 379 11485 [264] end;
+ 380 11497 [264] 
+ 381 11498 [264] func crossup(yline: real): boolean;
+ 382 11498 [267] begin
+ 383 11498 [267]   crossup := (bys < yline) and (by >= yline)
+ 384 11522 [267] end;
+ 385 11534 [267] 
+ 386 11535 [266] func crossdown(yline: real): boolean;
+ 387 11535 [269] begin
+ 388 11535 [269]   crossdown := (bys > yline) and (by <= yline)
+ 389 11559 [269] end;
+ 390 11571 [269] 
+ 391 11572 [268] proc hreflect(xline: integer);
+ 392 11572 [270] begin
+ 393 11572 [270]   if (bxs < xline) and (bx >= xline) then begin
+ 394 11596 [270]     bx := xline - 1;
+ 395 11605 [270]     bxspeed := -bxspeed
+ 396 11610 [270]   end
+ 397 11610 [270]   else if (bxs > xline) and (bx <= xline) then begin
+ 398 11641 [270]     bx := xline + 1;
+ 399 11650 [270]     bxspeed := -bxspeed
+ 400 11655 [270]   end
+ 401 11655 [270] end;
+ 402 11664 [270] 
+ 403 11665 [269] proc nextround;
+ 404 11665 [270] begin
+ 405 11665 [270]   eraseball;
+ 406 11674 [270]   flashplayer;
+ 407 11678 [270]   fx:=conv(xdoor[0]+XDOORSIZE-8);
+ 408 11690 [270]   fy:=ydoor[0];
+ 409 11699 [270]   fxstep:=0.0;
+ 410 11713 [270]   ffloor:=0;
+ 411 11721 [270]   fyspeed:=0;
+ 412 11727 [270]   showresult;
+ 413 11735 [270]   newball;
+ 414 11739 [270] end;
+ 415 11739 [270] 
+ 416 11740 [270] func airborne(f:integer; fy:integer): boolean;
+ 417 11740 [274] begin
+ 418 11740 [274]   airborne := (not onfloor(f, fy)) or (jump > 0.01);
+ 419 11775 [274] end;
+ 420 11780 [274] 
+ 421 11781 [272] proc checkcrossing(f: integer; var x: real);
+ 422 11781 [275] var center: real;
+ 423 11784 [276] 
+ 424 11784 [276]   proc checkcenter(c: real);
+ 425 11784 [278]   begin
+ 426 11784 [278]     if fxstep > 0.0 then begin
+ 427 11802 [278]       if (x < c) and (x + fxstep >= c) then begin
+ 428 11839 [278]         x := c;
+ 429 11842 [278]         fxstep := 0.0;
+ 430 11860 [278]         pause := SETPAUSE;
+ 431 11868 [278]       end;
+ 432 11872 [278]     end else if fxstep < 0.0 then begin
+ 433 11888 [278]       if (x > c) and (x + fxstep <= c) then begin
+ 434 11925 [278]         x := c;
+ 435 11928 [278]         fxstep := 0.0;
+ 436 11946 [278]         pause := SETPAUSE;
+ 437 11954 [278]       end;
+ 438 11958 [278]     end;
+ 439 11958 [278]   end;
+ 440 11958 [278] 
+ 441 11959 [277] begin
+ 442 11959 [277]   if pause > 0 then
+ 443 11967 [277]     pause := pause - 1
+ 444 11975 [277]   else begin
+ 445 11985 [277]     if (f >= 0) and (f < NFLOORS) then begin
+ 446 12000 [277]       center := conv(ladders[f] + LADDERSIZE - 8);
+ 447 12017 [277]       checkcenter(center);
+ 448 12036 [277]     end;
+ 449 12036 [277] 
+ 450 12036 [277]     if (pause = 0) and (f > 0) then begin
+ 451 12051 [277]       center := conv(ladders[f-1] + LADDERSIZE - 8);
+ 452 12071 [277]       checkcenter(center);
+ 453 12090 [277]     end;
+ 454 12090 [277]   end;
+ 455 12090 [277] end;
+ 456 12090 [277] 
+ 457 12091 [273] func expaint: boolean;
+ 458 12091 [275] { paint picture and apply motion }
+ 459 12091 [275] var f,distx,fxt:integer;
+ 460 12094 [278]     yline:real;
+ 461 12094 [279]     s:cpnt;
+ 462 12094 [280] 
+ 463 12094 [280]   func holeahead(f:integer; x,xstep:real):boolean;
+ 464 12094 [285]   var xc,nextxc: integer;
+ 465 12097 [287]   begin
+ 466 12097 [287]     if xstep = 0.0 then
+ 467 12111 [287]       holeahead:=false
+ 468 12115 [287]     else begin
+ 469 12124 [287]       xc:=floor(x)+4;
+ 470 12133 [287]       nextxc:=floor(x + 3.0*xstep)+4;
+ 471 12161 [287]       if xstep > 0.0 then
+ 472 12178 [287]         holeahead:=(xc < holes[f]) and
+ 473 12195 [287]                     (nextxc >= holes[f])
+ 474 12203 [287]       else
+ 475 12208 [287]          holeahead:=(xc > holes[f]+HOLESIZE) and
+ 476 12232 [287]                     (nextxc <= holes[f]+HOLESIZE);
+ 477 12248 [287]     end;
+ 478 12253 [287]   end;
+ 479 12253 [287] 
+ 480 12254 [282] begin
+ 481 12254 [282]   if score>=10000 then begin
+ 482 12264 [282]     expaint:=true;
+ 483 12269 [282]     exit;
+ 484 12274 [282]   end;
+ 485 12274 [282]   expaint:=false;
+ 486 12276 [282] 
+ 487 12280 [282]   { ***** HANDLE DEMO MODE ***** }
+ 488 12280 [282] 
+ 489 12280 [282]   if  demomode and (jump<0.01) then begin
+ 490 12298 [282]     if valgem[ffloor]>0 then begin
+ 491 12312 [282]       { first collect gem }
+ 492 12315 [282]       if xgem[ffloor]<floor(fx) then
+ 493 12329 [282]         fxstep := -FXSTEPSIZE
+ 494 12334 [282]       else
+ 495 12340 [282]         fxstep := FXSTEPSIZE;
+ 496 12356 [282]     end else begin
+ 497 12365 [282]       if ffloor=NFLOORS then fxstep := FXSTEPSIZE
+ 498 12375 [282]       else if (ffloor<NFLOORS) and
+ 499 12397 [282]                             onupladder(ffloor,fx)
+ 500 12403 [282]       then tryladderup
+ 501 12416 [282]       else if onfloor(ffloor,fy) then  begin
+ 502 12442 [282]         if (floor(fx)>=ladders[ffloor]+1) then begin
+ 503 12464 [282]           if fxstep>1.0 then fxstep:=0.0
+ 504 12483 [282]           else fxstep:=-FXSTEPSIZE;
+ 505 12504 [282]         end else begin
+ 506 12514 [282]           if fxstep<-1.0 then fxstep:=0.0
+ 507 12531 [282]           else fxstep := FXSTEPSIZE
+ 508 12546 [282]         end;
+ 509 12558 [282]       end;
+ 510 12558 [282]     end;
+ 511 12558 [282]     if (jump < 0.01) and onfloor(ffloor,fy) then
+ 512 12587 [282]       if holeahead(ffloor,fx,fxstep) then begin
+ 513 12615 [282]         jumpspeed := JUMPOFFSPEED;
+ 514 12624 [282]         jump := 0.01;
+ 515 12636 [282]       end;
+ 516 12642 [282]     if pause > 0 then fxstep := 0.0;
+ 517 12658 [282]   end;
+ 518 12664 [282] 
+ 519 12664 [282]   { ***** HANDLE MOOVING OBJECTS ***** }
+ 520 12664 [282] 
+ 521 12664 [282]   moveelevator;
+ 522 12668 [282] 
+ 523 12668 [282]   { ***** HANDLE THE PLAYER ***** }
+ 524 12668 [282] 
+ 525 12668 [282]   { remember fxstep for airborne state }
+ 526 12668 [282]   if not airborne(ffloor, fy) then begin
+ 527 12685 [282]     if fxstep <> 0.0 then begin
+ 528 12701 [282]       lastfxstep := fxstep;
+ 529 12704 [282]       lastfxtimes := LASTXTIME;
+ 530 12718 [282]     end else begin
+ 531 12725 [282]       if lastfxtimes > 0 then
+ 532 12731 [282]         lastfxtimes := lastfxtimes - 1
+ 533 12739 [282]       else
+ 534 12741 [282]         lastfxstep := 0.0;
+ 535 12755 [282]     end;
+ 536 12761 [282]   end;
+ 537 12761 [282]   { check for exit on top floor }
+ 538 12761 [282]   if (ffloor=NFLOORS) and
+ 539 12768 [282]      (floor(fx) >= xdoor[1]) then begin
+ 540 12783 [282]     score:=score+100;
+ 541 12792 [282]     { align player with door before flashing/reset }
+ 542 12797 [282]     fx:=conv(xdoor[0]+XDOORSIZE-8);
+ 543 12809 [282]     fy:=ydoor[1];
+ 544 12818 [282]     nextround;
+ 545 12830 [282]     init;
+ 546 12834 [282]     exit;
+ 547 12835 [282]   end;
+ 548 12835 [282]   { check for next floor on ladder }
+ 549 12835 [282]   if ffloor<NFLOORS then
+ 550 12841 [282]     if onfloor(ffloor+1,fy) then begin
+ 551 12864 [282]       ffloor:=ffloor+1; fyspeed:=0;
+ 552 12880 [282]     end;
+ 553 12884 [282]   if ffloor>0 then
+ 554 12890 [282]     if onfloor(ffloor-1,fy) then begin
+ 555 12913 [282]       ffloor:=ffloor-1; fyspeed:=0;
+ 556 12929 [282]     end;
+ 557 12933 [282]   { ride elevator }
+ 558 12933 [282]   if on_elev then begin
+ 559 12937 [282]     fx:=conv(ex+1);
+ 560 12947 [282]     fy:=ey+1;
+ 561 12960 [282]     if (ey<>eytop) and (ey<>eybottom) then
+ 562 12983 [282]       fxstep:=0.0
+ 563 12987 [282]     else if fxstep<>0.0 then begin
+ 564 13015 [282]       on_elev:=false;
+ 565 13020 [282]       fx:=fx+fxstep; { move off already a bit }
+ 566 13043 [282]     end;
+ 567 13043 [282]     fyspeed:=0;
+ 568 13045 [282]     if ey=eytop then
+ 569 13053 [282]       ffloor:=efloor+1
+ 570 13065 [282]     else if ey=eybottom then
+ 571 13079 [282]       ffloor:=efloor
+ 572 13087 [282]       end;
+ 573 13095 [282]   if not on_elev then begin
+ 574 13100 [282]     { move player }
+ 575 13103 [282]     checkcrossing(ffloor, fx);
+ 576 13125 [282]     if airborne(ffloor, fy) then
+ 577 13141 [282]       fx := fx + lastfxstep
+ 578 13150 [282]     else
+ 579 13150 [282]       fx := fx + fxstep;
+ 580 13172 [282]     fy:=fy+fyspeed;
+ 581 13189 [282]     if fx>conv(XSIZE-8) then begin { right wall }
+ 582 13214 [282]       fx:=conv(XSIZE-8); fxstep:=0.0;
+ 583 13232 [282]     end;
+ 584 13238 [282]     if (fx<1.0) then begin { left wall }
+ 585 13254 [282]       fx:=1.0; fxstep:=-0.0;
+ 586 13272 [282]     end;
+ 587 13279 [282]     { check for player hitting gem }
+ 588 13279 [282]     distx:=_abs(floor(fx)-xgem[ffloor]);
+ 589 13303 [282]     if (distx<8) then begin
+ 590 13314 [282]       score:=score+valgem[ffloor];
+ 591 13325 [282]       showresult;
+ 592 13338 [282]       cleargem(ffloor);
+ 593 13348 [282]       valgem[ffloor]:=0;
+ 594 13354 [282]     end;
+ 595 13358 [282]     { jump }
+ 596 13358 [282]     jump:=jump+jumpspeed;
+ 597 13364 [282]     jumpspeed:=jumpspeed+GRAVITY;
+ 598 13389 [282]     if jump <= 0.0 then begin
+ 599 13409 [282]       if onhole(ffloor,fx) then begin
+ 600 13430 [282]         { continue falling to next floor }
+ 601 13433 [282]         ffloor := ffloor - 1;
+ 602 13439 [282]         jump := jump + conv(VFLOORS);
+ 603 13452 [282]         fy := ffloor * VFLOORS + 1;
+ 604 13469 [282]       end
+ 605 13474 [282]       else begin
+ 606 13477 [282]         { normal landing }
+ 607 13477 [282]         jump := 0.0;
+ 608 13483 [282]         jumpspeed := 0.0;
+ 609 13495 [282]       end;
+ 610 13501 [282]     end;
+ 611 13501 [282]   end;
+ 612 13501 [282] 
+ 613 13501 [282]   { ***** HANDLE THE BALL ***** }
+ 614 13501 [282] 
+ 615 13501 [282]   { move ball }
+ 616 13501 [282]   bxs:=bx; bys:=by;
+ 617 13509 [282]   bx:=bx+bxspeed; by:=by+byspeed;
+ 618 13540 [282]   { check for wall }
+ 619 13553 [282]   if bx>=XSIZE-4 then begin
+ 620 13563 [282]     bx:=XSIZE-4; bxspeed:=-bxspeed;
+ 621 13575 [282]   end else if bx<1 then begin
+ 622 13594 [282]     bx:=1; bxspeed:=-bxspeed;
+ 623 13603 [282]   end;
+ 624 13612 [282]   { check for reflection on ceiling }
+ 625 13612 [282]   yline := conv((flr+1)*VFLOORS-4);
+ 626 13625 [282]   if crossup(yline) then begin
+ 627 13646 [282]     by := yline;
+ 628 13649 [282]     byspeed := REFLECTION*byspeed
+ 629 13667 [282]   end;
+ 630 13680 [282]   { check for reflection on the floor }
+ 631 13680 [282]   yline := conv(flr*VFLOORS+1);
+ 632 13690 [282]   if (balloverlap(holes[flr],
+ 633 13703 [282]           holes[flr]+HOLESIZE-1))
+ 634 13727 [282]           and (by<=yline) then begin
+ 635 13741 [282]     { fall through hole hole }
+ 636 13744 [282]     if flr>0 then flr:=flr-1;
+ 637 13760 [282]   end else if (by<yline) or crossdown(yline) then
+ 638 13795 [282]   begin
+ 639 13796 [282]     { reflection on floor }
+ 640 13799 [282]     by:=yline+1.0; { jump a bit }
+ 641 13818 [282]     byspeed:=REFLECTION*byspeed;
+ 642 13824 [282]   end;
+ 643 13837 [282]   byspeed:=byspeed+GRAVITY;
+ 644 13849 [282]   if byspeed > MAXBYSPEED then
+ 645 13868 [282]     byspeed := MAXBYSPEED
+ 646 13872 [282]   else if byspeed < -MAXBYSPEED then
+ 647 13899 [282]     byspeed := -MAXBYSPEED;
+ 648 13910 [282]   { check for border on bottom floor }
+ 649 13917 [282]   if (by<8.0) and ((bx<=2) or (bx>=XSIZE-4))
+ 650 13947 [282]   then begin
+ 651 13949 [282]     newball;
+ 652 13956 [282]   end;
+ 653 13956 [282] 
+ 654 13956 [282]   { *** check for hit *** }
+ 655 13956 [282]   if (bx>=floor(fx)-4) and (bx<=floor(fx)+8) and
+ 656 13986 [282]      (floor(by)>=fy-4) and (floor(by)<=fy+8)
+ 657 14016 [282]     then begin
+ 658 14019 [282]       nextround;
+ 659 14026 [282]       { avoid endless loop in demo mode }
+ 660 14026 [282]       if demomode then begin
+ 661 14030 [282]         init;
+ 662 14037 [282]         exit;
+ 663 14038 [282]       end;
+ 664 14038 [282]     end;
+ 665 14038 [282] 
+ 666 14038 [282]   { ***** paint ***** }
+ 667 14038 [282] 
+ 668 14038 [282]   { paint ball }
+ 669 14038 [282]   showball;
+ 670 14042 [282]   { paint player }
+ 671 14042 [282]   if fyspeed<>0 then
+ 672 14048 [282]     if floor(fx)<>ladders[ffloor]+1 then
+ 673 14069 [282]       writeln('bad climb x ',floor(fx),
+ 674 14093 [282]               ' should ',ladders[ffloor]+1,
+ 675 14114 [282]               ' floor ',ffloor);
+ 676 14135 [282]   showplayer;
+ 677 14139 [282]   { paint moving elevator }
+ 678 14139 [282]   showelevator;
+ 679 14143 [282]   { ride elevator }
+ 680 14143 [282]   if not on_elev then begin
+ 681 14148 [282]     if (ffloor=efloor) and (ey=eybottom) and
+ 682 14169 [282]        onupladder(ffloor,fx) then begin
+ 683 14189 [282]       on_elev:=true;
+ 684 14194 [282]       fxstep:=0.0;
+ 685 14204 [282]       fyspeed:=0;
+ 686 14212 [282]     end
+ 687 14216 [282]   end;
+ 688 14216 [282]   fyspeed:=0;
+ 689 14218 [282]   if not airborne(ffloor,fy) then
+ 690 14238 [282]     if pause = 0 then
+ 691 14248 [282]       fxstep := 0.0;
+ 692 14258 [282] end;
+ 693 14264 [282] 
+ 694 14265 [275] proc savescore;
+ 695 14265 [276] var f:file;
+ 696 14268 [277] begin
+ 697 14268 [277]   _strfio('LADDERSCORE:B',0,1);
+ 698 14296 [277]   openw(f);
+ 699 14302 [277]   writeln(@f,score);
+ 700 14319 [277]   close(f);
+ 701 14325 [277] end;
+ 702 14325 [277] 
+ 703 14326 [276] proc loadscore;
+ 704 14326 [277] var f:file;
+ 705 14329 [278] begin
+ 706 14329 [278]   IOCHECK := false;
+ 707 14333 [278]   FILERR := 0;
+ 708 14339 [278]   _strfio('LADDERSCORE:B',0,1);
+ 709 14369 [278]   openr(f);
+ 710 14375 [278]   if (FILERR<>0) then
+ 711 14381 [278]   writeln(INVVID,'No stored score available',NORVID)
+ 712 14415 [278]   else if not _readint(f,score) then score:=0;
+ 713 14451 [278]   close(f);
+ 714 14461 [278]   IOCHECK := true;
+ 715 14463 [278] end;
+ 716 14467 [278] 
+ 717 14468 [277] func exkey(key:char):boolean;
+ 718 14468 [280] { check for key typed }
+ 719 14468 [280] 
+ 720 14468 [280]   func canwalk:boolean;
+ 721 14471 [282]   begin
+ 722 14471 [282]     canwalk := (pause = 0) and onfloor(ffloor,fy)
+ 723 14489 [282]                and (jump<=0.01)
+ 724 14512 [282]   end;
+ 725 14518 [282] 
+ 726 14519 [282] begin
+ 727 14519 [282]   exkey := (key = ESC);
+ 728 14528 [282]   case key of
+ 729 14532 [282]     CUP:      tryladderup;
+ 730 14547 [282]     CDOWN:    tryladderdown;
+ 731 14561 [282]     CLEFT:    if canwalk then
+ 732 14577 [282]                 fxstep := -FXSTEPSIZE;
+ 733 14586 [282]     CRIGHT:   if canwalk then
+ 734 14609 [282]                fxstep := FXSTEPSIZE;
+ 735 14618 [282]     JUMPKEY:  begin
+ 736 14634 [282]                 if (not airborne(ffloor, fy)) and
+ 737 14651 [282]                   (not onhole(ffloor, fx)) then begin
+ 738 14671 [282]                   jumpspeed := JUMPOFFSPEED;
+ 739 14680 [282]                   { jump a bit further }
+ 740 14686 [282]                   fxstep := lastfxstep;
+ 741 14686 [282]                 end;
+ 742 14698 [282]               end;
+ 743 14698 [282]     'L':    begin
+ 744 14708 [282]               loadscore;
+ 745 14712 [282]               showresult;
+ 746 14716 [282]             end;
+ 747 14716 [282]     '!':    begin
+ 748 14726 [282]               score:=score+500; { cheat key }
+ 749 14738 [282]               showresult;
+ 750 14742 [282]               init;
+ 751 14746 [282]             end
+ 752 14746 [282]    end {case};
+ 753 14748 [282] end;
+ 754 14748 [282] 
+ 755 14749 [279] proc init;
+ 756 14749 [279] var f:integer;
+ 757 14752 [280] 
+ 758 14752 [280]   func nearladder(f,x:integer):boolean;
+ 759 14752 [284]   begin
+ 760 14752 [284]     if f<=0 then
+ 761 14763 [284]       nearladder:=false
+ 762 14767 [284]     else
+ 763 14769 [284]       nearladder:=_abs(x-ladders[f-1]) <= MINDIST;
+ 764 14802 [284]   end;
+ 765 14807 [284] 
+ 766 14808 [282]   func nearhole(f,x:integer):boolean;
+ 767 14808 [286]   begin
+ 768 14808 [286]     nearhole :=
+ 769 14813 [286]       (x + LADDERSIZE >= holes[f] - HOLEMARGIN) and
+ 770 14832 [286]       (x <= holes[f] + HOLESIZE + HOLEMARGIN);
+ 771 14851 [286]   end;
+ 772 14856 [286] 
+ 773 14857 [284]   func ladderok(f,x:integer):boolean;
+ 774 14857 [288]   begin
+ 775 14857 [288]     ladderok := not nearhole(f,x) and
+ 776 14878 [288]                 not nearhole(f+1,x);
+ 777 14898 [288]   end;
+ 778 14904 [288] 
+ 779 14905 [286]   func gemok(f,x:integer):boolean;
+ 780 14905 [290]   begin
+ 781 14905 [290]     gemok:=true;
+ 782 14912 [290] 
+ 783 14916 [290]     { avoid upward ladder starting on this floor }
+ 784 14916 [290]     if f<NFLOORS then
+ 785 14922 [290]       if _abs(x-ladders[f]) <= 9 then
+ 786 14949 [290]         gemok:=false;
+ 787 14955 [290] 
+ 788 14959 [290]     { avoid downward ladder arriving on this floor }
+ 789 14959 [290]     if f>0 then
+ 790 14965 [290]       if _abs(x-ladders[f-1]) <= 9 then
+ 791 14995 [290]         gemok:=false;
+ 792 15001 [290] 
+ 793 15005 [290]     { avoid visible hole on this floor }
+ 794 15005 [290]     if f>0 then
+ 795 15011 [290]       if (x >= holes[f]-HOLEMARGIN-8) and
+ 796 15034 [290]          (x <= holes[f]+HOLESIZE+HOLEMARGIN) then
+ 797 15053 [290]         gemok:=false;
+ 798 15059 [290] 
+ 799 15063 [290]     { avoid bottom door }
+ 800 15063 [290]     if f=0 then
+ 801 15069 [290]       if x < XDOORSIZE+10 then
+ 802 15081 [290]         gemok:=false;
+ 803 15088 [290] 
+ 804 15092 [290]     { avoid top door }
+ 805 15092 [290]     if f=NFLOORS then
+ 806 15098 [290]       if x > XSIZE-XDOORSIZE-10 then
+ 807 15113 [290]         gemok:=false;
+ 808 15120 [290]   end;
+ 809 15124 [290] 
+ 810 15125 [288] begin
+ 811 15125 [288]   pause := 0;
+ 812 15129 [288]   on_elev:=false;
+ 813 15135 [288]   _cleargr;
+ 814 15143 [288]   level:=score div 1000+1;
+ 815 15153 [288]   if level>9 then level:=9;
+ 816 15170 [288]   showresult;
+ 817 15178 [288]   if (level>2) and (not demomode) then begin
+ 818 15191 [288]     savescore;
+ 819 15198 [288]     writeln('Level 2 Complete');
+ 820 15221 [288]     _abort;
+ 821 15225 [288]   end;
+ 822 15225 [288]   { initialize ball }
+ 823 15225 [288]   bxs:=2; bys:=conv(NFLOORS*VFLOORS-10);
+ 824 15239 [288]   newball;
+ 825 15250 [288]   { initialize player }
+ 826 15250 [288]   fx:=3.0; fy:=1; jump:=0.0;  jumpspeed:=0.0;
+ 827 15286 [288]   fxs:=fx; fys:=fy;
+ 828 15304 [288]   fxstep:=0.0; fyspeed:=0;
+ 829 15326 [288]   { make and show holes }
+ 830 15330 [288]   holes[0]:=-50;
+ 831 15334 [288]   _move(0,0); _draw(XSIZE,0,WHITE);
+ 832 15361 [288]   for flr:=1 to NFLOORS do begin
+ 833 15378 [288]     holes[flr]:=
+ 834 15382 [288]       irandom(XDOORSIZE+4+HOLEMARGIN,
+ 835 15391 [288]               XSIZE-HOLESIZE-3-XDOORSIZE-HOLEMARGIN);
+ 836 15412 [288]     showfloor(flr);
+ 837 15426 [288]   end;
+ 838 15426 [288]   { make ladders }
+ 839 15440 [288]   for flr:=0 to NFLOORS-1 do begin
+ 840 15460 [288]     repeat
+ 841 15460 [288]       ladders[flr]:=irandom(2,XSIZE-LADDERSIZE-2);
+ 842 15482 [288] 
+ 843 15486 [288]       if flr=0 then
+ 844 15492 [288]         if ladders[0] < XDOORSIZE+10 then
+ 845 15506 [288]           ladders[0]:=XDOORSIZE+10;
+ 846 15517 [288] 
+ 847 15522 [288]     until ladderok(flr,ladders[flr]) and
+ 848 15542 [288]           not nearladder(flr,ladders[flr]);
+ 849 15562 [288]   end;
+ 850 15567 [288]   ladders[NFLOORS]:=-LADDERSIZE;
+ 851 15585 [288]   flr:=NFLOORS;
+ 852 15592 [288]   ffloor:=0;
+ 853 15598 [288]   { make and show doors }
+ 854 15602 [288]   xdoor[0]:=2;
+ 855 15606 [288]   ydoor[0]:=1;
+ 856 15614 [288]   xdoor[1]:=XSIZE-XDOORSIZE-2;
+ 857 15627 [288]   ydoor[1]:=VFLOORS*NFLOORS+1;
+ 858 15641 [288]   showdoor(0);
+ 859 15654 [288]   showdoor(1);
+ 860 15662 [288]   { make gems }
+ 861 15662 [288]   for f:=0 to NFLOORS do begin
+ 862 15679 [288]     repeat
+ 863 15679 [288]       xgem[f]:=irandom(1,XSIZE-9);
+ 864 15698 [288]     until gemok(f,xgem[f]);
+ 865 15722 [288]     valgem[f]:=10;
+ 866 15731 [288]   end;
+ 867 15735 [288]   { one coin worth 30 points }
+ 868 15749 [288]   valgem[irandom(0,NFLOORS)]:=30;
+ 869 15763 [288]   { make elevator for level 2 }
+ 870 15767 [288]   ecount:=0;
+ 871 15769 [288] 
+ 872 15773 [288]   if level>=2 then begin
+ 873 15780 [288]     efloor:=irandom(0,NFLOORS-1);
+ 874 15798 [288]     ex:=ladders[efloor];
+ 875 15806 [288]   end else begin
+ 876 15817 [288]     efloor:=NFLOORS+1; { move off floors }
+ 877 15826 [288]     ex:=300;           { move off screen }
+ 878 15833 [288]   end;
+ 879 15833 [288]   eybottom:=efloor*VFLOORS;
+ 880 15839 [288]   eytop:=eybottom+VFLOORS;
+ 881 15850 [288]   ey:=eybottom;
+ 882 15855 [288]   eys:=eytop;
+ 883 15863 [288]   edir:=1;
+ 884 15873 [288]   ewait:=EWAIT;
+ 885 15879 [288]   { show ladders, elevator and gems }
+ 886 15883 [288]   for f:=0 to NFLOORS-1 do begin
+ 887 15903 [288]     if f<>efloor then
+ 888 15907 [288]       showladder(f);
+ 889 15925 [288]     showgem(f);
+ 890 15935 [288]   end;
+ 891 15935 [288]   showshaft;
+ 892 15953 [288]   showgem(NFLOORS);
+ 893 15961 [288] end;
+ 894 15961 [288] 
+ 895 15962 [279] {$I IANIMATE:P}
+{I:IANIMA}  1 15962 [279] { ianimate - run animation in loop                  }
+{I:IANIMA}  2 15962 [279] {  proc expaint;                                    }
+{I:IANIMA}  3 15962 [279] {    Called to paint one picture and apply motion.  }
+{I:IANIMA}  4 15962 [279] {  func exkey(ch:char):boolean;                     }
+{I:IANIMA}  5 15962 [279] {    Called to check for KEY and stop loop if true  }
+{I:IANIMA}  6 15962 [279] 
+{I:IANIMA}  7 15962 [279] proc animate(arepeat:boolean);
+{I:IANIMA}  8 15962 [281] { arepeat: auto repeat cursor keys without _delay }
+{I:IANIMA}  9 15962 [281] const toggle=chr($0c);
+{I:IANIMA} 10 15965 [282]       cleft=chr($03); cright=chr($16);
+{I:IANIMA} 11 15965 [284]       cup=chr($1a); cdown=chr($18); esc=chr(0);
+{I:IANIMA} 12 15965 [287] mem   sflag=$1781:integer&;
+{I:IANIMA} 13 15965 [288]       emuflags=$1707:integer&;
+{I:IANIMA} 14 15965 [289] var   ch:char;
+{I:IANIMA} 15 15965 [290]       dummy0:integer;
+{I:IANIMA} 16 15965 [291]       stop:boolean;
+{I:IANIMA} 17 15965 [292] begin
+{I:IANIMA} 18 15965 [292]   repeat
+{I:IANIMA} 19 15965 [292]     repeat
+{I:IANIMA} 20 15967 [292]       stop:=expaint;
+{I:IANIMA} 21 15973 [292]       dummy0:=_syncscreen; { sleep for up to 30 msec }
+{I:IANIMA} 22 15987 [292]       ch:=KEYPRESSED; { sleep for 10 msec }
+{I:IANIMA} 23 15995 [292]       { sflag bit 8 is escape flag. Pass it through }
+{I:IANIMA} 24 15995 [292]     until (ord(ch)<>0) or ((sflag and $80)<>0)
+{I:IANIMA} 25 16011 [292]       or stop;
+{I:IANIMA} 26 16013 [292]     if not(((ch=cup) or (ch=cdown) or (ch=cleft) or
+{I:IANIMA} 27 16043 [292]        (ch=cright)) and
+{I:IANIMA} 28 16052 [292]        ((emuflags and 1)<>0) and arepeat) then
+{I:IANIMA} 29 16068 [292]        { cursor keys auto repeat without _delay }
+{I:IANIMA} 30 16069 [292]        KEYPRESSED := chr(0);
+{I:IANIMA} 31 16074 [292]     sflag:=sflag and $7f; { clear escape flag }
+{I:IANIMA} 32 16092 [292]     if ch=toggle then write(toggle);
+{I:IANIMA} 33 16105 [292]   until exkey(ch) or stop;
+{I:IANIMA} 34 16117 [292] end;
+{I:IANIMA} 35 16125 [292] 
+ 896 16126 [280] 
+ 897 16126 [280] begin
+ 898 16126 [280]   score:=0;
+ 899 16131 [280]   level:=1;
+ 900 16137 [280]   loopcounter:=0;
+ 901 16143 [280]   if option('H') then begin
+ 902 16157 [280]     writeln('/D   endless demo mode');
+ 903 16189 [280]     exit;
+ 904 16190 [280]   end;
+ 905 16190 [280]   demomode:=option('D');
+ 906 16200 [280]   if demomode then writeln('Demo mode');
+ 907 16227 [280]   _grinit; _fullview;
+ 908 16235 [280]   writeln('Reach the exit on the top floor.');
+ 909 16274 [280]   writeln('Collect gems and avoid the ball.');
+ 910 16313 [280]   writeln('L load saved score, <arrow> move player');
+ 911 16359 [280]   init;
+ 912 16363 [280]   animate(true);
+ 913 16371 [280]   _splitview;
+ 914 16375 [280]   showresult;
+ 915 16379 [280]   writeln('Final score ',score);
+ 916 16403 [280]   savescore;
+ 917 16407 [280] end.
+Code length:           16406
+Compiler stack size:   253/300
+Ident stack size:      292/350

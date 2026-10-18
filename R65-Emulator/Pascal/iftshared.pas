@@ -215,9 +215,9 @@ func round(r: real): integer;
 {**************************}
 begin
   if r >= 0.0 then
-    round := trunc(r + 0.5)
+    round := floor(r + 0.5)
   else
-    round := trunc(r - 0.5);
+    round := floor(r - 0.5);
 end;
 
 proc _getdataheader(f: file);

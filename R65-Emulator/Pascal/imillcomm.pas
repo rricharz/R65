@@ -11,15 +11,15 @@ var
 proc computerturn(player: integer); forward;
 proc init_ai; forward;
 
-func strunc(r: real): integer;
+func sfloor(r: real): integer;
 {*************************}
 begin
   if r>32767.0 then
-    strunc:=32767
+    sfloor:=32767
   else if r< -32768.0 then
-    strunc:=-32768
+    sfloor:=-32768
   else
-    strunc:=trunc(r);
+    sfloor:=floor(r);
 end;
 
 proc protocolboard;
@@ -642,7 +642,7 @@ begin
     player:=otherplayer(player);
   until gameover(player);
 
-  writeln(@PROTOCOL,'AI TIME ',strunc(aitime),' S');
+  writeln(@PROTOCOL,'AI TIME ',sfloor(aitime),' S');
   quit;
   message(10,'  ',player);
   message(11,'  ',otherplayer(player));

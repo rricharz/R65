@@ -292,8 +292,8 @@ begin {main}
 { display info at bottom of table }
   ffree:=conv(sfree)/conv(TSECTORS);
   fdel:=conv(sdel)/conv(TSECTORS);
-  writeln('Free:', trunc(100.0*ffree+0.5),
-    '%, deleted:',trunc(100.0*fdel+0.5),
+  writeln('Free:', floor(100.0*ffree+0.5),
+    '%, deleted:',floor(100.0*fdel+0.5),
     '%,',' entries:', index-1, '/',MAXENT);
 
 { Change back to original disk }

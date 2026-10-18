@@ -42,7 +42,7 @@ begin
   end;
   if ((shipx>=4) and (shipx<=XSIZE-4))
     then begin
-    lastsy:=trunc(shipy);
+    lastsy:=floor(shipy);
     _plotmap(shipx-4,lastsy,shipmap[0]);
     _plotmap(shipx,lastsy,shipmap[1]);
     lastsx:=shipx;
@@ -52,7 +52,7 @@ end;
 proc moveship;
 var change: real;
 begin
-  shipx:=shipx + trunc(sspeedx);
+  shipx:=shipx + floor(sspeedx);
   shipy:=shipy + sspeedy;
   change:=0.05 * conv(XSIZE div 2 - shipx);
   change:=change * rrandom(-0.3,0.3);
