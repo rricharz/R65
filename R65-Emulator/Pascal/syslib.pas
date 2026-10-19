@@ -106,6 +106,17 @@ begin
   if x<0 then _abs:=-x else _abs:=x
 end;
 
+func _trunc(r: real): integer;
+{****************************}
+begin
+  if r<=-32768.0 then
+    _trunc:=-32768
+  else if r>=0.0 then
+    _trunc:=floor(r)
+  else
+    _trunc:=-floor(-r);
+end;
+
 func _mod(x,n: integer): integer;
 {*******************************}
 { compute modulo function of integer }

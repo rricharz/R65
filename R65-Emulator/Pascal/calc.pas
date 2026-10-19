@@ -59,18 +59,16 @@ end;
 
 func fix(rf: real): integer;
 {**************************}
-var rnd:real;
 begin
-  if rf>=0.0 then rnd:=0.5 else rnd:=-0.5;
   if (rf>=32767.5) then begin
       error('Integer value exceeds',
         'upper limit, set to 32767');
       fix:=$7fff;
-    end else if (rf<=-32768.5) then begin
+    end else if (rf<-32768.5) then begin
       error('Integer value exceeds',
         ' lower limit, set to -32768');
       fix:=$8000;
-    end else fix:=floor(rf+rnd);
+    end else fix:=floor(rf+0.5);
 end;
 
 proc checkfor(c: char);

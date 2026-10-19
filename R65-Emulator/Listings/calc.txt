@@ -13,431 +13,429 @@
   13     4 [  0] 
   14     4 [  0] program calc;
   15     4 [  0] uses syslib,mathlib,strlib,writelib;
-  16  7393 [109] 
-  17  7393 [109] const
-  18  7393 [109]   M_FLOAT=0;
-  19  7396 [110]   M_WORD=1;
-  20  7396 [111]   M_BYTE=2;
-  21  7396 [112]   M_BOOL=3;
-  22  7396 [113] 
-  23  7396 [113]   F_AUTO=0;
-  24  7396 [114]   F_FIX2=1;
-  25  7396 [115] 
-  26  7396 [115] mem vidpnt=$00e9:integer;
-  27  7396 [116]     BUFFPN   = $0015: integer&;
-  28  7396 [117] 
-  29  7396 [117] var ch: char;
-  30  7396 [118]     r, lastr: real;
-  31  7396 [120]     stop, dotused, firsterror, dummy: boolean;
-  32  7396 [124]     line: cpnt;
-  33  7396 [125]     pos, n, mode, format: integer;
-  34  7396 [129] 
-  35  7396 [129] proc clearinput;
-  36  7396 [130] {**************}
-  37  7396 [130] begin
-  38  7396 [130]   BUFFPN:=-1;
-  39  7403 [130] end;
-  40  7408 [130] 
-  41  7409 [130] proc error(s1,s2:cpnt);
-  42  7409 [133] {*********************}
-  43  7409 [133] begin
-  44  7409 [133]   if firsterror then
-  45  7414 [133]     writeln(INVVID,'Error: ',s1,' ',s2,NORVID);
-  46  7453 [133]   firsterror:=false;
-  47  7455 [133] end;
-  48  7459 [133] 
-  49  7460 [131] proc readch;
-  50  7460 [132] {**********}
-  51  7460 [132] begin
-  52  7460 [132]   if firsterror then begin
-  53  7469 [132]     ch := line[pos];
-  54  7480 [132]     if ch<>ENDMARK then pos := pos + 1
-  55  7500 [132]     else ch := CR;
-  56  7512 [132]   end else
-  57  7516 [132]     ch := CR;
-  58  7521 [132] end;
-  59  7525 [132] 
-  60  7526 [132] func fix(rf: real): integer;
-  61  7526 [135] {**************************}
-  62  7526 [135] var rnd:real;
-  63  7529 [136] begin
-  64  7529 [136]   if rf>=0.0 then rnd:=0.5 else rnd:=-0.5;
-  65  7568 [136]   if (rf>=32767.5) then begin
-  66  7588 [136]       error('Integer value exceeds',
-  67  7615 [136]         'upper limit, set to 32767');
-  68  7649 [136]       fix:=$7fff;
-  69  7652 [136]     end else if (rf<=-32768.5) then begin
-  70  7673 [136]       error('Integer value exceeds',
-  71  7700 [136]         ' lower limit, set to -32768');
-  72  7736 [136]       fix:=$8000;
-  73  7739 [136]     end else fix:=floor(rf+rnd);
-  74  7759 [136] end;
-  75  7764 [136] 
-  76  7765 [134] proc checkfor(c: char);
-  77  7765 [136] {*********************}
-  78  7765 [136] var s1,s2:cpnt;
-  79  7768 [138] begin
-  80  7768 [138]   if ch<>c then begin
-  81  7779 [138]     s1:=_new; s2:=_new;
-  82  7798 [138]     _strcpy('Expected ',s1);
-  83  7824 [138]     if c=CR then _strcpy('Expected <eol>',s1)
-  84  7851 [138]     else _strinsc(c,9,s1);
-  85  7880 [138]     _strcpy('but found ',s2);
-  86  7903 [138]     if ch=CR then _strcpy('but found <eol>',s2)
-  87  7931 [138]     else _strinsc(ch,10,s2);
-  88  7960 [138]     error(s1,s2);
-  89  7974 [138]     _release(s2); _release(s1);
-  90  7994 [138]   end;
-  91  7994 [138] end;
-  92  7994 [138] 
-  93  7995 [135] proc skip(c:char);
-  94  7995 [137] {****************}
-  95  7995 [137] begin
-  96  7995 [137]   checkfor(c); readch;
-  97  8014 [137] end;
-  98  8014 [137] 
-  99  8015 [136] func isnumber(cn:char):boolean;
- 100  8015 [139] {*****************************}
- 101  8015 [139] begin
- 102  8015 [139]   isnumber:=(cn>='0') and (cn<='9');
- 103  8034 [139] end;
- 104  8039 [139] 
- 105  8040 [138] proc writebinary(f:file; r,bits:integer);
- 106  8040 [142] {***************************************}
- 107  8040 [142] var mask,i:integer;
- 108  8043 [144] begin
- 109  8043 [144]   write(@f,'%');
- 110  8053 [144]   if bits=8 then mask:=$0080
- 111  8063 [144]   else mask:=$8000;
- 112  8075 [144] 
- 113  8079 [144]   i:=0;
- 114  8081 [144]   while mask<>0 do begin
- 115  8095 [144]     if (r and mask)<>0 then write(@f,'1')
- 116  8117 [144]     else write(@f,'0');
- 117  8129 [144] 
- 118  8129 [144]     mask:=mask shr 1;
- 119  8135 [144]     i:=i+1;
- 120  8146 [144]     if (mask<>0) and (_mod(i,4)=0) then
- 121  8175 [144]       write(@f,' ');
- 122  8187 [144]   end;
- 123  8187 [144] end;
- 124  8190 [144] 
- 125  8191 [139] proc showresult;
- 126  8191 [140] {**************}
- 127  8191 [140] var i:integer;
- 128  8194 [141] begin
- 129  8194 [141]   case mode of
- 130  8196 [141]     M_FLOAT:
- 131  8204 [141]       if format=F_AUTO then
- 132  8213 [141]         write(r:12)
- 133  8225 [141]       else
- 134  8233 [141]         write(r:12:2);
- 135  8252 [141] 
- 136  8255 [141]     M_WORD:
- 137  8259 [141]       if (r < -32768.5) or (r >= 32767.5) then
- 138  8289 [141]         write('OVERFLOW')
- 139  8302 [141]       else begin
- 140  8305 [141]         i:=fix(r);
- 141  8319 [141]         write(i:12,'  $',hexw(i),'  ');
- 142  8355 [141]         writebinary(OUTPUT,i,16);
- 143  8369 [141]       end;
- 144  8369 [141] 
- 145  8372 [141]     M_BYTE:
- 146  8376 [141]       if (r < -0.5) or (r >= 255.5) then
- 147  8406 [141]         write('OVERFLOW')
- 148  8419 [141]       else begin
- 149  8422 [141]         i:=fix(r);
- 150  8436 [141]         write(i:12,'    $',hexb(i),'  ');
- 151  8474 [141]         write('          ');
- 152  8485 [141]         writebinary(OUTPUT,i,8);
- 153  8499 [141]       end;
- 154  8499 [141] 
- 155  8502 [141]     M_BOOL:
- 156  8506 [141]       if r=0.0 then
- 157  8521 [141]         write('false')
- 158  8531 [141]       else
- 159  8531 [141]         write('true')
- 160  8539 [141]   end;
- 161  8541 [141]   writeln;
- 162  8541 [141] end;
- 163  8547 [141] 
- 164  8548 [140] func express:real;
- 165  8548 [142] {****************}
- 166  8548 [142] var
- 167  8548 [142]   re: real;
- 168  8551 [143] 
- 169  8551 [143] func binval: integer;
- 170  8551 [145] {*******************}
- 171  8551 [145] begin
- 172  8551 [145]   if (ch='0') then binval:=0
- 173  8566 [145]   else if (ch='1') then binval:=1
- 174  8585 [145]   else binval:=-1;
- 175  8596 [145] end;
- 176  8601 [145] 
- 177  8602 [145] func hexval: integer;
- 178  8602 [147] {*******************}
- 179  8602 [147] begin
- 180  8602 [147]   if (ch>='0') and (ch<='9')
- 181  8620 [147]     then hexval:=ord(ch)-ord('0')
- 182  8631 [147]   else if (ch>='A') and (ch<='F')
- 183  8652 [147]     then hexval:=ord(ch)-ord('A')+10
- 184  8664 [147]   else hexval:=-1;
- 185  8676 [147] end;
- 186  8681 [147] 
- 187  8682 [147] func isletter(ch:char):boolean;
- 188  8682 [150] {*****************************}
- 189  8682 [150] begin
- 190  8682 [150]   isletter:=(ord(ch)>=ord('A'))and(ord(ch)<=ord('Z'))
- 191  8700 [150] end;
- 192  8706 [150] 
- 193  8707 [149] func function:real;
- 194  8707 [151] {*****************}
- 195  8707 [151] var i: integer;
- 196  8710 [152]     r: real;
- 197  8710 [153]     lstring: cpnt;
- 198  8710 [154] begin
- 199  8710 [154]   lstring:=_new;
- 200  8718 [154]   lstring[0]:=chr(0);
- 201  8726 [154]   _strinsc(ch,0,lstring); readch; i:=1;
- 202  8753 [154]   while isletter(ch) do begin
- 203  8772 [154]     _strinsc(ch,i,lstring); readch; i:=i+1;
- 204  8800 [154]   end;
- 205  8805 [154]   stop:=false;
- 206  8810 [154]   if _strcmp(lstring,'R')=0 then begin
- 207  8833 [154]     function:=lastr; _release(lstring); exit;
- 208  8859 [154]   end;
- 209  8859 [154]   if _strcmp(lstring,'PI')=0 then begin
- 210  8879 [154]     function:=PI; _release(lstring); exit;
- 211  8905 [154]   end;
- 212  8905 [154]   if _strcmp(lstring,'E')=0 then begin
- 213  8924 [154]     function:=E; _release(lstring); exit;
- 214  8950 [154]   end;
- 215  8950 [154]   { functions with single argument follow }
- 216  8950 [154]   checkfor('('); r:=express; skip(')');
- 217  8978 [154]   if _strcmp(lstring,'SQR')=0 then begin
- 218  8999 [154]     function:=r*r; _release(lstring); exit;
- 219  9032 [154]   end;
- 220  9032 [154]   if _strcmp(lstring,'SQRT')=0 then begin
- 221  9054 [154]     function:=sqrt(r); _release(lstring); exit;
- 222  9088 [154]   end;
- 223  9088 [154]   if _strcmp(lstring,'SIN')=0 then begin
- 224  9109 [154]     function:=sin(r); _release(lstring); exit;
- 225  9143 [154]   end;
- 226  9143 [154]   if _strcmp(lstring,'COS')=0 then begin
- 227  9164 [154]     function:=cos(r); _release(lstring); exit;
- 228  9198 [154]   end;
- 229  9198 [154]   if _strcmp(lstring,'TAN')=0 then begin
- 230  9219 [154]     function:=tan(r); _release(lstring); exit;
- 231  9253 [154]   end;
- 232  9253 [154]   if _strcmp(lstring,'EXP')=0 then begin
- 233  9274 [154]     function:=exp(r); _release(lstring); exit;
- 234  9308 [154]   end;
- 235  9308 [154]   if _strcmp(lstring,'LN')=0 then begin
- 236  9328 [154]     function:=ln(r); _release(lstring); exit;
- 237  9362 [154]   end;
- 238  9362 [154]   if _strcmp(lstring,'LOG')=0 then begin
- 239  9383 [154]     function:=log(r); _release(lstring); exit;
- 240  9417 [154]   end;
- 241  9417 [154]   error('Unknow function',lstring);
- 242  9445 [154]   function:=0.0;
- 243  9451 [154]   _release(lstring);
- 244  9467 [154] end;
- 245  9467 [154] 
- 246  9468 [151] proc exponent(var r:real);
- 247  9468 [153] {************************}
- 248  9468 [153] var minus:boolean;
- 249  9471 [154]     exp:integer;
- 250  9471 [155] begin
- 251  9471 [155]   minus:=false;
- 252  9475 [155]   if ch='-' then begin minus:=true; readch end
- 253  9499 [155]   else if ch='+' then readch;
- 254  9516 [155]   exp:=0;
- 255  9518 [155]   if isnumber(ch) then begin
- 256  9534 [155]     exp:=ord(ch)-ord('0'); readch
- 257  9548 [155]   end else error('Expecting','exponent');
- 258  9584 [155]   if isnumber(ch) then begin
- 259  9596 [155]     exp:=10*exp+(ord(ch)-ord('0')); readch;
- 260  9622 [155]   end;
- 261  9622 [155]   if minus then
- 262  9622 [155]     while exp>0 do begin r:=0.1*r; exp:=exp-1 end
- 263  9664 [155]   else
- 264  9669 [155]     while exp>0 do begin r:=10.0*r; exp:=exp-1 end;
- 265  9715 [155] end;
- 266  9718 [155] 
- 267  9719 [152] func factor:real;
- 268  9719 [154] {***************}
- 269  9719 [154] var negative:boolean;
- 270  9722 [155]     rf,rt:real;
- 271  9722 [157]     iv:integer;
- 272  9722 [158] begin
- 273  9722 [158]   negative:=false; rf:=0.0; readch;
- 274  9746 [158] 
- 275  9746 [158]   if ch='-' then begin
- 276  9753 [158]     negative:=true; readch;
- 277  9766 [158]   end;
- 278  9766 [158] 
- 279  9766 [158]   if ch='(' then begin
- 280  9773 [158]     stop:=false; rf:=express;
- 281  9788 [158]     checkfor(')'); readch;
- 282  9806 [158]   end else if ch='%' then begin
- 283  9816 [158]     stop:=false; readch; iv:=0;
- 284  9831 [158]     while binval>=0 do begin
- 285  9847 [158]       iv:=(iv shl 1)+binval; readch;
- 286  9869 [158]     end;
- 287  9869 [158]     rf:=conv(iv);
- 288  9876 [158]   end else if ch='$' then begin
- 289  9893 [158]     stop:=false; readch; iv:=0;
- 290  9908 [158]     while hexval>=0 do begin
- 291  9924 [158]       iv:=(iv shl 4)+hexval; readch;
- 292  9946 [158]     end;
- 293  9946 [158]     rf:=conv(iv);
- 294  9953 [158]   end else if isletter(ch) then
- 295  9975 [158]     rf:=function
- 296  9978 [158]   else if ch<>chr(0) then begin
- 297 10001 [158]     if ch<>CR then begin
- 298 10011 [158]       stop:=false;
- 299 10016 [158]       if ch='+' then readch;
- 300 10034 [158] 
- 301 10034 [158]       if not isnumber(ch) then
- 302 10046 [158]         error('Expected','number');
- 303 10076 [158] 
- 304 10076 [158]       while isnumber(ch) do begin
- 305 10091 [158]         rt:=rf+rf; rt:=rt+rt;
- 306 10116 [158]         rf:=rt+rt+rf+rf+
- 307 10149 [158]             conv(ord(ch)-ord('0'));
- 308 10163 [158]         readch;
- 309 10175 [158]       end;
- 310 10175 [158] 
- 311 10178 [158]       if ch='.' then begin
- 312 10185 [158]         dotused:=true; readch; rt:=0.1;
- 313 10204 [158]         while isnumber(ch) do begin
- 314 10225 [158]           rf:=rf+conv(ord(ch)-ord('0'))*rt;
- 315 10239 [158]           rt:=rt/10.0; readch;
- 316 10276 [158]         end;
- 317 10276 [158]       end;
- 318 10279 [158] 
- 319 10279 [158]       if ch='E' then begin
- 320 10286 [158]         readch; exponent(rf);
- 321 10309 [158]       end;
- 322 10309 [158]     end;
- 323 10309 [158]   end;
- 324 10309 [158] 
- 325 10309 [158]   if negative then rf:=-rf;
- 326 10316 [158]   factor:=rf;
- 327 10329 [158] end;
- 328 10341 [158] 
- 329 10342 [154] func simexp:real;
- 330 10342 [156] {***************}
- 331 10342 [156] var
- 332 10342 [156]   rs,divisor: real;
- 333 10345 [158] begin
- 334 10345 [158]   rs:=factor;
- 335 10353 [158]   while (ch='*') or (ch='/') or (ch='&') or (ch='<')
- 336 10388 [158]     or (ch='>') or (ch='^') do begin
- 337 10409 [158]     case ch of
- 338 10409 [158]       '*': begin rs:=rs*factor; end;
- 339 10439 [158]       '/': begin
- 340 10449 [158]              divisor:=factor;
- 341 10455 [158]              if divisor=0.0 then
- 342 10473 [158]                error('Division','by zero')
- 343 10498 [158]              else
- 344 10504 [158]                rs:=rs/divisor;
- 345 10513 [158]            end;
- 346 10526 [158]       '&': rs:=conv(fix(rs) and fix(factor));
- 347 10565 [158]       '^': rs:=exp(factor*ln(rs));
- 348 10611 [158]       '<': begin
- 349 10627 [158]              readch; checkfor('<');
- 350 10639 [158]              rs:=conv(fix(rs) shl fix(factor));
- 351 10668 [158]              end;
- 352 10675 [158]       '>': begin
- 353 10685 [158]              readch; checkfor('>');
- 354 10697 [158]              rs:=conv(fix(rs) shr fix(factor));
- 355 10726 [158]            end
- 356 10733 [158]       end {case};
- 357 10735 [158]   end;
- 358 10735 [158]   simexp:=rs;
- 359 10738 [158] end;
- 360 10750 [158] 
- 361 10751 [156] {********body of express********}
- 362 10751 [156] begin
- 363 10751 [156]   re:=simexp;
- 364 10759 [156]   while (ch='+') or (ch='-') or (ch='|') do begin
- 365 10791 [156]     case ch of
- 366 10791 [156]       '+': begin re:=re+simexp; end;
- 367 10821 [156]       '-': begin re:=re-simexp; end;
- 368 10850 [156]       '|': begin
- 369 10860 [156]              re:=conv(fix(re) or fix(factor));
- 370 10889 [156]            end
- 371 10896 [156]     end {case};
- 372 10898 [156]   end;
- 373 10898 [156]   express:=re;
- 374 10901 [156] end;
- 375 10913 [156] 
- 376 10914 [142] func command:boolean;
- 377 10914 [144] {*******************}
- 378 10914 [144] begin
- 379 10914 [144]   command:=true;
- 380 10921 [144]   if _strcmp(line,'FLOAT')=0 then
- 381 10947 [144]     mode:=M_FLOAT
- 382 10951 [144]   else if _strcmp(line,'WORD')=0 then
- 383 10981 [144]     mode:=M_WORD
- 384 10985 [144]   else if _strcmp(line,'BYTE')=0 then
- 385 11015 [144]     mode:=M_BYTE
- 386 11019 [144]   else if _strcmp(line,'BOOL')=0 then
- 387 11049 [144]     mode:=M_BOOL
- 388 11053 [144]   else if _strcmp(line,'AUTO')=0 then
- 389 11083 [144]     format:=F_AUTO
- 390 11087 [144]   else if _strcmp(line,'FIX2')=0 then
- 391 11117 [144]     format:=F_FIX2
- 392 11121 [144]   else
- 393 11123 [144]     command:=false;
- 394 11132 [144] end;
- 395 11136 [144] 
- 396 11137 [144] {*********main body********}
- 397 11137 [144] begin
- 398 11137 [144]   line := _new;
- 399 11145 [144] 
- 400 11149 [144]   write(INVVID);
- 401 11152 [144]   writeln('Enter an expression, for example:');
- 402 11192 [144]   writeln('32767      INPUT decimal number');
- 403 11230 [144]   writeln('$FFF       INPUT hex number');
- 404 11264 [144]   writeln('%1101      INPUT binary number');
- 405 11301 [144]   writeln('-55.35     INPUT negative number');
- 406 11340 [144]   writeln('2*(5+28)   math expression');
- 407 11373 [144]   writeln('R*3        last result');
- 408 11402 [144]   writeln('<return>,<esc>    exit');
- 409 11431 [144]   writeln('Operators: +,-,*,/,^,(),&,|,<<,>>');
- 410 11471 [144]   writeln('Functions: SQRT(),SQR(),SIN(),COS()');
- 411 11513 [144]   writeln('           TAN(),EXP(),LN(),LOG()');
- 412 11553 [144]   writeln('Modes:     FLOAT,WORD,BYTE,BOOL');
- 413 11591 [144]   writeln('Format:    AUTO,FIX2');
- 414 11618 [144]   writeln(NORVID);
- 415 11627 [144] 
- 416 11627 [144]   r := 0.0;
- 417 11633 [144]   lastr := 0.0;
- 418 11645 [144]   mode := M_FLOAT;
- 419 11653 [144]   format := F_AUTO;
- 420 11659 [144]   showresult;
- 421 11667 [144] 
- 422 11667 [144]   repeat
- 423 11667 [144]     firsterror:=true;
- 424 11669 [144]     n := _strread(INPUT, line, dummy);
- 425 11695 [144]     pos := 0;
- 426 11701 [144]     stop := true;
- 427 11707 [144] 
- 428 11711 [144]     if not command then begin
- 429 11718 [144]       dotused := false;
- 430 11723 [144]       lastr := r;
- 431 11727 [144]       r := express;
- 432 11745 [144]       checkfor(CR);
- 433 11759 [144]     end else
- 434 11759 [144]       stop := false;
- 435 11764 [144] 
- 436 11768 [144]     if not stop then showresult;
- 437 11780 [144]   until stop;
- 438 11780 [144] 
- 439 11787 [144]   _release(line);
- 440 11797 [144] end.
-Code length:           11796
-Compiler stack size:   140/300
-Ident stack size:      158/350
+  16  7470 [111] 
+  17  7470 [111] const
+  18  7470 [111]   M_FLOAT=0;
+  19  7473 [112]   M_WORD=1;
+  20  7473 [113]   M_BYTE=2;
+  21  7473 [114]   M_BOOL=3;
+  22  7473 [115] 
+  23  7473 [115]   F_AUTO=0;
+  24  7473 [116]   F_FIX2=1;
+  25  7473 [117] 
+  26  7473 [117] mem vidpnt=$00e9:integer;
+  27  7473 [118]     BUFFPN   = $0015: integer&;
+  28  7473 [119] 
+  29  7473 [119] var ch: char;
+  30  7473 [120]     r, lastr: real;
+  31  7473 [122]     stop, dotused, firsterror, dummy: boolean;
+  32  7473 [126]     line: cpnt;
+  33  7473 [127]     pos, n, mode, format: integer;
+  34  7473 [131] 
+  35  7473 [131] proc clearinput;
+  36  7473 [132] {**************}
+  37  7473 [132] begin
+  38  7473 [132]   BUFFPN:=-1;
+  39  7480 [132] end;
+  40  7485 [132] 
+  41  7486 [132] proc error(s1,s2:cpnt);
+  42  7486 [135] {*********************}
+  43  7486 [135] begin
+  44  7486 [135]   if firsterror then
+  45  7491 [135]     writeln(INVVID,'Error: ',s1,' ',s2,NORVID);
+  46  7530 [135]   firsterror:=false;
+  47  7532 [135] end;
+  48  7536 [135] 
+  49  7537 [133] proc readch;
+  50  7537 [134] {**********}
+  51  7537 [134] begin
+  52  7537 [134]   if firsterror then begin
+  53  7546 [134]     ch := line[pos];
+  54  7557 [134]     if ch<>ENDMARK then pos := pos + 1
+  55  7577 [134]     else ch := CR;
+  56  7589 [134]   end else
+  57  7593 [134]     ch := CR;
+  58  7598 [134] end;
+  59  7602 [134] 
+  60  7603 [134] func fix(rf: real): integer;
+  61  7603 [137] {**************************}
+  62  7603 [137] begin
+  63  7603 [137]   if (rf>=32767.5) then begin
+  64  7621 [137]       error('Integer value exceeds',
+  65  7648 [137]         'upper limit, set to 32767');
+  66  7682 [137]       fix:=$7fff;
+  67  7685 [137]     end else if (rf<-32768.5) then begin
+  68  7706 [137]       error('Integer value exceeds',
+  69  7733 [137]         ' lower limit, set to -32768');
+  70  7769 [137]       fix:=$8000;
+  71  7772 [137]     end else fix:=floor(rf+0.5);
+  72  7792 [137] end;
+  73  7797 [137] 
+  74  7798 [136] proc checkfor(c: char);
+  75  7798 [138] {*********************}
+  76  7798 [138] var s1,s2:cpnt;
+  77  7801 [140] begin
+  78  7801 [140]   if ch<>c then begin
+  79  7812 [140]     s1:=_new; s2:=_new;
+  80  7831 [140]     _strcpy('Expected ',s1);
+  81  7857 [140]     if c=CR then _strcpy('Expected <eol>',s1)
+  82  7884 [140]     else _strinsc(c,9,s1);
+  83  7913 [140]     _strcpy('but found ',s2);
+  84  7936 [140]     if ch=CR then _strcpy('but found <eol>',s2)
+  85  7964 [140]     else _strinsc(ch,10,s2);
+  86  7993 [140]     error(s1,s2);
+  87  8007 [140]     _release(s2); _release(s1);
+  88  8027 [140]   end;
+  89  8027 [140] end;
+  90  8027 [140] 
+  91  8028 [137] proc skip(c:char);
+  92  8028 [139] {****************}
+  93  8028 [139] begin
+  94  8028 [139]   checkfor(c); readch;
+  95  8047 [139] end;
+  96  8047 [139] 
+  97  8048 [138] func isnumber(cn:char):boolean;
+  98  8048 [141] {*****************************}
+  99  8048 [141] begin
+ 100  8048 [141]   isnumber:=(cn>='0') and (cn<='9');
+ 101  8067 [141] end;
+ 102  8072 [141] 
+ 103  8073 [140] proc writebinary(f:file; r,bits:integer);
+ 104  8073 [144] {***************************************}
+ 105  8073 [144] var mask,i:integer;
+ 106  8076 [146] begin
+ 107  8076 [146]   write(@f,'%');
+ 108  8086 [146]   if bits=8 then mask:=$0080
+ 109  8096 [146]   else mask:=$8000;
+ 110  8108 [146] 
+ 111  8112 [146]   i:=0;
+ 112  8114 [146]   while mask<>0 do begin
+ 113  8128 [146]     if (r and mask)<>0 then write(@f,'1')
+ 114  8150 [146]     else write(@f,'0');
+ 115  8162 [146] 
+ 116  8162 [146]     mask:=mask shr 1;
+ 117  8168 [146]     i:=i+1;
+ 118  8179 [146]     if (mask<>0) and (_mod(i,4)=0) then
+ 119  8208 [146]       write(@f,' ');
+ 120  8220 [146]   end;
+ 121  8220 [146] end;
+ 122  8223 [146] 
+ 123  8224 [141] proc showresult;
+ 124  8224 [142] {**************}
+ 125  8224 [142] var i:integer;
+ 126  8227 [143] begin
+ 127  8227 [143]   case mode of
+ 128  8229 [143]     M_FLOAT:
+ 129  8237 [143]       if format=F_AUTO then
+ 130  8246 [143]         write(r:12)
+ 131  8258 [143]       else
+ 132  8266 [143]         write(r:12:2);
+ 133  8285 [143] 
+ 134  8288 [143]     M_WORD:
+ 135  8292 [143]       if (r < -32768.5) or (r >= 32767.5) then
+ 136  8322 [143]         write('OVERFLOW')
+ 137  8335 [143]       else begin
+ 138  8338 [143]         i:=fix(r);
+ 139  8352 [143]         write(i:12,'  $',hexw(i),'  ');
+ 140  8388 [143]         writebinary(OUTPUT,i,16);
+ 141  8402 [143]       end;
+ 142  8402 [143] 
+ 143  8405 [143]     M_BYTE:
+ 144  8409 [143]       if (r < -0.5) or (r >= 255.5) then
+ 145  8439 [143]         write('OVERFLOW')
+ 146  8452 [143]       else begin
+ 147  8455 [143]         i:=fix(r);
+ 148  8469 [143]         write(i:12,'    $',hexb(i),'  ');
+ 149  8507 [143]         write('          ');
+ 150  8518 [143]         writebinary(OUTPUT,i,8);
+ 151  8532 [143]       end;
+ 152  8532 [143] 
+ 153  8535 [143]     M_BOOL:
+ 154  8539 [143]       if r=0.0 then
+ 155  8554 [143]         write('false')
+ 156  8564 [143]       else
+ 157  8564 [143]         write('true')
+ 158  8572 [143]   end;
+ 159  8574 [143]   writeln;
+ 160  8574 [143] end;
+ 161  8580 [143] 
+ 162  8581 [142] func express:real;
+ 163  8581 [144] {****************}
+ 164  8581 [144] var
+ 165  8581 [144]   re: real;
+ 166  8584 [145] 
+ 167  8584 [145] func binval: integer;
+ 168  8584 [147] {*******************}
+ 169  8584 [147] begin
+ 170  8584 [147]   if (ch='0') then binval:=0
+ 171  8599 [147]   else if (ch='1') then binval:=1
+ 172  8618 [147]   else binval:=-1;
+ 173  8629 [147] end;
+ 174  8634 [147] 
+ 175  8635 [147] func hexval: integer;
+ 176  8635 [149] {*******************}
+ 177  8635 [149] begin
+ 178  8635 [149]   if (ch>='0') and (ch<='9')
+ 179  8653 [149]     then hexval:=ord(ch)-ord('0')
+ 180  8664 [149]   else if (ch>='A') and (ch<='F')
+ 181  8685 [149]     then hexval:=ord(ch)-ord('A')+10
+ 182  8697 [149]   else hexval:=-1;
+ 183  8709 [149] end;
+ 184  8714 [149] 
+ 185  8715 [149] func isletter(ch:char):boolean;
+ 186  8715 [152] {*****************************}
+ 187  8715 [152] begin
+ 188  8715 [152]   isletter:=(ord(ch)>=ord('A'))and(ord(ch)<=ord('Z'))
+ 189  8733 [152] end;
+ 190  8739 [152] 
+ 191  8740 [151] func function:real;
+ 192  8740 [153] {*****************}
+ 193  8740 [153] var i: integer;
+ 194  8743 [154]     r: real;
+ 195  8743 [155]     lstring: cpnt;
+ 196  8743 [156] begin
+ 197  8743 [156]   lstring:=_new;
+ 198  8751 [156]   lstring[0]:=chr(0);
+ 199  8759 [156]   _strinsc(ch,0,lstring); readch; i:=1;
+ 200  8786 [156]   while isletter(ch) do begin
+ 201  8805 [156]     _strinsc(ch,i,lstring); readch; i:=i+1;
+ 202  8833 [156]   end;
+ 203  8838 [156]   stop:=false;
+ 204  8843 [156]   if _strcmp(lstring,'R')=0 then begin
+ 205  8866 [156]     function:=lastr; _release(lstring); exit;
+ 206  8892 [156]   end;
+ 207  8892 [156]   if _strcmp(lstring,'PI')=0 then begin
+ 208  8912 [156]     function:=PI; _release(lstring); exit;
+ 209  8938 [156]   end;
+ 210  8938 [156]   if _strcmp(lstring,'E')=0 then begin
+ 211  8957 [156]     function:=E; _release(lstring); exit;
+ 212  8983 [156]   end;
+ 213  8983 [156]   { functions with single argument follow }
+ 214  8983 [156]   checkfor('('); r:=express; skip(')');
+ 215  9011 [156]   if _strcmp(lstring,'SQR')=0 then begin
+ 216  9032 [156]     function:=r*r; _release(lstring); exit;
+ 217  9065 [156]   end;
+ 218  9065 [156]   if _strcmp(lstring,'SQRT')=0 then begin
+ 219  9087 [156]     function:=sqrt(r); _release(lstring); exit;
+ 220  9121 [156]   end;
+ 221  9121 [156]   if _strcmp(lstring,'SIN')=0 then begin
+ 222  9142 [156]     function:=sin(r); _release(lstring); exit;
+ 223  9176 [156]   end;
+ 224  9176 [156]   if _strcmp(lstring,'COS')=0 then begin
+ 225  9197 [156]     function:=cos(r); _release(lstring); exit;
+ 226  9231 [156]   end;
+ 227  9231 [156]   if _strcmp(lstring,'TAN')=0 then begin
+ 228  9252 [156]     function:=tan(r); _release(lstring); exit;
+ 229  9286 [156]   end;
+ 230  9286 [156]   if _strcmp(lstring,'EXP')=0 then begin
+ 231  9307 [156]     function:=exp(r); _release(lstring); exit;
+ 232  9341 [156]   end;
+ 233  9341 [156]   if _strcmp(lstring,'LN')=0 then begin
+ 234  9361 [156]     function:=ln(r); _release(lstring); exit;
+ 235  9395 [156]   end;
+ 236  9395 [156]   if _strcmp(lstring,'LOG')=0 then begin
+ 237  9416 [156]     function:=log(r); _release(lstring); exit;
+ 238  9450 [156]   end;
+ 239  9450 [156]   error('Unknow function',lstring);
+ 240  9478 [156]   function:=0.0;
+ 241  9484 [156]   _release(lstring);
+ 242  9500 [156] end;
+ 243  9500 [156] 
+ 244  9501 [153] proc exponent(var r:real);
+ 245  9501 [155] {************************}
+ 246  9501 [155] var minus:boolean;
+ 247  9504 [156]     exp:integer;
+ 248  9504 [157] begin
+ 249  9504 [157]   minus:=false;
+ 250  9508 [157]   if ch='-' then begin minus:=true; readch end
+ 251  9532 [157]   else if ch='+' then readch;
+ 252  9549 [157]   exp:=0;
+ 253  9551 [157]   if isnumber(ch) then begin
+ 254  9567 [157]     exp:=ord(ch)-ord('0'); readch
+ 255  9581 [157]   end else error('Expecting','exponent');
+ 256  9617 [157]   if isnumber(ch) then begin
+ 257  9629 [157]     exp:=10*exp+(ord(ch)-ord('0')); readch;
+ 258  9655 [157]   end;
+ 259  9655 [157]   if minus then
+ 260  9655 [157]     while exp>0 do begin r:=0.1*r; exp:=exp-1 end
+ 261  9697 [157]   else
+ 262  9702 [157]     while exp>0 do begin r:=10.0*r; exp:=exp-1 end;
+ 263  9748 [157] end;
+ 264  9751 [157] 
+ 265  9752 [154] func factor:real;
+ 266  9752 [156] {***************}
+ 267  9752 [156] var negative:boolean;
+ 268  9755 [157]     rf,rt:real;
+ 269  9755 [159]     iv:integer;
+ 270  9755 [160] begin
+ 271  9755 [160]   negative:=false; rf:=0.0; readch;
+ 272  9779 [160] 
+ 273  9779 [160]   if ch='-' then begin
+ 274  9786 [160]     negative:=true; readch;
+ 275  9799 [160]   end;
+ 276  9799 [160] 
+ 277  9799 [160]   if ch='(' then begin
+ 278  9806 [160]     stop:=false; rf:=express;
+ 279  9821 [160]     checkfor(')'); readch;
+ 280  9839 [160]   end else if ch='%' then begin
+ 281  9849 [160]     stop:=false; readch; iv:=0;
+ 282  9864 [160]     while binval>=0 do begin
+ 283  9880 [160]       iv:=(iv shl 1)+binval; readch;
+ 284  9902 [160]     end;
+ 285  9902 [160]     rf:=conv(iv);
+ 286  9909 [160]   end else if ch='$' then begin
+ 287  9926 [160]     stop:=false; readch; iv:=0;
+ 288  9941 [160]     while hexval>=0 do begin
+ 289  9957 [160]       iv:=(iv shl 4)+hexval; readch;
+ 290  9979 [160]     end;
+ 291  9979 [160]     rf:=conv(iv);
+ 292  9986 [160]   end else if isletter(ch) then
+ 293 10008 [160]     rf:=function
+ 294 10011 [160]   else if ch<>chr(0) then begin
+ 295 10034 [160]     if ch<>CR then begin
+ 296 10044 [160]       stop:=false;
+ 297 10049 [160]       if ch='+' then readch;
+ 298 10067 [160] 
+ 299 10067 [160]       if not isnumber(ch) then
+ 300 10079 [160]         error('Expected','number');
+ 301 10109 [160] 
+ 302 10109 [160]       while isnumber(ch) do begin
+ 303 10124 [160]         rt:=rf+rf; rt:=rt+rt;
+ 304 10149 [160]         rf:=rt+rt+rf+rf+
+ 305 10182 [160]             conv(ord(ch)-ord('0'));
+ 306 10196 [160]         readch;
+ 307 10208 [160]       end;
+ 308 10208 [160] 
+ 309 10211 [160]       if ch='.' then begin
+ 310 10218 [160]         dotused:=true; readch; rt:=0.1;
+ 311 10237 [160]         while isnumber(ch) do begin
+ 312 10258 [160]           rf:=rf+conv(ord(ch)-ord('0'))*rt;
+ 313 10272 [160]           rt:=rt/10.0; readch;
+ 314 10309 [160]         end;
+ 315 10309 [160]       end;
+ 316 10312 [160] 
+ 317 10312 [160]       if ch='E' then begin
+ 318 10319 [160]         readch; exponent(rf);
+ 319 10342 [160]       end;
+ 320 10342 [160]     end;
+ 321 10342 [160]   end;
+ 322 10342 [160] 
+ 323 10342 [160]   if negative then rf:=-rf;
+ 324 10349 [160]   factor:=rf;
+ 325 10362 [160] end;
+ 326 10374 [160] 
+ 327 10375 [156] func simexp:real;
+ 328 10375 [158] {***************}
+ 329 10375 [158] var
+ 330 10375 [158]   rs,divisor: real;
+ 331 10378 [160] begin
+ 332 10378 [160]   rs:=factor;
+ 333 10386 [160]   while (ch='*') or (ch='/') or (ch='&') or (ch='<')
+ 334 10421 [160]     or (ch='>') or (ch='^') do begin
+ 335 10442 [160]     case ch of
+ 336 10442 [160]       '*': begin rs:=rs*factor; end;
+ 337 10472 [160]       '/': begin
+ 338 10482 [160]              divisor:=factor;
+ 339 10488 [160]              if divisor=0.0 then
+ 340 10506 [160]                error('Division','by zero')
+ 341 10531 [160]              else
+ 342 10537 [160]                rs:=rs/divisor;
+ 343 10546 [160]            end;
+ 344 10559 [160]       '&': rs:=conv(fix(rs) and fix(factor));
+ 345 10598 [160]       '^': rs:=exp(factor*ln(rs));
+ 346 10644 [160]       '<': begin
+ 347 10660 [160]              readch; checkfor('<');
+ 348 10672 [160]              rs:=conv(fix(rs) shl fix(factor));
+ 349 10701 [160]              end;
+ 350 10708 [160]       '>': begin
+ 351 10718 [160]              readch; checkfor('>');
+ 352 10730 [160]              rs:=conv(fix(rs) shr fix(factor));
+ 353 10759 [160]            end
+ 354 10766 [160]       end {case};
+ 355 10768 [160]   end;
+ 356 10768 [160]   simexp:=rs;
+ 357 10771 [160] end;
+ 358 10783 [160] 
+ 359 10784 [158] {********body of express********}
+ 360 10784 [158] begin
+ 361 10784 [158]   re:=simexp;
+ 362 10792 [158]   while (ch='+') or (ch='-') or (ch='|') do begin
+ 363 10824 [158]     case ch of
+ 364 10824 [158]       '+': begin re:=re+simexp; end;
+ 365 10854 [158]       '-': begin re:=re-simexp; end;
+ 366 10883 [158]       '|': begin
+ 367 10893 [158]              re:=conv(fix(re) or fix(factor));
+ 368 10922 [158]            end
+ 369 10929 [158]     end {case};
+ 370 10931 [158]   end;
+ 371 10931 [158]   express:=re;
+ 372 10934 [158] end;
+ 373 10946 [158] 
+ 374 10947 [144] func command:boolean;
+ 375 10947 [146] {*******************}
+ 376 10947 [146] begin
+ 377 10947 [146]   command:=true;
+ 378 10954 [146]   if _strcmp(line,'FLOAT')=0 then
+ 379 10980 [146]     mode:=M_FLOAT
+ 380 10984 [146]   else if _strcmp(line,'WORD')=0 then
+ 381 11014 [146]     mode:=M_WORD
+ 382 11018 [146]   else if _strcmp(line,'BYTE')=0 then
+ 383 11048 [146]     mode:=M_BYTE
+ 384 11052 [146]   else if _strcmp(line,'BOOL')=0 then
+ 385 11082 [146]     mode:=M_BOOL
+ 386 11086 [146]   else if _strcmp(line,'AUTO')=0 then
+ 387 11116 [146]     format:=F_AUTO
+ 388 11120 [146]   else if _strcmp(line,'FIX2')=0 then
+ 389 11150 [146]     format:=F_FIX2
+ 390 11154 [146]   else
+ 391 11156 [146]     command:=false;
+ 392 11165 [146] end;
+ 393 11169 [146] 
+ 394 11170 [146] {*********main body********}
+ 395 11170 [146] begin
+ 396 11170 [146]   line := _new;
+ 397 11178 [146] 
+ 398 11182 [146]   write(INVVID);
+ 399 11185 [146]   writeln('Enter an expression, for example:');
+ 400 11225 [146]   writeln('32767      INPUT decimal number');
+ 401 11263 [146]   writeln('$FFF       INPUT hex number');
+ 402 11297 [146]   writeln('%1101      INPUT binary number');
+ 403 11334 [146]   writeln('-55.35     INPUT negative number');
+ 404 11373 [146]   writeln('2*(5+28)   math expression');
+ 405 11406 [146]   writeln('R*3        last result');
+ 406 11435 [146]   writeln('<return>,<esc>    exit');
+ 407 11464 [146]   writeln('Operators: +,-,*,/,^,(),&,|,<<,>>');
+ 408 11504 [146]   writeln('Functions: SQRT(),SQR(),SIN(),COS()');
+ 409 11546 [146]   writeln('           TAN(),EXP(),LN(),LOG()');
+ 410 11586 [146]   writeln('Modes:     FLOAT,WORD,BYTE,BOOL');
+ 411 11624 [146]   writeln('Format:    AUTO,FIX2');
+ 412 11651 [146]   writeln(NORVID);
+ 413 11660 [146] 
+ 414 11660 [146]   r := 0.0;
+ 415 11666 [146]   lastr := 0.0;
+ 416 11678 [146]   mode := M_FLOAT;
+ 417 11686 [146]   format := F_AUTO;
+ 418 11692 [146]   showresult;
+ 419 11700 [146] 
+ 420 11700 [146]   repeat
+ 421 11700 [146]     firsterror:=true;
+ 422 11702 [146]     n := _strread(INPUT, line, dummy);
+ 423 11728 [146]     pos := 0;
+ 424 11734 [146]     stop := true;
+ 425 11740 [146] 
+ 426 11744 [146]     if not command then begin
+ 427 11751 [146]       dotused := false;
+ 428 11756 [146]       lastr := r;
+ 429 11760 [146]       r := express;
+ 430 11778 [146]       checkfor(CR);
+ 431 11792 [146]     end else
+ 432 11792 [146]       stop := false;
+ 433 11797 [146] 
+ 434 11801 [146]     if not stop then showresult;
+ 435 11813 [146]   until stop;
+ 436 11813 [146] 
+ 437 11820 [146]   _release(line);
+ 438 11830 [146] end.
+Code length:           11829
+Compiler stack size:   143/300
+Ident stack size:      160/350
