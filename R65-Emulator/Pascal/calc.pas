@@ -18,13 +18,11 @@ const
   M_FLOAT=0;
   M_WORD=1;
   M_BYTE=2;
-  M_BOOL=3;
 
   F_AUTO=0;
   F_FIX2=1;
 
 mem vidpnt=$00e9:integer;
-    BUFFPN   = $0015: integer&;
 
 var ch: char;
     r, lastr: real;
@@ -32,17 +30,11 @@ var ch: char;
     line: cpnt;
     pos, n, mode, format: integer;
 
-proc clearinput;
-{**************}
-begin
-  BUFFPN:=-1;
-end;
-
 proc error(s1,s2:cpnt);
 {*********************}
 begin
   if firsterror then
-    writeln(INVVID,'Error: ',s1,' ',s2,NORVID);
+    writeln(INVVID,s1,' ',s2,NORVID);
   firsterror:=false;
 end;
 
@@ -57,15 +49,21 @@ begin
     ch := CR;
 end;
 
+proc skipblanks;
+{**************}
+begin
+  while ch=' ' do readch;
+end;
+
 func fix(rf: real): integer;
 {**************************}
 begin
   if (rf>=32767.5) then begin
-      error('Integer value exceeds',
+      error('Integer exceeds',
         'upper limit, set to 32767');
       fix:=$7fff;
     end else if (rf<-32768.5) then begin
-      error('Integer value exceeds',
+      error('Integer exceeds',
         ' lower limit, set to -32768');
       fix:=$8000;
     end else fix:=floor(rf+0.5);
@@ -148,13 +146,8 @@ begin
         write(i:12,'    $',hexb(i),'  ');
         write('          ');
         writebinary(OUTPUT,i,8);
-      end;
+      end
 
-    M_BOOL:
-      if r=0.0 then
-        write('false')
-      else
-        write('true')
   end;
   writeln;
 end;
@@ -162,7 +155,8 @@ end;
 func express:real;
 {****************}
 var
-  re: real;
+    re,operand:real;
+    i1,i2,i3:integer;
 
 func binval: integer;
 {*******************}
@@ -204,6 +198,13 @@ begin
   if _strcmp(lstring,'R')=0 then begin
     function:=lastr; _release(lstring); exit;
   end;
+  if mode<>M_FLOAT then begin
+    error('Mathematical functions',
+          'require FLOAT mode');
+    function:=0.0;
+    _release(lstring);
+    exit;
+  end;
   if _strcmp(lstring,'PI')=0 then begin
     function:=PI; _release(lstring); exit;
   end;
@@ -211,6 +212,7 @@ begin
     function:=E; _release(lstring); exit;
   end;
   { functions with single argument follow }
+  skipblanks;
   checkfor('('); r:=express; skip(')');
   if _strcmp(lstring,'SQR')=0 then begin
     function:=r*r; _release(lstring); exit;
@@ -268,10 +270,15 @@ var negative:boolean;
     rf,rt:real;
     iv:integer;
 begin
-  negative:=false; rf:=0.0; readch;
+  negative:=false;
+  rf:=0.0;
+  readch;
+  skipblanks;
 
   if ch='-' then begin
-    negative:=true; readch;
+    negative:=true;
+    readch;
+    skipblanks;
   end;
 
   if ch='(' then begin
@@ -321,37 +328,65 @@ begin
   end;
 
   if negative then rf:=-rf;
+  skipblanks;
   factor:=rf;
 end;
 
 func simexp:real;
 {***************}
 var
-  rs,divisor: real;
+  rs,divisor:real;
+  i1,i2,i3:integer;
 begin
   rs:=factor;
   while (ch='*') or (ch='/') or (ch='&') or (ch='<')
-    or (ch='>') or (ch='^') do begin
+    or (ch='>') do begin
     case ch of
-      '*': begin rs:=rs*factor; end;
+      '*': begin
+             divisor:=factor;
+             if mode=M_FLOAT then
+               rs:=rs*divisor
+             else begin
+               i1:=fix(rs);
+               i2:=fix(divisor);
+               i3:=i1*i2;
+               if conv(i3)<>conv(i1)*conv(i2) then
+                 error('Integer multiplication',
+                                         'overflow');
+               rs:=conv(i3);
+             end;
+           end;
+
       '/': begin
              divisor:=factor;
              if divisor=0.0 then
                error('Division','by zero')
-             else
-               rs:=rs/divisor;
-           end;
-      '&': rs:=conv(fix(rs) and fix(factor));
-      '^': rs:=exp(factor*ln(rs));
-      '<': begin
-             readch; checkfor('<');
-             rs:=conv(fix(rs) shl fix(factor));
+             else if mode=M_FLOAT then
+               rs:=rs/divisor
+             else begin
+               i1:=fix(rs);
+               i2:=fix(divisor);
+               if i2=0 then
+                 error('Integer division','by zero')
+               else
+                 rs:=conv(i1 div i2);
              end;
+           end;
+
+      '&': rs:=conv(fix(rs) and fix(factor));
+
+      '<': begin
+             readch;
+             checkfor('<');
+             rs:=conv(fix(rs) shl fix(factor));
+           end;
+
       '>': begin
-             readch; checkfor('>');
+             readch;
+             checkfor('>');
              rs:=conv(fix(rs) shr fix(factor));
            end
-      end {case};
+    end {case};
   end;
   simexp:=rs;
 end;
@@ -361,11 +396,36 @@ begin
   re:=simexp;
   while (ch='+') or (ch='-') or (ch='|') do begin
     case ch of
-      '+': begin re:=re+simexp; end;
-      '-': begin re:=re-simexp; end;
-      '|': begin
-             re:=conv(fix(re) or fix(factor));
-           end
+      '+': begin
+             operand:=simexp;
+             if mode=M_FLOAT then
+               re:=re+operand
+             else begin
+               i1:=fix(re);
+               i2:=fix(operand);
+               i3:=i1+i2;
+               if conv(i3)<>conv(i1)+conv(i2) then
+                 error('Integer addition','overflow');
+               re:=conv(i3);
+             end;
+           end;
+
+      '-': begin
+             operand:=simexp;
+             if mode=M_FLOAT then
+               re:=re-operand
+             else begin
+               i1:=fix(re);
+               i2:=fix(operand);
+               i3:=i1-i2;
+               if conv(i3)<>conv(i1)-conv(i2) then
+                 error('Integer subtraction',
+                                          'overflow');
+               re:=conv(i3);
+             end;
+           end;
+
+      '|': re:=conv(fix(re) or fix(simexp))
     end {case};
   end;
   express:=re;
@@ -377,13 +437,15 @@ begin
   command:=true;
   if _strcmp(line,'FLOAT')=0 then
     mode:=M_FLOAT
-  else if _strcmp(line,'WORD')=0 then
-    mode:=M_WORD
-  else if _strcmp(line,'BYTE')=0 then
-    mode:=M_BYTE
-  else if _strcmp(line,'BOOL')=0 then
-    mode:=M_BOOL
-  else if _strcmp(line,'AUTO')=0 then
+  else if _strcmp(line,'WORD')=0 then begin
+    mode:=M_WORD;
+    r:=conv(fix(r));
+  end else if _strcmp(line,'BYTE')=0 then begin
+    mode:=M_BYTE;
+    r:=conv(fix(r));
+    if r<0.0 then r:=0.0;
+    if r>255.0 then r:=255.0;
+  end else if _strcmp(line,'AUTO')=0 then
     format:=F_AUTO
   else if _strcmp(line,'FIX2')=0 then
     format:=F_FIX2
@@ -404,10 +466,10 @@ begin
   writeln('2*(5+28)   math expression');
   writeln('R*3        last result');
   writeln('<return>,<esc>    exit');
-  writeln('Operators: +,-,*,/,^,(),&,|,<<,>>');
+  writeln('Operators: +,-,*,/,(),&,|,<<,>>');
   writeln('Functions: SQRT(),SQR(),SIN(),COS()');
   writeln('           TAN(),EXP(),LN(),LOG()');
-  writeln('Modes:     FLOAT,WORD,BYTE,BOOL');
+  writeln('Modes:     FLOAT,WORD,BYTE');
   writeln('Format:    AUTO,FIX2');
   writeln(NORVID);
 
@@ -419,6 +481,13 @@ begin
 
   repeat
     firsterror:=true;
+
+    case mode of
+      M_FLOAT: write('FLOAT> ');
+      M_WORD:  write('WORD> ');
+      M_BYTE:  write('BYTE> ')
+    end;
+
     n := _strread(INPUT, line, dummy);
     pos := 0;
     stop := true;
