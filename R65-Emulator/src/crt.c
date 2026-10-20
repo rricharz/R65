@@ -318,6 +318,44 @@ void infoPanel()
   SETBUTTONCOLOR;
 }
 
+#define GRAPHIC_LINE_WIDTH  (int)(hcell / 5.0 + 0.5)
+#define GRAPHIC_Y_OFFSET    (int)(-vcell * 0.37)
+#define GRAPHIC_X_OFFSET    0
+#define GRAPHIC_OVERLAP     (int)(hcell / 10.0 + 0.5)
+
+/********************************************************/
+void DrawGraphicCharacter(int xx, int yy, unsigned char c)
+/********************************************************/
+{
+    // Character cell boundaries
+    int x1 = hcell * xx + crtOffset + GRAPHIC_X_OFFSET;
+    int x2 = hcell * (xx + 1) + crtOffset + GRAPHIC_X_OFFSET;
+    int y1 = vcell * yy + 8 * panelScale + crtOffset
+             + GRAPHIC_Y_OFFSET;
+    int y2 = vcell * (yy + 1) + 8 * panelScale + crtOffset
+             + GRAPHIC_Y_OFFSET;
+
+    // Center of character cell
+    int cx = (x1 + x2) / 2;
+    int cy = (y1 + y2) / 2;
+
+    StrokeWidth(GRAPHIC_LINE_WIDTH);
+
+    if (c & 0x01)  // Up
+        Line(cx, cy, cx, y1 - GRAPHIC_OVERLAP);
+
+    if (c & 0x02)  // Right
+        Line(cx, cy, x2 + GRAPHIC_OVERLAP, cy);
+
+    if (c & 0x04)  // Down
+        Line(cx, cy, cx, y2 + GRAPHIC_OVERLAP);
+
+    if (c & 0x08)  // Left
+        Line(cx, cy, x1 - GRAPHIC_OVERLAP, cy);
+
+    StrokeWidth(2);
+}
+
 /**************/
 void crtUpdate()
 /**************/
@@ -374,15 +412,26 @@ void crtUpdate()
                     else
                         SETNORMALTEXTCOLOR;
                     s[0] = s[0] & 0x7F;
-                    int coffset;
-                    if ((!pixelated) && (s[0] == '*')) coffset = csize/5;
-                    else coffset = 0;
-                    if (pixelated)
-                        Text(hcell * xx + crtOffset, vcell * (yy + 1) -5 + crtOffset + coffset,
-                            s, "basis33", csize, 0, 0);
-                    else
-                        Text(hcell * xx + crtOffset, vcell * (yy + 1) - 5 + crtOffset + coffset,
-                            s, SCREEN_FONT, csize, 0, 0);
+
+                    if (s[0] < 32) {
+                        DrawGraphicCharacter(xx, yy, s[0]);
+                    }
+                    else {
+                        int coffset;
+                        if ((!pixelated) && (s[0] == '*'))
+                            coffset = csize/5;
+                        else
+                            coffset = 0;
+
+                        if (pixelated)
+                            Text(hcell * xx + crtOffset,
+                                 vcell * (yy + 1) - 5 + crtOffset + coffset,
+                                 s, "basis33", csize, 0, 0);
+                        else
+                            Text(hcell * xx + crtOffset,
+                                 vcell * (yy + 1) - 5 + crtOffset + coffset,
+                                 s, SCREEN_FONT, csize, 0, 0);
+                    }
                 }
             }
                         // Display cursor

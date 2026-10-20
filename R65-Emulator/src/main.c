@@ -779,6 +779,7 @@ int main (int argc, char *argv[])
     crtHeight = windowHeight - (2 * crtOffset);
     // Aspect ratio of original display
     crtWidth  = 4 * crtHeight / 3;
+    logmsg("R65 CRT dimensions: %d x %d\n", crtWidth, crtHeight);
     
     panelOffset = crtWidth +  (2 * crtOffset); 
     panelSize   = windowWidth -panelOffset - ( crtOffset / 2);
