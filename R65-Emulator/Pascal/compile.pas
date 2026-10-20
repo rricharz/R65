@@ -1062,7 +1062,7 @@ begin
             code1(0); value[0]:=0; restype:='s';
           end else error(15);
     'cr': begin parse(' ('); scan; val:=getcon;
-            if (val>127) or (val<0) then
+            if (val>255) or (val<0) then
               error(12);
             testtype('i');
             restype:='c'; parse(' )');
