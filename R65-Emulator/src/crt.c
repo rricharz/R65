@@ -12,20 +12,22 @@
 #include "fdc.h"
 
 
-#define SETNORMALTEXTCOLOR   Stroke(210,210,210)
-#define SETDOTCOLOR          Fill(255,180,0,0)
-#define SETDOTBACKGROUNDCOLOR Stroke(255,180,0); Fill(36,26,0,0)
-#define SETPASCALCOLOR       Stroke(0,210,210)
-#define SETHIDETEXTCOLOR     Stroke(0,0,0) 
-#define SETINVERSETEXTCOLOR  Stroke(160,160,160); Fill(160,160,160,0)
+#define SETNORMALTEXTCOLOR    Stroke(210,210,210)
+#define SETINVERSETEXTCOLOR   Stroke(255,191,64)
+
+#define SETPASCALCOLOR        Stroke(0,210,210)
 #define SETINVERSEPASCALCOLOR Stroke(210,210,0); Fill(210,210,0,0)
-#define SETDISKNAMECOLOR     Stroke(255, 20, 20)
-#define SETBACKGROUNDCOLOR   Fill(0,0,0,0)
-#define SETBUTTONCOLOR       Stroke(210,210,210); Fill(100,0,0,1)
-#define SETLEDBORDERCOLOR    Stroke(210,210,210);
-#define SETLEDONCOLOR        Fill(255, 0, 0, 0)
-#define SETLEDOFFCOLOR       Fill(127, 0, 0, 0)
-#define SETINFOBACKGROUND    Stroke(10,45,60); Fill(10,45,60,255)
+
+#define SETDOTCOLOR           Fill(255,180,0,0)
+#define SETDOTBACKGROUNDCOLOR Stroke(255,180,0); Fill(36,26,0,0)
+#define SETHIDETEXTCOLOR      Stroke(0,0,0) 
+#define SETDISKNAMECOLOR      Stroke(255, 20, 20)
+#define SETBACKGROUNDCOLOR    Fill(0,0,0,0)
+#define SETBUTTONCOLOR        Stroke(210,210,210); Fill(100,0,0,1)
+#define SETLEDBORDERCOLOR     Stroke(210,210,210);
+#define SETLEDONCOLOR         Fill(255, 0, 0, 0)
+#define SETLEDOFFCOLOR        Fill(127, 0, 0, 0)
+#define SETINFOBACKGROUND     Stroke(10,45,60); Fill(10,45,60,255)
 
 int      global_pendingCrtUpdate;
 int      global_videoBaseAddress;
@@ -51,11 +53,26 @@ int      stop_hpos;      // STOP button
 
 int led[NUM_LEDS];
 
+// Screen and symbol fonts
 #ifdef __APPLE__
 #define SCREEN_FONT "Monaco"
+#define SYMBOL_FONT "Apple Symbols"
 #else
 #define SCREEN_FONT "DejaVu Sans Mono"
+#define SYMBOL_FONT "DejaVu Sans"
 #endif
+
+// UTF-8 symbols for character codes $18-$1F
+static const char *symbols[8] = {
+    "●",  // $18 Black circle
+    "○",  // $19 White circle
+    "⬢",  // $1A Black hexagon
+    "⬡",  // $1B White hexagon
+    "�",  // $1C Undefined
+    "�",  // $1D Undefined
+    "�",  // $1E Undefined
+    "�"   // $1F Undefined
+};
 
 /*************/
 void crt_init()
@@ -356,6 +373,91 @@ void DrawGraphicCharacter(int xx, int yy, unsigned char c)
     StrokeWidth(2);
 }
 
+/**************************************************/
+void DrawCircleCharacter(int xx, int yy, int filled)
+/**************************************************/
+{
+    int cx = hcell * xx + crtOffset + hcell / 2;
+    int cy = vcell * yy + 8 * panelScale + crtOffset
+             + GRAPHIC_Y_OFFSET + vcell / 2;
+
+    DrawCircle(cx, cy, 2 * hcell, filled);
+}
+
+/********************************************/
+static void SetCharacterColor(unsigned char c)
+/********************************************/
+{
+    int pascal = (memory[M8_SFLAG] & 1) != 0;
+    int inverse = (c & 0x80) != 0;
+
+    if (pascal) {
+        if (inverse) {
+            SETINVERSEPASCALCOLOR;
+        }
+        else
+            SETPASCALCOLOR;
+        
+    }
+    else {
+        if (inverse)
+            SETINVERSETEXTCOLOR;
+        else
+            SETNORMALTEXTCOLOR;
+    }
+}
+
+/****************************************************************/
+static void DrawEnlargedCharacter(int xx, int yy, unsigned char c)
+/****************************************************************/
+{
+    int cx = hcell * xx + crtOffset + hcell / 2;
+    int cy = vcell * yy + 8 * panelScale + crtOffset
+             + GRAPHIC_Y_OFFSET + vcell / 2;
+
+    switch (c) {
+        case 0x10:  // White stone (filled)
+            DrawCircle(cx, cy, 2 * hcell, 1);
+            break;
+
+        case 0x11:  // Black stone (outlined)
+            DrawCircle(cx, cy, 2 * hcell, 0);
+            break;
+
+        // $12-$17: Reserved for additional enlarged objects
+    }
+}
+
+/*******************************************************************/
+static void DrawCharacter(int xx, int yy, unsigned char c, int csize)
+/*******************************************************************/
+{
+    char s[2] = {c, 0};
+
+    if (c < 0x10) {
+        DrawGraphicCharacter(xx, yy, c);
+    }
+    else if (c < 0x18) {
+        // Enlarged objects: handled in second pass
+    }
+    else if (c < 0x1F) {
+        // Unicode symbols ($18-$1B)
+        Text(hcell * xx + crtOffset,
+             vcell * (yy + 1) - 5 + crtOffset,
+             symbols[c - 0x18],
+             SYMBOL_FONT, csize, 0, 0);
+    }
+    else {
+        // Normal characters
+        int coffset = (!pixelated && c == '*') ? csize/5 : 0;
+
+        Text(hcell * xx + crtOffset,
+             vcell * (yy + 1) - 5 + crtOffset + coffset,
+             s, pixelated ? "basis33" : SCREEN_FONT,
+             csize, 0, 0);
+    }
+}
+
 /**************/
 void crtUpdate()
 /**************/
@@ -393,65 +495,55 @@ void crtUpdate()
         int xx, yy;
         
         if (1) {  // always show text
-            for (yy = 0; yy < 16; yy++) {
-                for (xx = 0; xx < NUMCHAR; xx++) {
-                    s[0] = read6502(global_videoBaseAddress + (NUMCHAR * yy) + xx);
-                    if (s[0] & 0x80) {
-                        if (memory[M8_SFLAG] & 1) {
-							SETINVERSEPASCALCOLOR;
-                        }
-                    	else {
-                            SETINVERSETEXTCOLOR;
-                            Rect(hcell*xx + crtOffset, vcell*(yy+1) + 8 * panelScale + crtOffset - 8,
-                                hcell, vcell);
-                            Stroke(0,0,0);
-                        }
-                    }
-                    else if (memory[M8_SFLAG] & 1)
-                        SETPASCALCOLOR;
-                    else
-                        SETNORMALTEXTCOLOR;
-                    s[0] = s[0] & 0x7F;
+          // First pass: text, line graphics and Unicode symbols
+          for (yy = 0; yy < 16; yy++) {
+              for (xx = 0; xx < NUMCHAR; xx++) {
 
-                    if (s[0] < 32) {
-                        DrawGraphicCharacter(xx, yy, s[0]);
-                    }
-                    else {
-                        int coffset;
-                        if ((!pixelated) && (s[0] == '*'))
-                            coffset = csize/5;
-                        else
-                            coffset = 0;
+                  unsigned char c =
+                      read6502(global_videoBaseAddress + NUMCHAR * yy + xx);
 
-                        if (pixelated)
-                            Text(hcell * xx + crtOffset,
-                                 vcell * (yy + 1) - 5 + crtOffset + coffset,
-                                 s, "basis33", csize, 0, 0);
-                        else
-                            Text(hcell * xx + crtOffset,
-                                 vcell * (yy + 1) - 5 + crtOffset + coffset,
-                                 s, SCREEN_FONT, csize, 0, 0);
-                    }
-                }
-            }
-                        // Display cursor
-            int onscreenCurlin = (global_curloc - global_videoBaseAddress) / NUMCHAR;
-            int onscreenCurpos = (global_curloc - global_videoBaseAddress) % NUMCHAR;
+                  // Enlarged objects ($10-$17) are drawn in pass 2
+                  if ((c & 0x7F) >= 0x10 && (c & 0x7F) < 0x18)
+                      continue;
+
+                  SetCharacterColor(c);
+                  DrawCharacter(xx, yy, c & 0x7F, csize);
+              }
+          }
+          
+          // Second pass: enlarged objects ($10-$17)
+          for (yy = 0; yy < 16; yy++) {
+              for (xx = 0; xx < NUMCHAR; xx++) {
+
+                  unsigned char c =
+                      read6502(global_videoBaseAddress + NUMCHAR * yy + xx);
+
+                  // Skip everything except enlarged objects
+                  if ((c & 0x7F) < 0x10 || (c & 0x7F) >= 0x18)
+                      continue;
+
+                  SetCharacterColor(c);
+                  DrawEnlargedCharacter(xx, yy, c & 0x7F);
+              }
+          }
+            // Display cursor
+          int onscreenCurlin = (global_curloc - global_videoBaseAddress) / NUMCHAR;
+          int onscreenCurpos = (global_curloc - global_videoBaseAddress) % NUMCHAR;
             
-            if ((onscreenCurlin >= 0) && (onscreenCurlin < 16) && showCursor) {
-                if (memory[M8_SFLAG] & 1)
+          if ((onscreenCurlin >= 0) && (onscreenCurlin < 16) && showCursor) {
+              if (memory[M8_SFLAG] & 1)
                     SETPASCALCOLOR;
-                else
+              else
                     SETNORMALTEXTCOLOR;
-                if (read6502(global_videoBaseAddress + (NUMCHAR*onscreenCurlin)
+              if (read6502(global_videoBaseAddress + (NUMCHAR*onscreenCurlin)
                    + onscreenCurpos) & 0x80) Stroke(0,0,0);
-                xx = hcell * onscreenCurpos;
-                yy = vcell * (onscreenCurlin + 1) + 3;
-                if (hcell < 10) StrokeWidth(2);
-                else StrokeWidth(hcell / 5); 
-                Line(xx + crtOffset, yy  + crtOffset + hcell/3 - 7,
-                    xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell/3 - 7);
-                StrokeWidth(2);
+              xx = hcell * onscreenCurpos;
+              yy = vcell * (onscreenCurlin + 1) + 3;
+              if (hcell < 10) StrokeWidth(2);
+              else StrokeWidth(hcell / 5); 
+              Line(xx + crtOffset, yy  + crtOffset + hcell/3 - 7,
+                  xx + hcell - 1 + crtOffset, yy  + crtOffset + hcell/3 - 7);
+              StrokeWidth(2);
             }
         }   
         if (global_videoMemorySplitted) {

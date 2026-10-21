@@ -4,7 +4,7 @@ const
   CYAN = 0;
   YELLOW = 1;
 
-proc _txtgraph(x,y,bits,color);
+proc _txtgr(x,y,bits,color);
 const
   C_CURLOC = $e294;
   MAXX = 47;
@@ -26,11 +26,14 @@ begin
     curpos := x;
     call(C_CURLOC);
 
-    code := bits and $0f;
-    c := mem[vidpnt];
+    code := bits and $7f;
 
-    if (c and $7f)<$20 then
-      code := code or (c and $0f);
+    if code<$10 then begin
+      { combine line graphics }
+      c := mem[vidpnt];
+      if (c and $7f)<$10 then
+        code := code or (c and $0f);
+    end;
 
     if color=YELLOW then
       code := code or $80;
@@ -42,40 +45,40 @@ begin
   end;
 end;
 
-proc _htxtgraph(xmin,xmax,y,color);
+proc _htxtgr(xmin,xmax,y,color);
 var
   i: integer;
 begin
   for i:=xmin to xmax do begin
     if i=xmin then
-      _txtgraph(i,y,$02,color)
+      _txtgr(i,y,$02,color)
     else if i=xmax then
-      _txtgraph(i,y,$08,color)
+      _txtgr(i,y,$08,color)
     else
-      _txtgraph(i,y,$0a,color);
+      _txtgr(i,y,$0a,color);
   end;
 end;
 
-proc _vtxtgraph(x,ymin,ymax,color);
+proc _vtxtgr(x,ymin,ymax,color);
 var
   i: integer;
 begin
   for i:=ymin to ymax do begin
     if i=ymin then
-      _txtgraph(x,i,$04,color)
+      _txtgr(x,i,$04,color)
     else if i=ymax then
-      _txtgraph(x,i,$01,color)
+      _txtgr(x,i,$01,color)
     else
-      _txtgraph(x,i,$05,color);
+      _txtgr(x,i,$05,color);
   end;
 end;
 
-proc _recttxtgraph(xmin,xmax,ymin,ymax,color);
+proc _recttxtgr(xmin,xmax,ymin,ymax,color);
 begin
-  _htxtgraph(xmin,xmax,ymin,color);
-  _htxtgraph(xmin,xmax,ymax,color);
-  _vtxtgraph(xmin,ymin,ymax,color);
-  _vtxtgraph(xmax,ymin,ymax,color);
+  _htxtgr(xmin,xmax,ymin,color);
+  _htxtgr(xmin,xmax,ymax,color);
+  _vtxtgr(xmin,ymin,ymax,color);
+  _vtxtgr(xmax,ymin,ymax,color);
 end;
 
 begin

@@ -368,5 +368,21 @@ begin
   _writef0(r, fl, d, false);
 end;
 
+proc _setcursor(x,y:integer);
+{***************************}
+const
+  C_SETCUR = $e2e2;
+mem
+  curlin = $00ed: integer&;
+  curpos = $00ee: integer&;
+begin
+  if (x>=0) and (x<48) and
+     (y>=0) and (y<16) then begin
+    curpos:=x;
+    curlin:=y;
+    call(C_SETCUR);
+  end;
+end;
+
 begin
 end. 

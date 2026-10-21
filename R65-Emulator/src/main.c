@@ -182,19 +182,42 @@ void Line(int x1, int y1, int x2, int y2)
 }
 
 ////////////////////////////////
-void Circle(int x, int y, int r)
+void Circle(int x, int y, int d)
 ////////////////////////////////
 {
 	cairo_set_source_rgb(global_surface_cr, strokeColor.r, strokeColor.g, strokeColor.b);
-	cairo_arc(global_surface_cr, x, y, r / 2, 0, 2*M_PI);
+	cairo_arc(global_surface_cr, x, y, d / 2, 0, 2*M_PI);
 	cairo_stroke_preserve(global_surface_cr);
         cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
 	cairo_fill(global_surface_cr);
 	global_surface_has_been_updated = TRUE;
 }
 
+//////////////////////////////////////////////////////
+void DrawCircle(int x, int y, int diameter, int white)
+/////////////////////////////////////////////////////
+{
+    cairo_arc(global_surface_cr, x, y,
+              diameter / 2.0, 0, 2*M_PI);
+
+    if (white)
+        cairo_set_source_rgb(global_surface_cr,
+            strokeColor.r, strokeColor.g, strokeColor.b);
+    else
+        cairo_set_source_rgb(global_surface_cr, 0, 0, 0);
+
+    cairo_fill_preserve(global_surface_cr);
+
+    cairo_set_source_rgb(global_surface_cr,
+        strokeColor.r, strokeColor.g, strokeColor.b);
+
+    cairo_stroke(global_surface_cr);
+
+    global_surface_has_been_updated = TRUE;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
-void Text(int x, int y, char *s, char *fn, int fontSize, int erase, int bold)
+void Text(int x, int y, const char *s, char *fn, int fontSize, int erase, int bold)
 ///////////////////////////////////////////////////////////////////////////////
 {
 	cairo_text_extents_t extents;
