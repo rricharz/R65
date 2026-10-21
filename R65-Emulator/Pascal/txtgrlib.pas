@@ -7,22 +7,23 @@ const
 proc _txtgr(x,y,bits,color);
 const
   C_CURLOC = $e294;
-  MAXX = 47;
   MAXY = 15;
 mem
   vidpnt = $00e9: integer;
   curlin = $00ed: integer&;
   curpos = $00ee: integer&;
+  offset = $1782: integer&;
+  numchr = $178a: integer&;
 var
   scurlin,scurpos,c,code: integer;
 begin
-  if (x>=0) and (x<=MAXX) and
+  if (x>=0) and (x<=numchr) and
      (y>=0) and (y<=MAXY) then begin
 
     scurlin := curlin;
     scurpos := curpos;
 
-    curlin := y;
+    curlin := offset+y;
     curpos := x;
     call(C_CURLOC);
 
@@ -79,6 +80,25 @@ begin
   _htxtgr(xmin,xmax,ymax,color);
   _vtxtgr(xmin,ymin,ymax,color);
   _vtxtgr(xmax,ymin,ymax,color);
+end;
+
+proc _writetxtgr(bits:integer);
+{***************************}
+const
+  C_CURLOC = $e294;
+  C_PRTADV = $e4fb;
+mem
+  vidpnt = $00e9: integer;
+  vflag = $1781: integer&;
+var
+  code:integer;
+begin
+  code:=bits and $7f;
+  if (vflag and $80)<>0 then
+    code:=code or $80;
+  call(C_CURLOC);
+  mem[vidpnt]:=code;
+  call(C_PRTADV);
 end;
 
 begin

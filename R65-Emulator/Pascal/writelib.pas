@@ -375,11 +375,13 @@ const
 mem
   curlin = $00ed: integer&;
   curpos = $00ee: integer&;
+  numchr = $178a: integer&;
+  offset = $1782: integer&;
 begin
-  if (x>=0) and (x<48) and
+  if (x>=0) and (x<=numchr) and
      (y>=0) and (y<16) then begin
     curpos:=x;
-    curlin:=y;
+    curlin:=offset+y;
     call(C_SETCUR);
   end;
 end;
