@@ -414,13 +414,13 @@ begin
       end;
 
   p1:=bestpos;
+  marktake:=p1;
 
   board[p1]:=EMPTY;
   clearstone(p1,player);
   captured[player]:=captured[player]+1;
   drawreserve(player);
 
-  marktake:=p1;
   computertake:=p1;
 end;
 
@@ -506,7 +506,6 @@ begin
     drawstone(p,player);
     drawreserve(player);
     protocolaction(player,p,-1,bestvalue);
-    markplace:=p;
 
     s:=_new;
     if ismill(p,player) then begin
@@ -558,11 +557,11 @@ begin
   board[p1]:=EMPTY;
   board[p2]:=player;
 
-  clearstone(p1,player);
-  drawstone(p2,player);
-
   markmove1:=p1;
   markmove2:=p2;
+
+  clearstone(p1,player);
+  drawstone(p2,player);
 
   protocolaction(player,bestp1,bestp2,bestvalue);
 
@@ -1289,11 +1288,11 @@ begin
 
   board[p]:=player;
   stones[player]:=stones[player]-1;
+  markplace:=p;
 
   drawstone(p,player);
   drawreserve(player);
   protocolaction(player,bestpos,-1,bestvalue);
-  markplace:=p;
 
   if ismill(p,player) then begin
     tk:=computertake(player);
@@ -1315,10 +1314,7 @@ var s:cpnt;
 begin
   starttimer;
   searchtimeout:=false;
-  markplace:=-1;
-  marktake:=-1;
-  markmove1:=-1;
-  markmove2:=-1;
+  clearmarks;
   found:=false;
 
   writeln(@PROTOCOL,'STONES W/B ',stones[WHITE],' ',

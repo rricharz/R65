@@ -100,7 +100,7 @@ const
   C_PRTADV = $e4fb;
 mem
   vidpnt = $00e9: integer;
-  vflag = $1781: integer&;
+  vflag = $1780: integer&;
 var
   code:integer;
 begin

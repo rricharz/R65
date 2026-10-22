@@ -721,3 +721,12 @@ begin
     result := _emulator(C_NEWPRINT);
   end;
 end;
+
+proc clearmarks;
+{***************}
+begin
+  markplace:=-1;
+  marktake:=-1;
+  markmove1:=-1;
+  markmove2:=-1;
+end;

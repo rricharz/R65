@@ -1,19 +1,20 @@
 { IMILLTGR:P Include file for MILL (graphics) }
 
 const
-    SPACING = 16;
-    X0 = 15;
-    Y0 = 15;
+    { board coordinates }
+    CX = 17;
+    CY = 7;
+    SX = 5;
+    SY = 2;
 
-    DASHX      = 125;
-    DASHWHITEY = 63;
-    DASHBLACKY = 15;
-    DASHWIDTH  = 95;
-    DASHHEIGHT = 48;
-    MSGOFF     = 3;
-    INPUTOFF   = 13;
-    STONEOFF   = 29;
-    NAMEOFF    = 37;
+    { dashboard coordinates }
+    DASHX      = 36;
+    DASHWHITEY = 2;
+    DASHBLACKY = 8;
+    MSGOFF     = 4;
+    INPUTOFF   = 3;
+    STONEOFF   = 1;
+    NAMEOFF    = 0;
 
     I_PLACE  = 1;
     I_MOVE   = 2;
@@ -22,11 +23,16 @@ const
 
 var  markplace,marktake,markmove1,markmove2: integer;
 
+func _escape_pending: boolean;
+{****************************}
+begin
+  _escape_pending := ((mem[$1781] and $80)<>0);
+end;
+
 proc init_graphics;
 {*****************}
 begin
-  _grinit;
-  _fullview;
+  write(HOM,CSC);
   markplace:=-1;
   marktake:=-1;
   markmove1:=-1;
@@ -36,77 +42,75 @@ end;
 proc init_canvas;
 {***************}
 begin
-  _cleargr;
-  _move(DASHX+1,DASHWHITEY+NAMEOFF);
+  write(HOM,CSC);
 
-  write(@PLOTDEV,'PLAYER');
+  { draw dashboard borders }
+  _recttxtgr(DASHX-1,47,
+          DASHWHITEY-1,DASHWHITEY+5,CYAN);
+  _recttxtgr(DASHX-1,47,
+          DASHBLACKY-1,DASHBLACKY+5,CYAN);
 
-  _move(DASHX+1,DASHBLACKY+NAMEOFF);
-  write(@PLOTDEV,'COMPUTER');
-
-end;
-
-proc vector(x1,y1,x2,y2, color: integer);
-{***************************************}
-begin
-  _move(x1,y1);
-  _draw(x2,y2,color);
-end;
-
-proc endpoints(x1,y1,x2,y2: integer);
-{***********************************}
-begin
-  _plot(x1,y1,WHITE);
-  _plot(x2,y2,WHITE);
+  { dashboard titles }
+  _setcursor(DASHX,DASHWHITEY+NAMEOFF);
+  write('PLAYER');
+  _setcursor(DASHX,DASHBLACKY+NAMEOFF);
+  write('COMPUTER');
 end;
 
 proc message(number: integer; field: packed char;
-           player: integer);
+             player: integer);
 {***********************************************}
-var  y, dummy: integer;
+var y: integer;
 begin
   if player=WHITE then
-    y := DASHWHITEY
+    y:=DASHWHITEY
   else
-    y := DASHBLACKY;
+    y:=DASHBLACKY;
 
-  _move(DASHX+1, y+MSGOFF);
-  write(@PLOTDEV,'           '); { 11 blanks }
+  _setcursor(DASHX,y+MSGOFF);
+  write('           ');
+  _setcursor(DASHX,y+MSGOFF);
 
-  _move(DASHX+1, y+MSGOFF);
+  if (number<>0) and (number<>27) then
+    write(INVVID);
+
   case number of
     0: begin end;
-    1: write(@PLOTDEV,'INVALID');
-    2: write(@PLOTDEV,field,' INVALID');
-    3: write(@PLOTDEV,field,' EMPTY');
-    4: write(@PLOTDEV,field,' WHITE');
-    5: write(@PLOTDEV,field,' BLACK');
-    6: write(@PLOTDEV,field,' OCCUPIED');
-    7: write(@PLOTDEV,'BAD MOVE');
-    8: write(@PLOTDEV,field,' IS MILL');
-   10: write(@PLOTDEV,'LOOSER');
-   11: write(@PLOTDEV,'WINNER');
-   12: write(@PLOTDEV,'ABORTED');
-   21: write(@PLOTDEV,'THINKING');
-   27: write(@PLOTDEV,'SAVED')
-   else write(@PLOTDEV,'ERROR ', number)
+    1: write('Invalid');
+    2: write(field,' invalid');
+    3: write(field,' empty');
+    4: write(field,' white');
+    5: write(field,' black');
+    6: write(field,' occupied');
+    7: write('Bad move');
+    8: write(field,' is mill');
+   10: write('Looser');
+   11: write('Winner');
+   12: write('Aborted');
+   21: write('Thinking');
+   27: write('Saved')
+   else write('Error ',number)
   end;
+
+  write(NORVID);
 end;
 
 proc strmessage(s:cpnt; player: integer);
 {***************************************}
-var  y: integer;
+var y: integer;
 begin
   if player=WHITE then
-    y:=DASHWHITEY
+    y:=DASHWHITEY+MSGOFF
   else if player=BLACK then
-    y:=DASHBLACKY
+    y:=DASHBLACKY+MSGOFF
   else
-    y:=DASHBLACKY+INPUTOFF-MSGOFF;
-  _move(DASHX+1, y+MSGOFF);
-  write(@PLOTDEV,'           '); { 11 blanks }
-  _move(DASHX+1, y+MSGOFF);
-  write(@PLOTDEV,s);
+    { computer's last move }
+    y:=DASHBLACKY+INPUTOFF;
+
+  _setcursor(DASHX,y);
+  write('           ');
+  _setcursor(DASHX,y);
+  write(s);
 end;
 
 func findpos(labelvalue: packed char): integer;
@@ -137,92 +141,55 @@ var s: cpnt;
 
   proc prompt;
   begin
-    _move(DASHX+1,y);
+    _setcursor(DASHX,y);
+    write(INVVID);
+
     case request of
       I_PLACE:
         begin
-          write(@PLOTDEV,'PLACE?');
-          x:=DASHX+1+6*8;
+          write('Place?');
+          x:=DASHX+6;
         end;
       I_MOVE:
         begin
-          write(@PLOTDEV,'MOVE?');
-          x:=DASHX+1+5*8;
+          write('Move?');
+          x:=DASHX+5;
         end;
       I_TAKE:
         begin
-          write(@PLOTDEV,'TAKE?');
-          x:=DASHX+1+5*8;
+          write('Take?');
+          x:=DASHX+5;
         end;
       I_NAME:
         begin
-          write(@PLOTDEV,'NAME?');
-          x:=DASHX+1+5*8;
+          write('Name?');
+          x:=DASHX+5;
         end
     end;
+
+    write(NORVID);
   end;
 
   proc editinput;
   var c: char;
-      i: integer;
 
     proc redraw;
     var j: integer;
     begin
       { clear complete input line }
-      _move(DASHX+1,y);
-      write(@PLOTDEV,'           ');
+      _setcursor(DASHX,y);
+      write('           ');
 
       { redraw prompt }
       prompt;
 
-      { redraw input and cursor }
-      _move(x,y);
+      { redraw input }
+      _setcursor(x,y);
       for j:=0 to len-1 do
-        write(@PLOTDEV,s[j]);
-      write(@PLOTDEV,'_');
-    end;
+        write(s[j]);
 
-    func readandblink(x0,y0: integer): char;
-    const BLINKTIME = 16;
-    var dummy,count: integer;
-        ch: char;
-        cursoron: boolean;
-    begin
-      dummy:=_syncscreen;
-      count:=0;
-      cursoron:=true;
-
-      _move(x0,y0);
-      write(@PLOTDEV,'_');
-
-      repeat
-        ch:=KEYPRESSED;
-
-        if ch<>chr(0) then begin
-          _move(x0,y0);
-          write(@PLOTDEV,' ');
-          readandblink:=ch;
-          KEYPRESSED:=chr(0);
-          exit;
-        end;
-
-        count:=count+1;
-        _delay10msec(3);
-
-        if count>=BLINKTIME then begin
-          count:=0;
-          _move(x0,y0);
-
-          if cursoron then
-            write(@PLOTDEV,' ')
-          else
-            write(@PLOTDEV,'_');
-
-          cursoron:=not cursoron;
-          dummy:=_syncscreen;
-        end
-      until false;
+      { position blinking cursor }
+      _setcursor(x+len,y);
     end;
 
   begin
@@ -232,12 +199,18 @@ var s: cpnt;
     if request=I_MOVE then
       maxlen:=5
     else
-      maxlen:=4;       { enough for QUIT }
+      maxlen:=4;
 
     redraw;
 
     repeat
-      c:=readandblink(x+8*len,y);
+      repeat
+        c:=KEYPRESSED;
+        if c=chr(0) then
+          _delay10msec(3);
+      until c<>chr(0);
+
+      KEYPRESSED:=chr(0);
 
       if c=BACKSPACE then begin
         if len>0 then begin
@@ -262,8 +235,8 @@ var s: cpnt;
     until c=CR;
 
     { clear complete input line }
-    _move(DASHX+1,y);
-    write(@PLOTDEV,'           ');
+    _setcursor(DASHX,y);
+    write('           ');
   end;
 
 begin { getinput }
@@ -357,73 +330,64 @@ end;
 
 proc drawstone(pos, player: integer);
 {**********************************}
-var x, y: integer;
+var x,y,code,color: integer;
+    marked: boolean;
 begin
-  x:=X0+(ord(low(label[pos]))-ord('1'))*SPACING;
-  y:=Y0+(ord(high(label[pos]))-ord('A'))*SPACING;
+  x:=CX+(ord(high(label[pos]))-ord('D'))*SX;
+  y:=CY-(ord(low(label[pos]))-ord('4'))*SY;
 
-  vector(x-1, y-5, x+1, y-5, WHITE);
-  vector(x-1, y+5, x+1, y+5, WHITE);
+  marked:=false;
 
-  if player=WHITE then begin
-    vector(x-3, y-4, x+3, y-4, WHITE);
-    vector(x-3, y+4, x+3, y+4, WHITE);
+  if marks then
+    marked:=(pos=markplace) or
+            (pos=marktake) or
+            (pos=markmove1) or
+            (pos=markmove2);
 
-    vector(x-4, y-3, x+4, y-3, WHITE);
-    vector(x-4, y+3, x+4, y+3, WHITE);
+  writeln(@PROTOCOL,
+    'DRAWSTONE pos=',pos,
+    ' player=',player,
+    ' marks=',marks,
+    ' place=',markplace,
+    ' take=',marktake,
+    ' move1=',markmove1,
+    ' move2=',markmove2,
+    ' marked=',marked);
 
-    vector(x-5, y-2, x+5, y-2, WHITE);
-    vector(x-5, y-1, x+5, y-1, WHITE);
-    vector(x-5, y,   x+5, y,   WHITE);
-    vector(x-5, y+1, x+5, y+1, WHITE);
-    vector(x-5, y+2, x+5, y+2, WHITE)
-  end else begin
-    vector(x-3, y-4, x-2, y-4, WHITE);
-    vector(x+2, y-4, x+3, y-4, WHITE);
-    vector(x-3, y+4, x-2, y+4, WHITE);
-    vector(x+2, y+4, x+3, y+4, WHITE);
+  if player=WHITE then code:=$10
+  else code:=$11;
 
-    endpoints(x-4, y-3, x+4, y-3);
-    endpoints(x-4, y+3, x+4, y+3);
-
-    endpoints(x-5, y-2, x+5, y-2);
-    endpoints(x-5, y-1, x+5, y-1);
-    endpoints(x-5, y,   x+5, y);
-    endpoints(x-5, y+1, x+5, y+1);
-    endpoints(x-5, y+2, x+5, y+2);
-
-    vector(x,   y-4, x,   y+4, BLACK);
-    vector(x-4, y,   x+4, y,   BLACK)
-  end;
+  if marked then color:=YELLOW else color:=CYAN;
+  _txtgr(x,y,code,color);
 end;
 
 proc drawboard;
 {*************}
 var i,x1,y1,x2,y2: integer;
 
-begin
-
-  { three nested squares }
-  for i:=0 to 2 do begin
-    x1 := X0 + i*SPACING;
-    y1 := Y0 + i*SPACING;
-    x2 := X0 + (6-i)*SPACING;
-    y2 := Y0 + (6-i)*SPACING;
-    vector(x1,y1,x2,y1,WHITE);
-    vector(x2,y1,x2,y2,WHITE);
-    vector(x2,y2,x1,y2,WHITE);
-    vector(x1,y2,x1,y1,WHITE);
+  proc square(n: integer);
+  var
+    x1,x2,y1,y2: integer;
+  begin
+    x1:=CX-n*SX;
+    x2:=CX+n*SX;
+    y1:=CY-n*SY;
+    y2:=CY+n*SY;
+    _recttxtgr(x1,x2,y1,y2,CYAN);
   end;
 
-  { connections between the squares }
-  vector(X0+3*SPACING,Y0,
-         X0+3*SPACING,Y0+2*SPACING,WHITE);
-  vector(X0+3*SPACING,Y0+4*SPACING,
-         X0+3*SPACING,Y0+6*SPACING,WHITE);
-  vector(X0,Y0+3*SPACING,
-         X0+2*SPACING,Y0+3*SPACING,WHITE);
-  vector(X0+4*SPACING,Y0+3*SPACING,
-         X0+6*SPACING,Y0+3*SPACING,WHITE);
+begin
+  { three concentric squares }
+  square(1);
+  square(2);
+  square(3);
+
+  { connections between squares }
+  _htxtgr(CX-3*SX,CX-SX,CY,CYAN);
+  _htxtgr(CX+SX,CX+3*SX,CY,CYAN);
+
+  _vtxtgr(CX,CY-3*SY,CY-SY,CYAN);
+  _vtxtgr(CX,CY+SY,CY+3*SY,CYAN);
 end;
 
 proc drawstones;
@@ -437,171 +401,135 @@ end;
 
 proc clearstone(stone, player: integer);
 {*************************************}
-var i, x, y, sq, base,dummy: integer;
-empty: boolean;
 begin
-  x:=X0+(ord(low(label[stone]))-ord('1'))*SPACING;
-  y:=Y0+(ord(high(label[stone]))-ord('A'))*SPACING;
-  for i:=0 to 10 do begin
-    _move(x-5,y+i-5);
-    _draw(x+5,y+i-5, BLACK);
-  end;
-  dummy:=_syncscreen;
   drawboard;
   drawstones;
-  dummy:=_syncscreen;
-
-  sq:=stone shr 3;
-  base := stone and $fff8;
-  empty:=true;
-  for i:=base to base+7 do
-    if board[i]<>EMPTY then
-      empty:=false;
-  emptysquare[sq]:=empty;
-
 end;
 
 proc drawlabels;
 {**************}
 var i: integer;
-    c: char;
 begin
-  { 1..7 below the board }
-  for i:=0 to 6 do begin
-    c:=chr(ord('1')+i);
-    _move(X0+i*SPACING-5, 0);
-    write(@PLOTDEV,c);
-  end;
+  { column labels A-G }
+  for i:=0 to 6 do
+    _txtgr(CX+(i-3)*SX,14,ord('A')+i,CYAN);
 
-  { A..G left of the board }
-  for i:=0 to 6 do begin
-    c:=chr(ord('A')+i);
-    _move(0, Y0+i*SPACING-4);
-    write(@PLOTDEV,c);
-  end;
+  { row labels 1-7 }
+  for i:=0 to 6 do
+    _txtgr(0,CY+(3-i)*SY,ord('1')+i,CYAN);
 end;
 
 proc cleardashstone(stone, player: integer);
 {******************************************}
-var i, x, y: integer;
+var x,y: integer;
 begin
   if player=WHITE then
     y:=DASHWHITEY+STONEOFF
   else
     y:=DASHBLACKY+STONEOFF;
-  x:=DASHX+8+stone*10;
-  for i:=0 to 8 do begin
-    _move(x-4,y+i-4);
-    _draw(x+4,y+i-4, BLACK);
+
+  if stone<5 then
+    x:=DASHX+1+2*stone
+  else begin
+    x:=DASHX+1+2*(stone-5);
+    y:=y+1;
   end;
+
+  _setcursor(x,y);
+  write(' ');
 end;
 
 proc dashstone(stone,player,color: integer);
 {******************************************}
-var x, y: integer;
+var x,y: integer;
 begin
   if player=WHITE then
     y:=DASHWHITEY+STONEOFF
   else
     y:=DASHBLACKY+STONEOFF;
-  x:=DASHX+8+stone*10;
 
-  vector(x-1, y-4, x+1, y-4, WHITE);
-  vector(x-1, y+4, x+1, y+4, WHITE);
+  if stone<5 then
+    x:=DASHX+1+2*stone
+  else begin
+    x:=DASHX+1+2*(stone-5);
+    y:=y+1;
+  end;
 
-  if color=WHITE then begin
-    vector(x-3, y-3, x+3, y-3, WHITE);
-    vector(x-3, y+3, x+3, y+3, WHITE);
+  _setcursor(x,y);
 
-    vector(x-4, y-2, x+4, y-2, WHITE);
-    vector(x-4, y-1, x+4, y-1, WHITE);
-    vector(x-4, y,   x+4, y,   WHITE);
-    vector(x-4, y+1, x+4, y+1, WHITE);
-    vector(x-4, y+2, x+4, y+2, WHITE)
-  end else begin
-    vector(x-3, y-3, x-2, y-3, WHITE);
-    vector(x+2, y-3, x+3, y-3, WHITE);
-    vector(x-3, y+3, x-2, y+3, WHITE);
-    vector(x+2, y+3, x+3, y+3, WHITE);
+  if color=WHITE then
+    _writetxtgr($10)
+  else
+    _writetxtgr($11);
+end;
 
-    endpoints(x-4, y-2, x+4, y-2);
-    endpoints(x-4, y-1, x+4, y-1);
-    endpoints(x-4, y,   x+4, y);
-    endpoints(x-4, y+1, x+4, y+1);
-    endpoints(x-4, y+2, x+4, y+2);
+proc drawreserve(player: integer);
+{****************************}
+var stone,color: integer;
+begin
+  for stone:=0 to 8 do begin
+    if stone<stones[player] then
+      color:=player
+    else
+      color:=EMPTY;
 
-    vector(x,   y-3, x,   y+3, BLACK);
-    vector(x-3, y,   x+3, y,   BLACK)
+    if stone>8-captured[player] then
+      color:=otherplayer(player);
+
+    if color<>EMPTY then
+      dashstone(stone,player,color)
+    else
+      cleardashstone(stone,player);
   end;
 end;
 
 proc selectdashboard(player: integer);
 {**********************************}
 begin
-  { erase both boxes }
-  _rectangle(DASHX,DASHWHITEY,
-             DASHWIDTH,DASHHEIGHT,BLACK);
-  _rectangle(DASHX,DASHBLACKY,
-             DASHWIDTH,DASHHEIGHT,BLACK);
+  { player title }
+  _setcursor(DASHX,DASHWHITEY+NAMEOFF);
+  if player=WHITE then write(INVVID);
+  write('PLAYER');
+  write(NORVID);
 
-  { draw box around active player }
-  if player=WHITE then
-    _rectangle(DASHX,DASHWHITEY,
-               DASHWIDTH,DASHHEIGHT,WHITE)
-  else
-    _rectangle(DASHX,DASHBLACKY,
-               DASHWIDTH,DASHHEIGHT,WHITE);
-end;
-
-proc drawreserve(player: integer);
-{****************************}
-var stone,x,y,color: integer;
-begin
-  if player=WHITE then
-    y:=DASHWHITEY+STONEOFF
-  else
-    y:=DASHBLACKY+STONEOFF;
-
-  for stone:=0 to 8 do begin
-    x:=DASHX+8+stone*10;
-
-    if stone<stones[player] then
-      color:=player
-    else
-      color:=EMPTY;
-
-    if stone>8-captured[player] then begin
-      color:=otherplayer(player);
-    end;
-
-    if color<>EMPTY then
-      dashstone(stone,player,color)
-    else
-      cleardashstone(stone, player);
-  end;
+  { computer title }
+  _setcursor(DASHX,DASHBLACKY+NAMEOFF);
+  if player=BLACK then write(INVVID);
+  write('COMPUTER');
+  write(NORVID);
 end;
 
 proc quit;
 {********}
-var result: integer;
-const C_SHELL = 10;
-      C_FLUSHPRINT = 13;
-      C_NEWPRINT = 14;
+begin
+  _setcursor(0,15);
+end;
 
-  proc shell(s: cpnt);
-  { uses flp scratch register to transfer pointer }
-  mem   str    = $0004: cpnt;
-  var result:   integer;
+proc clearmarks;
+{***************}
+var p1,p2,p3,p4: integer;
+
+  proc restore(p: integer);
   begin
-    str := s;
-    result:=_emulator(C_SHELL);
+    if (p>=0) and (board[p]<>EMPTY) then
+      drawstone(p,board[p]);
   end;
 
 begin
-  if PROTOCOL<>NULLDEV then begin
-    result := _emulator(C_FLUSHPRINT);
-    shell('./backup_print mill');
-    result := _emulator(C_NEWPRINT);
+  p1:=markplace;
+  p2:=marktake;
+  p3:=markmove1;
+  p4:=markmove2;
+
+  markplace:=-1;
+  marktake:=-1;
+  markmove1:=-1;
+  markmove2:=-1;
+
+  if marks then begin
+    restore(p1);
+    restore(p2);
+    restore(p3);
+    restore(p4);
   end;
 end;
-

@@ -17,12 +17,28 @@
   /P  Do not make a protocol at the Linux level
       in printout.txt during the game
       in Print/timestamps after a game
-  /M  No marks (TEKMILL only)
+  /M  No marks (MILL and TEKMILL)
 
   2026 rricharz and ChatGPT                 }
 
 program mill;
 uses txtgrlib, syslib, strlib, striolib;
+
+const
+  WHITE=0;
+  INVERSE=1;
+  BLACK=2;
+
+mem KEYPRESSED=$1785: char&;
+
+proc _delay10msec(time:integer);
+mem
+{$I IHIDDENMEM}
+var i:integer;
+begin
+  for i:=1 to time do
+    emucom:=6;
+end;
 
 {$I IMILLTOP}
 {$I IMILLTGR}
