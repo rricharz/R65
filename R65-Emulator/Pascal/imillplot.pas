@@ -1,4 +1,4 @@
-{ IMILLPLOT:P Include file for MILL (graphics) }
+{ IMILLPLOT:P Include file for PLOTMILL (graphics) }
 
 const
     SPACING = 16;

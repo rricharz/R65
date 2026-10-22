@@ -1,8 +1,19 @@
 library txtgrlib;
 
+{ TXTGRLIB - Text graphics library for R65.
+  Draws horizontal and vertical lines and rectangles
+  on the 48x16 character screen using special graphics
+  characters. Lines are automatically joined at
+  intersections. Supports cyan and yellow colors. }
+
 const
   CYAN = 0;
   YELLOW = 1;
+
+  TGR_UP    = $01;
+  TGR_RIGHT = $02;
+  TGR_DOWN  = $04;
+  TGR_LEFT  = $08;
 
 proc _txtgr(x,y,bits,color);
 const
@@ -99,6 +110,24 @@ begin
   call(C_CURLOC);
   mem[vidpnt]:=code;
   call(C_PRTADV);
+end;
+
+proc _setcursor(x,y:integer);
+{***************************}
+const
+  C_SETCUR = $e2e2;
+mem
+  curlin = $00ed: integer&;
+  curpos = $00ee: integer&;
+  numchr = $178a: integer&;
+  offset = $1782: integer&;
+begin
+  if (x>=0) and (x<=numchr) and
+     (y>=0) and (y<16) then begin
+    curpos:=x;
+    curlin:=offset+y;
+    call(C_SETCUR);
+  end;
 end;
 
 begin

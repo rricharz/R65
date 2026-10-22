@@ -1,15 +1,17 @@
-{ MILL/TEKMILL - The game of NINE MORRIS
+{ MILL/PLOTMILL/TEKMILL - The game of NINE MORRIS
 
-  This game is available in 2 versions
-  MILL:    Version for the low resolution graphics
-  TEKMILL: Version for the Tektronix 4014 Terminal
+  This game is available in 3 versions
+  MILL:     Version for TXTTGR character graphics
+  PLOTMILL: Version for the low resolution graphics
+  TEKMILL:  Version for the Tektronix 4014 Terminal
 
-  Both versions include common code:
+  All versions include common code:
   IMILLTOP:P, IMILLCOMM:P and IMILLAI:P
 
   They use different graphics code:
-  MILL: PLOTLIB and IMILLPLOT
-  TEKLIB: TEKLIB and IMILLTEK
+  MILL:     TXTGRLIB and IMILLTGR
+  PLOTMILL: PLOTLIB and IMILLPLOT
+  TEKLIB:   TEKLIB and IMILLTEK
 
   Command line options:
   /P  Do not make a protocol at the Linux level

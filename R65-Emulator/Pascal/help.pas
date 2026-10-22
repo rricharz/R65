@@ -24,6 +24,7 @@ begin
   diskname := _new;
   _sgetstring(fname, _carg, default);
   _ssetsubtype(fname, 'H', true); { force set }
+  debug(fname);
 end;
 
 proc copyback;
@@ -32,8 +33,13 @@ proc copyback;
 var i: integer;
 begin
   ARGTYPE[0] := 's';
-  for i:= 0 to 15 do
-    ARGLISTS[i] := FILNAM[i];
+  for i := 0 to 15 do
+    ARGLISTS[i] := ' ';
+  i:=0;
+  while (fname[i]<>ENDMARK) and (i<=15) do begin
+    ARGLISTS[i] := fname[i];
+    i := i + 1;
+  end;
   ARGTYPE[8] := 'i';
   ARGLIST[8] := 0;
   ARGTYPE[9] := 'd';
