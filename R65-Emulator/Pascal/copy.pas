@@ -20,7 +20,7 @@ uses syslib, arglib, wildlib, filelib;
 const MAXLINES = 13;
       rdfile=$e815;
       wrfile=$eb2c; {keep date}
-      sblock=$5e00;
+      sblock=$5a00;
       eblock=TOPMEM;
 
 mem   filsa=$031a,
@@ -121,7 +121,8 @@ begin
         end;
       debug(filea, TOPMEM, ENDSTK, sblock);
       if uge(filea,TOPMEM) then begin
-        writeln('Error: File too large');
+        writeln('INVVID');
+        writeln('Error: File too large',NORVID);
         ENDSTK:=TOPMEM-144;
         _abort;
       end;
