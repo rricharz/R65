@@ -396,6 +396,8 @@ READCH  LDA =0          MUST BE READ FILE
         JSR CPOINT
         LDA (POINT),Y   GET ONE CHAR FROM FILE
         BMI READC4      SKIP, IF BIT 7 SET
+        CMP =$7F        EOF?
+        BEQ READC7
 *
 READC0  LDX CURSEQ
         INY             COUNT CHAR
@@ -416,21 +418,16 @@ READC7  LDY =0          NORMAL EXIT
         STY FILERR
         RTS
 *
-READC3  TYA             READ ERROR
+READC3  LDY FILERR      READ ERROR
         PLA
         LDA =$1D
         BNE READC7+2    ALLWAYS TAKEN
 *
 READC4  CMP =$FE        EOR?
-        BNE READC5
+        BNE READC6
         JSR READC1      GET NEXT RECORD
         BEQ READCH      OK, GET CHAR
         RTS             ERROR, RETURN
-*
-READC5  CMP =$7F        EOF?
-        BNE READC6
-        LDA =$7F
-        BNE READC7      ALLWAYS TAKEN, OK
 *
 READC6  SEC             COUNT ONE BLANK
         SBC =1
@@ -440,6 +437,10 @@ READC6  SEC             COUNT ONE BLANK
         CPX =$80
         BEQ READC0      IF LAST BLANK, INCREASE
         BNE READC7      ELSE SAME PNT AGAIN
+*
+        NOP             FREE SPACE
+        NOP
+        NOP
 *
 * TESTFN: TEST FILE NUMBER IN X
 *******************************

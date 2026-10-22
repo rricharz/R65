@@ -722,7 +722,6 @@ begin
   end;
 end;
 
-
 proc screenmessage(s:cpnt);
 {*************************}
 begin
