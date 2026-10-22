@@ -533,3 +533,11 @@ begin
     restore(p4);
   end;
 end;
+
+proc screenmessage(s:cpnt);
+{*************************}
+begin
+  _setcursor(0,15);
+  write(CSC);
+  write(s);
+end;

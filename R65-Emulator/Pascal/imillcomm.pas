@@ -643,9 +643,9 @@ begin
   until gameover(player);
 
   writeln(@PROTOCOL,'AI TIME ',sfloor(aitime),' S');
-  quit;
   message(10,'  ',player);
   message(11,'  ',otherplayer(player));
+  quit;
 end;
 
 

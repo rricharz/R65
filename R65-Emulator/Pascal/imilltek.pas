@@ -722,6 +722,13 @@ begin
   end;
 end;
 
+
+proc screenmessage(s:cpnt);
+{*************************}
+begin
+  writeln(s);
+end;
+
 proc clearmarks;
 {***************}
 begin

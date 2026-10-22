@@ -614,3 +614,9 @@ begin
   markmove2:=-1;
 end;
 
+proc screenmessage(s:cpnt);
+{*************************}
+begin
+  writeln(s);
+end;
+

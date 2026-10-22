@@ -271,17 +271,89 @@ begin
   _release(line);
 end;
 
+proc screenmessage(s:cpnt); forward;
+
 proc loadgame;
 {************}
 var name,fullname,line: cpnt;
-    i,length: integer;
+    msg,last1,last2: cpnt;
+    i,length,resume: integer;
     dummy: boolean;
     f: file;
     ateof: boolean;
+
+  proc compact(s,dest:cpnt);
+  {************************}
+  var i: integer;
+  begin
+    dest[0]:=ENDMARK;
+
+    { skip ACTION }
+    i:=7;
+
+    { copy action number }
+    while (s[i]>='0') and (s[i]<='9') do begin
+      write(@dest,s[i]);
+      i:=i+1;
+    end;
+
+    { skip spaces }
+    while s[i]=' ' do i:=i+1;
+
+    { copy player initial }
+    write(@dest,' ',s[i]);
+
+    { skip player name }
+    while (s[i]<>' ') and
+          (s[i]<>ENDMARK) do i:=i+1;
+    while s[i]=' ' do i:=i+1;
+
+    { skip PLACE or MOVE }
+    while (s[i]<>' ') and
+          (s[i]<>ENDMARK) do i:=i+1;
+    while s[i]=' ' do i:=i+1;
+
+    { copy position or move }
+    write(@dest,' ');
+    while (s[i]<>' ') and
+          (s[i]<>ENDMARK) do begin
+      write(@dest,s[i]);
+      i:=i+1;
+    end;
+
+    { optional TAKE }
+    if s[i]=' ' then begin
+      while s[i]=' ' do i:=i+1;
+
+      if (s[i]='T') and (s[i+1]='A') then begin
+        { skip TAKE }
+        while (s[i]<>' ') and
+              (s[i]<>ENDMARK) do i:=i+1;
+        while s[i]=' ' do i:=i+1;
+
+        write(@dest,'/');
+        while (s[i]<>' ') and
+              (s[i]<>ENDMARK) do begin
+          write(@dest,s[i]);
+          i:=i+1;
+        end;
+      end;
+    end;
+  end;
+
 begin
   name:=_new;
   fullname:=_new;
   line:=_new;
+  msg:=_new;
+  last1:=_new;
+  last2:=_new;
+
+  name[0]:=ENDMARK;
+  fullname[0]:=ENDMARK;
+  msg[0]:=ENDMARK;
+  last1[0]:=ENDMARK;
+  last2[0]:=ENDMARK;
 
   _sgetstring(name,carg,dummy);
 
@@ -297,36 +369,44 @@ begin
   length:=_strread(f,line,ateof);
 
   if length=0 then begin
-    writeln('Empty MILL file');
+    screenmessage('Empty MILL file');
     quit;
     _abort;
   end;
 
   while strbegins(line,'ACTION ') do begin
-    writeln(line);
+    { retain the last two actions }
+    last1[0]:=ENDMARK;
+    write(@last1,last2);
+    compact(line,last2);
+
     length:=_strread(f,line,ateof);
 
     if length=0 then begin
-      writeln(INVVID,'Missing MILL state',NORVID);
+      screenmessage('Missing MILL state');
       quit;
       _abort;
     end;
   end;
 
+  resume:=-1;
+
   if strbegins(line,'RESUME ') then begin
     action:=0;
     i:=7;
-    while (line[i]>='0') and (line[i]<='9') do begin
+    while (line[i]>='0') and
+          (line[i]<='9') do begin
       action:=10*action+ord(line[i])-ord('0');
       i:=i+1;
     end;
+
+    resume:=action;
     length:=_strread(f,line,ateof);
-    writeln('RESUME ',action);
     action:=action-1;
   end;
 
   if not strbegins(line,'MILL2 ') then begin
-    writeln(INVVID,'Bad MILL state',NORVID);
+    screenmessage('Bad MILL state');
     quit;
     _abort;
   end;
@@ -334,7 +414,22 @@ begin
   decodestate(line,player);
   setemptysquares;
 
+  { construct compact loading information }
+  if last1[0]<>ENDMARK then
+    write(@msg,last1,' -> ');
+
+  if last2[0]<>ENDMARK then
+    write(@msg,last2);
+
+  if resume>=0 then
+    write(@msg,'  RESUME ',resume);
+
+  screenmessage(msg);
+
   close(f);
+  _release(last2);
+  _release(last1);
+  _release(msg);
   _release(line);
   _release(fullname);
   _release(name);
