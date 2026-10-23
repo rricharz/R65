@@ -216,6 +216,40 @@ void DrawCircle(int x, int y, int diameter, int white)
     global_surface_has_been_updated = TRUE;
 }
 
+//////////////////////////////////////////////////////
+void DrawFadedCircle(int x, int y, int diameter, int white)
+//////////////////////////////////////////////////////
+{
+    double r = diameter / 2.0;
+
+    cairo_save(global_surface_cr);
+
+    cairo_new_path(global_surface_cr);
+    cairo_arc(global_surface_cr, x, y, r, 0, 2*M_PI);
+
+    if (white)
+        cairo_set_source_rgb(global_surface_cr,
+            0.5 * strokeColor.r,
+            0.5 * strokeColor.g,
+            0.5 * strokeColor.b);
+    else
+        cairo_set_source_rgb(global_surface_cr, 0, 0, 0);
+
+    cairo_fill_preserve(global_surface_cr);
+
+    cairo_set_source_rgb(global_surface_cr,
+        0.5 * strokeColor.r,
+        0.5 * strokeColor.g,
+        0.5 * strokeColor.b);
+
+    cairo_set_line_width(global_surface_cr, 2.0);
+    cairo_stroke(global_surface_cr);
+
+    cairo_restore(global_surface_cr);
+
+    global_surface_has_been_updated = TRUE;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 void Text(int x, int y, const char *s, char *fn, int fontSize, int erase, int bold)
 ///////////////////////////////////////////////////////////////////////////////

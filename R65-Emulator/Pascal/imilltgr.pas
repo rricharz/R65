@@ -390,6 +390,19 @@ begin
   _vtxtgr(CX,CY+SY,CY+3*SY,CYAN);
 end;
 
+proc drawmark(pos, player: integer);
+{**********************************}
+var x,y,code: integer;
+begin
+  x:=CX+(ord(high(label[pos]))-ord('D'))*SX;
+  y:=CY-(ord(low(label[pos]))-ord('4'))*SY;
+
+  if player=WHITE then code:=$12
+  else code:=$13;
+
+  _txtgr(x,y,code,YELLOW);
+end;
+
 proc drawstones;
 {**************}
 var position: integer;
@@ -399,11 +412,25 @@ begin
       drawstone(position,board[position]);
 end;
 
-proc clearstone(stone, player: integer);
+proc drawmarkedstones(player: integer);
 {*************************************}
 begin
-  drawboard;
   drawstones;
+
+  if marks then begin
+    if markmove1>=0 then
+      drawmark(markmove1,player);
+
+    if marktake>=0 then
+      drawmark(marktake,otherplayer(player));
+  end;
+end;
+
+proc clearstone(stone,player: integer);
+{************************************}
+begin
+  drawboard;
+  drawmarkedstones(player);
 end;
 
 proc drawlabels;

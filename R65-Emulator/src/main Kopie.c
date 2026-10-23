@@ -1,0 +1,860 @@
+/*
+ * R65
+ *
+ * main.c
+ * 
+ * Copyright 2016  rricharz
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *  
+ */
+ 
+#define GDK_DISABLE_DEPRECATION_WARNINGS
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <errno.h>
+#include <string.h>
+#include <stdint.h>
+#include <limits.h>
+
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
+#include <cairo.h>
+#include <gtk/gtk.h>
+#include <math.h>
+
+#include "main.h"
+#include "R65.h"
+#include "crt.h"
+#include "fdc.h"
+#include "fake6502.h"
+
+GtkWidget *global_window;
+cairo_surface_t *global_surface;
+cairo_t *global_surface_cr;
+int global_surface_has_been_updated;
+int global_firstcall;
+guint global_timeout_ref;
+int cursorDisabled;
+int exDisplay;
+int fullscreen;
+int pixelated;
+int tekTerminal;
+
+struct tColor {
+	double r, g, b;
+} strokeColor, fillColor;
+
+struct tClick {
+	int button, x, y, down;
+} global_click;
+
+int global_char;
+int global_key_is_down;
+
+int windowWidth, windowHeight;
+int crtWidth, crtHeight, crtOffset;
+int panelSize, panelOffset;
+double panelScale;
+
+static gboolean global_hasFocus = FALSE;
+
+#include <stdarg.h>
+
+FILE *logFile = NULL;
+
+void logmsg(const char *format, ...)
+{
+    va_list args;
+
+    if (logFile == NULL)
+        return;
+
+    va_start(args, format);
+    vfprintf(logFile, format, args);
+    va_end(args);
+
+    fflush(logFile);
+}
+
+/////////////////////////////////////////////
+void Background(double r, double g, double b)
+/////////////////////////////////////////////
+{
+    cairo_set_source_rgb(global_surface_cr, r, g, b);
+    cairo_rectangle (global_surface_cr, 0, 0, windowWidth, windowHeight);
+    cairo_fill(global_surface_cr);
+    global_surface_has_been_updated = TRUE;
+}
+
+/////////////////////////////////////////////////
+void Crt_Background(double r, double g, double b)
+/////////////////////////////////////////////////
+{
+    // cairo_set_source_rgb(global_surface_cr, r, g, b);
+    Stroke(210, 210, 210); Fill(0, 0, 0, 0);
+    Rect(crtOffset/2,  windowHeight - crtOffset/2,
+        crtWidth + crtOffset, crtHeight + crtOffset);
+    cairo_fill(global_surface_cr);
+    global_surface_has_been_updated = TRUE;
+}
+
+
+////////////////////////////////
+void Stroke(int r, int g, int b)
+////////////////////////////////
+{
+	strokeColor.r = (double)r / 256.0;
+	strokeColor.g = (double)g / 256.0;
+	strokeColor.b = (double)b / 256.0;
+}
+
+/////////////////////////////////////////
+void Fill(int r, int g, int b, int alpha)
+/////////////////////////////////////////
+{
+	fillColor.r = (double)r / 256.0;
+	fillColor.g = (double)g / 256.0;
+	fillColor.b = (double)b / 256.0;
+}
+
+///////////////////////
+void StrokeWidth(int w)
+///////////////////////
+{
+	cairo_set_line_width (global_surface_cr, w);
+}
+
+/////////////////////////////////////
+void Rect(int x, int y, int w, int h)
+/////////////////////////////////////
+{
+	cairo_set_source_rgb(global_surface_cr, strokeColor.r, strokeColor.g, strokeColor.b);
+	cairo_rectangle(global_surface_cr, x, y - h, w, h);
+	cairo_stroke_preserve(global_surface_cr);
+	cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
+	cairo_fill(global_surface_cr);
+	global_surface_has_been_updated = TRUE;
+}
+
+/////////////////////////////////////////
+void FillRect(int x, int y, int w, int h)
+/////////////////////////////////////////
+{
+        cairo_set_antialias(global_surface_cr, CAIRO_ANTIALIAS_NONE);
+        cairo_set_source_rgb(global_surface_cr,
+                             fillColor.r, fillColor.g, fillColor.b);
+        cairo_rectangle(global_surface_cr, x, y - h, w, h);
+        cairo_fill(global_surface_cr);
+        global_surface_has_been_updated = TRUE;
+        cairo_set_antialias(global_surface_cr, CAIRO_ANTIALIAS_DEFAULT);
+}
+
+/////////////////////////////////////////
+void Line(int x1, int y1, int x2, int y2)
+/////////////////////////////////////////
+{
+	cairo_set_source_rgb(global_surface_cr, strokeColor.r, strokeColor.g, strokeColor.b);
+	cairo_move_to(global_surface_cr, x1, y1);
+        cairo_line_to(global_surface_cr, x2, y2);
+        cairo_stroke(global_surface_cr);
+        global_surface_has_been_updated = TRUE;
+}
+
+////////////////////////////////
+void Circle(int x, int y, int d)
+////////////////////////////////
+{
+	cairo_set_source_rgb(global_surface_cr, strokeColor.r, strokeColor.g, strokeColor.b);
+	cairo_arc(global_surface_cr, x, y, d / 2, 0, 2*M_PI);
+	cairo_stroke_preserve(global_surface_cr);
+        cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
+	cairo_fill(global_surface_cr);
+	global_surface_has_been_updated = TRUE;
+}
+
+//////////////////////////////////////////////////////
+void DrawCircle(int x, int y, int diameter, int white)
+/////////////////////////////////////////////////////
+{
+    cairo_arc(global_surface_cr, x, y,
+              diameter / 2.0, 0, 2*M_PI);
+
+    if (white)
+        cairo_set_source_rgb(global_surface_cr,
+            strokeColor.r, strokeColor.g, strokeColor.b);
+    else
+        cairo_set_source_rgb(global_surface_cr, 0, 0, 0);
+
+    cairo_fill_preserve(global_surface_cr);
+
+    cairo_set_source_rgb(global_surface_cr,
+        strokeColor.r, strokeColor.g, strokeColor.b);
+
+    cairo_stroke(global_surface_cr);
+
+    global_surface_has_been_updated = TRUE;
+}
+
+//////////////////////////////////////////////////////
+void DrawCross(int x, int y, int diameter, int inverse)
+//////////////////////////////////////////////////////
+{
+    double r = diameter / 2.0;
+
+    cairo_save(global_surface_cr);
+
+    if (inverse)
+        cairo_set_source_rgb(global_surface_cr, 0, 0, 0);
+    else
+        cairo_set_source_rgb(global_surface_cr,
+            strokeColor.r, strokeColor.g, strokeColor.b);
+
+    cairo_set_line_width(global_surface_cr, 2.0);
+    cairo_new_path(global_surface_cr);
+
+    cairo_move_to(global_surface_cr, x-r, y-r);
+    cairo_line_to(global_surface_cr, x+r, y+r);
+
+    cairo_move_to(global_surface_cr, x+r, y-r);
+    cairo_line_to(global_surface_cr, x-r, y+r);
+
+    cairo_stroke(global_surface_cr);
+    cairo_restore(global_surface_cr);
+
+    global_surface_has_been_updated = TRUE;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void Text(int x, int y, const char *s, char *fn, int fontSize, int erase, int bold)
+///////////////////////////////////////////////////////////////////////////////
+{
+	cairo_text_extents_t extents;
+	cairo_font_weight_t weight;
+	if (bold)
+	    weight = CAIRO_FONT_WEIGHT_BOLD;
+	else
+	    weight = CAIRO_FONT_WEIGHT_NORMAL;
+	cairo_select_font_face(global_surface_cr, fn, CAIRO_FONT_SLANT_NORMAL, weight);
+	cairo_set_font_size(global_surface_cr, fontSize - 1);
+	if (erase) {
+		cairo_text_extents(global_surface_cr, s, &extents);
+		cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
+		cairo_rectangle(global_surface_cr, x, 
+		  y - extents.height - 1, 
+		  extents.width + ((3 * fontSize) / 4), (7 * extents.height) / 5);
+		cairo_fill(global_surface_cr);
+	}
+	cairo_set_source_rgb(global_surface_cr, strokeColor.r, strokeColor.g, strokeColor.b);
+	cairo_move_to(global_surface_cr, x, y);
+	cairo_show_text(global_surface_cr, s);	
+	cairo_stroke(global_surface_cr);
+	global_surface_has_been_updated = TRUE;
+}
+
+////////////////////////////////////////////////////////////
+void TextMid(int x, int y, char *s, int fontSize, int erase)
+////////////////////////////////////////////////////////////
+{
+	cairo_text_extents_t extents;
+	cairo_select_font_face(global_surface_cr, "Monospace", CAIRO_FONT_SLANT_NORMAL,
+	    CAIRO_FONT_WEIGHT_NORMAL);
+	cairo_set_font_size(global_surface_cr, fontSize - 1);
+	cairo_text_extents(global_surface_cr, s, &extents);
+	if (erase) {
+		cairo_set_source_rgb(global_surface_cr, fillColor.r, fillColor.g, fillColor.b);
+		cairo_rectangle(global_surface_cr, x, 
+		  y - extents.height - 1, 
+		  extents.width + ((3 * fontSize) / 4), (7 * extents.height) / 5);
+		cairo_fill(global_surface_cr);
+	}
+	cairo_set_source_rgb(global_surface_cr, strokeColor.r, strokeColor.g, strokeColor.b);
+	cairo_move_to(global_surface_cr, x - extents.width / 2, y);
+	cairo_show_text(global_surface_cr, s);	
+	cairo_stroke (global_surface_cr);
+	global_surface_has_been_updated = TRUE;
+}
+
+////////////////////////////////////////
+void Image(int x, int y, char *filename)
+////////////////////////////////////////
+{
+	cairo_surface_t *image = cairo_image_surface_create_from_png(filename);
+	if (image != NULL) {
+		int h = cairo_image_surface_get_height(image);
+		cairo_set_source_surface(global_surface_cr, image, x, y - h);
+		cairo_paint(global_surface_cr);
+	}
+	cairo_surface_destroy(image);
+	global_surface_has_been_updated = TRUE;
+}
+
+////////////////
+void Paint(void)
+////////////////
+// force immediate redraw, if global surface has been updated
+{
+	if (global_surface_has_been_updated) {
+		gtk_widget_queue_draw(global_window);
+		while (gtk_events_pending())
+			gtk_main_iteration();
+		global_surface_has_been_updated = FALSE;
+	}
+}
+
+/////////////////////////////
+void Alert(char *s, int halt)
+/////////////////////////////
+{
+	GtkWidget *dialog;
+	if (!cursorDisabled) {   // do not show if cursor is disabled
+		dialog = gtk_message_dialog_new(GTK_WINDOW(global_window), GTK_DIALOG_DESTROY_WITH_PARENT,
+			GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, s, NULL, NULL);
+		gtk_dialog_run(GTK_DIALOG (dialog));
+		gtk_widget_destroy (dialog);
+	}
+	else
+		logmsg("******** Alert! %s\n", s);
+	if (halt)
+		exit(1);
+}
+
+///////////////
+void Quit(void)
+///////////////
+{
+  logmsg("Quitting R65 emulator\n");
+  if (logFile != NULL) {
+      fclose(logFile);
+      logFile = NULL;
+  }
+	gtk_main_quit();
+}
+
+////////////////////////
+void disableCursor(void)
+////////////////////////
+{
+	GdkWindow *gdk_window = gtk_widget_get_window(GTK_WIDGET(global_window));
+	gdk_window_set_cursor(gdk_window, gdk_cursor_new(GDK_BLANK_CURSOR));
+	cursorDisabled = TRUE;
+}
+
+//////////////////////
+void clearClicks(void)
+//////////////////////
+{
+	while (gtk_events_pending())           // check for clicks
+		gtk_main_iteration();
+	global_click.button = 0;
+	global_click.x      = 0;
+	global_click.y      = 0;
+	global_click.down   = 0;
+}
+
+///////////////////////////////
+void checkClick(int *x, int *y)
+///////////////////////////////
+{
+        while (gtk_events_pending())           // check for clicks
+                gtk_main_iteration();
+	*x = global_click.x;
+        *y = global_click.y;		
+	global_click.button = 0;
+	global_click.x = 0;
+	global_click.y = 0;
+}
+
+////////////////////////
+void checkPendingEvents()
+////////////////////////
+{
+    while (gtk_events_pending())            // check for gtk events
+        gtk_main_iteration();
+}
+
+////////////////////////
+int clickStillDown(void)
+////////////////////////
+{
+	Paint();                               // update painting bevore waiting for input
+	while (gtk_events_pending())           // check for clicks
+		gtk_main_iteration();
+	return global_click.down;
+}
+
+//////////////////////////////////////////////////////
+static gboolean on_focus_in_event(GtkWidget *widget,
+                                  GdkEventFocus *event,
+                                  gpointer user_data)
+//////////////////////////////////////////////////////
+                                    
+{
+    global_hasFocus = TRUE;
+    showCursor = TRUE;
+
+    global_pendingCrtUpdate = TRUE;
+    crtUpdate();
+    gtk_widget_queue_draw(widget);
+
+    return FALSE;
+}
+
+///////////////////////////////////////////////////////
+static gboolean on_focus_out_event(GtkWidget *widget,
+                                   GdkEventFocus *event,
+                                   gpointer user_data)
+///////////////////////////////////////////////////////
+{
+    global_hasFocus = FALSE;
+    showCursor = FALSE;
+
+    global_pendingCrtUpdate = TRUE;
+    crtUpdate();
+    gtk_widget_queue_draw(widget);
+
+    return FALSE;
+}
+
+//////////////////////////////////////////////////////
+static gboolean on_next_timer_event(GtkWidget *widget)
+//////////////////////////////////////////////////////
+// Blinks the cursor and updates the screen
+{
+    global_surface_has_been_updated = FALSE;
+    g_source_remove(global_timeout_ref);    // stop timer, in case crtUpdate takes too long
+    if (global_hasFocus)
+        showCursor = !showCursor;
+    else
+        showCursor = FALSE;
+    global_pendingCrtUpdate = TRUE;
+    crtUpdate();
+	if (global_surface_has_been_updated)
+		gtk_widget_queue_draw(widget);
+	global_timeout_ref = g_timeout_add(TIME_INTERVAL,
+		(GSourceFunc) on_next_timer_event, (gpointer) global_window);  // restart timer
+	return TRUE;
+}
+
+///////////////////////////////////////////////////////
+static gboolean on_first_timer_event(GtkWidget *widget)
+///////////////////////////////////////////////////////
+// starts the interpreter
+{
+        global_surface_has_been_updated = FALSE;
+        global_timeout_ref = g_timeout_add(TIME_INTERVAL,
+			(GSourceFunc) on_next_timer_event, (gpointer) global_window);  // timer
+        r65Loop();                      // start interpreting and stay there
+	return TRUE;
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data)
+/////////////////////////////////////////////////////////////////////////////////
+{  	
+	if (global_firstcall) {
+		global_surface = cairo_surface_create_similar(cairo_get_target(cr),
+			CAIRO_CONTENT_COLOR_ALPHA, windowWidth, windowHeight);
+		global_surface_cr = cairo_create(global_surface);
+		global_surface_has_been_updated = FALSE;
+		global_firstcall = FALSE;
+                // add a first timer event to start interpreting
+		global_timeout_ref = g_timeout_add(0,
+			(GSourceFunc) on_first_timer_event, (gpointer) global_window);
+	}
+	
+	cairo_set_source_surface(cr, global_surface, 0, 0);
+	cairo_paint(cr);
+	
+	return FALSE;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+static gboolean clicked(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+/////////////////////////////////////////////////////////////////////////////////////
+{
+        global_click.button = event->button;
+        global_click.x      = event->x;
+        global_click.y      = event->y;
+        global_click.down   = 1;
+        
+        return TRUE;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+static void released(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+//////////////////////////////////////////////////////////////////////////////////////
+{
+	global_click.down   = 0;
+}
+
+///////////////////////////
+static void on_quit_event()
+///////////////////////////
+{
+	r65Quit();
+        gtk_main_quit();
+        exit(0);
+}
+
+//////////////////////////////////
+void QuitProgram(int shutDownFlag)
+//////////////////////////////////
+{
+        r65Quit();
+        gtk_main_quit();
+        if (shutDownFlag)
+          system("sudo shutdown -h now");
+        exit(0);
+}
+
+///////////////////////////////////////////////////////////////////////////////////
+static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
+///////////////////////////////////////////////////////////////////////////////////
+{
+
+    #define LEFT_OPTION_MASK_VNC 0x80
+    #define LEFT_OPTION_MASK_UTM 0x08
+
+    // ignore pure modifier key events
+    // right option / AltGr related keyvals are intentionally ignored
+    if ((event->keyval == 0xFFE1) || (event->keyval == 0xFFE2) ||   // Shift L/R
+        (event->keyval == 0xFFE3) || (event->keyval == 0xFFE4) ||   // Control L/R
+        (event->keyval == 0xFFE9) ||                                // Left Alt/Option key itself
+        (event->keyval == 0xFFEA) ||                                // Right Alt key itself
+        (event->keyval == 0xFE03))                                  // ISO_Level3_Shift / AltGr-ish
+        return;
+
+    if (event->keyval == 0xFFFF) {
+        logmsg("Making screen shot with grim (Wayland only)\n");
+        system("grim");
+        return;
+    }
+
+    // left option + cursor keys
+    // Mac/VNC uses state 0x80, Mac/UTM uses state 0x08
+    if (((event->state & LEFT_OPTION_MASK_VNC) || (event->state & LEFT_OPTION_MASK_UTM)) &&
+        (event->keyval == 0xFF51 || event->keyval == 0xFF52 ||
+         event->keyval == 0xFF53 || event->keyval == 0xFF54)) {
+
+        if (event->keyval == 0xFF53)      // option cursor right -> insert
+            global_char = 0x15;
+        else if (event->keyval == 0xFF52) // option cursor up -> roll up
+            global_char = 0x08;
+        else if (event->keyval == 0xFF54) // option cursor down -> roll down
+            global_char = 0x02;
+        else if (event->keyval == 0xFF51) // option cursor left -> delete
+            global_char = 0x19;
+
+        setKeyboardInterrupt();
+        global_key_is_down = 1;
+        return;
+    }
+
+    // control keys (direct Pi use etc.)
+    if (event->state & GDK_CONTROL_MASK) {
+        if (event->keyval == 0xFF53)      // control cursor right -> insert
+            global_char = 0x15;
+        else if (event->keyval == 0xFF52) // control cursor up -> roll up
+            global_char = 0x08;
+        else if (event->keyval == 0xFF54) // control cursor down -> roll down
+            global_char = 0x02;
+        else if (event->keyval == 0xFF51) // control cursor left -> delete
+            global_char = 0x19;
+        else if (event->keyval == 0xFF08) // control rubout -> delete
+            global_char = 0x19;
+        else if (event->keyval == 0xFF0D) // control return -> clear to end of screen
+            global_char = 0x11;
+        else
+            global_char = event->keyval & 0x1F;
+    }
+
+    // shift special keys
+    else if ((event->state & GDK_SHIFT_MASK) && ((event->keyval & 0xFF00) == 0xFF00)) {
+        global_char = event->keyval & 0xFEFF;
+        if (global_char == 0xFE1B)  {    // <shift> ESC: execute NMI
+            pendingNMI = 1;
+            global_char = 0;
+            return;
+        }
+        else if (global_char == 0xFEEB)  {    // <shift> menu: execute QUIT
+            QuitProgram(0);
+            return;
+        }
+        else if (global_char == 0xFEE7)  {    // <shift> ALT: execute QUIT and SHUTDOWN
+            QuitProgram(1);
+            system("sudo shutdown -h now");
+            return;
+        }
+        else global_char = event->keyval & 0x1F;
+    }
+
+    // normal keys
+    else if (event->keyval == 0x1008ff2f) {
+        QuitProgram(1);
+        system("sudo shutdown -h now");
+        return;
+    }
+    else {
+        global_char = event->keyval;
+    }
+
+    setKeyboardInterrupt();
+    global_key_is_down = 1;
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+static void on_key_release(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
+////////////////////////////////////////////////////////////////////////////////////
+{
+  global_key_is_down = 0;
+}
+
+static int lock_fd = -1;
+
+//////////////////////////////////////
+int acquire_single_instance_lock(void)
+//?///////////////////////////////////
+{
+    const char *lockfile = "/tmp/r65-emulator.lock";
+
+    lock_fd = open(lockfile, O_RDWR | O_CREAT, 0666);
+    if (lock_fd < 0) {
+        perror("open lockfile");
+        return -1;
+    }
+
+    if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
+        if (errno == EWOULDBLOCK) {
+            fprintf(stderr, "Another instance is already running.\n");
+        } else {
+            perror("flock");
+        }
+        close(lock_fd);
+        lock_fd = -1;
+        return -1;
+    }
+
+    /* Optional: write PID into lock file */
+    if (ftruncate(lock_fd, 0) == 0) {
+        char buf[64];
+        int len = snprintf(buf, sizeof(buf), "%ld\n",
+                           (long)getpid());
+        if (len > 0) {
+            write(lock_fd, buf, (size_t)len);
+        }
+    }
+
+    return 0;
+}
+
+///////////////////////////////////////
+void release_single_instance_lock(void)
+///////////////////////////////////////
+{
+    if (lock_fd >= 0) {
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        lock_fd = -1;
+    }
+}
+
+/////////////////////////////////////////////
+int set_working_directory_to_executable(void)
+/////////////////////////////////////////////
+{
+    char path[PATH_MAX];
+    char *last_slash;
+
+#ifdef __APPLE__
+    uint32_t size = sizeof(path);
+    if (_NSGetExecutablePath(path, &size) != 0) {
+        fprintf(stderr, "Path buffer too small\n");
+        return -1;
+    }
+#elif __linux__
+    ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
+    if (len == -1) {
+        perror("readlink");
+        return -1;
+    }
+    path[len] = '\0';
+#else
+    #error "Unsupported platform"
+#endif
+
+    // Remove executable name → keep directory
+    last_slash = strrchr(path, '/');
+    if (last_slash != NULL) {
+        *last_slash = '\0';
+    }
+
+    // Change working directory
+    if (chdir(path) != 0) {
+        perror("chdir");
+        return -1;
+    }
+
+    return 0;
+}
+
+/////////////////////////////////
+int main (int argc, char *argv[])
+/////////////////////////////////
+{
+    GtkWidget *darea;
+    
+    logFile = fopen("R65.log", "w");
+    if (logFile == NULL) {
+        fprintf(stderr, "Cannot open R65.log\n");
+    }
+    logmsg("R65 6502 emulator\n");
+    
+    char *term = getenv("TERM");
+
+    if ((term != NULL) && (strcmp(term, "tek4014") == 0)) {
+        struct termios tio;
+        int flags;
+
+        tekTerminal = 1;
+        logmsg("Started from tek4010\n");
+
+        /* Character-at-a-time input, no local echo */
+        if (tcgetattr(STDIN_FILENO, &tio) == 0) {
+            tio.c_lflag &= ~(ICANON | ECHO);
+            tio.c_cc[VMIN] = 1;
+            tio.c_cc[VTIME] = 0;
+            tcsetattr(STDIN_FILENO, TCSANOW, &tio);
+        }
+    }
+    	
+    int firstArg = 1;
+    
+    if (acquire_single_instance_lock() != 0) {
+        return 1;
+    }
+	
+	set_working_directory_to_executable();
+        
+    exDisplay  = FALSE;
+    fullscreen = FALSE;
+    pixelated      = FALSE;
+	
+    while (firstArg < argc) {
+      if (strcmp(argv[firstArg],"-full") == 0)
+	      fullscreen = TRUE;
+	    else if (strcmp(argv[firstArg],"-extern") == 0)
+	      exDisplay = TRUE;  
+	    else if (strcmp(argv[firstArg],"-pixelated") == 0)
+	      pixelated = TRUE; 
+      else {
+            logmsg("R65: unknown argument %s\n", argv[firstArg]);
+      }
+      firstArg++;
+    }
+      
+    gtk_init(&argc, &argv);
+	
+    global_firstcall = TRUE;
+    cursorDisabled = FALSE;
+	
+    clearClicks();
+
+    global_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
+    darea = gtk_drawing_area_new();
+    gtk_container_add(GTK_CONTAINER(global_window), darea);
+    gtk_widget_add_events(global_window, GDK_BUTTON_PRESS_MASK);
+    gtk_widget_add_events(global_window, GDK_BUTTON_RELEASE_MASK);
+    gtk_widget_add_events(global_window, GDK_KEY_PRESS_MASK);
+        	
+    GdkScreen *screen = gtk_window_get_screen(GTK_WINDOW(global_window));
+    int screenWidth = gdk_screen_get_width(screen);
+    int screenHeight = gdk_screen_get_height(screen);
+    logmsg("Screen dimensions: %d x %d\n", screenWidth, screenHeight);
+    double aspect = (double) screenWidth / (double) (screenHeight);
+    double target = 1920.0 / 1080.0;
+    if (aspect > target) screenWidth =  (int)((screenHeight  * target) + 0.5 );
+    if (aspect < target) screenHeight = (int)((screenWidth / target) + 0.5);
+    
+    g_set_prgname("r65-emulator");
+    g_set_application_name("R65 Emulator");
+    
+    GError *icon_error = NULL;
+    if (!gtk_window_set_icon_from_file(GTK_WINDOW(global_window),
+                        "r65_icon.png", &icon_error)) {
+        g_printerr("Could not load icon: %s\n", icon_error->message);
+        g_clear_error(&icon_error);
+    }
+
+    gtk_window_set_title(GTK_WINDOW(global_window), WINDOW_NAME);
+    if (fullscreen) {	    
+	    // DISPLAY UNDECORATED MAXIMIZED WINDOW
+	    gtk_window_set_decorated(GTK_WINDOW(global_window), FALSE);
+	    gtk_window_fullscreen(GTK_WINDOW(global_window));
+	    windowWidth  = screenWidth;
+	    windowHeight = screenHeight;
+	    panelScale = (double)screenHeight * 0.0028;
+    }	
+    else {
+	    // DISPLAY DECORATED WINDOW
+	    gtk_window_set_decorated(GTK_WINDOW(global_window), TRUE);
+	    windowWidth  = (int)(0.5 * (double)screenWidth);
+	    windowHeight = (int)(0.5 * (double)screenHeight);
+	    panelScale = (double)screenHeight * 0.00142;
+	    gtk_window_set_default_size(GTK_WINDOW(global_window),
+		windowWidth, windowHeight);
+    }
+    logmsg("Window dimensions: %d x %d\n", windowWidth, windowHeight);
+    
+    crtOffset = windowHeight / 15;
+    crtHeight = windowHeight - (2 * crtOffset);
+    // Aspect ratio of original display
+    crtWidth  = 4 * crtHeight / 3;
+    logmsg("R65 CRT dimensions: %d x %d\n", crtWidth, crtHeight);
+    
+    panelOffset = crtWidth +  (2 * crtOffset); 
+    panelSize   = windowWidth -panelOffset - ( crtOffset / 2);
+	
+    gtk_window_set_title(GTK_WINDOW(global_window), WINDOW_NAME);
+	
+    gtk_widget_set_events(darea,gtk_widget_get_events(darea) | GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK);	
+    g_signal_connect(G_OBJECT(darea), "draw",  G_CALLBACK(on_draw_event), NULL);
+    g_signal_connect(G_OBJECT(global_window), "destroy", G_CALLBACK(on_quit_event), NULL);
+    g_signal_connect(G_OBJECT(darea), "button-press-event", G_CALLBACK(clicked), NULL);
+    g_signal_connect(G_OBJECT(darea), "button-release-event", G_CALLBACK(released), NULL);
+    g_signal_connect(G_OBJECT(global_window), "key_press_event", G_CALLBACK(on_key_press), NULL);
+    g_signal_connect(G_OBJECT(global_window), "key_release_event", G_CALLBACK(on_key_release), NULL);
+    g_signal_connect(global_window, "focus-in-event", G_CALLBACK(on_focus_in_event), NULL);
+    g_signal_connect(global_window, "focus-out-event", G_CALLBACK(on_focus_out_event), NULL);	
+
+    gtk_widget_show_all(global_window);
+	
+    r65Setup();
+
+    gtk_main();
+
+    release_single_instance_lock();
+
+	return 0;
+}

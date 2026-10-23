@@ -423,8 +423,16 @@ static void DrawEnlargedCharacter(int xx, int yy, unsigned char c)
         case 0x11:  // Black stone (outlined)
             DrawCircle(cx, cy, 2 * hcell, 0);
             break;
+            
+        case 0x12:
+            DrawFadedCircle(cx, cy, 2 * hcell, 1);
+            break;
 
-        // $12-$17: Reserved for additional enlarged objects
+        case 0x13:
+            DrawFadedCircle(cx, cy, 2 * hcell, 0);
+            break;
+            
+        // $14-$17: Reserved for additional enlarged objects
     }
 }
 

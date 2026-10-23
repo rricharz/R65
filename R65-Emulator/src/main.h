@@ -12,6 +12,7 @@ void FillRect(int x, int y, int w, int h);
 void Line(int x1, int y1, int x2, int y2);
 void Circle(int x, int y, int d);
 void DrawCircle(int x, int y, int diameter, int white);
+void DrawFadedCircle(int x, int y, int diameter, int white);
 void Text(int x, int y, const char *s, char *fn, int fontSize, int erase, int bold);
 void TextMid(int x, int y, char *s, int fontSize, int erase);
 void Image(int x, int y, char *filename);
