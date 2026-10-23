@@ -133,7 +133,7 @@ begin
 end;
 
 proc blink;
-const bcount=50; { 50x10 msec interval for blinking }
+const bcount=20;
 mem sflag=$1781:integer&;
 var count:integer;
     displayed:boolean;
@@ -141,7 +141,8 @@ begin
   count:=0; { start with cursor on }
   displayed:=false;
   repeat
-    ch:=KEYPRESSED; { sleeps for 10 msec }
+    ch:=KEYPRESSED;
+    _delay10msec(1);
     count:=count-1;
     if count<=0 then begin
       showcursor(x,y);

@@ -503,6 +503,9 @@ static gboolean clicked(GtkWidget *widget, GdkEventButton *event, gpointer user_
         global_click.y      = event->y;
         global_click.down   = 1;
         
+        if (event->button == 1)
+            crtMouseClick(event->x, event->y);
+        
         return TRUE;
 }
 

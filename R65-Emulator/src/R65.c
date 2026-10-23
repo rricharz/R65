@@ -105,6 +105,22 @@ int  global_forceCrtUpdate = 0;
 int  pcSample = 0;
 int  pascalPcSample = 0;
 
+static unsigned char mouseMode = 0;
+static unsigned char mouseX = 0;
+static unsigned char mouseY = 0;
+static int mouseMask = 0;
+
+/****************************************/
+void setMouseClick(int mode, int x, int y)
+/****************************************/
+{
+    if (mouseMode != 0 || mouseMask)
+        return;
+
+    mouseX = x;
+    mouseY = y;
+    mouseMode = mode;
+}
 
 /********************/
 void checkMinTimeout()
@@ -273,78 +289,97 @@ uint8_t read6502(uint16_t address)
 /********************************/
 // read a byte from memory
 // handles memory mapped io
-
 {
+    // showtrace(address, 0x2063, "STOP");
 
-	// showtrace(address, 0x2063, "STOP");
-      
     if (address < 0x1400)
         return memory[address];
-    else if (address >= 0x1800)
+
+    if (address >= 0x1800)
         return memory[address];
-        
+
     // Update date and time.
     // Important, read memory[M8_DATE] first to update
     // date and time!
-    
+
     if (address == M8_DATE)
         setDateAndTime();
-    
-    // floppy disk controller
-    
-   if ((address >= R8_FDSTAT) && (address <= R8_FDDAT))
-        return fdc_read(address);    
-    
-    // Hardware multiplier
-    
-    else if (address == R16_MULTR) {
-        memory[R16_MULTR] = (memory[0x14E0] * memory[0x14E1]) & 0xFF;
-    }
-    else if (address == R16_MULTR + 1) {
-        memory[R16_MULTR + 1] = (memory[0x14E0] * memory[0x14E1]) >> 8;
-    }
-    
-    // Hardware timer 1, count down miliseconds
 
-    else if (address == R8_TMSEC) {
-        if (memory[R8_TMSEC] >= 0) {
-            usleep(1000);                   // this is not an exact implementation
-            memory[R8_TMSEC]--;
-        }
+    // Floppy disk controller
+
+    if ((address >= R8_FDSTAT) && (address <= R8_FDDAT))
+        return fdc_read(address);
+
+    // Hardware multiplier
+
+    if (address == R16_MULTR)
+        memory[R16_MULTR] =
+            (memory[0x14E0] * memory[0x14E1]) & 0xFF;
+
+    if (address == R16_MULTR + 1)
+        memory[R16_MULTR + 1] =
+            (memory[0x14E0] * memory[0x14E1]) >> 8;
+
+    // Hardware timer 1, count down milliseconds
+
+    if (address == R8_TMSEC) {
+        usleep(1000);
+        memory[R8_TMSEC]--;
     }
     
     // Keyboard
-    
-    else if (address == M8_CHAR) {
-        if (memory[address] == 0) {         // no char there, wait
-            if (pendingNMI || pendingIRQ)   // do not wait for key if nmi or irq pending
-                return(0);
-            crtUpdate();                    // update screen bevore waiting for events
+
+    if (address == M8_CHAR) {
+        if (memory[address] == 0) {
+            if (pendingNMI || pendingIRQ)
+                return 0;
+
+            crtUpdate();
             checkPendingEvents();
-            
+
             if (!isAnimation)
-                usleep(1000);              // avoid 100% cpu usage during waiting for key
+                usleep(1000);
+
             checkMotorTurnoff(1);
             // checkMinTimeout();
         }
     }
-        
-    else if ((address >= 0x1440) && (address <= 0x177F)) {
-        if (address == KIM_PORTA2) {
-            memory[address] = translateKey(global_char);
-            // global_char = 0; now done when IRQ handler writes to M8_CHAR
-            memory[KIM_IFR2] = 0x00;    // clear level 2 interrupt from KIM 6522-2, keyboard interrupt
-        }
-        else if (address == EMU_RAND) {
-            int rnd = (rand() & 255);
-            return(rnd);
-            
-        }
-        else if (address == EMU_FLAGS)  {
-            return(global_key_is_down); // bit 0 set if key is down           
-        }
+
+    // KIM-1 keyboard
+
+    if (address == KIM_PORTA2) {
+        memory[address] = translateKey(global_char);
+        // global_char = 0; now done when IRQ handler
+        // writes to M8_CHAR
+        memory[KIM_IFR2] = 0x00;
     }
-    
+
+    // Emulator random number generator
+
+    if (address == EMU_RAND)
+        return rand() & 255;
+
+    // Emulator keyboard flags
+
+    if (address == EMU_FLAGS)
+        return global_key_is_down;
+
+    // Mouse registers
+
+    if (address == KIM_MOUSEMODE) {
+        mouseMask = 1;
+        return mouseMode;
+    }
+
+    if (address == KIM_MOUSEX)
+        return mouseX;
+
+    if (address == KIM_MOUSEY) {
+        mouseMask = 0;
+        mouseMode = 0;
+        return mouseY;
+    }
+
     return memory[address];
 }
 
@@ -512,7 +547,7 @@ void write6502(uint16_t address, uint8_t value)
             logmsg("writing into EPROM address space not allowed\n");
             return;
         }
-        else {
+        else { 
             memory[address] = value;
             return;
         }
@@ -764,7 +799,7 @@ void write6502(uint16_t address, uint8_t value)
         if (address == KIM_HOSTOUT) {
             putc(value, stdout);
         }
-
+        
         if (address == KIM_IER2) {
             if (value & 0x82) {
                 keyboardIrqEnabled = 1;

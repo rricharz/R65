@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "main.h"
 #include "R65.h"
@@ -50,7 +51,6 @@ int      sdown_hsize;
 int      quit_hpos;      // Horizontal position of QUIT button
 int      stop_hpos;      // STOP button
 
-
 int led[NUM_LEDS];
 
 // Screen and symbol fonts
@@ -73,6 +73,11 @@ static const char *symbols[8] = {
     "�",  // $1E Undefined
     "�"   // $1F Undefined
 };
+
+#define GRAPHIC_LINE_WIDTH  (int)(hcell / 5.0 + 0.5)
+#define GRAPHIC_Y_OFFSET    (int)(-vcell * 0.37)
+#define GRAPHIC_X_OFFSET    0
+#define GRAPHIC_OVERLAP     (int)(hcell / 10.0 + 0.5)
 
 /*************/
 void crt_init()
@@ -101,6 +106,111 @@ void crt_init()
 
 }
 
+/************************************/
+void crtMouseClick(double x, double y)
+/************************************/
+{
+    printf("Mouse click: x=%.1f y=%.1f\n", x, y);
+
+    if (!global_videoMemorySplitted) {
+        double hc = (double)crtWidth / NUMCHAR;
+        double vc = 0.99 * (double)crtHeight / NUMLINES;
+
+        double xx = x - crtOffset;
+        double yy = y - crtOffset
+                      - 8 * panelScale
+                      - GRAPHIC_Y_OFFSET;
+
+        if (xx >= 0 && xx < NUMCHAR * hc &&
+            yy >= 0 && yy < NUMLINES * vc) {
+
+            int col = (int)(xx / hc);
+            int row = (int)(yy / vc);
+
+            setMouseClick(1, col, row);
+        }
+    }
+    else if (global_graphicsFlag) {
+
+        // Full-size graphics
+
+        double scale = crtWidth / NUMXDOTS;
+
+        if (scale < 1.0) {
+            scale = (double)crtWidth / NUMXDOTS;
+            if (scale > 1.0)
+                scale = 1.0;
+        }
+
+        int dotWidth  = (int)(NUMXDOTS * scale + 0.999);
+        int dotHeight = (int)(NUMYDOTS * scale + 0.999);
+
+        int xoff = crtOffset + (crtWidth - dotWidth) / 2;
+        int yoff = crtOffset + 1 + dotHeight;
+
+        double xx = x - xoff;
+        double yy = yoff - y;
+
+        if (xx >= 0 && xx < dotWidth &&
+            yy >= 0 && yy < dotHeight) {
+
+            int gx = (int)(xx / scale);
+            int gy = (int)(yy / scale);
+
+            if (gx >= 0 && gx < NUMXDOTS &&
+                gy >= 0 && gy < NUMYDOTS) {
+
+                printf("Graphics coordinates: x=%d y=%d\n",
+                       gx, gy);
+                setMouseClick(2, gx, gy);
+            }
+        }
+        else {
+            printf("Outside graphics display\n");
+        }
+    }
+    else {
+        // Split view: small graphics, right justified
+
+        double scale = (crtWidth / NUMXDOTS) / 2;
+
+        if (scale < 1.0) {
+            scale = (double)crtWidth /
+                    (2.0 * (double)NUMXDOTS);
+
+            if (scale > 1.0)
+                scale = 1.0;
+        }
+
+        int dotWidth  = (int)(NUMXDOTS * scale + 0.999);
+        int dotHeight = (int)(NUMYDOTS * scale + 0.999);
+
+        int xoff = crtOffset + crtWidth - dotWidth - 1;
+        int yoff = crtOffset + 1 + dotHeight;
+
+        double xx = x - xoff;
+        double yy = yoff - y;
+
+        if (xx >= 0 && xx < dotWidth &&
+            yy >= 0 && yy < dotHeight) {
+
+            int gx = (int)(xx / scale);
+            int gy = (int)(yy / scale);
+
+            if (gx >= 0 && gx < NUMXDOTS &&
+                gy >= 0 && gy < NUMYDOTS) {
+
+                printf("Graphics coordinates: x=%d y=%d\n",
+                       gx, gy);
+                setMouseClick(2, gx, gy);
+            }
+        }
+        else {
+            printf("Outside graphics display\n");
+        }
+    }
+}
+
 /*******************************/
 void setLed(int index, int value)
 /*******************************/
@@ -112,7 +222,6 @@ void setLed(int index, int value)
         }
     }
 }
-
 
 /************************/
 void checkInfoBarButtons()
@@ -334,11 +443,6 @@ void infoPanel()
    
   SETBUTTONCOLOR;
 }
-
-#define GRAPHIC_LINE_WIDTH  (int)(hcell / 5.0 + 0.5)
-#define GRAPHIC_Y_OFFSET    (int)(-vcell * 0.37)
-#define GRAPHIC_X_OFFSET    0
-#define GRAPHIC_OVERLAP     (int)(hcell / 10.0 + 0.5)
 
 /********************************************************/
 void DrawGraphicCharacter(int xx, int yy, unsigned char c)

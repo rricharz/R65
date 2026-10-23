@@ -28,9 +28,14 @@
 #define KIM_IER3    0x146E  // irq enable register
 #define KIM_PORTA2  0x1451  // 6552-2 Port A (keyboard)
 #define KIM_HOSTOUT 0x1700  // output to stdout
-#define EMU_RAND    0x1706  // KIM timer, rand() in emulator
+
+#define EMU_RAND     0x1706  // KIM timer, rand() in emulator emulator
 
 #define EMU_FLAGS   0x1707  // emulator flags (bit 0: kex down)
+
+#define KIM_MOUSEMODE 0x1708  // mouse event mode
+#define KIM_MOUSEX   0x1709  // mouse X coordinate
+#define KIM_MOUSEY   0x170A  // mouse Y coordinate
 
 // Multiplier and timer
 
@@ -77,6 +82,7 @@ void write6502_8(uint16_t address, uint8_t value);
 int catchSubroutine(uint16_t ea);
 void printRegisters();
 void setKeyboardInterrupt();
+void setMouseClick(int mode, int x, int y);
 
 extern int pendingNMI;
 extern int pendingIRQ;
