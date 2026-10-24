@@ -197,6 +197,12 @@ var s: cpnt;
       write(@PLOTDEV,'_');
 
       repeat
+
+        if _isesc then begin
+          readandblink:=chr($1b);
+          exit;
+          end;
+
         ch:=KEYPRESSED;
 
         if ch<>chr(0) then begin
@@ -238,6 +244,12 @@ var s: cpnt;
 
     repeat
       c:=readandblink(x+8*len,y);
+
+      if c=chr($1b) then begin
+        s:='QUIT';
+        len:=4;
+        exit;
+      end;
 
       if c=BACKSPACE then begin
         if len>0 then begin

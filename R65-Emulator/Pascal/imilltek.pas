@@ -327,6 +327,12 @@ var s: cpnt;
         end
 
         { normal keyboard input }
+        else if c=chr($1b) then begin
+          s:='QUIT';
+          len:=4;
+          exit;
+        end
+
         else if c=BACKSPACE then begin
 
           { cancel completed FROM position }

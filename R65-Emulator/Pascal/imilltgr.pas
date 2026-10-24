@@ -23,12 +23,6 @@ const
 
 var  markplace,marktake,markmove1,markmove2: integer;
 
-func _escape_pending: boolean;
-{****************************}
-begin
-  _escape_pending := ((mem[$1781] and $80)<>0);
-end;
-
 proc init_graphics;
 {*****************}
 begin
@@ -128,6 +122,54 @@ begin
     findpos:=-1;
 end;
 
+func findtgrpos(x,y:integer):integer;
+{**********************************}
+var i,px,py:integer;
+begin
+  findtgrpos:=-1;
+
+  for i:=0 to 23 do begin
+    px:=CX+(ord(high(label[i]))-ord('D'))*SX;
+    py:=CY-(ord(low(label[i]))-ord('4'))*SY;
+
+    if (x=px) and (y=py) then
+      findtgrpos:=i;
+  end;
+end;
+
+proc drawstone(pos, player: integer);
+{**********************************}
+var x,y,code,color: integer;
+    marked: boolean;
+begin
+  x:=CX+(ord(high(label[pos]))-ord('D'))*SX;
+  y:=CY-(ord(low(label[pos]))-ord('4'))*SY;
+
+  marked:=false;
+
+  if marks then
+    marked:=(pos=markplace) or
+            (pos=marktake) or
+            (pos=markmove1) or
+            (pos=markmove2);
+
+  writeln(@PROTOCOL,
+    'DRAWSTONE pos=',pos,
+    ' player=',player,
+    ' marks=',marks,
+    ' place=',markplace,
+    ' take=',marktake,
+    ' move1=',markmove1,
+    ' move2=',markmove2,
+    ' marked=',marked);
+
+  if player=WHITE then code:=$10
+  else code:=$11;
+
+  if marked then color:=YELLOW else color:=CYAN;
+  _txtgr(x,y,code,color);
+end;
+
 proc getinput(player, request0: integer;
               var p1,p2: integer);
 {**************************************}
@@ -138,6 +180,22 @@ const TOGGLE    = chr(12);
 var s: cpnt;
     x,y,len,maxlen, request, oldrequest: integer;
     valid: boolean;
+
+  proc markfrom(p:integer);
+  begin
+    markmove1:=p;
+    drawstone(p,board[p]);
+  end;
+
+  proc unmarkfrom;
+  var p:integer;
+  begin
+    p:=markmove1;
+    if p>=0 then begin
+      markmove1:=-1;
+      drawstone(p,board[p]);
+    end;
+  end;
 
   proc prompt;
   begin
@@ -171,30 +229,41 @@ var s: cpnt;
   end;
 
   proc editinput;
-  var c: char;
+  var c:char;
+      mx,my,p,mode:integer;
 
     proc redraw;
-    var j: integer;
+    var j:integer;
     begin
-      { clear complete input line }
       _setcursor(DASHX,y);
       write('           ');
-
-      { redraw prompt }
       prompt;
-
-      { redraw input }
       _setcursor(x,y);
       for j:=0 to len-1 do
         write(s[j]);
-
-      { position blinking cursor }
       _setcursor(x+len,y);
+    end;
+
+    proc markfrom(p:integer);
+    begin
+      markmove1:=p;
+      drawstone(p,board[p]);
+    end;
+
+    proc unmarkfrom;
+    var p:integer;
+    begin
+      p:=markmove1;
+      if p>=0 then begin
+        markmove1:=-1;
+        drawstone(p,board[p]);
+      end;
     end;
 
   begin
     len:=0;
     s[0]:=ENDMARK;
+    markmove1:=-1;
 
     if request=I_MOVE then
       maxlen:=5
@@ -204,35 +273,88 @@ var s: cpnt;
     redraw;
 
     repeat
-      repeat
-        c:=KEYPRESSED;
-        if c=chr(0) then
-          _delay10msec(3);
-      until c<>chr(0);
+      _waitinput(mode,mx,my,c);
 
-      KEYPRESSED:=chr(0);
+      if _isesc then begin
+        unmarkfrom;
+        s:='QUIT';
+        len:=4;
+        exit;
+      end;
 
+      { mouse input }
+      if mode=1 then begin
+        p:=findtgrpos(mx,my);
+
+        if p>=0 then begin
+          case request of
+
+            I_PLACE,I_TAKE:
+              begin
+                s[0]:=high(label[p]);
+                s[1]:=low(label[p]);
+                s[2]:=ENDMARK;
+                len:=2;
+                redraw;
+                c:=CR;
+              end;
+
+            I_MOVE:
+              begin
+                if len=0 then begin
+                  s[0]:=high(label[p]);
+                  s[1]:=low(label[p]);
+                  s[2]:='-';
+                  s[3]:=ENDMARK;
+                  len:=3;
+                  redraw;
+                  markfrom(p);
+                end else if len=3 then begin
+                  s[3]:=high(label[p]);
+                  s[4]:=low(label[p]);
+                  s[5]:=ENDMARK;
+                  len:=5;
+                  redraw;
+                  c:=CR;
+                end;
+              end
+
+          end;
+        end;
+      end;
+
+      { keyboard input }
       if c=BACKSPACE then begin
         if len>0 then begin
+          if len=3 then unmarkfrom;
           len:=len-1;
           s[len]:=ENDMARK;
           redraw;
-        end
+        end;
       end
 
       else if c=TOGGLE then
         write(TOGGLE)
 
-      else if c<>CR then begin
+      else if (c<>CR) and (c<>chr(0)) then begin
         if len<maxlen then begin
           s[len]:=c;
           len:=len+1;
           s[len]:=ENDMARK;
           redraw;
-        end
-      end
+
+          { mark completed FROM position }
+          if (request=I_MOVE) and
+             (len=3) and (s[2]='-') then begin
+            p:=findpos(packed(s[0],s[1]));
+            if p>=0 then markfrom(p);
+          end;
+        end;
+      end;
 
     until c=CR;
+
+    unmarkfrom;
 
     { clear complete input line }
     _setcursor(DASHX,y);
@@ -242,6 +364,7 @@ var s: cpnt;
 begin { getinput }
 
   request:=request0;
+  markmove1:=-1;
   s:=_new;
   s[0]:=ENDMARK;
 
@@ -326,39 +449,6 @@ begin { getinput }
 
   message(0,'  ',player);
   _release(s);
-end;
-
-proc drawstone(pos, player: integer);
-{**********************************}
-var x,y,code,color: integer;
-    marked: boolean;
-begin
-  x:=CX+(ord(high(label[pos]))-ord('D'))*SX;
-  y:=CY-(ord(low(label[pos]))-ord('4'))*SY;
-
-  marked:=false;
-
-  if marks then
-    marked:=(pos=markplace) or
-            (pos=marktake) or
-            (pos=markmove1) or
-            (pos=markmove2);
-
-  writeln(@PROTOCOL,
-    'DRAWSTONE pos=',pos,
-    ' player=',player,
-    ' marks=',marks,
-    ' place=',markplace,
-    ' take=',marktake,
-    ' move1=',markmove1,
-    ' move2=',markmove2,
-    ' marked=',marked);
-
-  if player=WHITE then code:=$10
-  else code:=$11;
-
-  if marked then color:=YELLOW else color:=CYAN;
-  _txtgr(x,y,code,color);
 end;
 
 proc drawboard;

@@ -551,10 +551,6 @@ func gameover(player: integer): boolean;
 var p1,p2: integer;
 begin
 
-  if _escape_pending then begin
-    gameover:=true;
-    exit;
-  end;
   if stones[player]>0 then begin
     gameover:=false;
     exit;

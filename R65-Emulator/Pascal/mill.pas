@@ -22,23 +22,12 @@
   2026 rricharz and ChatGPT                 }
 
 program mill;
-uses txtgrlib, syslib, strlib, striolib;
+uses txtgrlib, syslib, strlib, striolib, mouselib;
 
 const
   WHITE=0;
   INVERSE=1;
   BLACK=2;
-
-mem KEYPRESSED=$1785: char&;
-
-proc _delay10msec(time:integer);
-mem
-{$I IHIDDENMEM}
-var i:integer;
-begin
-  for i:=1 to time do
-    emucom:=6;
-end;
 
 {$I IMILLTOP}
 {$I IMILLTGR}

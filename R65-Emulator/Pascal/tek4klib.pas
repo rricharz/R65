@@ -169,12 +169,6 @@ begin
   end;
 end;
 
-func _escape_pending: boolean;
-{****************************}
-begin
-  _escape_pending := ((mem[$1781] and $80)<>0);
-end;
-
 func _tekread(var c: char): boolean;
 {**********************************}
 const
@@ -330,6 +324,12 @@ var
   tx,ty: integer;
   okay: boolean;
 
+  func isesc:boolean;
+  begin
+    isesc:=((SFLAG and $80) <> 0);
+    SFLAG:=SFLAG and $7f;
+  end;
+
 begin
   { enter GIN mode }
   write(@PLOTTER,chr(27),chr(26));
@@ -339,7 +339,7 @@ begin
     tc:=KEYPRESSED;
 
     if tc=chr(0) then begin
-      if _escape_pending then begin
+      if isesc then begin
         _purgeinput;
         _getcrosshair:=false;
         exit;

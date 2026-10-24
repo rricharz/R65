@@ -939,7 +939,7 @@ begin
       end {case};
     end;
 
-  until _escape_pending or
+  until _isesc or
         not okay or
         (ch='Q') or
         (ch=CR);
