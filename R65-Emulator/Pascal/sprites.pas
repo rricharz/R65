@@ -16,18 +16,21 @@
 
 program sprites;
 uses  syslib,strlib,striolib,plotlib,filelib,
-      spritelib,writelib;
+      spritelib,writelib,mouselib,txtgrlib;
 
 {$R+}
 {$U+}
 
-const NX        = 12;
+const NX        = 11;
       NPIXELS   = 8;
+      SPACING   = 9;
+      TABLEX    = 8;
+      TABLEY    = 8;
       LARGEPIX  = 12;
       CLEFT     = chr($03);
       CRIGHT    = chr($16);
       CDOWN     = chr($18);
-      ESC       = chr(0);
+      ESC       = chr($1b);
       TOGGLE    = chr($0c);
       NBLINKS   = 10;  {no of loops until bink}
       LOOPS     = 10;  {no of loops until next frame}
@@ -38,10 +41,12 @@ mem sflag=$1781: integer&;
 
 var selected, lastselected: integer;
     frames, framecounter:   integer;
-    in, editbit:            integer;
+    in, editbit,mode:       integer;
     isedited, editflag:     boolean;
+    found:                  boolean;
     ch:                     char;
     blink, elapsed:         integer;
+    mx, my:                 integer;
     copied_sprites:         array[3] of integer;
 
 proc writetable;
@@ -66,16 +71,36 @@ begin
   close(f);
 end;
 
+proc mouseselect(mx0,my0:integer);
+var xi,yi,i:integer;
+begin
+  if (mx0<TABLEX) or
+      (mx0>=TABLEX+NX*SPACING) then exit;
+  if (my0>YSIZE-TABLEY-1) or
+   (  my0<YSIZE-TABLEY-
+    SPACING*((NSPRITES+NX-1) div NX)) then exit;
+
+  xi:=(mx0-TABLEX) div SPACING;
+  yi:=(YSIZE-TABLEY-1-my0) div SPACING;
+
+  { Calculate sprite number }
+  i:=yi*NX+xi;
+
+  { Ignore unused cells }
+  if (i>=0) and (i<NSPRITES) then
+    selected:=i;
+end;
+
 proc spritetable(last, current: integer);
 var j, xoff, yoff: integer;
 
   proc coordinates(i);
-  var xi, yi: integer;
+  var xi,yi:integer;
   begin
-    yi := i div NX;
-    xi := i - (yi * NX);
-    yoff := YSIZE - (NPIXELS * (yi + 1) + 10);
-    xoff := NPIXELS * xi + 10;
+    yi:=i div NX;
+    xi:=i-(yi*NX);
+    yoff:=YSIZE-(SPACING*yi+NPIXELS+TABLEY);
+    xoff:=SPACING*xi+TABLEX;
   end;
 
 begin
@@ -171,6 +196,27 @@ begin
     end;
 end;
 
+proc mouseedit(mx0,my0:integer);
+var x,y,size,margin,bx,by:integer;
+begin
+  size:=8*LARGEPIX;
+  margin:=((YSIZE+1)-size) div 2;
+  x:=XSIZE-size-margin;
+  y:=margin;
+
+  { Check boundaries of enlarged sprite }
+  if (mx0<x) or (mx0>=x+size) then exit;
+  if (my0<y) or (my0>=y+size) then exit;
+
+  { Calculate pixel coordinates }
+  bx:=(mx0-x) div LARGEPIX;
+  by:=(my0-y) div LARGEPIX;
+
+  { Select pixel and toggle it }
+  editbit:=by*8+bx;
+  toggle(selected);
+end;
+
 proc showcursor;
 var x, y, bx, by, color, margin, size: integer;
 begin
@@ -262,14 +308,18 @@ begin
   _grinit;
   _fullview;
   _cleargr;
+
+  write(HOM,CSC);
+  _setcursor(0,12);
   writeln(
 'Q:   Save and quit   K:     Quit without saving');
   writeln(
 'E:   Start Edit mode BLANK: Toggle pixel');
   writeln(
 'C:   Copy sprite     V:     Paste sprite');
-  writeln(
+  write(
 '1..4 Animate frames  ESC:   Leave edit mode');
+  _setcursor(24,0);
   lastselected := 0;
   selected := 0;
   frames := 0;
@@ -283,15 +333,24 @@ begin
   _move(5,STATUSLN); write(@PLOTDEV,'VIEW');
 
   repeat { main loop }
-    repeat { wait for key pressed }
-      ch := KEYPRESSED;
-      { sflag bit 8 is escape flag. Pass it through }
+    repeat { wait for input }
+      found:=_getinput(mode,mx,my,ch);
+
       showframe(selected);
       showcursor;
-      elapsed := _syncscreen;
-    until (ord(ch)<>0) or ((sflag and $80)<>0);
-    read(@KEY,ch);
-    sflag:=sflag and $7f; { clear escape flag }
+      elapsed:=_syncscreen;
+
+      if _isesc then begin
+        ch:=ESC;
+        found:=true;
+      end;
+    until found;
+
+    if mode=2 then begin
+      mouseselect(mx,my);
+      if editflag then mouseedit(mx,my);
+    end;
+
     case ch of
       TOGGLE: write(TOGGLE);
       '0':    frames := 0;
