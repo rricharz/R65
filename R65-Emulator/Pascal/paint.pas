@@ -24,14 +24,23 @@ k
 
 
 program paint;
-uses syslib,arglib,wildlib,plotlib,strlib,filelib;
+uses  syslib,arglib,wildlib,plotlib,strlib,filelib,
+      mouselib,txtgrlib,writelib;
 
-const startcanvas=$700; sizecanvas=3304; {224x118/8}
-      rdfile=$e815; wrfile=$e81b;
+const startcanvas=$700;
+      sizecanvas=3304; {224x118/8}
+      rdfile=$e815;
+      wrfile=$e81b;
       toggle=chr($0c); {ctrl-l}
-      cleft=chr($03); cright=chr($16);
-      cup=chr($1a); cdown=chr($18); esc=chr(0);
-      dreset=0; dline=1; drect=2; dchar=3;
+      cleft=chr($03);
+      cright=chr($16);
+      cup=chr($1a);
+      cdown=chr($18);
+      esc=chr($1b);
+      dpoint=0;
+      dline=1;
+      drect=2;
+      dchar=3;
 
 mem   FILFLG=$da:   char&;
       filsa=$031a:  integer;
@@ -108,8 +117,11 @@ proc showcursor(ax,ay:integer);
 var i:integer;
 begin
   case dmode of
-    dreset: begin
-              _plot(ax,ay,INVERSE);
+    dpoint: begin
+              _move(ax-2,ay);
+              _draw(ax+2,ay,INVERSE);
+              _move(ax,ay-2);
+              _draw(ax,ay+2,INVERSE);
             end;
     dline:  begin
               _move(startx,starty);
@@ -133,27 +145,41 @@ begin
 end;
 
 proc blink;
-const bcount=20;
-mem sflag=$1781:integer&;
-var count:integer;
-    displayed:boolean;
+const bcount=12;
+var count,mode,mx,my:integer;
+    displayed,found:boolean;
 begin
-  count:=0; { start with cursor on }
+  count:=0;
   displayed:=false;
+
   repeat
-    ch:=KEYPRESSED;
-    _delay10msec(1);
-    count:=count-1;
-    if count<=0 then begin
-      showcursor(x,y);
-      displayed:=not displayed;
-      count:=bcount;
+    found:=_getinput(mode,mx,my,ch);
+
+    if _isesc then begin
+      ch:=chr($1b);
+      found:=true;
     end;
-  { sflag bit 8 is escape flag. Pass it through }
-  until (ord(ch)<>0) or ((sflag and $80)<>0);
-  read(@KEY,ch);
-  sflag:=sflag and $7f; { clear escape flag }
+
+    if not found then begin
+      _delay10msec(1);
+      count:=count-1;
+
+      if count<=0 then begin
+        showcursor(x,y);
+        displayed:=not displayed;
+        count:=bcount;
+      end;
+    end;
+
+  until found;
+
   if displayed then showcursor(x,y);
+
+  if mode=2 then begin
+    x:=mx;
+    y:=my;
+    ch:=chr(0);
+  end;
 end;
 
 proc drawline;
@@ -189,14 +215,61 @@ begin
   printable:=(a>=ord('A')) and (a<=ord('Z'));
 end;
 
+proc status;
+begin
+  _setcursor(0,15);
+
+  case dmode of
+    dpoint: write('POINT  ');
+    dline:  write('LINE   ');
+    drect:  write('RECT   ');
+    dchar:  write('CHAR   ')
+  end;
+
+  case cmode of
+    WHITE:   write('WHITE   ');
+    BLACK:   write('BLACK   ');
+    INVERSE: write('INVERSE ')
+  end;
+
+  _setcursor(32,15);
+  write('X:',x:3,' Y:',y:3);
+
+  _setcursor(24,0);
+end;
+
+proc initpanel;
+begin
+  _setcursor(0,12);
+  write(CSC);
+
+  write(INVVID,'C',NORVID,'lear  ',
+        INVVID,'M',NORVID,'ode  ',
+        INVVID,'P',NORVID,'oint  ',
+        INVVID,'L',NORVID,'ine  ',
+        INVVID,'R',NORVID,'ect  ',
+        INVVID,'S',NORVID,'ymbol');
+
+  _setcursor(0,13);
+  write(INVVID,'RET',NORVID,':Draw  ',
+        INVVID,'ESC',NORVID,':Cancel  ',
+        INVVID,'W',NORVID,':Save  ',
+        INVVID,'Q',NORVID,':Quit  ',
+        INVVID,'K',NORVID,':Kill');
+
+  _htxtgr(0,47,14,CYAN);
+end;
+
 proc paint;
 { This is the main painting loop }
 begin
-  x:=XSIZE div 2; y:=YSIZE div 2;
-  cmode:=WHITE; dmode:=dreset;
-  writeln('Drawing point mode');
+  x:=XSIZE div 2;
+  y:=YSIZE div 2;
+  cmode:=WHITE;
+  dmode:=dpoint;
+  initpanel;
   repeat
-    blink; { blink cursor and get next KEY }
+    blink;
     if (dmode=dchar) and printable then drawchar
     else case ch of
       toggle: write(ch);
@@ -208,20 +281,13 @@ begin
       'M':    begin
                 cmode:=cmode+1;
                 if cmode>2 then cmode:=0;
-                case cmode of
-                  WHITE: writeln('Drawing WHITE');
-                  BLACK: writeln('Drawing BLACK');
-                  INVERSE: writeln('Drawing INVERSE')
-                end {case};
               end;
       'P':    begin
-                writeln('Drawing point mode');
                 _plot(x,y,cmode);
                 x:=x+1;
                 if x>XSIZE then x:=0;
               end;
       'L':    begin
-                writeln('Drawing line mode');
                 if dmode=dline then drawline;
                 startx:=x; starty:=y;
                 dmode:=dline;
@@ -231,7 +297,6 @@ begin
                 if y>YSIZE then y:=y-4;
               end;
       'R':    begin
-                writeln('Drawing rectange mode');
                 if dmode=drect then drawrect;
                 startx:=x; starty:=y;
                 dmode:=drect;
@@ -241,7 +306,6 @@ begin
                 if y>YSIZE then y:=YSIZE-4;
               end;
       'S':    begin
-                writeln('Drawing character mode');
                 dmode:=dchar;
                 startx:=x; starty:=y;
               end;
@@ -251,15 +315,16 @@ begin
                    drect:   drawrect;
                    dchar:   drawchar
                 end {case};
-                dmode:=dreset;
-                writeln('Drawing point mode');
+                dmode:=dpoint;
              end;
-      esc:   dmode:=dreset;
-      'W','Q':  begin
-                writeln('saving canvas');
-                savecanvas;
-             end
+      esc:   dmode:=dpoint;
+      'W','Q': begin
+                 savecanvas;
+                 _setcursor(2,14);
+                 write('SAVED         ');
+              end
     end; {case}
+    if (ch<>'W') and (ch<>'Q') then status;
   until (ch='Q') or (ch='K');
 end;
 
