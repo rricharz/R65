@@ -130,5 +130,22 @@ begin
   end;
 end;
 
+proc _parkcursor;
+{***************}
+{ Parks the cursor on line 16, where it is not
+  visible. Subsequent write statements will work
+  as expected }
+const
+  C_SETCUR = $e2e2;
+mem
+  curlin = $00ed: integer&;
+  curpos = $00ee: integer&;
+  offset = $1782: integer&;
+begin
+    curpos:=0;
+    curlin:=offset+16;
+    call(C_SETCUR);
+end;
+
 begin
 end.

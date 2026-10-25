@@ -831,11 +831,9 @@ PRTCH1  LDA VIDKEY
         DEX
         BPL *-6
 *
-PRTCH0  LDA VIDKEY
-        NOP             WAS RUBOUT, NOT USED
-        NOP             ANYMORE; PASCAL USES
-        NOP             NOW USES UNDERSCORE
+PRTCH0  JSR CHKCUR      HANDLE PARKED CURSOR
         NOP
+        LDA VIDKEY
         CMP =$7F
         BNE PRTCH4
         JSR CLEFT
@@ -1161,6 +1159,36 @@ INSCH2  JSR ROLLOC-2
         BPL *-9
         INY
         JMP DELCH2
+*
+* CHKCUR HANDLE PARKED CURSOR 2026 RR
+*
+CHKCUR  TXA
+        PHA
+        TYA
+        PHA
+*
+        LDA CURLIN
+        SEC
+        SBC OFFSET
+        CMP =$10
+        BNE CHKEND
+*
+        LDA CURLIN
+        CMP NUMLIN
+        BCC CHKROLL
+        BEQ CHKROLL
+*
+        JSR MOVEUP
+        DEC CURLIN
+*
+CHKROLL JSR LOCRM
+*
+CHKEND  PLA
+        TAY
+        PLA
+        TAX
+        RTS
+*
         PAG
 *
 * TABLE OF OPCODES AND ADDRESSING MODES

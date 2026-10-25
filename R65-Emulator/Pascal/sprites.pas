@@ -31,7 +31,6 @@ const NX        = 11;
       CRIGHT    = chr($16);
       CDOWN     = chr($18);
       ESC       = chr($1b);
-      TOGGLE    = chr($0c);
       NBLINKS   = 10;  {no of loops until bink}
       LOOPS     = 10;  {no of loops until next frame}
       STATUSLN  = 36;
@@ -319,7 +318,7 @@ begin
 'C:   Copy sprite     V:     Paste sprite');
   write(
 '1..4 Animate frames  ESC:   Leave edit mode');
-  _setcursor(24,0);
+  _parkcursor;
   lastselected := 0;
   selected := 0;
   frames := 0;
@@ -352,7 +351,6 @@ begin
     end;
 
     case ch of
-      TOGGLE: write(TOGGLE);
       '0':    frames := 0;
       '1':    frames := 1;
       '2':    frames := 2;

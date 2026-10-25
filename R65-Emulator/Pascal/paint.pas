@@ -31,7 +31,6 @@ const startcanvas=$700;
       sizecanvas=3304; {224x118/8}
       rdfile=$e815;
       wrfile=$e81b;
-      toggle=chr($0c); {ctrl-l}
       cleft=chr($03);
       cright=chr($16);
       cup=chr($1a);
@@ -235,7 +234,7 @@ begin
   _setcursor(32,15);
   write('X:',x:3,' Y:',y:3);
 
-  _setcursor(24,0);
+  _parkcursor;
 end;
 
 proc initpanel;
@@ -268,11 +267,11 @@ begin
   cmode:=WHITE;
   dmode:=dpoint;
   initpanel;
+  status;
   repeat
     blink;
     if (dmode=dchar) and printable then drawchar
     else case ch of
-      toggle: write(ch);
       cleft:  if x>0 then x:=x-1;
       cright: if x<XSIZE then x:=x+1;
       cup:    if (y<YSIZE) then y:=y+1;
@@ -311,6 +310,7 @@ begin
               end;
       CR:     begin
                  case dmode of
+                   dpoint: _plot(x,y,cmode);
                    dline:   drawline;
                    drect:   drawrect;
                    dchar:   drawchar
