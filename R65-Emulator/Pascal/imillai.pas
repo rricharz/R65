@@ -20,7 +20,9 @@ const
 
   MAXLEVEL      = 2;
 
-  SEARCHTIME = 700; { 7 seconds }
+  SEARCHTIME    = 700; { 7 seconds }
+
+  AIPROTOCOL    = NULLDEV;
 
 var maxlevel:integer;
     safeplace: array[23] of boolean;
@@ -197,7 +199,7 @@ begin
             board[n]:=player;
 
             if reachablethreats(player)>=2 then begin
-              writeln(@PROTOCOL,'DOUBLE MOVE ',
+              writeln(@AIPROTOCOL,'DOUBLE MOVE ',
                     label[p1],'-',label[n]);
               found:=true;
             end;
@@ -336,7 +338,7 @@ begin
       value:=value+V_REMILL;
   end;
 
-  write(@PROTOCOL, 'EVAL ',
+  write(@AIPROTOCOL, 'EVAL ',
     ' T ',ownth,'/',oppth,
     ' M ',ownmill,'/',oppmill,
     ' F ',ownmob,'/',oppmob,
@@ -387,7 +389,7 @@ var p1,bestpos,bestvalue,value,
     opponent: integer;
     allinmills0: boolean;
 begin
-  writeln(@PROTOCOL,'COMPUTERTAKE');
+  writeln(@AIPROTOCOL,'COMPUTERTAKE');
   opponent:=otherplayer(player);
   allinmills0:=allinmills(opponent);
 
@@ -400,7 +402,7 @@ begin
 
         value:=takevalue(player,p1);
 
-        writeln(@PROTOCOL,
+        writeln(@AIPROTOCOL,
           'TAKE  ',label[p1],' ',value);
 
         if (bestpos<0)
@@ -430,7 +432,7 @@ proc tryplace(player,p: integer;
 var value: integer;
 begin
   value:=placevalue(player,p);
-  writeln(@PROTOCOL,'PLACE ',label[p],' ',value);
+  writeln(@AIPROTOCOL,'PLACE ',label[p],' ',value);
 
   if (bestpos<0)
     or (value>bestvalue)
@@ -460,10 +462,10 @@ begin
 
   if stones[player]=0 then begin
     if captured[opponent]=6 then begin
-      writeln(@PROTOCOL,
+      writeln(@AIPROTOCOL,
               'DOUBLE THREAT FLY NOT IMPLEMENTED')
     end else begin
-      writeln(@PROTOCOL,
+      writeln(@AIPROTOCOL,
               'DOUBLE THREAT MOVE NOT IMPLEMENTED');
     end;
     exit;
@@ -478,7 +480,7 @@ begin
       stones[player]:=stones[player]-1;
 
       if not doublethreat(opponent) then begin
-        writeln(@PROTOCOL,
+        writeln(@AIPROTOCOL,
             'BLOCK DOUBLE PLACE ',label[p]);
 
         { Restore before evaluating. }
@@ -526,7 +528,7 @@ proc computermove(player: integer);
 var p1,p2,tk,bestp1,bestp2,bestvalue,value: integer;
     s: cpnt;
 begin
-  writeln(@PROTOCOL,'COMPUTERMOVE');
+  writeln(@AIPROTOCOL,'COMPUTERMOVE');
   s:=_new;
 
   bestp1:=-1;
@@ -536,7 +538,7 @@ begin
   while findlegalmove(player,p1,p2) do begin
 
     value:=movevalue(player,p1,p2);
-    writeln(@PROTOCOL,'MOVE ',
+    writeln(@AIPROTOCOL,'MOVE ',
             label[p1],'-',label[p2],' ',value);
 
     if (bestp1<0)
@@ -598,7 +600,8 @@ begin
             if ismill(p2,player) then begin
               found:=true;
               canbridge:=p2;
-              writeln(@PROTOCOL,'  BRIDGE',label[p2]);
+              writeln(@AIPROTOCOL,'  BRIDGE',label[p2]
+);
 
             end;
 
@@ -624,7 +627,8 @@ begin
             if ismill(n,player) then begin
               found:=true;
               canbridge:=n;
-              writeln(@PROTOCOL,'  BRIDGE ',label[n]);
+              writeln(@AIPROTOCOL,'  BRIDGE ',label[n]
+);
 
             end;
 
@@ -657,10 +661,10 @@ var opponent,p1,p2,i,n: integer;
     reply,good: boolean;
 begin
   if frompos<0 then
-    writeln(@PROTOCOL,'LEVEL ',level,
+    writeln(@AIPROTOCOL,'LEVEL ',level,
           ' TRY PLACE ',label[topos])
   else
-    writeln(@PROTOCOL,'LEVEL ',level,
+    writeln(@AIPROTOCOL,'LEVEL ',level,
           ' TRY ',label[frompos],'-',label[topos]);
 
   opponent:=otherplayer(player);
@@ -682,7 +686,8 @@ begin
       else if board[p2]=EMPTY then begin
         reply:=true;
 
-        writeln(@PROTOCOL,'  TEST USER REPLY PLACE ',
+        writeln(@AIPROTOCOL,'  TEST USER REPLY PLACE '
+,
           label[p2]);
 
         { make opponent placement }
@@ -690,7 +695,7 @@ begin
         stones[opponent]:=stones[opponent]-1;
 
         if ismill(p2,opponent) then begin
-          writeln(@PROTOCOL,'  OPPONENT BRIDGE');
+          writeln(@AIPROTOCOL,'  OPPONENT BRIDGE');
           good:=false;
         end
         else if canbridge(player)>=0 then begin
@@ -698,11 +703,11 @@ begin
         end else if level<maxlevel then begin
           if not nextlevel(player,level+1) then
           begin
-            writeln(@PROTOCOL,'  NO BRIDGE');
+            writeln(@AIPROTOCOL,'  NO BRIDGE');
             good:=false;
           end;
         end else begin
-          writeln(@PROTOCOL,'  NO BRIDGE');
+          writeln(@AIPROTOCOL,'  NO BRIDGE');
           good:=false;
         end;
 
@@ -735,7 +740,8 @@ begin
             else if board[p2]=EMPTY then begin
               reply:=true;
 
-              writeln(@PROTOCOL,'  TEST USER REPLY ',
+              writeln(@AIPROTOCOL,'  TEST USER REPLY '
+,
                 label[p1],'-',label[p2]);
 
               { make opponent move }
@@ -743,8 +749,8 @@ begin
               board[p2]:=opponent;
 
               if ismill(p2,opponent) then begin
-                writeln(@PROTOCOL,'  OPPONENT BRIDGE')
-;
+                writeln(@AIPROTOCOL,
+                        '  OPPONENT BRIDGE');
                 good:=false;
               end
               else if canbridge(player)>=0 then begin
@@ -752,11 +758,11 @@ begin
               end else if level<maxlevel then begin
                 if not nextlevel(player,level+1) then
                 begin
-                  writeln(@PROTOCOL,'  NO BRIDGE');
+                  writeln(@AIPROTOCOL,'  NO BRIDGE');
                   good:=false;
                 end;
               end else begin
-                writeln(@PROTOCOL,'  NO BRIDGE');
+                writeln(@AIPROTOCOL,'  NO BRIDGE');
                 good:=false;
               end;
 
@@ -785,7 +791,8 @@ begin
               if (n>=0)and(board[n]=EMPTY) then begin
                 reply:=true;
 
-              writeln(@PROTOCOL,'  TEST USER REPLY ',
+              writeln(@AIPROTOCOL,'  TEST USER REPLY '
+,
                             label[p1],'-',label[n]);
 
                 { make opponent move }
@@ -793,7 +800,7 @@ begin
                 board[n]:=opponent;
 
                 if ismill(n,opponent) then begin
-                  writeln(@PROTOCOL,
+                  writeln(@AIPROTOCOL,
                     '  OPPONENT BRIDGE');
                   good:=false;
                 end
@@ -803,11 +810,12 @@ begin
                 end else if level<maxlevel then begin
                   if not nextlevel(player,level+1)
                   then begin
-                    writeln(@PROTOCOL,'  NO BRIDGE');
+                    writeln(@AIPROTOCOL,'  NO BRIDGE')
+;
                     good:=false;
                   end;
                 end else begin
-                  writeln(@PROTOCOL,'  NO BRIDGE');
+                  writeln(@AIPROTOCOL,'  NO BRIDGE');
                   good:=false;
                 end;
 
@@ -947,7 +955,7 @@ var opponent,p1,p2,i,n,tk,
     found: boolean;
     s: cpnt;
 begin
-  writeln(@PROTOCOL,'SEARCHLEVEL');
+  writeln(@AIPROTOCOL,'SEARCHLEVEL');
 
   searchlevel:=false;
   found:=false;
@@ -965,7 +973,7 @@ begin
       { Check search time between candidates. }
       if elapsed10ms>=SEARCHTIME then begin
         searchtimeout:=true;
-        writeln(@PROTOCOL,'SEARCH TIMEOUT');
+        writeln(@AIPROTOCOL,'SEARCH TIMEOUT');
         exit;
       end;
 
@@ -1006,7 +1014,7 @@ begin
       { Check search time between candidates. }
       if elapsed10ms>=SEARCHTIME then begin
         searchtimeout:=true;
-        writeln(@PROTOCOL,'SEARCH TIMEOUT');
+        writeln(@AIPROTOCOL,'SEARCH TIMEOUT');
         exit;
       end;
 
@@ -1092,10 +1100,10 @@ begin
   if found then begin
 
     if bestp1<0 then
-      writeln(@PROTOCOL,'SUCCESS PLACE ',
+      writeln(@AIPROTOCOL,'SUCCESS PLACE ',
         label[bestp2])
     else
-      writeln(@PROTOCOL,'SUCCESS ',
+      writeln(@AIPROTOCOL,'SUCCESS ',
         label[bestp1],'-',label[bestp2]);
 
     if bestp1<0 then
@@ -1155,7 +1163,7 @@ begin
     searchlevel:=true;
 
   end else
-    writeln(@PROTOCOL,
+    writeln(@AIPROTOCOL,
       'SEARCHLEVEL: NO BRIDGE FOUND');
 end;
 
@@ -1167,7 +1175,7 @@ begin
 
   maxlevel:=0;
   if searchlevel(player) then begin
-    writeln(@PROTOCOL,'SEARCHBRIDGE SUCCESS LEVEL ',
+    writeln(@AIPROTOCOL,'SEARCHBRIDGE SUCCESS LEVEL ',
                                           maxlevel);
     searchbridge:=true;
     exit;
@@ -1179,11 +1187,11 @@ begin
 
   maxlevel:=1;
   while maxlevel<=MAXLEVEL do begin
-    writeln(@PROTOCOL,'SEARCH LEVEL ',maxlevel);
+    writeln(@AIPROTOCOL,'SEARCH LEVEL ',maxlevel);
 
     if searchlevel(player) then begin
-      writeln(@PROTOCOL,'SEARCHBRIDGE SUCCESS LEVEL ',
-                                            maxlevel);
+      writeln(@AIPROTOCOL,
+        'SEARCHBRIDGE SUCCESS LEVEL',maxlevel);
       searchbridge:=true;
       exit;
     end;
@@ -1237,7 +1245,7 @@ begin
   end;
 
   if found then begin
-    writeln(@PROTOCOL,'SURVIVE ',
+    writeln(@AIPROTOCOL,'SURVIVE ',
       label[p1],'-',label[threat]);
     markmove1:=p1;
     markmove2:=threat;
@@ -1262,14 +1270,14 @@ proc computerplace(player: integer);
 var i,p,base,opposite,bestpos,bestvalue,tk: integer;
   s: cpnt;
 begin
-  writeln(@PROTOCOL,'COMPUTERPLACE');
+  writeln(@AIPROTOCOL,'COMPUTERPLACE');
 
   s:=_new;
   bestpos:=-1;
   bestvalue:=-1;
 
   if specialplace>=0 then begin
-    writeln(@PROTOCOL,'SPECIAL PLACE ',
+    writeln(@AIPROTOCOL,'SPECIAL PLACE ',
       label[specialplace]);
 
       base:=specialplace and $fff8;
@@ -1352,6 +1360,6 @@ begin
 
   write(@s,e,'0 MS');
   strmessage(s,player);
-  writeln(@PROTOCOL,'TIME ',s);
+  writeln(@AIPROTOCOL,'TIME ',s);
   _release(s);
 end;

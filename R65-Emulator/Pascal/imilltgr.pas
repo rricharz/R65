@@ -153,7 +153,7 @@ begin
             (pos=markmove1) or
             (pos=markmove2);
 
-  writeln(@PROTOCOL,
+{  writeln(@PROTOCOL,
     'DRAWSTONE pos=',pos,
     ' player=',player,
     ' marks=',marks,
@@ -161,7 +161,7 @@ begin
     ' take=',marktake,
     ' move1=',markmove1,
     ' move2=',markmove2,
-    ' marked=',marked);
+    ' marked=',marked); }
 
   if player=WHITE then code:=$10
   else code:=$11;
