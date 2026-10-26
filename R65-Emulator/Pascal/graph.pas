@@ -6,7 +6,7 @@
 
 program graph;
 uses syslib,ralib,mathlib,plotlib,writelib,
-      strlib,arglib,filelib;
+      strlib,arglib,filelib,txtgrlib,mouselib;
 
 const
   MAXX = 223;
@@ -395,7 +395,7 @@ begin
   readparams;
   _grinit;
   _cleargr;
-  _splitview;
+  _fullview;
   xs:=leftborder;
   xw:=MAXX-leftborder-border;
   ys:=border;
@@ -768,6 +768,7 @@ var vi: integer;
     name1: cpnt;
 begin
   vi := yposarray[xi];
+  _setcursor(0,15);
   if _domain = DOMAIN_FREQ then
     name1 := 'FREQ'
   else
@@ -775,11 +776,8 @@ begin
   write(name1, INVVID, xvalue[xi]:12:2, NORVID);
   write('        VALUE', INVVID);
   write(yvalue[xi]:11:2);
-  if lastbin - firstbin >= XSIZE then
-    write('#')
-  else
-    write(' ');
   write(NORVID, chr(13));
+  _parkcursor;
   if lastxi >= 0 then begin
     _move(lastxi - CSIZE, lastvi - CSIZE);
     _draw(lastxi + CSIZE, lastvi - CSIZE, INVERSE);
@@ -819,28 +817,47 @@ end;
 
 proc interactive;
 {***************}
-const ESC         = chr(0);
-      CLEFT       = chr($03);
+const CLEFT       = chr($03);
       CRIGHT      = chr($16);
       CSHIFTLEFT  = chr($11);
       CSHIFTRIGHT = chr($13);
       TOGGLE      = chr($0c);
 var ch: char;
-    xi, lastxi: integer;
+    xi, lastxi, mx, my: integer;
 begin
   makecursorarrays;
   xi := XSIZE div 2;
+
+  writeln;
+  _htxtgr(0,39,14,CYAN);
   updatecursor(-1, xi);
   lastxi := xi;
+
   repeat
-    read(@KEY, ch);
+    _waitinput(mode,mx,my,ch);
+
+    if mode=2 then xi:=mx;
+
     case ch of
-      CLEFT:        xi := xi - 1;
-      CRIGHT:       xi := xi + 1;
-      CSHIFTLEFT:   xi := xi - 4;
-      CSHIFTRIGHT:  xi := xi + 4;
-      'L':          setlimit(xi, true);
-      'R':          setlimit(xi, false);
+
+      CLEFT:
+            xi := xi - 1;
+
+      CRIGHT:
+            xi := xi + 1;
+
+      CSHIFTLEFT:
+            xi := xi - 4;
+
+      CSHIFTRIGHT:
+            xi := xi + 4;
+
+      'L':
+            setlimit(xi, true);
+
+      'R':
+            setlimit(xi, false);
+
       'F':
             begin
               if _domain=DOMAIN_TIME then
@@ -850,13 +867,18 @@ begin
               storeparams;
               _chainprog('GRAPH:R         ', 0, 1);
             end;
+
       TOGGLE:       write(TOGGLE)
+
     end {case };
     if xi < 0 then xi := 0;
     if xi > XSIZE then xi := XSIZE;
+
     if lastxi<>xi then updatecursor(lastxi,xi);
+
     lastxi := xi
-  until ((ch=ESC) or (ch='Q') or (ch=CR));
+
+  until _isesc or (ch='Q') or (ch=CR);
   writeln;
 end;
 
@@ -865,11 +887,13 @@ proc cleanup;
 begin
   storeparams;
   _move(1,MAXY-24);
+  _splitview;
 end;
 
 begin
   initiftshared;
   initialize;
+  if quiet then _splitview;
   validate;
   if not quiet then begin
     displayfuncpars;

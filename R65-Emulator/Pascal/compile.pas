@@ -32,7 +32,7 @@ const
     SYMBSIZE  = 350;  {id table entries}
     IDTABSIZE = 2800; {SYMBSIZE * PIDSIZE}
 
-    STACKSIZE = 300;   {stack size}
+    STACKSIZE = 320;   {stack size}
     PAGELENGHT= 60;    {no of lines per page}
     MAXFI     = 3;     {max n  of nested input files}
     NRESW     = 64;    {number of reserved words - 1}

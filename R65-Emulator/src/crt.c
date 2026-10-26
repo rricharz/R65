@@ -157,14 +157,8 @@ void crtMouseClick(double x, double y)
 
             if (gx >= 0 && gx < NUMXDOTS &&
                 gy >= 0 && gy < NUMYDOTS) {
-
-                printf("Graphics coordinates: x=%d y=%d\n",
-                       gx, gy);
                 setMouseClick(2, gx, gy);
             }
-        }
-        else {
-            printf("Outside graphics display\n");
         }
     }
     else {
@@ -197,14 +191,8 @@ void crtMouseClick(double x, double y)
 
             if (gx >= 0 && gx < NUMXDOTS &&
                 gy >= 0 && gy < NUMYDOTS) {
-
-                printf("Graphics coordinates: x=%d y=%d\n",
-                       gx, gy);
                 setMouseClick(2, gx, gy);
             }
-        }
-        else {
-            printf("Outside graphics display\n");
         }
     }
 }

@@ -889,7 +889,7 @@ end;
 proc interactive;
 {***************}
 const CR = chr(13);
-
+var name1: cpnt;
 var
   ch: char;
   x,y,bin,span: integer;
@@ -898,10 +898,16 @@ var
   proc showposition;
   begin
     _setcursor(0,15);
-    write(CSC,'X=',INVVID,
-      _min+conv(bin)*(_max-_min)/conv(_n):14,NORVID,
-      '        Y=',INVVID,fvalue(bin):14,
-      NORVID);
+    if _domain = DOMAIN_FREQ then
+      name1 := 'FREQ'
+    else
+      name1 := 'TIME';
+      _setcursor(0,15);
+    write(CSC,name1,INVVID,
+        _min+conv(bin)*(_max-_min)/conv(_n):12,NORVID,
+        '        VALUE=',INVVID,fvalue(bin):10,
+        NORVID);
+      _parkcursor;
     _parkcursor;
   end;
 

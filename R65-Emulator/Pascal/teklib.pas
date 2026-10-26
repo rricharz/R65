@@ -71,9 +71,8 @@ end {starttek};
 
 proc _endtek;
 {***********}
-{ Kept for compatibility with existing programs.
-  Tektronix window is not closed. }
 begin
+  write(@PLOTTER,chr($31));
 end;
 
 proc _startdraw(x1,y1:integer);
