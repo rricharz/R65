@@ -5,7 +5,7 @@
 
 program tekgraph;
 uses  syslib,ralib,mathlib,tek4Klib,writelib,
-      filelib,strlib;
+      filelib,strlib,txtgrlib;
 
 const
   border = 200;
@@ -157,7 +157,6 @@ begin
     writeln;
   end {row};
 
-  writeln;
   write('Expansion ', INVVID,
     conv(_n) / conv(lastbin-firstbin+1):6:1,
     NORVID);
@@ -896,6 +895,16 @@ var
   x,y,bin,span: integer;
   okay: boolean;
 
+  proc showposition;
+  begin
+    _setcursor(0,15);
+    write(CSC,'X=',INVVID,
+      _min+conv(bin)*(_max-_min)/conv(_n):14,NORVID,
+      '        Y=',INVVID,fvalue(bin):14,
+      NORVID);
+    _parkcursor;
+  end;
+
 begin
   span:=lastbin-firstbin;
 
@@ -903,6 +912,10 @@ begin
   bin:=firstbin+span div 2;
   x:=bintox(bin);
   y:=ys+ypos(bin);
+
+  writeln;
+  _htxtgr(0,39,14,CYAN);
+  showposition;
 
   repeat
     _moveto(x,y);
@@ -932,10 +945,7 @@ begin
           end;
 
         ' ':
-          writeln(
-              'X=',_min+
-                conv(bin)*(_max-_min)/conv(_n),
-              ' Y=',fvalue(bin))
+          showposition
       end {case};
     end;
 
@@ -952,6 +962,7 @@ proc cleanup;
 begin
   storeparams;
   close(f);
+  _purgeinput;
   _moveto(1,MAXY-24);
   _endtek;
 end;

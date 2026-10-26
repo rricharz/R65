@@ -110,9 +110,7 @@ void crt_init()
 void crtMouseClick(double x, double y)
 /************************************/
 {
-    printf("Mouse click: x=%.1f y=%.1f\n", x, y);
-
-    if (!global_videoMemorySplitted) {
+     if (!global_videoMemorySplitted) {
         double hc = (double)crtWidth / NUMCHAR;
         double vc = 0.99 * (double)crtHeight / NUMLINES;
 

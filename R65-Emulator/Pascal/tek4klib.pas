@@ -35,6 +35,7 @@ mem KEYPRESSED=$1785: char&;
 var   _xs,_ys: integer;
 
 proc _delay10msec(time:integer);
+{******************************}
 { _delay10msec: delay 10 msec }
 { process is suspended during delay }
 mem
@@ -46,11 +47,13 @@ begin
 end;
 
 proc _clearscreen;
+{****************}
 begin
   write(@PLOTTER,chr(27),chr(12));
 end;
 
 proc _starttek;
+{*************}
 { Switch R65 PRINTER output to the Tektronix terminal.
   R65 must have been started by tek4010. }
 
@@ -72,15 +75,14 @@ begin {starttek}
 end {starttek};
 
 proc _endtek;
-{ switch R65 PRINTER device to normal mode
-  tek4010 window is not closed }
-mem
-{$I IHIDDENMEM:P}
+{***********}
+{ Exit GIN mode, if necessary }
 begin
-  emucom := 12; { end raw mode }
+  write(@PLOTTER,chr($1f));
 end;
 
 proc _startdraw(x1,y1:integer);
+{*****************************}
 var x,y,xy4014: integer;
 begin
   x:=x1;
@@ -101,6 +103,7 @@ begin
 end;
 
 proc _draw(x2,y2:integer);
+{************************}
 var x,y,xy4014: integer;
     hxchange:boolean;
 begin
@@ -124,6 +127,7 @@ begin
 end;
 
 proc _enddraw;
+{************}
 begin
   write(@PLOTTER,chr(31));
 end;
@@ -136,6 +140,7 @@ begin
 end;
 
 proc _drawrectangle(x1,y1,x2,y2:integer);
+{***************************************}
 begin
   _startdraw(x1,y1);
   _draw(x2,y1);
@@ -146,6 +151,7 @@ begin
 end;
 
 proc _moveto(x1,y1: integer);
+{***************************}
 { move in graphics coordinate space }
 begin
   _startdraw(x1,y1);
@@ -153,6 +159,7 @@ begin
 end;
 
 proc _setchsize(size:integer);
+{****************************}
 { set character size }
 begin
   if (size>=1)and(size <= 4) then begin
@@ -162,6 +169,7 @@ begin
 end;
 
 proc _setlinemode(type:integer);
+{******************************}
 begin
   if (type>=SOLID)and(type<=LONGDASH) then begin
     write(@PLOTTER,chr(27));
@@ -238,7 +246,7 @@ begin
 end;
 
 func _query(var x,y,mode: integer): boolean;
-{*****************************************}
+{******************************************}
 const
   QUERYTIMEOUT=500;          { 5 seconds }
 

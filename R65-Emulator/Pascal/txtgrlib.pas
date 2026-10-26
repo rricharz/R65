@@ -15,7 +15,11 @@ const
   TGR_DOWN  = $04;
   TGR_LEFT  = $08;
 
+mem
+  NUMCHR = $178a: integer&;
+
 proc _txtgr(x,y,bits,color);
+{**************************}
 const
   C_CURLOC = $e294;
   MAXY = 15;
@@ -24,11 +28,10 @@ mem
   curlin = $00ed: integer&;
   curpos = $00ee: integer&;
   offset = $1782: integer&;
-  numchr = $178a: integer&;
 var
   scurlin,scurpos,c,code: integer;
 begin
-  if (x>=0) and (x<=numchr) and
+  if (x>=0) and (x<=NUMCHR) and
      (y>=0) and (y<=MAXY) then begin
 
     scurlin := curlin;
@@ -58,6 +61,7 @@ begin
 end;
 
 proc _htxtgr(xmin,xmax,y,color);
+{******************************}
 var
   i: integer;
 begin
@@ -72,6 +76,7 @@ begin
 end;
 
 proc _vtxtgr(x,ymin,ymax,color);
+{******************************}
 var
   i: integer;
 begin
@@ -86,6 +91,7 @@ begin
 end;
 
 proc _recttxtgr(xmin,xmax,ymin,ymax,color);
+{*****************************************}
 begin
   _htxtgr(xmin,xmax,ymin,color);
   _htxtgr(xmin,xmax,ymax,color);
@@ -119,10 +125,9 @@ const
 mem
   curlin = $00ed: integer&;
   curpos = $00ee: integer&;
-  numchr = $178a: integer&;
   offset = $1782: integer&;
 begin
-  if (x>=0) and (x<=numchr) and
+  if (x>=0) and (x<=NUMCHR) and
      (y>=0) and (y<16) then begin
     curpos:=x;
     curlin:=offset+y;
