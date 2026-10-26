@@ -892,6 +892,10 @@ begin
   showgem(NFLOORS);
 end;
 
+proc exmouse(mmode,mx,my:integer);
+begin
+end;
+
 {$I IANIMATE:P}
 
 begin

@@ -16,8 +16,6 @@ system.
 
           rricharz 2018,2019             }
 
-{$U+}
-
 program alien;
 uses syslib,plotlib,writelib;
 
@@ -192,6 +190,10 @@ func exkey(ch:char):boolean;
 begin
   if ch=' ' then lasercount := 6;
   exkey := (ch = chr(0));
+end;
+
+proc exmouse(mmode,mx,my:integer);
+begin
 end;
 
 {$I IANIMATE:P}

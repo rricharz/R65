@@ -30,7 +30,11 @@ var i,ypaddle,lastypaddle:integer;
     xspeed,yspeed,xball,yball:real;
     lastxball,lastyball:real;
 
+    ytarget:integer;
+    paddlespeed:integer;
+
 proc showball;
+{************}
 begin
   _plotmap(floor(lastxball),floor(lastyball),erase);
   _plotmap(floor(xball),floor(yball),ball);
@@ -39,6 +43,7 @@ begin
 end;
 
 proc showpaddle;
+{**************}
 begin
   if lastypaddle<>-1 then begin
     _move(XSIZE-3,lastypaddle);
@@ -50,6 +55,7 @@ begin
 end;
 
 proc showcount(x,y,count:integer);
+{********************************}
 var digit: integer;
 begin
   digit:=count div 10;
@@ -61,6 +67,7 @@ end;
 {$I IRANDOM:P}
 
 proc init;
+{********}
 begin
   _grinit;
   _cleargr;
@@ -77,6 +84,8 @@ begin
   yspeed:=rrandom(1.0,startspeed);
   ypaddle:=(YSIZE-paddlesize) div 2;
   lastypaddle:=-1;
+  ytarget:=ypaddle;
+  paddlespeed:=2;
   hit:=0;
   miss:=0;
   _move(1,100);
@@ -87,9 +96,23 @@ begin
   showcount(1,60,miss);
 end;
 
+proc movepaddle;
+{**************}
+begin
+  if ypaddle<ytarget then begin
+    ypaddle:=ypaddle+paddlespeed;
+    if ypaddle>ytarget then ypaddle:=ytarget;
+  end else if ypaddle>ytarget then begin
+    ypaddle:=ypaddle-paddlespeed;
+    if ypaddle<ytarget then ypaddle:=ytarget;
+  end;
+end;
+
 func expaint: boolean;
+{********************}
 begin
   expaint:=false;
+  movepaddle;
   showpaddle;
   xball:=xball+xspeed;
   yball:=yball+yspeed;
@@ -125,22 +148,38 @@ begin
 end;
 
 func exkey(KEY:char):boolean;
+{***************************}
 var ymax:integer;
 begin
   ymax:=YSIZE-paddlesize-4;
-  if (KEY=cup) and (ypaddle<ymax)  then
-    ypaddle := ypaddle+2
-  else if (KEY=cdown) and (ypaddle>5) then
-    ypaddle := ypaddle-2
-  else if KEY=CR then init;
-  exkey := KEY=chr(0);
+  if KEY=cup then begin
+    ytarget:=ytarget+2;
+    if ytarget>ymax then ytarget:=ymax;
+  end else if KEY=cdown then begin
+    ytarget:=ytarget-2;
+    if ytarget<5 then ytarget:=5;
+  end else if KEY=CR then init;
+  exkey:=KEY=chr(0);
+end;
+
+proc exmouse(mode,x,y:integer);
+{*****************************}
+var ymax:integer;
+begin
+  debug(mode,ypaddle,ytarget,paddlespeed);
+  if mode=2 then begin
+    ymax:=YSIZE-paddlesize-4;
+    ytarget:=y-paddlesize div 2;
+    if ytarget<5 then ytarget:=5;
+    if ytarget>ymax then ytarget:=ymax;
+  end;
 end;
 
 {$I IANIMATE:P}
 
 begin
   init;
-  writeln('Type RETURN to start _new game.');
+  writeln('Type RETURN to start a new game.');
   animate(autorepeat);
   _splitview;
 end.
