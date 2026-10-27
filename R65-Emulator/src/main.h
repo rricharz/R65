@@ -32,6 +32,7 @@ extern int global_char;
 extern int global_key_is_down;
 extern int exDisplay;
 extern int fullscreen,pixelated,tekTerminal;
+extern int showTiming;
 
 // wrapper for inputs
 void clearClicks(void);

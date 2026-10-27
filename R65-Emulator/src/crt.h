@@ -45,6 +45,7 @@ extern int      global_videoMemorySplitted;
 extern int      showCursor;
     
 void crt_init();
+void crtMouseReset(void);
 void crtUpdate();
 void setLed(int index, int value);
 void crtMouseClick(double x, double y);

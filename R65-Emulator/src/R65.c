@@ -688,6 +688,7 @@ void write6502(uint16_t address, uint8_t value)
 			else
                 sleepmicros = 0;
 
+      long frameStart = lastCrtSync;
 			lastCrtSync = wall_micros();
 
 			frameCount++;
@@ -704,9 +705,19 @@ void write6502(uint16_t address, uint8_t value)
                 lastPrint = lastCrtSync;
 			}
 
-			crtUpdate();
-			memory[R8_EMURES] = sleepmicros / 1000;
-			memory[R8_EMUCOM] = 0;
+      long long crtStart = wall_micros();
+      crtUpdate();
+      long long crtTime = wall_micros() - crtStart;
+
+      if (showTiming && frameStart != 0) {
+          long long processing =
+              wall_micros() - frameStart - sleepmicros;
+
+          if (processing > 30000)
+              printf("R65: frame %5.1f ms (CRT %5.1f ms)\n",
+                     processing / 1000.0,
+                     crtTime / 1000.0);
+      }
 		}
         else if (value == 8) {              			// start listing
             int i,end;
@@ -805,6 +816,7 @@ void write6502(uint16_t address, uint8_t value)
         }
         else if (savedCrtAdr == 0x6) {
             if (value == 118) {             // graphics mode
+                crtMouseReset();
                 if (global_graphicsFlag == 0) global_pendingCrtUpdate = 1;
                 if (global_videoMemorySplitted)
                     global_graphicsFlag = 1;

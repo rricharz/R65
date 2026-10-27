@@ -173,6 +173,14 @@ static bool graphicsMousePosition(double x, double y,
     return true;
 }
 
+/**********************/
+void crtMouseReset(void)
+/**********************/
+{
+    mouseTracking = false;
+    clearMouseDrag();
+}
+
 /************************************/
 void crtMouseClick(double x, double y)
 /************************************/

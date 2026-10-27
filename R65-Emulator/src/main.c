@@ -57,8 +57,11 @@ int global_firstcall;
 guint global_timeout_ref;
 int cursorDisabled;
 int exDisplay;
+
 int fullscreen;
 int pixelated;
+int showTiming = false;
+
 int tekTerminal;
 
 struct tColor {
@@ -769,17 +772,18 @@ int main (int argc, char *argv[])
         }
     }
     	
-    int firstArg = 1;
-    
     if (acquire_single_instance_lock() != 0) {
         return 1;
     }
 	
-	set_working_directory_to_executable();
+	  set_working_directory_to_executable();
+    
+    int firstArg = 1;
         
-    exDisplay  = FALSE;
-    fullscreen = FALSE;
-    pixelated      = FALSE;
+    exDisplay  = false;
+    fullscreen = false;
+    pixelated  = false;
+    showTiming = false;
 	
     while (firstArg < argc) {
       if (strcmp(argv[firstArg],"-full") == 0)
@@ -788,6 +792,8 @@ int main (int argc, char *argv[])
 	      exDisplay = TRUE;  
 	    else if (strcmp(argv[firstArg],"-pixelated") == 0)
 	      pixelated = TRUE; 
+      else if (strcmp(argv[firstArg],"-timing") == 0)
+          showTiming = true;
       else {
             logmsg("R65: unknown argument %s\n", argv[firstArg]);
       }
@@ -796,8 +802,8 @@ int main (int argc, char *argv[])
       
     gtk_init(&argc, &argv);
 	
-    global_firstcall = TRUE;
-    cursorDisabled = FALSE;
+    global_firstcall = true;
+    cursorDisabled = false;
 	
     clearClicks();
 
