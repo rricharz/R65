@@ -5,7 +5,7 @@
 #define R8_EMUCOM   0x1430      // Command register
 #define R8_EMURES   0x1431      // Result register
 #define RS8_LED     0x1432      // LED string register, 8 bytes
-#define R16_PPC     0x000A      // Pascal program pounter
+#define R16_PPC     0x000A      // Pascal program pointer
 #define R16_STPROG  0x0011      // Pascal start of program
 
 // Floppy disk controller
@@ -34,8 +34,10 @@
 #define EMU_FLAGS   0x1707  // emulator flags (bit 0: kex down)
 
 #define KIM_MOUSEMODE 0x1708  // mouse event mode
-#define KIM_MOUSEX   0x1709  // mouse X coordinate
-#define KIM_MOUSEY   0x170A  // mouse Y coordinate
+#define KIM_MOUSEX   0x1709   // mouse X coordinate
+#define KIM_MOUSEY   0x170A   // mouse Y coordinate
+#define KIM_MOUSEDRAGX 0x170B // mouse drag X ccordinate
+#define KIM_MOUSEDRAGY 0x170C // mouse drag y ccordinate
 
 // Multiplier and timer
 
@@ -83,6 +85,10 @@ int catchSubroutine(uint16_t ea);
 void printRegisters();
 void setKeyboardInterrupt();
 void setMouseClick(int mode, int x, int y);
+void setMouseDrag(int x, int y);
+void clearMouseDrag(void);
+void crtMouseMove(double x, double y);
+void crtMouseRelease(void);
 
 extern int pendingNMI;
 extern int pendingIRQ;

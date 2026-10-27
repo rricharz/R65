@@ -110,6 +110,9 @@ static unsigned char mouseX = 0;
 static unsigned char mouseY = 0;
 static int mouseMask = 0;
 
+uint8_t mouseDragX = 255;
+uint8_t mouseDragY = 255;
+
 /****************************************/
 void setMouseClick(int mode, int x, int y)
 /****************************************/
@@ -120,6 +123,22 @@ void setMouseClick(int mode, int x, int y)
     mouseX = x;
     mouseY = y;
     mouseMode = mode;
+}
+
+/*****************************/
+void setMouseDrag(int x, int y)
+/*****************************/
+{
+    mouseDragX = x;
+    mouseDragY = y;
+}
+
+/***********************/
+void clearMouseDrag(void)
+/***********************/
+{
+    mouseDragX = 255;
+    mouseDragY = 255;
 }
 
 /********************/
@@ -379,6 +398,12 @@ uint8_t read6502(uint16_t address)
         mouseMode = 0;
         return mouseY;
     }
+    
+    if (address == KIM_MOUSEDRAGX)
+        return mouseDragX;
+
+    if (address == KIM_MOUSEDRAGY)
+        return mouseDragY;
 
     return memory[address];
 }

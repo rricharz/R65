@@ -53,6 +53,8 @@ int      stop_hpos;      // STOP button
 
 int led[NUM_LEDS];
 
+static bool mouseTracking = false;
+
 // Screen and symbol fonts
 #ifdef __APPLE__
 #define SCREEN_FONT "Monaco"
@@ -106,11 +108,80 @@ void crt_init()
 
 }
 
+/**************************************************************/
+static bool graphicsMousePosition(double x, double y,
+                                  int *gx, int *gy,
+                                  bool clamp)
+/**************************************************************/
+{
+    if (!global_videoMemorySplitted)
+        return false;
+
+    double scale;
+    int xoff, yoff;
+
+    if (global_graphicsFlag) {
+        // Full-size graphics
+        scale = (double)(crtWidth / NUMXDOTS);
+
+        int dotWidth  = (int)(NUMXDOTS * scale + 0.999);
+        int dotHeight = (int)(NUMYDOTS * scale + 0.999);
+
+        xoff = crtOffset + (crtWidth - dotWidth) / 2;
+        yoff = crtOffset + 1 + dotHeight;
+    }
+    else {
+        // Split view: small graphics, right justified
+        scale = (double)(crtWidth / (2 * NUMXDOTS));
+
+        int dotWidth  = (int)(NUMXDOTS * scale + 0.999);
+        int dotHeight = (int)(NUMYDOTS * scale + 0.999);
+
+        xoff = crtOffset + crtWidth - dotWidth - 1;
+        yoff = crtOffset + 1 + dotHeight;
+    }
+
+    int dotWidth  = (int)(NUMXDOTS * scale + 0.999);
+    int dotHeight = (int)(NUMYDOTS * scale + 0.999);
+
+    double xx = x - xoff;
+    double yy = yoff - y;
+
+    if (!clamp) {
+        if (xx < 0 || xx >= dotWidth ||
+            yy < 0 || yy >= dotHeight)
+            return false;
+    }
+
+    int px = (int)(xx / scale);
+    int py = (int)(yy / scale);
+
+    if (!clamp &&
+        (px < 0 || px >= NUMXDOTS ||
+         py < 0 || py >= NUMYDOTS))
+        return false;
+
+    if (px < 0) px = 0;
+    if (px >= NUMXDOTS) px = NUMXDOTS - 1;
+
+    if (py < 0) py = 0;
+    if (py >= NUMYDOTS) py = NUMYDOTS - 1;
+
+    *gx = px;
+    *gy = py;
+
+    return true;
+}
+
 /************************************/
 void crtMouseClick(double x, double y)
 /************************************/
 {
-     if (!global_videoMemorySplitted) {
+    mouseTracking = false;
+    clearMouseDrag();
+    if (!global_videoMemorySplitted) {
+        // Alphanumeric display
+
         double hc = (double)crtWidth / NUMCHAR;
         double vc = 0.99 * (double)crtHeight / NUMLINES;
 
@@ -128,73 +199,36 @@ void crtMouseClick(double x, double y)
             setMouseClick(1, col, row);
         }
     }
-    else if (global_graphicsFlag) {
-
-        // Full-size graphics
-
-        double scale = crtWidth / NUMXDOTS;
-
-        if (scale < 1.0) {
-            scale = (double)crtWidth / NUMXDOTS;
-            if (scale > 1.0)
-                scale = 1.0;
-        }
-
-        int dotWidth  = (int)(NUMXDOTS * scale + 0.999);
-        int dotHeight = (int)(NUMYDOTS * scale + 0.999);
-
-        int xoff = crtOffset + (crtWidth - dotWidth) / 2;
-        int yoff = crtOffset + 1 + dotHeight;
-
-        double xx = x - xoff;
-        double yy = yoff - y;
-
-        if (xx >= 0 && xx < dotWidth &&
-            yy >= 0 && yy < dotHeight) {
-
-            int gx = (int)(xx / scale);
-            int gy = (int)(yy / scale);
-
-            if (gx >= 0 && gx < NUMXDOTS &&
-                gy >= 0 && gy < NUMYDOTS) {
-                setMouseClick(2, gx, gy);
-            }
-        }
-    }
     else {
-        // Split view: small graphics, right justified
+        // Graphics display: full-size or split
 
-        double scale = (crtWidth / NUMXDOTS) / 2;
+        int gx, gy;
 
-        if (scale < 1.0) {
-            scale = (double)crtWidth /
-                    (2.0 * (double)NUMXDOTS);
-
-            if (scale > 1.0)
-                scale = 1.0;
-        }
-
-        int dotWidth  = (int)(NUMXDOTS * scale + 0.999);
-        int dotHeight = (int)(NUMYDOTS * scale + 0.999);
-
-        int xoff = crtOffset + crtWidth - dotWidth - 1;
-        int yoff = crtOffset + 1 + dotHeight;
-
-        double xx = x - xoff;
-        double yy = yoff - y;
-
-        if (xx >= 0 && xx < dotWidth &&
-            yy >= 0 && yy < dotHeight) {
-
-            int gx = (int)(xx / scale);
-            int gy = (int)(yy / scale);
-
-            if (gx >= 0 && gx < NUMXDOTS &&
-                gy >= 0 && gy < NUMYDOTS) {
-                setMouseClick(2, gx, gy);
-            }
+        if (graphicsMousePosition(x, y, &gx, &gy, false)) {
+            setMouseClick(2, gx, gy);
+            setMouseDrag(gx, gy);
+            mouseTracking = true;
         }
     }
+}
+
+/************************************/
+void crtMouseMove(double x, double y)
+/************************************/
+{
+    int gx, gy;
+
+    if (mouseTracking &&
+        graphicsMousePosition(x, y, &gx, &gy, true))
+        setMouseDrag(gx, gy);
+}
+
+/************************************/
+void crtMouseRelease(void)
+/************************************/
+{
+    mouseTracking = false;
+    clearMouseDrag();
 }
 
 /*******************************/

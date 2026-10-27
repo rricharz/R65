@@ -48,3 +48,5 @@ void crt_init();
 void crtUpdate();
 void setLed(int index, int value);
 void crtMouseClick(double x, double y);
+void crtMouseMove(double x, double y);
+void crtMouseRelease(void);

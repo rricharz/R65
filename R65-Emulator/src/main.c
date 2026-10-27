@@ -514,6 +514,19 @@ static void released(GtkWidget *widget, GdkEventButton *event, gpointer user_dat
 //////////////////////////////////////////////////////////////////////////////////////
 {
 	global_click.down   = 0;
+  if (event->button == 1)
+      crtMouseRelease();
+}
+
+///////////////////////////////////////////////////////
+static gboolean moved(GtkWidget *widget, GdkEventMotion *event,
+                      gpointer user_data)
+//////////////////////////////////////////////////////
+{
+    if (event->state & GDK_BUTTON1_MASK)
+        crtMouseMove(event->x, event->y);
+
+    return TRUE;
 }
 
 ///////////////////////////
@@ -795,6 +808,7 @@ int main (int argc, char *argv[])
     gtk_widget_add_events(global_window, GDK_BUTTON_PRESS_MASK);
     gtk_widget_add_events(global_window, GDK_BUTTON_RELEASE_MASK);
     gtk_widget_add_events(global_window, GDK_KEY_PRESS_MASK);
+    gtk_widget_add_events(global_window, GDK_POINTER_MOTION_MASK);
         	
     GdkScreen *screen = gtk_window_get_screen(GTK_WINDOW(global_window));
     int screenWidth = gdk_screen_get_width(screen);
@@ -854,7 +868,8 @@ int main (int argc, char *argv[])
     g_signal_connect(G_OBJECT(global_window), "key_press_event", G_CALLBACK(on_key_press), NULL);
     g_signal_connect(G_OBJECT(global_window), "key_release_event", G_CALLBACK(on_key_release), NULL);
     g_signal_connect(global_window, "focus-in-event", G_CALLBACK(on_focus_in_event), NULL);
-    g_signal_connect(global_window, "focus-out-event", G_CALLBACK(on_focus_out_event), NULL);	
+    g_signal_connect(global_window, "focus-out-event", G_CALLBACK(on_focus_out_event), NULL);
+    g_signal_connect(global_window, "motion-notify-event",G_CALLBACK(moved), NULL);	
 
     gtk_widget_show_all(global_window);
 	
