@@ -34,6 +34,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
+#include <stdbool.h>
+
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
