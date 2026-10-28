@@ -813,8 +813,8 @@ int main (int argc, char *argv[])
 
     darea = gtk_drawing_area_new();
     gtk_container_add(GTK_CONTAINER(global_window), darea);
-    gtk_widget_add_events(global_window, GDK_BUTTON_PRESS_MASK);
-    gtk_widget_add_events(global_window, GDK_BUTTON_RELEASE_MASK);
+    gtk_widget_add_events(darea, GDK_BUTTON_PRESS_MASK);
+    gtk_widget_add_events(darea, GDK_BUTTON_RELEASE_MASK);
     gtk_widget_add_events(global_window, GDK_KEY_PRESS_MASK);
     gtk_widget_add_events(global_window, GDK_POINTER_MOTION_MASK);
         	

@@ -17,8 +17,7 @@
 
     W              write canvas to disk
     Q              write canvas to disk and quit
-    K              kill program without writing to dis
-k
+    K              kill program without writing
 
   2024 rricharz                                   }
 
@@ -31,29 +30,62 @@ const startcanvas=$700;
       sizecanvas=3304; {224x118/8}
       rdfile=$e815;
       wrfile=$e81b;
-      cleft=chr($03);
-      cright=chr($16);
-      cup=chr($1a);
-      cdown=chr($18);
-      esc=chr($1b);
-      dpoint=0;
-      dline=1;
-      drect=2;
-      dchar=3;
 
-mem   FILFLG=$da:   char&;
-      filsa=$031a:  integer;
-      filea=$031c:  integer;
-      filsa1=$0331: integer;
-      filtyp=$0300: char&;
+      CLEFT       = chr($03);
+      CRIGHT      = chr($16);
+      CUP         = chr($1a);
+      CDOWN       = chr($18);
+      RUBOUT      = chr($7f);
 
-var cyclus,drive:integer;
-    x,y,cmode,startx,starty:integer;
-    name:array[15] of char;
-    ch:char;
-    dmode:integer;
+      dpoint      = 0;
+      dline       = 1;
+      drect       = 2;
+      dtext       = 3;
+
+mem   FILFLG=$da:       char&;
+      FILSA=$031a:      integer;
+      FILEA=$031c:      integer;
+      FILSA1=$0331:     integer;
+      FILTYP=$0300:     char&;
+      MOUSEDRAGX=$170b: integer&;
+      MOUSEDRAGY=$170c: integer&;
+
+var cyclus,drive:       integer;
+    x,y,cmode:          integer;
+    startx,starty:      integer;
+    name:               array[15] of char;
+    ch,nextch:          char;
+    dmode:              integer;
+
+
+const CANVASSIZE  = 1652;   {words}
+      LASTINDEX   = 1651;   {- 1}
+mem   canvas      = $700:  array[1652] of integer;
+var   undobuf:     array[1652] of integer;
+      undovalid:  boolean;
+
+proc saveundo;
+{************}
+var i: integer;
+begin
+  for i:=0 to CANVASSIZE-1 do
+    undobuf[i]:=canvas[i];
+  undovalid:=true;
+end;
+
+proc restoreundo;
+{***************}
+var i: integer;
+begin
+  if undovalid then begin
+    for i:=0 to CANVASSIZE-1 do
+      canvas[i]:=undobuf[i];
+    undovalid:=false;
+  end;
+end;
 
 proc forcesubtype(subtype:char);
+{******************************}
 var i:integer;
 begin
   i:=0;
@@ -66,6 +98,7 @@ begin
 end;
 
 proc loadcanvas;
+{**************}
 var entry: integer;
     last,found,default:  boolean;
 begin
@@ -84,10 +117,10 @@ begin
   if (not found) or last then exit;
   _asetfile(name,cyclus,drive,'I');
   FILFLG:=chr($40); { silent load }
-  filsa:=startcanvas;
-  filea:=startcanvas+sizecanvas;
-  filsa1:=startcanvas;
-  filtyp:='I';
+  FILSA:=startcanvas;
+  FILEA:=startcanvas+sizecanvas;
+  FILSA1:=startcanvas;
+  FILTYP:='I';
   FILERR:=0;
   call(rdfile);
   writeln;
@@ -101,84 +134,15 @@ proc savecanvas;
 begin
   _asetfile(name,cyclus,drive,'I');
   FILFLG:=chr($40); { silent store }
-  filsa:=startcanvas;
-  filea:=startcanvas+sizecanvas;
-  filsa1:=startcanvas;
-  filtyp:='I';
+  FILSA:=startcanvas;
+  FILEA:=startcanvas+sizecanvas;
+  FILSA1:=startcanvas;
+  FILTYP:='I';
   FILERR:=0;
   call(wrfile);
   if FILERR<>0 then
     writeln(INVVID,'File error ',FILERR shr 4,
       FILERR and 15,NORVID);
-end;
-
-proc showcursor(ax,ay:integer);
-var i:integer;
-begin
-  case dmode of
-    dpoint: begin
-              _move(ax-2,ay);
-              _draw(ax+2,ay,INVERSE);
-              _move(ax,ay-2);
-              _draw(ax,ay+2,INVERSE);
-            end;
-    dline:  begin
-              _move(startx,starty);
-              _draw(x,y,INVERSE);
-            end;
-    drect:  begin
-              _move(startx,starty);
-              _draw(x,starty,INVERSE);
-              _draw(x,y,INVERSE);
-              _draw(startx,y,INVERSE);
-              _draw(startx,starty,INVERSE);
-            end;
-    dchar: begin
-               if (x>XSIZE-8) then x:=XSIZE-8;
-               if (y<2) then y:=2;
-               if (y>YSIZE-9) then y:=y-9;
-               _move(x+2,y-2);
-               _draw(x+8,y-2,INVERSE);
-             end
-  end {case};
-end;
-
-proc blink;
-const bcount=12;
-var count,mode,mx,my:integer;
-    displayed,found:boolean;
-begin
-  count:=0;
-  displayed:=false;
-
-  repeat
-    found:=_getinput(mode,mx,my,ch);
-
-    if _isesc then begin
-      ch:=chr($1b);
-      found:=true;
-    end;
-
-    if not found then begin
-      _delay10msec(1);
-      count:=count-1;
-
-      if count<=0 then begin
-        showcursor(x,y);
-        displayed:=not displayed;
-        count:=bcount;
-      end;
-    end;
-
-  until found;
-
-  if displayed then showcursor(x,y);
-
-  if mode=2 then begin
-    x:=mx;
-    y:=my;
-    ch:=chr(0);
-  end;
 end;
 
 proc drawline;
@@ -222,7 +186,7 @@ begin
     dpoint: write('POINT  ');
     dline:  write('LINE   ');
     drect:  write('RECT   ');
-    dchar:  write('CHAR   ')
+    dtext:  write('TEXT   ')
   end;
 
   case cmode of
@@ -247,11 +211,10 @@ begin
         INVVID,'P',NORVID,'oint  ',
         INVVID,'L',NORVID,'ine  ',
         INVVID,'R',NORVID,'ect  ',
-        INVVID,'S',NORVID,'ymbol');
+        INVVID,'T',NORVID,'ext');
 
   _setcursor(0,13);
-  write(INVVID,'RET',NORVID,':Draw  ',
-        INVVID,'ESC',NORVID,':Cancel  ',
+  write(INVVID,'ESC',NORVID,':Cancel  ',
         INVVID,'W',NORVID,':Save  ',
         INVVID,'Q',NORVID,':Quit  ',
         INVVID,'K',NORVID,':Kill');
@@ -259,8 +222,319 @@ begin
   _htxtgr(0,47,14,CYAN);
 end;
 
+proc rectanglemode;
+{*****************}
+var mode,mx,my:integer;
+    key:char;
+    found, visible:boolean;
+begin
+  if _isesc then begin end;
+  saveundo;
+  repeat
+    if _isesc then exit;
+    mode:=0;
+    found:=_getinput(mode,mx,my,key);
+
+    if found then begin
+      if mode=2 then begin
+        startx:=mx;
+        starty:=my;
+      end;
+
+      if key<>chr(0) then begin
+        nextch:=key;
+        exit;
+      end;
+    end else
+      _delay10msec(1);
+  until mode=2;
+
+  { Drag rectangle }
+  visible:=false;
+
+  mx:=MOUSEDRAGX;
+  my:=MOUSEDRAGY;
+  while (mx<>$ff) and (my<>$ff)
+  do begin
+    if _isesc then begin
+      { Remove the current XOR preview }
+      if visible then begin
+        _move(startx,starty);
+        _draw(x,starty,INVERSE);
+        _draw(x,y,INVERSE);
+        _draw(startx,y,INVERSE);
+        _draw(startx,starty,INVERSE);
+      end;
+      exit;
+    end;
+
+    if (not visible) or (mx<>x) or (my<>y) then begin
+
+      { Erase previous XOR rectangle }
+      if visible then begin
+        _move(startx,starty);
+        _draw(x,starty,INVERSE);
+        _draw(x,y,INVERSE);
+        _draw(startx,y,INVERSE);
+        _draw(startx,starty,INVERSE);
+      end;
+
+      x:=mx;
+      y:=my;
+
+      { Draw new XOR rectangle }
+      _move(startx,starty);
+      _draw(x,starty,INVERSE);
+      _draw(x,y,INVERSE);
+      _draw(startx,y,INVERSE);
+      _draw(startx,starty,INVERSE);
+
+      visible:=true;
+    end;
+    mx:=MOUSEDRAGX;
+    my:=MOUSEDRAGY;
+  end;
+
+  { Erase the temporary XOR rectangle }
+  if visible then begin
+    _move(startx,starty);
+    _draw(x,starty,INVERSE);
+    _draw(x,y,INVERSE);
+    _draw(startx,y,INVERSE);
+    _draw(startx,starty,INVERSE);
+  end;
+
+  { Draw the permanent rectangle }
+  _move(startx,starty);
+  _draw(x,starty,cmode);
+  _draw(x,y,cmode);
+  _draw(startx,y,cmode);
+  _draw(startx,starty,cmode);
+end;
+
+proc linemode;
+{************}
+var mode,mx,my:integer;
+    key:char;
+    found, visible:boolean;
+begin
+  if _isesc then begin end;
+  saveundo;
+
+  repeat
+    if _isesc then exit;
+    mode:=0;
+    found:=_getinput(mode,mx,my,key);
+
+    if found then begin
+      if mode=2 then begin
+        startx:=mx;
+        starty:=my;
+      end;
+
+      if key<>chr(0) then begin
+        nextch:=key;
+        exit;
+      end;
+    end else
+      _delay10msec(1);
+  until mode=2;
+
+  { Drag line }
+  visible:=false;
+
+  mx:=MOUSEDRAGX;
+  my:=MOUSEDRAGY;
+  while (mx<>$ff) and (my<>$ff)
+  do begin
+    if _isesc then begin
+      { Remove the current XOR preview }
+      if visible then begin
+        _move(startx,starty);
+        _draw(x,y,INVERSE);
+      end;
+      exit;
+    end;
+
+    if (not visible) or (mx<>x) or (my<>y) then begin
+
+      { Erase previous XOR line }
+      if visible then begin
+        _move(startx,starty);
+        _draw(x,y,INVERSE);
+      end;
+
+      x:=mx;
+      y:=my;
+
+      { Draw new XOR line }
+      _move(startx,starty);
+      _draw(x,y,INVERSE);
+
+      visible:=true;
+    end;
+
+    mx:=MOUSEDRAGX;
+    my:=MOUSEDRAGY;
+  end;
+
+  { Erase the temporary XOR line }
+  if visible then begin
+    _move(startx,starty);
+    _draw(x,y,INVERSE);
+  end;
+
+  { Draw the permanent line }
+  _move(startx,starty);
+  _draw(x,y,cmode);
+end;
+
+proc pointmode(mx,my:integer);
+{***************************}
+var nx,ny:integer;
+begin
+  saveundo;
+
+  { Draw the first point }
+  _plot(mx,my,cmode);
+  x:=mx;
+  y:=my;
+
+  if cmode=INVERSE then exit;
+
+  { Follow the mouse while the button is down }
+  nx:=MOUSEDRAGX;
+  ny:=MOUSEDRAGY;
+
+  while (nx<>$ff) and (ny<>$ff) do begin
+    if (nx<>x) or (ny<>y) then begin
+      _move(x,y);
+      _draw(nx,ny,cmode);
+      x:=nx;
+      y:=ny;
+    end;
+
+    nx:=MOUSEDRAGX;
+    ny:=MOUSEDRAGY;
+  end;
+end;
+
+proc textmode;
+{*************}
+const LEFTMARGIN   = 2;
+      RIGHTMARGIN  = 216;
+      TOPMARGIN    = 108;
+      BOTTOMMARGIN = 2;
+      CHARWIDTH    = 8;
+      CHARHEIGHT   = 8;
+
+var mode,mx,my:   integer;
+    ch:           char;
+    found,visible:boolean;
+    count:        integer;
+    textstartx:   integer;
+begin
+  if _isesc then begin end;
+  saveundo;
+
+  { Keep the initial position within the margins }
+  if x<LEFTMARGIN then x:=LEFTMARGIN;
+  if x>RIGHTMARGIN then x:=RIGHTMARGIN;
+  if y<BOTTOMMARGIN then y:=BOTTOMMARGIN;
+  if y>TOPMARGIN then y:=TOPMARGIN;
+  textstartx:=x;
+
+  visible:=false;
+  count:=0;
+
+  repeat
+    mode:=0;
+    found:=_getinput(mode,mx,my,ch);
+
+    if found then begin
+
+      { Remove cursor }
+      if visible then begin
+        _move(x+1,y);
+        _draw(x+5,y,INVERSE);
+        visible:=false;
+      end;
+
+      { Mouse selects new text position }
+      if mode=2 then begin
+        x:=mx;
+        y:=my;
+        if x<LEFTMARGIN then x:=LEFTMARGIN;
+        if x>RIGHTMARGIN then x:=RIGHTMARGIN;
+        if y<BOTTOMMARGIN then y:=BOTTOMMARGIN;
+        if y>TOPMARGIN then y:=TOPMARGIN;
+        textstartx:=x;
+      end;
+
+      { Cursor movement and character input }
+      case ch of
+
+        CLEFT:
+          if x>=LEFTMARGIN+CHARWIDTH then
+            x:=x-CHARWIDTH;
+
+        CRIGHT:
+          if x<=RIGHTMARGIN-CHARWIDTH then
+            x:=x+CHARWIDTH;
+
+        CUP:
+          if y<=TOPMARGIN-CHARHEIGHT then
+            y:=y+CHARHEIGHT;
+
+        CDOWN:
+          if y>=BOTTOMMARGIN+CHARHEIGHT then
+            y:=y-CHARHEIGHT;
+
+        CR:
+          begin
+            x:=textstartx;
+            if y>=BOTTOMMARGIN+CHARHEIGHT then
+            y:=y-CHARHEIGHT;
+          end
+
+        else
+          if (ch>=' ') and (ch<='~') then begin
+            _move(x-2,y);
+            write(@PLOTDEV,ch);
+
+            if x<=RIGHTMARGIN-CHARWIDTH then
+              x:=x+CHARWIDTH;
+          end
+      end;
+
+      count:=0;
+
+    end else begin
+      _delay10msec(1);
+      count:=count+1;
+
+      if count>=30 then begin
+        _move(x+1,y);
+        _draw(x+5,y,INVERSE);
+        visible:=not visible;
+        count:=0;
+      end;
+    end;
+
+  until _isesc;
+
+  { Remove cursor before leaving }
+  if visible then begin
+    _move(x+1,y);
+    _draw(x+5,y,INVERSE);
+  end;
+end;
+
 proc paint;
+{*********}
 { This is the main painting loop }
+var mode,mx,my:integer;
+    found:boolean;
 begin
   x:=XSIZE div 2;
   y:=YSIZE div 2;
@@ -268,60 +542,60 @@ begin
   dmode:=dpoint;
   initpanel;
   status;
+  nextch:=chr(0);
   repeat
-    blink;
-    if (dmode=dchar) and printable then drawchar
-    else case ch of
-      cleft:  if x>0 then x:=x-1;
-      cright: if x<XSIZE then x:=x+1;
-      cup:    if (y<YSIZE) then y:=y+1;
-      cdown:  if (y>0) then y:=y-1;
+    if nextch<>chr(0) then begin
+      ch:=nextch;
+      nextch:=chr(0);
+    end else begin
+      repeat
+        found:=_getinput(mode,mx,my,ch);
+        if not found then _delay10msec(1);
+        until found;
+    end;
+
+    if (mode=2) and (dmode=dpoint) then
+      pointmode(mx,my);
+
+      case ch of
+
       'C':    _cleargr;
+
       'M':    begin
                 cmode:=cmode+1;
                 if cmode>2 then cmode:=0;
               end;
+
       'P':    begin
-                _plot(x,y,cmode);
-                x:=x+1;
-                if x>XSIZE then x:=0;
-              end;
-      'L':    begin
-                if dmode=dline then drawline;
-                startx:=x; starty:=y;
-                dmode:=dline;
-                x:=x+4; {minimum size for visibility}
-                y:=y+4;
-                if x>XSIZE then x:=x-4;
-                if y>YSIZE then y:=y-4;
-              end;
-      'R':    begin
-                if dmode=drect then drawrect;
-                startx:=x; starty:=y;
-                dmode:=drect;
-                x:=x+4; {minimum size for visibility}
-                y:=y+4;
-                if x>XSIZE then x:=XSIZE-4;
-                if y>YSIZE then y:=YSIZE-4;
-              end;
-      'S':    begin
-                dmode:=dchar;
-                startx:=x; starty:=y;
-              end;
-      CR:     begin
-                 case dmode of
-                   dpoint: _plot(x,y,cmode);
-                   dline:   drawline;
-                   drect:   drawrect;
-                   dchar:   drawchar
-                end {case};
                 dmode:=dpoint;
-             end;
-      esc:   dmode:=dpoint;
+              end;
+
+      'L':    begin
+                dmode:=dline;
+                status;
+                linemode;
+                dmode:=dpoint;
+              end;
+
+      'R':    begin
+                dmode:=drect;
+                status;
+                rectanglemode;
+                dmode:=dpoint;
+              end;
+
+      'T':    begin
+                dmode:=dtext;
+                status;
+                textmode;
+                dmode:=dpoint;
+              end;
+
+      RUBOUT: restoreundo;
+
       'W','Q': begin
                  savecanvas;
                  _setcursor(2,14);
-                 write('SAVED         ');
               end
     end; {case}
     if (ch<>'W') and (ch<>'Q') then status;
@@ -330,6 +604,7 @@ end;
 
 begin
   _grinit; _cleargr; _fullview;
+  undovalid:=false;
   loadcanvas;
   paint;
   _grend;
