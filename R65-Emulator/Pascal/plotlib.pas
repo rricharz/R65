@@ -57,6 +57,8 @@ begin
   call(igraph); call(iCRtgr);
   writeln('CTRT-L to toggle canvas size,',
    'GREND to close it');
+  _xcursor:=0;
+  _ycursor:=0;
 end;
 
 { _grend: end of graphics, initialize }
@@ -109,8 +111,8 @@ begin
   if x>XSIZE then _xcursor:=XSIZE;
   if y<0 then _ycursor:=0;
   if y>YSIZE then _ycursor:=YSIZE;
-  grx:=x;
-  gry:=y;
+  grx:=_xcursor;
+  gry:=_ycursor;
   grc:=c;
   call(a_plot);
 end;
@@ -132,9 +134,10 @@ begin
   gry:=_ycursor;
 end;
 
-{ _draw(x,y,c)          }
-{ _draw a straight line }
-{ end points are clipped to graphics area }
+{ _draw(x,y,c)                              }
+{ draw a straight line                      }
+{ endpoints are clamped to graphics area    }
+{ this is a safety guard, not true clipping }
 
 proc _draw(x,y,c:integer);
 mem grxinc=$03b6: integer;
@@ -174,7 +177,7 @@ var x_new,y_new,xstep,ystep,xl,yl,i,cnt:integer;
     grc:=c0;
     grn:=n;
     grxinc:=xi;
-    gryinc:=yi
+    gryinc:=yi;
     call(a_drawxy);
   end;
 

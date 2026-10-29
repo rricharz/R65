@@ -41,6 +41,8 @@ const startcanvas=$700;
       dline       = 1;
       drect       = 2;
       dtext       = 3;
+      dflood      = 4;
+      djoin       = 5;
 
 mem   FILFLG=$da:       char&;
       FILSA=$031a:      integer;
@@ -61,8 +63,179 @@ var cyclus,drive:       integer;
 const CANVASSIZE  = 1652;   {words}
       LASTINDEX   = 1651;   {- 1}
 mem   canvas      = $700:  array[1652] of integer;
+      canvasbytes = $700:array[3304] of integer&;
 var   undobuf:     array[1652] of integer;
       undovalid:  boolean;
+
+const STACKSIZE=512;
+
+var stack:array[STACKSIZE] of packed char;
+    sp,maxsp,overflows,pushes:integer;
+
+proc initstack;
+{*************}
+begin
+  sp:=0;
+  maxsp:=0;
+  overflows:=0;
+  pushes:=0;
+end;
+
+proc push(x,y:integer);
+{*********************}
+begin
+  if sp<STACKSIZE then begin
+    stack[sp]:=packed(chr(y),chr(x));
+    sp:=sp+1;
+    if sp>maxsp then maxsp:=sp;
+    pushes:=pushes+1;
+  end else
+    overflows:=overflows+1;
+end;
+
+proc pop(var x,y:integer);
+{************************}
+begin
+  if sp>0 then begin
+    sp:=sp-1;
+    x:=ord(low(stack[sp]));
+    y:=ord(high(stack[sp]));
+  end;
+end;
+
+func pget(x,y:integer):integer;
+{*****************************}
+var index,mask:integer;
+begin
+  index:=28*y+(x shr 3);
+  mask:=$80 shr (x and 7);
+  if (canvasbytes[index] and mask)<>0 then
+    pget:=WHITE
+  else
+    pget:=BLACK;
+end;
+
+proc hline(xl,xr,y,c:integer);
+{****************************}
+var x:integer;
+begin
+  _move(xl,y);
+  _draw(xr,y,c);
+end;
+
+proc findrun(x,y:integer; var xl,xr:integer);
+{*******************************************}
+var color,full,row,i,mask:integer;
+    searching:boolean;
+begin
+  color:=pget(x,y);
+  if color=WHITE then full:=$ff
+  else full:=0;
+
+  row:=28*y;
+  xl:=x;
+  xr:=x;
+
+  { search left }
+  i:=x;
+  searching:=true;
+  while (i>0) and searching do begin
+    if (i and 7)=0 then begin
+      { previous byte is entirely the same color? }
+      if canvasbytes[row+(i shr 3)-1]=full then
+        i:=i-8
+      else begin
+        mask:=$80 shr ((i-1) and 7);
+        if (canvasbytes[row+((i-1) shr 3)] and mask)=
+           (full and mask) then
+          i:=i-1
+        else
+          searching:=false;
+      end;
+    end else begin
+      mask:=$80 shr ((i-1) and 7);
+      if (canvasbytes[row+((i-1) shr 3)] and mask)=
+         (full and mask) then
+        i:=i-1
+      else
+        searching:=false;
+    end;
+  end;
+  xl:=i;
+
+  { search right }
+  i:=x;
+  searching:=true;
+  while (i<XSIZE) and searching do begin
+    if (i<=XSIZE-8) and ((i and 7)=7) then begin
+      { next byte is entirely the same color? }
+      if canvasbytes[row+(i shr 3)+1]=full then
+        i:=i+8
+      else begin
+        mask:=$80 shr ((i+1) and 7);
+        if (canvasbytes[row+((i+1) shr 3)] and mask)=
+           (full and mask) then
+          i:=i+1
+        else
+          searching:=false;
+      end;
+    end else begin
+      mask:=$80 shr ((i+1) and 7);
+      if (canvasbytes[row+((i+1) shr 3)] and mask)=
+         (full and mask) then
+        i:=i+1
+      else
+        searching:=false;
+    end;
+  end;
+  xr:=i;
+end;
+
+proc scanruns(xl,xr,y:integer);
+{*****************************}
+var x,left,right:integer;
+begin
+  x:=xl;
+  while x<=xr do begin
+    if pget(x,y)=BLACK then begin
+      push(x,y);
+    end;
+    findrun(x,y,left,right);
+    x:=right+1;
+  end;
+end;
+
+proc fillrun(x,y:integer);
+{************************}
+var xl,xr:integer;
+begin
+  if pget(x,y)=BLACK then begin
+    findrun(x,y,xl,xr);
+    hline(xl,xr,y,WHITE);
+
+    if y<YSIZE then
+      scanruns(xl,xr,y+1);
+
+    if y>0 then
+      scanruns(xl,xr,y-1);
+  end;
+end;
+
+proc floodfill(x,y:integer);
+{**************************}
+var px,py:integer;
+begin
+  initstack;
+
+  if pget(x,y)=BLACK then begin
+    push(x,y);
+
+    while sp>0 do begin
+      pop(px,py);
+      fillrun(px,py);
+    end;
+  end;
+end;
 
 proc saveundo;
 {************}
@@ -130,6 +303,7 @@ begin
 end;
 
 proc savecanvas;
+{**************}
 { save the canvas on disk }
 begin
   _asetfile(name,cyclus,drive,'I');
@@ -146,6 +320,7 @@ begin
 end;
 
 proc drawline;
+{************}
 begin
   _move(startx,starty); _draw(x,y,cmode);
   startx:=x; starty:=y;
@@ -161,6 +336,7 @@ begin
 end;
 
 proc drawchar;
+{************}
 begin
   _move(x,y); write(@PLOTDEV,ch);
   x:=x+8;
@@ -171,6 +347,7 @@ begin
 end;
 
 func printable:boolean;
+{*********************}
 var a:integer;
 begin
   a:=ord(ch);
@@ -186,6 +363,8 @@ begin
     dpoint: write('POINT  ');
     dline:  write('LINE   ');
     drect:  write('RECT   ');
+    dflood: write('FLOOD  ');
+    djoin:  write('JOIN   ');
     dtext:  write('TEXT   ')
   end;
 
@@ -202,6 +381,7 @@ begin
 end;
 
 proc initpanel;
+{*************}
 begin
   _setcursor(0,12);
   write(CSC);
@@ -530,6 +710,40 @@ begin
   end;
 end;
 
+proc floodmode;
+{*************}
+var mode,mx,my:integer;
+    key:char;
+    found:boolean;
+begin
+  if _isesc then begin end;
+
+  repeat
+    if _isesc then exit;
+    mode:=0;
+    found:=_getinput(mode,mx,my,key);
+
+    if found then begin
+      if mode=2 then begin
+        saveundo;
+        floodfill(mx,my);
+        exit;
+      end;
+
+      if key<>chr(0) then begin
+        nextch:=key;
+        exit;
+      end;
+    end else
+      _delay10msec(1);
+  until false;
+end;
+
+proc joinmode;
+{************}
+begin
+end;
+
 proc paint;
 {*********}
 { This is the main painting loop }
@@ -577,10 +791,23 @@ begin
                 dmode:=dpoint;
               end;
 
+      'F':    begin
+                dmode:=dflood;
+                status;
+                floodmode;
+                dmode:=dpoint;
+              end;
+
       'R':    begin
                 dmode:=drect;
                 status;
                 rectanglemode;
+                dmode:=dpoint;
+              end;
+      'J':    begin
+                dmode:=djoin;
+                status;
+                joinmode;
                 dmode:=dpoint;
               end;
 
