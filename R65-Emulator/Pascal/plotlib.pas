@@ -28,6 +28,7 @@ var _xcursor, _ycursor: integer;
 { process is suspended during _delay }
 
 proc _delay10msec(time:integer);
+{******************************}
 mem
 {$I IHIDDENMEM}
 var i:integer;
@@ -37,6 +38,7 @@ begin
 end;
 
 func _syncscreen;
+{***************}
 { synchronize screen and sleep
   up to 30 msec since last sync.
   returns sleep time in msec   }
@@ -51,6 +53,7 @@ end;
 { alpha/graphics display        }
 
 proc _grinit;
+{***********}
 const igraph=$e01e;
       iCRtgr=$e016;
 begin
@@ -65,6 +68,7 @@ end;
 { memory for alpha display           }
 
 proc _grend;
+{**********}
 const initCR=$e01b;
 mem sflag=$1781: integer&;
 begin
@@ -75,6 +79,7 @@ end;
 { _cleargr: clear graphics display }
 
 proc _cleargr;
+{************}
 const clrgra=$e231; { not a vector! }
 begin
   call(clrgra);
@@ -83,6 +88,7 @@ end;
 { _fullview: go to full sCReen graphics display }
 
 proc _fullview;
+{*************}
 const iCRtgr=$e016;
 begin
   call(iCRtgr);
@@ -91,6 +97,7 @@ end;
 { _splitview: go to splitted graphics display }
 
 proc _splitview;
+{**************}
 const iCRtal=$e015;
 begin
   call(iCRtal);
@@ -100,6 +107,7 @@ end;
 { _plot a dot at x,y, using c }
 
 proc _plot(x,y,c:integer);
+{************************}
 const a_plot=$c815;
 mem grx=$03ae: integer&;
     gry=$03af: integer&;
@@ -121,6 +129,7 @@ end;
 { _move graphics cursor }
 
 proc _move(x,y:integer);
+{**********************}
 mem grx=$03ae: integer&;
     gry=$03af: integer&;
 begin
@@ -140,6 +149,7 @@ end;
 { this is a safety guard, not true clipping }
 
 proc _draw(x,y,c:integer);
+{************************}
 mem grxinc=$03b6: integer;
     gryinc=$03ba: integer;
     grx=$03ae: integer&;
@@ -220,6 +230,7 @@ end;
 { the top left corner is bit 15 }
 
 proc _plotmap(x,y,m:integer);
+{***************************}
 const abitmap=$c81b;
 mem grmap=$03b6: integer;
     grx=$03ae: integer&;
@@ -239,6 +250,7 @@ end;
 { wait for a KEY to be typed    }
 
 proc _waitforKEY;
+{***************}
 const KEY=@1;
       toggle=chr($0c);
 var ch:char;
@@ -253,6 +265,7 @@ end;
 { pot within canvas limits }
 
 proc _plotif(x,y,mode: integer);
+{******************************}
 begin
   if (x >= 0) and (x <= XSIZE) and
      (y >= 0) and (y <= YSIZE) then
@@ -263,18 +276,28 @@ end;
 { draw a circle            }
 
 proc _circle(cx,cy,r,mode: integer);
+{**********************************}
 var x, y, d: integer;
 
   proc put8(x,y: integer);
   begin
     _plotif(cx + x, cy + y, mode);
-    _plotif(cx - x, cy + y, mode);
-    _plotif(cx + x, cy - y, mode);
-    _plotif(cx - x, cy - y, mode);
-    _plotif(cx + y, cy + x, mode);
-    _plotif(cx - y, cy + x, mode);
-    _plotif(cx + y, cy - x, mode);
-    _plotif(cx - y, cy - x, mode);
+    if x<>0 then
+      _plotif(cx - x, cy + y, mode);
+    if y<>0 then
+      _plotif(cx + x, cy - y, mode);
+    if (x<>0) and (y<>0) then
+      _plotif(cx - x, cy - y, mode);
+
+    if x<>y then begin
+      _plotif(cx + y, cy + x, mode);
+      if y<>0 then
+        _plotif(cx - y, cy + x, mode);
+      if x<>0 then
+        _plotif(cx + y, cy - x, mode);
+      if (x<>0) and (y<>0) then
+        _plotif(cx - y, cy - x, mode);
+    end;
   end;
 
 begin
@@ -294,12 +317,27 @@ begin
 end;
 
 proc _rectangle(x, y, sx, sy, mode: integer);
+{*******************************************}
 begin
   _move(x, y);
   _draw(x + sx, y, mode);
   _draw(x + sx, y + sy, mode);
   _draw(x, y + sy, mode);
   _draw(x, y, mode);
+end;
+
+func _getpixel(x,y:integer):integer;
+{********************************}
+mem canvas=$700:array[3304] of integer&;
+var b,mask:integer;
+begin
+  b:=canvas[y*28+(x shr 3)];
+  mask:=$80 shr (x and 7);
+
+  if (b and mask)<>0 then
+    _getpixel:=WHITE
+  else
+    _getpixel:=BLACK;
 end;
 
 begin {initialization}

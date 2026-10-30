@@ -24,7 +24,7 @@
 
 program paint;
 uses  syslib,arglib,wildlib,plotlib,strlib,filelib,
-      mouselib,txtgrlib,writelib;
+      mouselib,txtgrlib,writelib,mathlib;
 
 const startcanvas=$700;
       sizecanvas=3304; {224x118/8}
@@ -43,6 +43,8 @@ const startcanvas=$700;
       dtext       = 3;
       dflood      = 4;
       djoin       = 5;
+      derase      = 6;
+      dcircle     = 7;
 
 mem   FILFLG=$da:       char&;
       FILSA=$031a:      integer;
@@ -103,18 +105,6 @@ begin
   end;
 end;
 
-func pget(x,y:integer):integer;
-{*****************************}
-var index,mask:integer;
-begin
-  index:=28*y+(x shr 3);
-  mask:=$80 shr (x and 7);
-  if (canvasbytes[index] and mask)<>0 then
-    pget:=WHITE
-  else
-    pget:=BLACK;
-end;
-
 proc hline(xl,xr,y,c:integer);
 {****************************}
 var x:integer;
@@ -128,7 +118,7 @@ proc findrun(x,y:integer; var xl,xr:integer);
 var color,full,row,i,mask:integer;
     searching:boolean;
 begin
-  color:=pget(x,y);
+  color:=_getpixel(x,y);
   if color=WHITE then full:=$ff
   else full:=0;
 
@@ -197,7 +187,7 @@ var x,left,right:integer;
 begin
   x:=xl;
   while x<=xr do begin
-    if pget(x,y)=BLACK then begin
+    if _getpixel(x,y)=BLACK then begin
       push(x,y);
     end;
     findrun(x,y,left,right);
@@ -209,7 +199,7 @@ proc fillrun(x,y:integer);
 {************************}
 var xl,xr:integer;
 begin
-  if pget(x,y)=BLACK then begin
+  if _getpixel(x,y)=BLACK then begin
     findrun(x,y,xl,xr);
     hline(xl,xr,y,WHITE);
 
@@ -227,7 +217,7 @@ var px,py:integer;
 begin
   initstack;
 
-  if pget(x,y)=BLACK then begin
+  if _getpixel(x,y)=BLACK then begin
     push(x,y);
 
     while sp>0 do begin
@@ -356,16 +346,20 @@ begin
 end;
 
 proc status;
+{**********}
 begin
   _setcursor(0,15);
+  write(CSC);
 
   case dmode of
-    dpoint: write('POINT  ');
-    dline:  write('LINE   ');
-    drect:  write('RECT   ');
-    dflood: write('FLOOD  ');
-    djoin:  write('JOIN   ');
-    dtext:  write('TEXT   ')
+    dpoint:  write('POINT  ');
+    dline:   write('LINE   ');
+    drect:   write('RECT   ');
+    dtext:   write('TEXT   ');
+    dflood:  write('FLOOD  ');
+    djoin:   write('JOIN   ');
+    derase:  write('ERASE  ');
+    dcircle: write('CIRCLE ')
   end;
 
   case cmode of
@@ -374,8 +368,18 @@ begin
     INVERSE: write('INVERSE ')
   end;
 
-  _setcursor(32,15);
-  write('X:',x:3,' Y:',y:3);
+  _setcursor(18,15);
+
+  case dmode of
+    dpoint:  write('Click or drag to paint');
+    dline:   write('Drag to draw line');
+    drect:   write('Drag to draw rectangle');
+    dtext:   write('Type text; ESC exits');
+    dflood:  write('Click inside area');
+    djoin:   write('Drag connected lines');
+    derase:  write('Drag area to erase');
+    dcircle: write('Drag radius from center')
+  end;
 
   _parkcursor;
 end;
@@ -383,27 +387,87 @@ end;
 proc initpanel;
 {*************}
 begin
-  _setcursor(0,12);
+  _setcursor(0,11);
   write(CSC);
 
-  write(INVVID,'C',NORVID,'lear  ',
-        INVVID,'M',NORVID,'ode  ',
-        INVVID,'P',NORVID,'oint  ',
-        INVVID,'L',NORVID,'ine  ',
-        INVVID,'R',NORVID,'ect  ',
-        INVVID,'T',NORVID,'ext');
+  _setcursor(0,11);
+  write(INVVID,'P',NORVID,'oint');
+  _setcursor(10,11);
+  write(INVVID,'L',NORVID,'ine');
+  _setcursor(20,11);
+  write(INVVID,'J',NORVID,'oin');
+  _setcursor(30,11);
+  write(INVVID,'R',NORVID,'ect');
+  _setcursor(40,11);
+  write(INVVID,'O',NORVID,'circle');
+
+  _setcursor(0,12);
+  write(INVVID,'T',NORVID,'ext');
+  _setcursor(10,12);
+  write(INVVID,'F',NORVID,'lood');
+  _setcursor(20,12);
+  write(INVVID,'E',NORVID,'rase');
+  _setcursor(30,12);
+  write(INVVID,'C',NORVID,'lear');
+  _setcursor(40,12);
+  write(INVVID,'M',NORVID,'ode');
 
   _setcursor(0,13);
-  write(INVVID,'ESC',NORVID,':Cancel  ',
-        INVVID,'W',NORVID,':Save  ',
-        INVVID,'Q',NORVID,':Quit  ',
-        INVVID,'K',NORVID,':Kill');
+  write(INVVID,'ESC',NORVID,':Exit');
+  _setcursor(10,13);
+  write(INVVID,'DEL',NORVID,':Undo');
+  _setcursor(20,13);
+  write(INVVID,'W',NORVID,':Save');
+  _setcursor(30,13);
+  write(INVVID,'Q',NORVID,':Quit');
+  _setcursor(40,13);
+  write(INVVID,'K',NORVID,':Kill');
 
   _htxtgr(0,47,14,CYAN);
 end;
 
-proc rectanglemode;
-{*****************}
+proc eraserect(x,y,sx,sy:integer);
+{********************************}
+var xmin,xmax,ymin,ymax,yy:integer;
+begin
+  if sx>=0 then begin
+    xmin:=x;
+    xmax:=x+sx;
+  end else begin
+    xmin:=x+sx;
+    xmax:=x;
+  end;
+
+  if sy>=0 then begin
+    ymin:=y;
+    ymax:=y+sy;
+  end else begin
+    ymin:=y+sy;
+    ymax:=y;
+  end;
+
+  for yy:=ymin to ymax do begin
+    _move(xmin,yy);
+    _draw(xmax,yy,BLACK);
+  end;
+end;
+
+proc drawshape(mode:integer);
+{***************************}
+var dx,dy,r:integer;
+begin
+  if dmode=dcircle then begin
+    dx:=x-startx;
+    dy:=y-starty;
+    r:=floor(sqrt(conv(dx*dx+dy*dy)+0.5));
+    _circle(startx,starty,r,mode);
+  end else
+    _rectangle(startx,starty,
+      x-startx,y-starty,mode);
+end;
+
+proc shapemode;
+{*************}
 var mode,mx,my:integer;
     key:char;
     found, visible:boolean;
@@ -438,37 +502,22 @@ begin
   do begin
     if _isesc then begin
       { Remove the current XOR preview }
-      if visible then begin
-        _move(startx,starty);
-        _draw(x,starty,INVERSE);
-        _draw(x,y,INVERSE);
-        _draw(startx,y,INVERSE);
-        _draw(startx,starty,INVERSE);
-      end;
+      if visible then
+        drawshape(INVERSE);
       exit;
     end;
 
     if (not visible) or (mx<>x) or (my<>y) then begin
 
       { Erase previous XOR rectangle }
-      if visible then begin
-        _move(startx,starty);
-        _draw(x,starty,INVERSE);
-        _draw(x,y,INVERSE);
-        _draw(startx,y,INVERSE);
-        _draw(startx,starty,INVERSE);
-      end;
+      if visible then
+        drawshape(INVERSE);
 
       x:=mx;
       y:=my;
 
       { Draw new XOR rectangle }
-      _move(startx,starty);
-      _draw(x,starty,INVERSE);
-      _draw(x,y,INVERSE);
-      _draw(startx,y,INVERSE);
-      _draw(startx,starty,INVERSE);
-
+      drawshape(INVERSE);
       visible:=true;
     end;
     mx:=MOUSEDRAGX;
@@ -476,97 +525,109 @@ begin
   end;
 
   { Erase the temporary XOR rectangle }
-  if visible then begin
-    _move(startx,starty);
-    _draw(x,starty,INVERSE);
-    _draw(x,y,INVERSE);
-    _draw(startx,y,INVERSE);
-    _draw(startx,starty,INVERSE);
-  end;
+  if visible then
+    drawshape(INVERSE);
 
-  { Draw the permanent rectangle }
-  _move(startx,starty);
-  _draw(x,starty,cmode);
-  _draw(x,y,cmode);
-  _draw(startx,y,cmode);
-  _draw(startx,starty,cmode);
+  { Draw permanent rectangle or erase area }
+  if visible then begin
+    if dmode=derase then
+      eraserect(startx,starty,x-startx,y-starty)
+    else
+      drawshape(cmode);
+  end;
 end;
 
-proc linemode;
-{************}
+proc linemode(join:boolean);
+{***************************}
 var mode,mx,my:integer;
     key:char;
-    found, visible:boolean;
+    found,visible,first:boolean;
 begin
   if _isesc then begin end;
   saveundo;
+  first:=true;
 
   repeat
-    if _isesc then exit;
-    mode:=0;
-    found:=_getinput(mode,mx,my,key);
 
-    if found then begin
-      if mode=2 then begin
-        startx:=mx;
-        starty:=my;
-      end;
+    { Wait for mouse click }
+    repeat
+      if _isesc then exit;
+      mode:=0;
+      found:=_getinput(mode,mx,my,key);
 
-      if key<>chr(0) then begin
-        nextch:=key;
-        exit;
-      end;
-    end else
-      _delay10msec(1);
-  until mode=2;
+      if found then begin
+        if mode=2 then begin
+          if first then begin
+            startx:=mx;
+            starty:=my;
+          end;
+        end;
 
-  { Drag line }
-  visible:=false;
+        if key<>chr(0) then begin
+          nextch:=key;
+          exit;
+        end;
+      end else
+        _delay10msec(1);
+    until mode=2;
 
-  mx:=MOUSEDRAGX;
-  my:=MOUSEDRAGY;
-  while (mx<>$ff) and (my<>$ff)
-  do begin
-    if _isesc then begin
-      { Remove the current XOR preview }
-      if visible then begin
-        _move(startx,starty);
-        _draw(x,y,INVERSE);
-      end;
-      exit;
-    end;
-
-    if (not visible) or (mx<>x) or (my<>y) then begin
-
-      { Erase previous XOR line }
-      if visible then begin
-        _move(startx,starty);
-        _draw(x,y,INVERSE);
-      end;
-
-      x:=mx;
-      y:=my;
-
-      { Draw new XOR line }
-      _move(startx,starty);
-      _draw(x,y,INVERSE);
-
-      visible:=true;
-    end;
+    { Drag line }
+    visible:=false;
 
     mx:=MOUSEDRAGX;
     my:=MOUSEDRAGY;
-  end;
+    while (mx<>$ff) and (my<>$ff) do begin
+      if _isesc then begin
+        { Remove current XOR preview }
+        if visible then begin
+          _move(startx,starty);
+          _draw(x,y,INVERSE);
+        end;
+        exit;
+      end;
 
-  { Erase the temporary XOR line }
-  if visible then begin
-    _move(startx,starty);
-    _draw(x,y,INVERSE);
-  end;
+      if (not visible) or (mx<>x) or (my<>y)
+      then begin
 
-  { Draw the permanent line }
-  _move(startx,starty);
-  _draw(x,y,cmode);
+        { Erase previous XOR line }
+        if visible then begin
+          _move(startx,starty);
+          _draw(x,y,INVERSE);
+        end;
+
+        x:=mx;
+        y:=my;
+
+        { Draw new XOR line }
+        _move(startx,starty);
+        _draw(x,y,INVERSE);
+
+        visible:=true;
+      end;
+
+      mx:=MOUSEDRAGX;
+      my:=MOUSEDRAGY;
+    end;
+
+    { Erase temporary XOR line }
+    if visible then begin
+      _move(startx,starty);
+      _draw(x,y,INVERSE);
+    end;
+
+    { Draw permanent line }
+    if visible then begin
+      _move(startx,starty);
+      _draw(x,y,cmode);
+
+      { Endpoint becomes start of next segment }
+      startx:=x;
+      starty:=y;
+    end;
+
+    first:=false;
+
+  until not join;
 end;
 
 proc pointmode(mx,my:integer);
@@ -640,6 +701,12 @@ begin
         visible:=false;
       end;
 
+      { RUBOUT exits TEXT and requests Undo }
+      if ch=RUBOUT then begin
+        nextch:=ch;
+        exit;
+      end;
+
       { Mouse selects new text position }
       if mode=2 then begin
         x:=mx;
@@ -708,6 +775,7 @@ begin
     _move(x+1,y);
     _draw(x+5,y,INVERSE);
   end;
+
 end;
 
 proc floodmode;
@@ -739,11 +807,6 @@ begin
   until false;
 end;
 
-proc joinmode;
-{************}
-begin
-end;
-
 proc paint;
 {*********}
 { This is the main painting loop }
@@ -773,7 +836,10 @@ begin
 
       case ch of
 
-      'C':    _cleargr;
+      'C':    begin
+                saveundo;
+                _cleargr;
+              end;
 
       'M':    begin
                 cmode:=cmode+1;
@@ -787,7 +853,7 @@ begin
       'L':    begin
                 dmode:=dline;
                 status;
-                linemode;
+                linemode(false);
                 dmode:=dpoint;
               end;
 
@@ -801,13 +867,28 @@ begin
       'R':    begin
                 dmode:=drect;
                 status;
-                rectanglemode;
+                shapemode;
                 dmode:=dpoint;
               end;
+
+      'E':    begin
+                dmode:=derase;
+                status;
+                shapemode;
+                dmode:=dpoint;
+              end;
+
+      'O':    begin
+                dmode:=dcircle;
+                status;
+                shapemode;
+                dmode:=dpoint;
+              end;
+
       'J':    begin
                 dmode:=djoin;
                 status;
-                joinmode;
+                linemode(true);
                 dmode:=dpoint;
               end;
 
@@ -817,6 +898,8 @@ begin
                 textmode;
                 dmode:=dpoint;
               end;
+
+      'S':    savecanvas;
 
       RUBOUT: restoreundo;
 
