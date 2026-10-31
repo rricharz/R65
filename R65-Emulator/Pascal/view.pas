@@ -306,7 +306,7 @@ end;
 
 proc exit56mode;
 begin
-  setnumlin($29,$2f);
+  setnumlin($54,$2f);
   write(HOM,CLRSCR);
 end;
 

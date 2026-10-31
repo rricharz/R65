@@ -687,7 +687,7 @@ begin {main}
       esc: if doesc then stop:=true
     end {case};
     until stop;
-  setnumlin($29,$2f);
+  setnumlin($54,$2f);
   writeln(HOM, clrscr);
   dummy:=_freedrv(FILDRV,true);
 end.
