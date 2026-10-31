@@ -5,17 +5,20 @@ program gr3d;
 uses syslib,mathlib,plotlib;
 
 var mask:array[XSIZE] of integer;
+{*******************************}
     i:integer;
     x1,y1,x2,y2:real;
     x,y,step,max,scale:real;
     sx,sy,dx,dy:real;
 
 func f1(x0,y0:real):real;
+{***********************}
 begin
   f1:=sin(2.0*x0+y0);
 end;
 
 func f2(x0,y0:real):real;
+{***********************}
 var r:real;
 begin
   r:=sqrt(x0 * x0 + y0 * y0);
@@ -24,12 +27,14 @@ begin
 end;
 
 proc drawvec(x11,y11,x22,y22);
+{****************************}
 begin
   _move(x11,y11);
   _draw(x22,y22,WHITE);
 end;
 
 proc drawmasked(x1,y1,x2,y2:integer;
+{**********************************}
                 visible:boolean);
 var i,start,vstart:integer;
     dodraw:boolean;
@@ -98,15 +103,15 @@ begin
     mask[x2]:=y2;
 end;
 
-{$I ICHKESC:P}
-
-begin
+begin { main }
   sx:=conv(XSIZE)/2.0;
   sy:=conv(YSIZE)/8.0;
   dx:=6.0;
   dy:=3.0;
 
-  _grinit; _cleargr; _splitview;
+  _grinit;
+  _cleargr;
+  _fullview;
 
   step:=20.0;
   max:=360.0;
@@ -139,7 +144,7 @@ begin
     x1:=dx*x-dx*y;
     y1:=dy*x+dy*y+f1(x,y)*scale;
     y:=0.0;
-    if chkesc(true) then begin _splitview; exit end;
+    if _isesc then begin _splitview; exit end;
     while y<max do begin
       y:=y+step;
       x2:=dx*x-dx*y;
@@ -176,7 +181,7 @@ begin
     x1:=dx*x-dx*y;
     y1:=dy*x+dy*y+f1(x,y)*scale;
     x:=0.0;
-    if chkesc(true) then begin _splitview; exit end;
+    if _isesc then begin _splitview; exit end;
 
     while x<max do begin
       x:=x+step;
@@ -230,7 +235,7 @@ begin
     y1:=dy*x+dy*y+
       f2(x-max/2.0,y-max/2.0)*scale;
     y:=0.0;
-    if chkesc(true) then begin _splitview; exit end;
+    if _isesc then begin _splitview; exit end;
 
     while y<max do begin
       y:=y+step;
@@ -272,7 +277,7 @@ begin
     y1:=dy*x+dy*y+
       f2(x-max/2.0,y-max/2.0)*scale;
     x:=0.0;
-    if chkesc(true) then begin _splitview; exit end;
+    if _isesc then begin _splitview; exit end;
 
     while x<max do begin
       x:=x+step;

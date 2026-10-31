@@ -174,8 +174,9 @@ begin
   if mode>3 then mode:=1;
 end;
 
-proc exmouse(mmode,mx,my:integer);
+proc exmouse(mode,x,y:integer);
 begin
+  { dummy procedure, do nothing }
 end;
 
 {$I IANIMATE:P}

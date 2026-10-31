@@ -752,6 +752,11 @@ begin
    end {case};
 end;
 
+proc exmouse(mode,x,y:integer);
+begin
+  { dummy procedure, do nothing }
+end;
+
 proc init;
 var f:integer;
 
@@ -890,10 +895,6 @@ begin
   end;
   showshaft;
   showgem(NFLOORS);
-end;
-
-proc exmouse(mmode,mx,my:integer);
-begin
 end;
 
 {$I IANIMATE:P}

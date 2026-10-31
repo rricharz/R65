@@ -23,6 +23,11 @@ begin
   { otherwise nothing to do }
 end;
 
+proc exmouse(mode,x,y:integer);
+begin
+  { dummy procedure, do nothing }
+end;
+
 {$I IANIMATE:P}
 
 begin

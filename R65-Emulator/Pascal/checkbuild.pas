@@ -136,8 +136,15 @@ begin
   for i:=0 to 15 do
     FILNM1[i] := FILNAM[i];
   FILCY1 := FILCYC;
+        { search for object on drive 0 }
   FILDRV := 0;
   notfound := not match;
+        { search for object on drive 1 }
+        if notfound then begin
+        FILDRV := 1;
+        notfound := not match;
+        end;
+  FILDRV := 0;
   if notfound then begin
     last := 15;
     while (last > 0) and (FILNAM[last] = ' ') do
@@ -199,7 +206,7 @@ begin {main}
     end;
     entry := entry + 1;
     if _isesc then done := true;
-  until done;
+  until (done or _isesc);
   writeln(PRTON);
   writeln('CHECKBUILD complete, errors: ',errors);
   writeln('Files checked:               ', files);
@@ -210,4 +217,4 @@ begin {main}
   write(PRTOFF);
 
 end.
-                          
+

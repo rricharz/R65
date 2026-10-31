@@ -37,6 +37,11 @@ begin
  exkey := (ch = chr(0));  { stop on escape }
 end;
 
+proc exmouse(mode,x,y:integer);
+begin
+  { dummy procedure, do nothing }
+end;
+
 {$I IANIMATE:P}
 
 begin

@@ -16,6 +16,8 @@ system.
 
           rricharz 2018,2019             }
 
+{$U+}
+
 program alien;
 uses syslib,plotlib,writelib;
 
@@ -192,8 +194,9 @@ begin
   exkey := (ch = chr(0));
 end;
 
-proc exmouse(mmode,mx,my:integer);
+proc exmouse(mode,x,y:integer);
 begin
+  if mode=2 then lasercount := 6;
 end;
 
 {$I IANIMATE:P}
