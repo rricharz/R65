@@ -648,7 +648,7 @@ begin
 
   r := 0.0;
   lastr := 0.0;
-  mode := M_FLOAT;
+  mode := M_WORD;
   format := F_AUTO;
   showresult;
 
