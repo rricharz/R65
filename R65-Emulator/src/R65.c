@@ -494,12 +494,14 @@ int editor()
 
 #else
 
-        char *argv[] = {
-            "/usr/bin/mousepad",
-            "--disable-server",
-            name,
-            NULL
-        };
+		char *argv[] = {
+			"/usr/bin/env",
+			"GDK_BACKEND=x11",
+			"/usr/bin/mousepad",
+			"--disable-server",
+			name,
+			NULL
+		};
         logmsg("Running mousepad on %s, waiting for completion\n", name);
 
 #endif
