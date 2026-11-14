@@ -12,7 +12,7 @@
    Written 2019-2023 by rricharz  }
 
 program calc;
-uses syslib,mathlib,strlib,writelib;
+uses syslib,mathlib,strlib,writelib,txtgrlib;
 
 const
     M_FLOAT=0;
@@ -30,6 +30,7 @@ const
     T_SHR = chr($85);
 
 mem vidpnt=$00e9:integer;
+                curlin  = $ed: integer&;
 
 var ch: char;
     r, lastr: real;
@@ -41,7 +42,7 @@ proc error(s1,s2:cpnt);
 {*********************}
 begin
   if firsterror then
-    writeln(INVVID,s1,' ',s2,NORVID);
+    writeln(INVVID,' ',s1,' ',s2,NORVID);
   firsterror:=false;
 end;
 
@@ -226,6 +227,8 @@ proc showresult;
 {**************}
 var i:integer;
 begin
+  write('  ');
+
   case mode of
     M_FLOAT:
       if format=F_AUTO then
@@ -260,6 +263,10 @@ begin
 
   end;
   writeln;
+  writeln;
+  _vtxtgr(0,11,14,CYAN);
+  _vtxtgr(NUMCHR,11,14,CYAN);
+  _htxtgr(0,NUMCHR,14,CYAN);
 end;
 
 func express:real;
@@ -629,22 +636,27 @@ end;
 begin
   line := _new;
 
-  writeln('Enter an expression, for example:');
-  writeln('32767      INPUT decimal number');
-  writeln('$FFF       INPUT hex number');
-  writeln('%1101      INPUT binary number');
-  writeln(chr(39),'A',chr(39),
-          '        INPUT ASCII character');
-  writeln('2*(5+28)   math expression');
-  writeln('R*3        last result');
-  writeln('<return>,<esc>   exit');
-  writeln('Operators: +,-,*,/,(),AND,OR,XOR',
-          ',SHL,SHR,MOD');
-  writeln('Functions: SQRT(),SQR(),SIN(),COS()');
-  writeln('           TAN(),EXP(),LN(),LOG(),MEM()');
-  writeln('Modes:     FLOAT,WORD,BYTE');
-  writeln('Format:    AUTO,FIX2');
   writeln;
+  writeln('  Enter an expression, for example:');
+  writeln('  1170   $FFFF   ',
+            'INPUT decimal or hex');
+  writeln('  %1101  ',chr(39),'A',chr(39),'     ',
+            'INPUT binary or character');
+  writeln('  2*(5+28)*R     ',
+            'expression with last result');
+  writeln('  <return>,<esc>   exit');
+  writeln('  Operators: +,-,*,/,(),AND,OR,XOR',
+          ',SHL,SHR,MOD');
+  writeln('  Functions: SQRT(),SQR(),SIN(),COS()');
+  writeln('             TAN(),EXP(),LN(),',
+                    'LOG(),MEM()');
+  writeln('  Modes:     FLOAT,WORD,BYTE');
+  writeln('  Format:    AUTO,FIX2');
+  writeln;
+  _htxtgr(0,NUMCHR,3,CYAN);
+  _htxtgr(0,NUMCHR,13,CYAN);
+  _vtxtgr(0,3,13,CYAN);
+  _vtxtgr(NUMCHR,3,13,CYAN);
 
   r := 0.0;
   lastr := 0.0;
@@ -656,9 +668,9 @@ begin
     firsterror:=true;
 
     case mode of
-      M_FLOAT: write('FLOAT> ');
-      M_WORD:  write('WORD> ');
-      M_BYTE:  write('BYTE> ')
+      M_FLOAT: write(' FLOAT> ');
+      M_WORD:  write(' WORD> ');
+      M_BYTE:  write(' BYTE> ')
     end;
 
     n := _strread(INPUT, line, dummy);
