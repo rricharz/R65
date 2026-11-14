@@ -30,20 +30,26 @@ begin
   call(stopcode);
 end;
 
+func _freepages;
+{********************}
+mem  sp     = $0008: integer;
+     endstk = $000e: integer;
+begin
+   { Pascal has no type unsigned integer. }
+  { But the free space can be larger than 32767 }
+  { We work therefore with free words here }
+  _freepages:=(endstk-sp) shr 8;
+end;
+
 func _new: cpnt;
 {**************}
 { alocate memory on heap for string }
 mem  sp     = $0008: integer;
      endstk = $000e: integer;
-var  freewords,i:integer;
-     str:cpnt;
+var  str:cpnt;
 begin
-  { Pascal has no type unsigned integer. }
-  { But the free space can be larger than 32767 }
-  { We work therefore with free words here }
-  freewords:=(endstk-sp) shr 1;
-  if freewords < (STRSIZE + 256) then begin
-    { 255 words are left for the growing stack }
+  if _freepages < 4 then begin
+    { leave some space for the growing stack }
     _runerr($88);
   end;
   { allocate heap memory }
