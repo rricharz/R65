@@ -88,7 +88,9 @@ static gboolean global_hasFocus = FALSE;
 
 FILE *logFile = NULL;
 
+////////////////////////////////////
 void logmsg(const char *format, ...)
+////////////////////////////////////
 {
     va_list args;
 
@@ -100,6 +102,14 @@ void logmsg(const char *format, ...)
     va_end(args);
 
     fflush(logFile);
+}
+
+/////////////////////////
+void present_window(void)
+/////////////////////////
+{
+    if (global_window != NULL)
+        gtk_window_present(GTK_WINDOW(global_window));
 }
 
 /////////////////////////////////////////////

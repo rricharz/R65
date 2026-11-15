@@ -22,6 +22,7 @@ void Paint(void);
 void Alert(char *s, int halt);
 void QuitProgram(int shutDownFlag);
 void checkPendingEvents();
+void present_window(void);
 
 extern int windowWidth, windowHeight;
 extern int crtWidth, crtHeight, crtOffset;

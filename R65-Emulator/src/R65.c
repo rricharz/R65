@@ -529,6 +529,9 @@ int editor()
     }
 
     g_spawn_close_pid(pid);
+#ifdef __linux__
+    present_window();
+#endif
 
     if (!(WIFEXITED(status) && (WEXITSTATUS(status) == 0)))
         return 0x68;

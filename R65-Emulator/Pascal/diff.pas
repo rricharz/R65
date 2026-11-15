@@ -13,8 +13,25 @@ Usage:
     default for version:      highest
     default for drive:        1         }
 
+{ String length optimization:
+  R65 strings have STRSIZE+1 bytes (0..STRSIZE).
+  The actual string ends with ENDMARK.
+  Since text lines are limited to 56 characters,
+  the last byte s[STRSIZE] is unused.
+
+  DIFF stores the string length in this last byte
+  when reading a line with append_line.
+
+  same_line first compares these lengths, then
+  compares characters only if the lengths match.
+  This speeds up synchronization searches without
+  requiring any additional memory.
+}
+
 program diff;
 uses syslib, arglib, strlib, striolib, writelib;
+
+const SYNC_LINES = 3;
 
 var file1, file2:     file;
     line1, line2:     integer;
@@ -53,9 +70,8 @@ begin
   _strfio(name1, cyclus1, drive1);
   openr(file1);
   cyclus1:= FILCYC;
-  writeln('DIFF - DIFFERENCE BETWEEN TEXT FILES');
-  writeln('File 1: ', name1,'.',
-      hexb(cyclus1),'.',drive1);
+  writeln('--- ', name1,'.',
+      hexb(cyclus1),',',drive1);
 
   { get second argument and convert to filespec }
    case ARGTYPE[_carg] of
@@ -89,8 +105,8 @@ begin
   _strfio(name2, cyclus2, drive2);
   openr(file2);
   cyclus2 := FILCYC;
-  writeln('File 2: ', name2,'.',
-    hexb(cyclus2),'.',drive2);
+  writeln('+++ ', name2,'.',
+    hexb(cyclus2),',',drive2);
 
   { Validation }
   if (_strcmp(name1,name2) = 0)
@@ -104,22 +120,24 @@ begin
   eof2 := false;
 end;
 
-const buffer_size = 200;
-var buffer1, buffer2: array[buffer_size] of cpnt;
-    head1, head2: integer;
+const BUFFER_SIZE = 200;
+
+var buffer1, buffer2: array[BUFFER_SIZE] of cpnt;
+    head1, head2:   integer;
     count1, count2: integer;
+    sync1, sync2:   integer;
 
 proc init_buffers;
 {****************}
 var i: integer;
 begin
-  if _freepages < ((buffer_size * 2 * 65) shr 8) + 8
+  if _freepages < ((BUFFER_SIZE * 2 * 65) shr 8) + 8
   then begin
-    writeln('Internal error: reduce buffer_size');
+    writeln('Internal error: reduce BUFFER_SIZE');
     _abort;
   end;
 
-  for i := 0 to buffer_size - 1 do begin
+  for i := 0 to BUFFER_SIZE - 1 do begin
     buffer1[i] := _new;
     buffer2[i] := _new;
   end;
@@ -130,66 +148,303 @@ begin
   count2 := 0;
 end;
 
+func bufindex(head,p:integer):integer;
+{************************************}
+var i:integer;
+begin
+  i := head + p;
+  if i >= BUFFER_SIZE then
+    i := i - BUFFER_SIZE;
+  bufindex := i;
+end;
+
 proc advance(n:integer);
 {*********************}
 begin
   if n = 1 then begin
-    head1 := _mod(head1 + 1, buffer_size);
+    head1 := bufindex(head1,1);
     count1 := count1 - 1;
     line1 := line1 + 1;
   end
   else begin
-    head2 := _mod(head2 + 1, buffer_size);
+    head2 := bufindex(head2,1);
     count2 := count2 - 1;
     line2 := line2 + 1;
   end;
 end;
 
+func append_line(n:integer):boolean;
+{**********************************}
+var p,length:integer;
+    b:cpnt;
+begin
+  append_line := false;
+
+  if n = 1 then begin
+    if eof1 or (count1 = BUFFER_SIZE) then exit;
+
+    p := bufindex(head1,count1);
+    b := buffer1[p];
+    length := _strread(file1,b,eof1);
+    if eof1 then exit;
+
+    b[STRSIZE] := chr(length);
+    count1 := count1 + 1;
+  end
+  else begin
+    if eof2 or (count2 = BUFFER_SIZE) then exit;
+
+    p := bufindex(head2,count2);
+    b := buffer2[p];
+    length := _strread(file2,b,eof2);
+    if eof2 then exit;
+
+    b[STRSIZE] := chr(length);
+    count2 := count2 + 1;
+  end;
+
+  append_line := true;
+end;
+
 func getline(n:integer):cpnt;
 {*************************}
-var p,length:integer;
+var success:boolean;
 begin
   if n = 1 then begin
-    if count1 = 0 then begin
-      p := head1;
-      length := _strread(file1,buffer1[p],eof1);
-      if not eof1 then count1 := 1;
-    end;
+    if count1 = 0 then success := append_line(1);
     getline := buffer1[head1];
   end
   else begin
-    if count2 = 0 then begin
-      p := head2;
-      length := _strread(file2,buffer2[p],eof2);
-      if not eof2 then count2 := 1;
-    end;
+    if count2 = 0 then success := append_line(2);
     getline := buffer2[head2];
   end;
+end;
+
+func same_line(s1,s2:cpnt):boolean;
+{********************************}
+var i,n:integer;
+begin
+  same_line := true;
+  exit;
+
+  { compare lengths first }
+  if s1[STRSIZE] <> s2[STRSIZE] then exit;
+
+  n := ord(s1[STRSIZE]);
+  i := 0;
+  while i < n do begin
+    if s1[i] <> s2[i] then exit;
+    i := i + 1;
+  end;
+
+  same_line := true;
 end;
 
 proc skip_equal;
 {**************}
 var s1, s2: cpnt;
 begin
-  while not eof1 and not eof2 do begin
+  while true do begin
+    if eof1 and (count1 = 0) then exit;
+    if eof2 and (count2 = 0) then exit;
+
     s1 := getline(1);
     s2 := getline(2);
 
-    if _strcmp(s1,s2) <> 0 then
-      exit;
+    if (eof1 and (count1 = 0)) or
+       (eof2 and (count2 = 0)) then exit;
+
+    if not same_line(s1,s2) then exit;
 
     advance(1);
     advance(2);
   end;
 end;
 
+func buffer_line(n,p:integer):cpnt;
+{********************************}
+begin
+  if n = 1 then
+    buffer_line := buffer1[bufindex(head1,p)]
+  else
+    buffer_line := buffer2[bufindex(head2,p)];
+end;
+
+func match_sync(p1,p2:integer):boolean;
+{*************************************}
+var i:integer;
+    s1,s2:cpnt;
+begin
+  match_sync := false;
+  debug('match_sync', p1,  p2);
+
+  if (p1 < SYNC_LINES - 1) or
+      (p2 < SYNC_LINES -1) then exit;
+
+  for i := 0 to SYNC_LINES - 1 do begin
+    s1 := buffer_line(1,p1-i);
+    s2 := buffer_line(2,p2-i);
+    debug('compare: ', s1, s2);
+    if not same_line(s1,s2) then exit;
+  end;
+
+  match_sync := true;
+end;
+
+func check_new_line(n:integer):boolean;
+{***********************************}
+var p,i:integer;
+begin
+  check_new_line := false;
+
+  if (count1 < SYNC_LINES)
+      or (count2 < SYNC_LINES) then exit;
+
+  if n = 1 then begin
+    p := count1-1;
+    for i := SYNC_LINES - 1 to count2-1 do begin
+      if match_sync(p,i) then begin
+        sync1 := p - SYNC_LINES + 1;
+        sync2 := i - SYNC_LINES + 1;
+        check_new_line := true;
+        exit;
+      end;
+    end;
+  end
+  else begin
+    p := count2-1;
+    for i := SYNC_LINES - 1 to count1-1 do begin
+      if match_sync(i,p) then begin
+        sync1 := i - SYNC_LINES + 1;
+        sync2 := p - SYNC_LINES + 1;
+        check_new_line := true;
+        exit;
+      end;
+    end;
+  end;
+end;
+
+func find_sync:boolean;
+{**********************}
+var success:boolean;
+begin
+  find_sync := false;
+
+  while true do begin
+
+    { read from file 1 }
+    success := append_line(1);
+    if success then begin
+      debug('Append1: ',count1);
+      if check_new_line(1) then begin
+        find_sync := true;
+        exit;
+      end;
+    end;
+
+    { read from file 2 }
+    success := append_line(2);
+    if success then begin
+      debug('Append2: ',count2);
+      if check_new_line(2) then begin
+        find_sync := true;
+        exit;
+      end;
+    end;
+
+    { stop if neither file can supply another line }
+    if ((eof1 or (count1 = BUFFER_SIZE)) and
+        (eof2 or (count2 = BUFFER_SIZE))) then exit;
+
+    { stop if either buffer is full }
+    if (count1 = BUFFER_SIZE) or
+       (count2 = BUFFER_SIZE) then exit;
+
+  end;
+end;
+
+proc finish_diff;
+{****************}
+var b:cpnt;
+    length:integer;
+begin
+  { Report all remaining lines from file 1 }
+  while count1>0 do begin
+    writeln('-',buffer_line(1,0));
+    advance(1);
+  end;
+
+  { Report all remaining lines from file 2 }
+  while count2>0 do begin
+    writeln('+',buffer_line(2,0));
+    advance(2);
+  end;
+
+  { Read any additional lines from file 1 }
+  while not eof1 do begin
+    b:=buffer1[head1];
+    length:=_strread(file1,b,eof1);
+    if not eof1 then begin
+      writeln('-',b);
+      line1:=line1+1;
+    end;
+  end;
+
+  { Read any additional lines from file 2 }
+  while not eof2 do begin
+    b:=buffer2[head2];
+    length:=_strread(file2,b,eof2);
+    if not eof2 then begin
+      writeln('+',b);
+      line2:=line2+1;
+    end;
+  end;
+end;
+
+proc show_different;
+{******************}
+var found:boolean;
+    i:integer;
+begin
+  found:=find_sync;
+
+  if found then begin
+    writeln(INVVID,'@@ -',line1,',',sync1,
+            ' +',line2,',',sync2,' @@',NORVID);
+
+    for i:=0 to sync1-1 do
+      writeln('-',buffer_line(1,i));
+
+    for i:=0 to sync2-1 do
+      writeln('+',buffer_line(2,i));
+
+    for i:=1 to sync1 do advance(1);
+    for i:=1 to sync2 do advance(2);
+  end else begin
+    if eof1 and eof2 then
+      finish_diff
+    else begin
+      writeln(INVVID,
+        'DIFF: synchronization buffer full',NORVID);
+      _abort;
+    end;
+  end;
+end;
+
+var i: integer;
+
 begin
   init_files;
   init_buffers;
 
-  skip_equal;
-  writeln('line1=', line1, ', line2=',line2);
+  while not (eof1 and eof2 and
+           (count1 = 0) and (count2 = 0)) do begin
+    skip_equal;
 
+    if not (eof1 and eof2 and
+          (count1 = 0) and (count2 = 0)) then
+      show_different;
+  end;
   close(file1);
   close(file2);
 end.
