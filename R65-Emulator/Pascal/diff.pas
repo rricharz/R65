@@ -36,6 +36,44 @@ const SYNC_LINES = 3;
 var file1, file2:     file;
     line1, line2:     integer;
     eof1, eof2:       boolean;
+    progresscount:    integer;
+
+proc lednumber(n:integer);
+{************************}
+mem LEDREG=$1432: array[7] of char&;
+var s:cpnt;
+    i:integer;
+begin
+  s:=_new;
+  write(@s,n);
+
+  i:=0;
+  while (i<8) and (s[i]<>ENDMARK) do begin
+    LEDREG[i]:=s[i];
+    i:=i+1;
+  end;
+
+  while i<8 do begin
+    LEDREG[i]:=' ';
+    i:=i+1;
+  end;
+
+  _release(s);
+end;
+
+proc checkprogress;
+{*****************}
+var n:integer;
+begin
+  if _isesc then begin
+    writeln('DIFF aborted by ESC');
+    _abort;
+  end;
+  n:=line1;
+  if line2>n then n:=line2;
+  lednumber((n div 100) * 100);
+end;
+
 
 proc init_files;
 {**************}
@@ -53,6 +91,7 @@ begin
   line1 := 1;
   line2 := 1;
   default := true;
+  progresscount := 0;
 
   { get first filespec }
   _sgetstring(name1, _carg, default);
@@ -180,6 +219,12 @@ var p,length:integer;
 begin
   append_line := false;
 
+  progresscount:=progresscount-1;
+  if progresscount<0 then begin
+    progresscount:=400;
+    checkprogress;
+  end;
+
   if n = 1 then begin
     if eof1 or (count1 = BUFFER_SIZE) then exit;
 
@@ -224,8 +269,7 @@ func same_line(s1,s2:cpnt):boolean;
 {********************************}
 var i,n:integer;
 begin
-  same_line := true;
-  exit;
+  same_line := false;
 
   { compare lengths first }
   if s1[STRSIZE] <> s2[STRSIZE] then exit;

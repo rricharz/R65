@@ -153,34 +153,28 @@ begin
 end;
 
 func _strread(f:file; s:cpnt;
-          var ateof0:boolean):integer;
-{************************************}
-{ read string from file }
-var ch  : char;
-    i   : integer;
-    done: boolean;
+              var ateof0:boolean):integer;
+{****************************************}
+var ch:char;
+    i:integer;
 begin
-  ateof0 := false;
-  i := 0;
-  done := false;
-  while not done do begin
-    read(@f, ch);
-    if (ch = chr($7f)) or (ch = chr($1f))
-      then begin { EOF, also for old files }
-      ateof0 := true;
-      done := true;
+  ateof0:=false;
+  i:=0;
+
+  read(@f,ch);
+  while (ch<>chr($7f)) and (ch<>chr($0d)) do begin
+    if i<STRSIZE-1 then begin
+      s[i]:=ch;
+      i:=i+1;
     end;
-    if (ch = chr($0d)) or (ch = chr($0a)) then
-      done := true;
-    if not done then
-      if i < STRSIZE-1 then
-      begin
-        s[i] := ch;
-        i := i + 1;
-      end;
+    read(@f,ch);
   end;
-  s[i] := ENDMARK;
-  _strread := i;
+
+  if ch=chr($7f) then
+    ateof0:=true;
+
+  s[i]:=ENDMARK;
+  _strread:=i;
 end;
 
 proc _strdelc(pos:integer; s:cpnt);
