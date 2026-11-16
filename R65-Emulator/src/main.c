@@ -666,11 +666,65 @@ static void on_key_release(GtkWidget *widget, GdkEventKey *event, gpointer user_
   global_key_is_down = 0;
 }
 
+static gboolean scrolled(GtkWidget *widget,
+                         GdkEventScroll *event,
+                         gpointer data)
+{
+    static double accumulated_y = 0.0;
+    double dx = 0.0, dy = 0.0;
+    int ch = 0;
+
+    switch (event->direction) {
+
+        case GDK_SCROLL_UP:
+            accumulated_y = 0.0;
+            ch = 0x08;
+            break;
+
+        case GDK_SCROLL_DOWN:
+            accumulated_y = 0.0;
+            ch = 0x02;
+            break;
+
+        case GDK_SCROLL_SMOOTH:
+            if (gdk_event_get_scroll_deltas(
+                    (GdkEvent *)event, &dx, &dy)) {
+
+                // Discard accumulated movement on reversal
+                if ((dy > 0.0 && accumulated_y < 0.0) ||
+                    (dy < 0.0 && accumulated_y > 0.0))
+                    accumulated_y = 0.0;
+
+                accumulated_y += dy;
+
+                if (accumulated_y >= 1.0) {
+                    accumulated_y -= 1.0;
+                    ch = 0x02;  // ROLL DOWN
+                }
+                else if (accumulated_y <= -1.0) {
+                    accumulated_y += 1.0;
+                    ch = 0x08;  // ROLL UP
+                }
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    if (ch != 0) {
+        global_char = ch;
+        setKeyboardInterrupt();
+    }
+
+    return TRUE;
+}
+
 static int lock_fd = -1;
 
 //////////////////////////////////////
 int acquire_single_instance_lock(void)
-//?///////////////////////////////////
+//////////////////////////////////////
 {
     const char *lockfile = "/tmp/r65-emulator.lock";
 
@@ -878,7 +932,8 @@ int main (int argc, char *argv[])
 	
     gtk_window_set_title(GTK_WINDOW(global_window), WINDOW_NAME);
 	
-    gtk_widget_set_events(darea,gtk_widget_get_events(darea) | GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK);	
+    gtk_widget_set_events(darea, gtk_widget_get_events(darea) |
+            GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK | GDK_SMOOTH_SCROLL_MASK);
     g_signal_connect(G_OBJECT(darea), "draw",  G_CALLBACK(on_draw_event), NULL);
     g_signal_connect(G_OBJECT(global_window), "destroy", G_CALLBACK(on_quit_event), NULL);
     g_signal_connect(G_OBJECT(darea), "button-press-event", G_CALLBACK(clicked), NULL);
@@ -887,7 +942,8 @@ int main (int argc, char *argv[])
     g_signal_connect(G_OBJECT(global_window), "key_release_event", G_CALLBACK(on_key_release), NULL);
     g_signal_connect(global_window, "focus-in-event", G_CALLBACK(on_focus_in_event), NULL);
     g_signal_connect(global_window, "focus-out-event", G_CALLBACK(on_focus_out_event), NULL);
-    g_signal_connect(global_window, "motion-notify-event",G_CALLBACK(moved), NULL);	
+    g_signal_connect(global_window, "motion-notify-event",G_CALLBACK(moved), NULL);
+    g_signal_connect(G_OBJECT(darea), "scroll-event", G_CALLBACK(scrolled), NULL);	
 
     gtk_widget_show_all(global_window);
 	
