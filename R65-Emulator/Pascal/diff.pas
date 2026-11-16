@@ -1,17 +1,24 @@
-{***************************************
- * diff - difference between text file *
- ***************************************
+{
+ ****************************************
+ * DIFF - difference between text files *
+ ****************************************
 
 Usage:
-  diff filespec version
-  diff filespec filespec
+  DIFF filespec version
+  DIFF filespec filespec
 
   filespec:
     name:subtype.version,srive
 
     default for subtype:      :P
     default for version:      highest
-    default for drive:        1         }
+    default for drive:        1
+
+Special cases:
+  DIFF abc      Difference between second last and
+                last version of abc
+  DIFF abc.5    Difference between version 5 and
+                last version
 
 { String length optimization:
   R65 strings have STRSIZE+1 bytes (0..STRSIZE).
@@ -36,44 +43,6 @@ const SYNC_LINES = 3;
 var file1, file2:     file;
     line1, line2:     integer;
     eof1, eof2:       boolean;
-    progresscount:    integer;
-
-proc lednumber(n:integer);
-{************************}
-mem LEDREG=$1432: array[7] of char&;
-var s:cpnt;
-    i:integer;
-begin
-  s:=_new;
-  write(@s,n);
-
-  i:=0;
-  while (i<8) and (s[i]<>ENDMARK) do begin
-    LEDREG[i]:=s[i];
-    i:=i+1;
-  end;
-
-  while i<8 do begin
-    LEDREG[i]:=' ';
-    i:=i+1;
-  end;
-
-  _release(s);
-end;
-
-proc checkprogress;
-{*****************}
-var n:integer;
-begin
-  if _isesc then begin
-    writeln('DIFF aborted by ESC');
-    _abort;
-  end;
-  n:=line1;
-  if line2>n then n:=line2;
-  lednumber((n div 100) * 100);
-end;
-
 
 proc init_files;
 {**************}
@@ -91,13 +60,12 @@ begin
   line1 := 1;
   line2 := 1;
   default := true;
-  progresscount := 0;
 
   { get first filespec }
   _sgetstring(name1, _carg, default);
   if default then begin
     write(INVVID);
-    writeln(,'Usage: DIFF filespec [version]');
+    writeln('Usage: DIFF filespec [version]');
     writeln('   or   DIFF filespec filespec');
     write(NORVID);
     _abort;
@@ -108,6 +76,13 @@ begin
   _ssetsubtype(name1,'P', false);
   _strfio(name1, cyclus1, drive1);
   openr(file1);
+  if (cyclus1=0) and (ARGTYPE[_carg]=chr(0)) then
+  begin
+    close(file1);
+    cyclus1 := FILCYC - 1; { second last version }
+    _strfio(name1, cyclus1, drive1);
+    openr(file1);
+  end;
   cyclus1:= FILCYC;
   writeln('--- ', name1,'.',
       hexb(cyclus1),',',drive1);
@@ -219,10 +194,9 @@ var p,length:integer;
 begin
   append_line := false;
 
-  progresscount:=progresscount-1;
-  if progresscount<0 then begin
-    progresscount:=400;
-    checkprogress;
+  if _isesc then begin
+    writeln('DIFF aborted by ESC');
+    _abort;
   end;
 
   if n = 1 then begin
@@ -320,7 +294,6 @@ var i:integer;
     s1,s2:cpnt;
 begin
   match_sync := false;
-  debug('match_sync', p1,  p2);
 
   if (p1 < SYNC_LINES - 1) or
       (p2 < SYNC_LINES -1) then exit;
@@ -328,7 +301,6 @@ begin
   for i := 0 to SYNC_LINES - 1 do begin
     s1 := buffer_line(1,p1-i);
     s2 := buffer_line(2,p2-i);
-    debug('compare: ', s1, s2);
     if not same_line(s1,s2) then exit;
   end;
 
@@ -379,7 +351,6 @@ begin
     { read from file 1 }
     success := append_line(1);
     if success then begin
-      debug('Append1: ',count1);
       if check_new_line(1) then begin
         find_sync := true;
         exit;
@@ -389,7 +360,6 @@ begin
     { read from file 2 }
     success := append_line(2);
     if success then begin
-      debug('Append2: ',count2);
       if check_new_line(2) then begin
         find_sync := true;
         exit;

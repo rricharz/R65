@@ -1,498 +1,468 @@
-   1     4 {***************************************
-   2     4 [  0]  * diff - difference between text file *
-   3     4 [  0]  ***************************************
-   4     4 [  0] 
-   5     4 [  0] Usage:
-   6     4 [  0]   diff filespec version
-   7     4 [  0]   diff filespec filespec
-   8     4 [  0] 
-   9     4 [  0]   filespec:
-  10     4 [  0]     name:subtype.version,srive
-  11     4 [  0] 
-  12     4 [  0]     default for subtype:      :P
-  13     4 [  0]     default for version:      highest
-  14     4 [  0]     default for drive:        1         }
-  15     4 [  0] 
-  16     4 [  0] { String length optimization:
-  17     4 [  0]   R65 strings have STRSIZE+1 bytes (0..STRSIZE).
-  18     4 [  0]   The actual string ends with ENDMARK.
-  19     4 [  0]   Since text lines are limited to 56 characters,
-  20     4 [  0]   the last byte s[STRSIZE] is unused.
-  21     4 [  0] 
-  22     4 [  0]   DIFF stores the string length in this last byte
-  23     4 [  0]   when reading a line with append_line.
-  24     4 [  0] 
-  25     4 [  0]   same_line first compares these lengths, then
-  26     4 [  0]   compares characters only if the lengths match.
-  27     4 [  0]   This speeds up synchronization searches without
-  28     4 [  0]   requiring any additional memory.
-  29     4 [  0] }
-  30     4 [  0] 
-  31     4 [  0] program diff;
-  32     4 [  0] uses syslib, arglib, strlib, striolib, writelib;
-  33  6100 [112] 
-  34  6100 [112] const SYNC_LINES = 3;
-  35  6103 [113] 
-  36  6103 [113] var file1, file2:     file;
-  37  6103 [115]     line1, line2:     integer;
-  38  6103 [117]     eof1, eof2:       boolean;
-  39  6103 [119]     progresscount:    integer;
-  40  6103 [120] 
-  41  6103 [120] proc lednumber(n:integer);
-  42  6103 [122] {************************}
-  43  6103 [122] mem LEDREG=$1432: array[7] of char&;
-  44  6106 [123] var s:cpnt;
-  45  6106 [124]     i:integer;
-  46  6106 [125] begin
-  47  6106 [125]   s:=_new;
-  48  6114 [125]   write(@s,n);
-  49  6129 [125] 
-  50  6129 [125]   i:=0;
-  51  6131 [125]   while (i<8) and (s[i]<>ENDMARK) do begin
-  52  6159 [125]     LEDREG[i]:=s[i];
-  53  6171 [125]     i:=i+1;
-  54  6186 [125]   end;
-  55  6191 [125] 
-  56  6194 [125]   while i<8 do begin
-  57  6204 [125]     LEDREG[i]:=' ';
-  58  6210 [125]     i:=i+1;
-  59  6223 [125]   end;
-  60  6228 [125] 
-  61  6231 [125]   _release(s);
-  62  6241 [125] end;
-  63  6241 [125] 
-  64  6242 [121] proc checkprogress;
-  65  6242 [122] {*****************}
-  66  6242 [122] var n:integer;
-  67  6245 [123] begin
-  68  6245 [123]   if _isesc then begin
-  69  6253 [123]     writeln('DIFF aborted by ESC');
-  70  6282 [123]     _abort;
-  71  6286 [123]   end;
-  72  6286 [123]   n:=line1;
-  73  6286 [123]   if line2>n then n:=line2;
-  74  6306 [123]   lednumber((n div 100) * 100);
-  75  6330 [123] end;
-  76  6330 [123] 
-  77  6331 [122] 
-  78  6331 [122] proc init_files;
-  79  6331 [123] {**************}
-  80  6331 [123] mem FILCYC = $0311: integer&;
-  81  6334 [124] var name1, name2:     cpnt;
-  82  6334 [126]     cyclus1, drive1:  integer;
-  83  6334 [128]     cyclus2, drive2:  integer;
-  84  6334 [130] 
-  85  6334 [130]     default:          boolean;
-  86  6334 [131] begin
-  87  6334 [131]   name1 := _new;
-  88  6342 [131]   name2 := _new;
-  89  6352 [131]   cyclus1 := 0;
-  90  6358 [131]   drive1 := 1;
-  91  6364 [131]   line1 := 1;
-  92  6370 [131]   line2 := 1;
-  93  6376 [131]   default := true;
-  94  6382 [131]   progresscount := 0;
-  95  6388 [131] 
-  96  6392 [131]   { get first filespec }
-  97  6392 [131]   _sgetstring(name1, _carg, default);
-  98  6418 [131]   if default then begin
-  99  6422 [131]     write(INVVID);
- 100  6428 [131]     writeln(,'Usage: DIFF filespec [version]');
- 101  6465 [131]     writeln('   or   DIFF filespec filespec');
- 102  6502 [131]     write(NORVID);
- 103  6505 [131]     _abort;
- 104  6509 [131]   end;
- 105  6509 [131]   _agetval(cyclus1,    default);
- 106  6529 [131]   _agetval(drive1,     default);
- 107  6549 [131] 
- 108  6549 [131]   _ssetsubtype(name1,'P', false);
- 109  6563 [131]   _strfio(name1, cyclus1, drive1);
- 110  6581 [131]   openr(file1);
- 111  6587 [131]   cyclus1:= FILCYC;
- 112  6591 [131]   writeln('--- ', name1,'.',
- 113  6607 [131]       hexb(cyclus1),',',drive1);
- 114  6633 [131] 
- 115  6633 [131]   { get second argument and convert to filespec }
- 116  6633 [131]    case ARGTYPE[_carg] of
- 117  6639 [131]     chr(0): begin
- 118  6648 [131]               cyclus2 := 0;
- 119  6650 [131]               drive2 := drive1;
- 120  6654 [131]               _strcpy(name1,name2);
- 121  6676 [131]             end;
- 122  6676 [131]     'i':    begin
- 123  6686 [131]               cyclus2 := 0;
- 124  6688 [131]               _agetval(cyclus2, default);
- 125  6712 [131] 
- 126  6712 [131]               drive2 := drive1;
- 127  6712 [131]               _strcpy(name1,name2);
- 128  6734 [131]             end;
- 129  6734 [131]     's':    begin
- 130  6744 [131]               cyclus2 := 0;
- 131  6746 [131]               drive2 := drive1;
- 132  6750 [131]               _sgetstring(name2, _carg, default);
- 133  6784 [131]               _agetval(cyclus2,    default);
- 134  6804 [131]               _agetval(drive2,     default);
- 135  6824 [131]             end
- 136  6824 [131]     else    begin
- 137  6827 [131]               write(INVVID, 'Wrong type ');
- 138  6842 [131]               writeln('of second argument');
- 139  6867 [131]               writeln(NORVID);
- 140  6876 [131]             _abort;
- 141  6880 [131]             end
- 142  6880 [131]     end;
- 143  6882 [131]   _ssetsubtype(name2,'P', false);
- 144  6896 [131]   _strfio(name2, cyclus2, drive2);
- 145  6914 [131]   openr(file2);
- 146  6920 [131]   cyclus2 := FILCYC;
- 147  6924 [131]   writeln('+++ ', name2,'.',
- 148  6940 [131]     hexb(cyclus2),',',drive2);
- 149  6966 [131] 
- 150  6966 [131]   { Validation }
- 151  6966 [131]   if (_strcmp(name1,name2) = 0)
- 152  6984 [131]     and (cyclus1 = cyclus2) and (drive1 = drive2)
- 153  6999 [131]   then begin
- 154  7005 [131]     write(INVVID, 'Comparing identical files');
- 155  7037 [131]     writeln(' not allowed', NORVID);
- 156  7059 [131]     _abort;
- 157  7063 [131]   end;
- 158  7063 [131]   eof1 := false;
- 159  7065 [131]   eof2 := false;
- 160  7071 [131] end;
- 161  7075 [131] 
- 162  7076 [123] const BUFFER_SIZE = 200;
- 163  7076 [124] 
- 164  7076 [124] var buffer1, buffer2: array[BUFFER_SIZE] of cpnt;
- 165  7076 [126]     head1, head2:   integer;
- 166  7076 [128]     count1, count2: integer;
- 167  7076 [130]     sync1, sync2:   integer;
- 168  7076 [132] 
- 169  7076 [132] proc init_buffers;
- 170  7076 [133] {****************}
- 171  7076 [133] var i: integer;
- 172  7079 [134] begin
- 173  7079 [134]   if _freepages < ((BUFFER_SIZE * 2 * 65) shr 8) + 8
- 174  7098 [134]   then begin
- 175  7102 [134]     writeln('Internal error: reduce BUFFER_SIZE');
- 176  7146 [134]     _abort;
- 177  7150 [134]   end;
- 178  7150 [134] 
- 179  7150 [134]   for i := 0 to BUFFER_SIZE - 1 do begin
- 180  7170 [134]     buffer1[i] := _new;
- 181  7180 [134]     buffer2[i] := _new;
- 182  7194 [134]   end;
- 183  7198 [134] 
- 184  7212 [134]   head1 := 0;
- 185  7214 [134]   head2 := 0;
- 186  7220 [134]   count1 := 0;
- 187  7226 [134]   count2 := 0;
- 188  7232 [134] end;
- 189  7236 [134] 
- 190  7237 [133] func bufindex(head,p:integer):integer;
- 191  7237 [137] {************************************}
- 192  7237 [137] var i:integer;
- 193  7240 [138] begin
- 194  7240 [138]   i := head + p;
- 195  7246 [138]   if i >= BUFFER_SIZE then
- 196  7261 [138]     i := i - BUFFER_SIZE;
- 197  7271 [138]   bufindex := i;
- 198  7276 [138] end;
- 199  7284 [138] 
- 200  7285 [135] proc advance(n:integer);
- 201  7285 [137] {*********************}
- 202  7285 [137] begin
- 203  7285 [137]   if n = 1 then begin
- 204  7297 [137]     head1 := bufindex(head1,1);
- 205  7314 [137]     count1 := count1 - 1;
- 206  7324 [137]     line1 := line1 + 1;
- 207  7335 [137]   end
- 208  7340 [137]   else begin
- 209  7343 [137]     head2 := bufindex(head2,1);
- 210  7357 [137]     count2 := count2 - 1;
- 211  7367 [137]     line2 := line2 + 1;
- 212  7378 [137]   end;
- 213  7383 [137] end;
- 214  7383 [137] 
- 215  7384 [136] func append_line(n:integer):boolean;
- 216  7384 [139] {**********************************}
- 217  7384 [139] var p,length:integer;
- 218  7387 [141]     b:cpnt;
- 219  7387 [142] begin
- 220  7387 [142]   append_line := false;
- 221  7391 [142] 
- 222  7395 [142]   progresscount:=progresscount-1;
- 223  7401 [142]   if progresscount<0 then begin
- 224  7413 [142]     progresscount:=400;
- 225  7419 [142]     checkprogress;
- 226  7427 [142]   end;
- 227  7427 [142] 
- 228  7427 [142]   if n = 1 then begin
- 229  7434 [142]     if eof1 or (count1 = BUFFER_SIZE) then exit;
- 230  7453 [142] 
- 231  7453 [142]     p := bufindex(head1,count1);
- 232  7469 [142]     b := buffer1[p];
- 233  7477 [142]     length := _strread(file1,b,eof1);
- 234  7509 [142]     if eof1 then exit;
- 235  7521 [142] 
- 236  7521 [142]     b[STRSIZE] := chr(length);
- 237  7527 [142]     count1 := count1 + 1;
- 238  7538 [142]   end
- 239  7543 [142]   else begin
- 240  7546 [142]     if eof2 or (count2 = BUFFER_SIZE) then exit;
- 241  7562 [142] 
- 242  7562 [142]     p := bufindex(head2,count2);
- 243  7578 [142]     b := buffer2[p];
- 244  7586 [142]     length := _strread(file2,b,eof2);
- 245  7618 [142]     if eof2 then exit;
- 246  7630 [142] 
- 247  7630 [142]     b[STRSIZE] := chr(length);
- 248  7636 [142]     count2 := count2 + 1;
- 249  7647 [142]   end;
- 250  7652 [142] 
- 251  7652 [142]   append_line := true;
- 252  7654 [142] end;
- 253  7658 [142] 
- 254  7659 [138] func getline(n:integer):cpnt;
- 255  7659 [141] {*************************}
- 256  7659 [141] var success:boolean;
- 257  7662 [142] begin
- 258  7662 [142]   if n = 1 then begin
- 259  7671 [142]     if count1 = 0 then success := append_line(1);
- 260  7694 [142]     getline := buffer1[head1];
- 261  7702 [142]   end
- 262  7710 [142]   else begin
- 263  7713 [142]     if count2 = 0 then success := append_line(2);
- 264  7733 [142]     getline := buffer2[head2];
- 265  7741 [142]   end;
- 266  7749 [142] end;
- 267  7749 [142] 
- 268  7750 [140] func same_line(s1,s2:cpnt):boolean;
- 269  7750 [144] {********************************}
- 270  7750 [144] var i,n:integer;
- 271  7753 [146] begin
- 272  7753 [146]   same_line := false;
- 273  7757 [146] 
- 274  7761 [146]   { compare lengths first }
- 275  7761 [146]   if s1[STRSIZE] <> s2[STRSIZE] then exit;
- 276  7782 [146] 
- 277  7782 [146]   n := ord(s1[STRSIZE]);
- 278  7790 [146]   i := 0;
- 279  7796 [146]   while i < n do begin
- 280  7812 [146]     if s1[i] <> s2[i] then exit;
- 281  7837 [146]     i := i + 1;
- 282  7843 [146]   end;
- 283  7848 [146] 
- 284  7851 [146]   same_line := true;
- 285  7853 [146] end;
- 286  7857 [146] 
- 287  7858 [142] proc skip_equal;
- 288  7858 [143] {**************}
- 289  7858 [143] var s1, s2: cpnt;
- 290  7861 [145] begin
- 291  7861 [145]   while true do begin
- 292  7868 [145]     if eof1 and (count1 = 0) then exit;
- 293  7884 [145]     if eof2 and (count2 = 0) then exit;
- 294  7900 [145] 
- 295  7900 [145]     s1 := getline(1);
- 296  7910 [145]     s2 := getline(2);
- 297  7924 [145] 
- 298  7928 [145]     if (eof1 and (count1 = 0)) or
- 299  7940 [145]        (eof2 and (count2 = 0)) then exit;
- 300  7957 [145] 
- 301  7957 [145]     if not same_line(s1,s2) then exit;
- 302  7978 [145] 
- 303  7978 [145]     advance(1);
- 304  7986 [145]     advance(2);
- 305  7994 [145]   end;
- 306  7994 [145] end;
- 307  7997 [145] 
- 308  7998 [143] func buffer_line(n,p:integer):cpnt;
- 309  7998 [147] {********************************}
- 310  7998 [147] begin
- 311  7998 [147]   if n = 1 then
- 312  8009 [147]     buffer_line := buffer1[bufindex(head1,p)]
- 313  8029 [147]   else
- 314  8029 [147]     buffer_line := buffer2[bufindex(head2,p)];
- 315  8056 [147] end;
- 316  8064 [147] 
- 317  8065 [145] func match_sync(p1,p2:integer):boolean;
- 318  8065 [149] {*************************************}
- 319  8065 [149] var i:integer;
- 320  8068 [150]     s1,s2:cpnt;
- 321  8068 [152] begin
- 322  8068 [152]   match_sync := false;
- 323  8072 [152]   debug('match_sync', p1,  p2);
- 324  8076 [152] 
- 325  8076 [152]   if (p1 < SYNC_LINES - 1) or
- 326  8086 [152]       (p2 < SYNC_LINES -1) then exit;
- 327  8101 [152] 
- 328  8101 [152]   for i := 0 to SYNC_LINES - 1 do begin
- 329  8121 [152]     s1 := buffer_line(1,p1-i);
- 330  8140 [152]     s2 := buffer_line(2,p2-i);
- 331  8163 [152]     debug('compare: ', s1, s2);
- 332  8167 [152]     if not same_line(s1,s2) then exit;
- 333  8188 [152]   end;
- 334  8188 [152] 
- 335  8202 [152]   match_sync := true;
- 336  8204 [152] end;
- 337  8208 [152] 
- 338  8209 [147] func check_new_line(n:integer):boolean;
- 339  8209 [150] {***********************************}
- 340  8209 [150] var p,i:integer;
- 341  8212 [152] begin
- 342  8212 [152]   check_new_line := false;
- 343  8216 [152] 
- 344  8220 [152]   if (count1 < SYNC_LINES)
- 345  8226 [152]       or (count2 < SYNC_LINES) then exit;
- 346  8239 [152] 
- 347  8239 [152]   if n = 1 then begin
- 348  8246 [152]     p := count1-1;
- 349  8255 [152]     for i := SYNC_LINES - 1 to count2-1 do begin
- 350  8285 [152]       if match_sync(p,i) then begin
- 351  8301 [152]         sync1 := p - SYNC_LINES + 1;
- 352  8313 [152]         sync2 := i - SYNC_LINES + 1;
- 353  8327 [152]         check_new_line := true;
- 354  8334 [152]         exit;
- 355  8339 [152]       end;
- 356  8339 [152]     end;
- 357  8339 [152]   end
- 358  8353 [152]   else begin
- 359  8356 [152]     p := count2-1;
- 360  8362 [152]     for i := SYNC_LINES - 1 to count1-1 do begin
- 361  8392 [152]       if match_sync(i,p) then begin
- 362  8408 [152]         sync1 := i - SYNC_LINES + 1;
- 363  8420 [152]         sync2 := p - SYNC_LINES + 1;
- 364  8434 [152]         check_new_line := true;
- 365  8441 [152]         exit;
- 366  8446 [152]       end;
- 367  8446 [152]     end;
- 368  8446 [152]   end;
- 369  8460 [152] end;
- 370  8460 [152] 
- 371  8461 [149] func find_sync:boolean;
- 372  8461 [151] {**********************}
- 373  8461 [151] var success:boolean;
- 374  8464 [152] begin
- 375  8464 [152]   find_sync := false;
- 376  8468 [152] 
- 377  8472 [152]   while true do begin
- 378  8477 [152] 
- 379  8477 [152]     { read from file 1 }
- 380  8477 [152]     success := append_line(1);
- 381  8487 [152]     if success then begin
- 382  8495 [152]       debug('Append1: ',count1);
- 383  8498 [152]       if check_new_line(1) then begin
- 384  8508 [152]         find_sync := true;
- 385  8513 [152]         exit;
- 386  8518 [152]       end;
- 387  8518 [152]     end;
- 388  8518 [152] 
- 389  8518 [152]     { read from file 2 }
- 390  8518 [152]     success := append_line(2);
- 391  8528 [152]     if success then begin
- 392  8536 [152]       debug('Append2: ',count2);
- 393  8539 [152]       if check_new_line(2) then begin
- 394  8549 [152]         find_sync := true;
- 395  8554 [152]         exit;
- 396  8559 [152]       end;
- 397  8559 [152]     end;
- 398  8559 [152] 
- 399  8559 [152]     { stop if neither file can supply another line }
- 400  8559 [152]     if ((eof1 or (count1 = BUFFER_SIZE)) and
- 401  8571 [152]         (eof2 or (count2 = BUFFER_SIZE))) then exit;
- 402  8588 [152] 
- 403  8588 [152]     { stop if either buffer is full }
- 404  8588 [152]     if (count1 = BUFFER_SIZE) or
- 405  8595 [152]        (count2 = BUFFER_SIZE) then exit;
- 406  8607 [152] 
- 407  8607 [152]   end;
- 408  8607 [152] end;
- 409  8610 [152] 
- 410  8611 [151] proc finish_diff;
- 411  8611 [152] {****************}
- 412  8611 [152] var b:cpnt;
- 413  8614 [153]     length:integer;
- 414  8614 [154] begin
- 415  8614 [154]   { Report all remaining lines from file 1 }
- 416  8614 [154]   while count1>0 do begin
- 417  8626 [154]     writeln('-',buffer_line(1,0));
- 418  8647 [154]     advance(1);
- 419  8655 [154]   end;
- 420  8655 [154] 
- 421  8658 [154]   { Report all remaining lines from file 2 }
- 422  8658 [154]   while count2>0 do begin
- 423  8668 [154]     writeln('+',buffer_line(2,0));
- 424  8689 [154]     advance(2);
- 425  8697 [154]   end;
- 426  8697 [154] 
- 427  8700 [154]   { Read any additional lines from file 1 }
- 428  8700 [154]   while not eof1 do begin
- 429  8708 [154]     b:=buffer1[head1];
- 430  8712 [154]     length:=_strread(file1,b,eof1);
- 431  8744 [154]     if not eof1 then begin
- 432  8753 [154]       writeln('-',b);
- 433  8769 [154]       line1:=line1+1;
- 434  8775 [154]     end;
- 435  8780 [154]   end;
- 436  8780 [154] 
- 437  8783 [154]   { Read any additional lines from file 2 }
- 438  8783 [154]   while not eof2 do begin
- 439  8791 [154]     b:=buffer2[head2];
- 440  8795 [154]     length:=_strread(file2,b,eof2);
- 441  8827 [154]     if not eof2 then begin
- 442  8836 [154]       writeln('+',b);
- 443  8852 [154]       line2:=line2+1;
- 444  8858 [154]     end;
- 445  8863 [154]   end;
- 446  8863 [154] end;
- 447  8866 [154] 
- 448  8867 [152] proc show_different;
- 449  8867 [153] {******************}
- 450  8867 [153] var found:boolean;
- 451  8870 [154]     i:integer;
- 452  8870 [155] begin
- 453  8870 [155]   found:=find_sync;
- 454  8878 [155] 
- 455  8882 [155]   if found then begin
- 456  8886 [155]     writeln(INVVID,'@@ -',line1,',',sync1,
- 457  8904 [155]             ' +',line2,',',sync2,' @@',NORVID);
- 458  8937 [155] 
- 459  8937 [155]     for i:=0 to sync1-1 do
- 460  8949 [155]       writeln('-',buffer_line(1,i));
- 461  8982 [155] 
- 462  8996 [155]     for i:=0 to sync2-1 do
- 463  9008 [155]       writeln('+',buffer_line(2,i));
- 464  9041 [155] 
- 465  9055 [155]     for i:=1 to sync1 do advance(1);
- 466  9082 [155]     for i:=1 to sync2 do advance(2);
- 467  9123 [155]   end else begin
- 468  9140 [155]     if eof1 and eof2 then
- 469  9144 [155]       finish_diff
- 470  9149 [155]     else begin
- 471  9159 [155]       writeln(INVVID,
- 472  9161 [155]         'DIFF: synchronization buffer full',NORVID);
- 473  9205 [155]       _abort;
- 474  9209 [155]     end;
- 475  9209 [155]   end;
- 476  9209 [155] end;
- 477  9209 [155] 
- 478  9210 [153] var i: integer;
- 479  9210 [154] 
- 480  9210 [154] begin
- 481  9210 [154]   init_files;
- 482  9217 [154]   init_buffers;
- 483  9221 [154] 
- 484  9221 [154]   while not (eof1 and eof2 and
- 485  9225 [154]            (count1 = 0) and (count2 = 0)) do begin
- 486  9250 [154]     skip_equal;
- 487  9254 [154] 
- 488  9254 [154]     if not (eof1 and eof2 and
- 489  9258 [154]           (count1 = 0) and (count2 = 0)) then
- 490  9279 [154]       show_different;
- 491  9287 [154]   end;
- 492  9287 [154]   close(file1);
- 493  9296 [154]   close(file2);
- 494  9302 [154] end.
- 495  9302 [154] 
-Code length:           9301
-Compiler stack size:   152/320
-Ident stack size:      155/350
+   1     4 {
+   2     4 [  0]  ****************************************
+   3     4 [  0]  * DIFF - difference between text files *
+   4     4 [  0]  ****************************************
+   5     4 [  0] 
+   6     4 [  0] Usage:
+   7     4 [  0]   DIFF filespec version
+   8     4 [  0]   DIFF filespec filespec
+   9     4 [  0] 
+  10     4 [  0]   filespec:
+  11     4 [  0]     name:subtype.version,srive
+  12     4 [  0] 
+  13     4 [  0]     default for subtype:      :P
+  14     4 [  0]     default for version:      highest
+  15     4 [  0]     default for drive:        1
+  16     4 [  0] 
+  17     4 [  0] Special cases:
+  18     4 [  0]   DIFF abc      Difference between second last and
+  19     4 [  0]                 last version of abc
+  20     4 [  0]   DIFF abc.5    Difference between version 5 and
+  21     4 [  0]                 last version
+  22     4 [  0] 
+  23     4 [  0] { String length optimization:
+  24     4 [  0]   R65 strings have STRSIZE+1 bytes (0..STRSIZE).
+  25     4 [  0]   The actual string ends with ENDMARK.
+  26     4 [  0]   Since text lines are limited to 56 characters,
+  27     4 [  0]   the last byte s[STRSIZE] is unused.
+  28     4 [  0] 
+  29     4 [  0]   DIFF stores the string length in this last byte
+  30     4 [  0]   when reading a line with append_line.
+  31     4 [  0] 
+  32     4 [  0]   same_line first compares these lengths, then
+  33     4 [  0]   compares characters only if the lengths match.
+  34     4 [  0]   This speeds up synchronization searches without
+  35     4 [  0]   requiring any additional memory.
+  36     4 [  0] }
+  37     4 [  0] 
+  38     4 [  0] program diff;
+  39     4 [  0] uses syslib, arglib, strlib, striolib, writelib;
+  40  6100 [112] 
+  41  6100 [112] const SYNC_LINES = 3;
+  42  6103 [113] 
+  43  6103 [113] var file1, file2:     file;
+  44  6103 [115]     line1, line2:     integer;
+  45  6103 [117]     eof1, eof2:       boolean;
+  46  6103 [119] 
+  47  6103 [119] proc init_files;
+  48  6103 [120] {**************}
+  49  6103 [120] mem FILCYC = $0311: integer&;
+  50  6106 [121] var name1, name2:     cpnt;
+  51  6106 [123]     cyclus1, drive1:  integer;
+  52  6106 [125]     cyclus2, drive2:  integer;
+  53  6106 [127] 
+  54  6106 [127]     default:          boolean;
+  55  6106 [128] begin
+  56  6106 [128]   name1 := _new;
+  57  6114 [128]   name2 := _new;
+  58  6124 [128]   cyclus1 := 0;
+  59  6130 [128]   drive1 := 1;
+  60  6136 [128]   line1 := 1;
+  61  6142 [128]   line2 := 1;
+  62  6148 [128]   default := true;
+  63  6154 [128] 
+  64  6158 [128]   { get first filespec }
+  65  6158 [128]   _sgetstring(name1, _carg, default);
+  66  6184 [128]   if default then begin
+  67  6188 [128]     write(INVVID);
+  68  6194 [128]     writeln('Usage: DIFF filespec [version]');
+  69  6231 [128]     writeln('   or   DIFF filespec filespec');
+  70  6268 [128]     write(NORVID);
+  71  6271 [128]     _abort;
+  72  6275 [128]   end;
+  73  6275 [128]   _agetval(cyclus1,    default);
+  74  6295 [128]   _agetval(drive1,     default);
+  75  6315 [128] 
+  76  6315 [128]   _ssetsubtype(name1,'P', false);
+  77  6329 [128]   _strfio(name1, cyclus1, drive1);
+  78  6347 [128]   openr(file1);
+  79  6353 [128]   if (cyclus1=0) and (ARGTYPE[_carg]=chr(0)) then
+  80  6372 [128]   begin
+  81  6373 [128]     close(file1);
+  82  6382 [128]     cyclus1 := FILCYC - 1; { second last version }
+  83  6393 [128]     _strfio(name1, cyclus1, drive1);
+  84  6411 [128]     openr(file1);
+  85  6417 [128]   end;
+  86  6417 [128]   cyclus1:= FILCYC;
+  87  6421 [128]   writeln('--- ', name1,'.',
+  88  6437 [128]       hexb(cyclus1),',',drive1);
+  89  6463 [128] 
+  90  6463 [128]   { get second argument and convert to filespec }
+  91  6463 [128]    case ARGTYPE[_carg] of
+  92  6469 [128]     chr(0): begin
+  93  6478 [128]               cyclus2 := 0;
+  94  6480 [128]               drive2 := drive1;
+  95  6484 [128]               _strcpy(name1,name2);
+  96  6506 [128]             end;
+  97  6506 [128]     'i':    begin
+  98  6516 [128]               cyclus2 := 0;
+  99  6518 [128]               _agetval(cyclus2, default);
+ 100  6542 [128] 
+ 101  6542 [128]               drive2 := drive1;
+ 102  6542 [128]               _strcpy(name1,name2);
+ 103  6564 [128]             end;
+ 104  6564 [128]     's':    begin
+ 105  6574 [128]               cyclus2 := 0;
+ 106  6576 [128]               drive2 := drive1;
+ 107  6580 [128]               _sgetstring(name2, _carg, default);
+ 108  6614 [128]               _agetval(cyclus2,    default);
+ 109  6634 [128]               _agetval(drive2,     default);
+ 110  6654 [128]             end
+ 111  6654 [128]     else    begin
+ 112  6657 [128]               write(INVVID, 'Wrong type ');
+ 113  6672 [128]               writeln('of second argument');
+ 114  6697 [128]               writeln(NORVID);
+ 115  6706 [128]             _abort;
+ 116  6710 [128]             end
+ 117  6710 [128]     end;
+ 118  6712 [128]   _ssetsubtype(name2,'P', false);
+ 119  6726 [128]   _strfio(name2, cyclus2, drive2);
+ 120  6744 [128]   openr(file2);
+ 121  6750 [128]   cyclus2 := FILCYC;
+ 122  6754 [128]   writeln('+++ ', name2,'.',
+ 123  6770 [128]     hexb(cyclus2),',',drive2);
+ 124  6796 [128] 
+ 125  6796 [128]   { Validation }
+ 126  6796 [128]   if (_strcmp(name1,name2) = 0)
+ 127  6814 [128]     and (cyclus1 = cyclus2) and (drive1 = drive2)
+ 128  6829 [128]   then begin
+ 129  6835 [128]     write(INVVID, 'Comparing identical files');
+ 130  6867 [128]     writeln(' not allowed', NORVID);
+ 131  6889 [128]     _abort;
+ 132  6893 [128]   end;
+ 133  6893 [128]   eof1 := false;
+ 134  6895 [128]   eof2 := false;
+ 135  6901 [128] end;
+ 136  6905 [128] 
+ 137  6906 [120] const BUFFER_SIZE = 200;
+ 138  6906 [121] 
+ 139  6906 [121] var buffer1, buffer2: array[BUFFER_SIZE] of cpnt;
+ 140  6906 [123]     head1, head2:   integer;
+ 141  6906 [125]     count1, count2: integer;
+ 142  6906 [127]     sync1, sync2:   integer;
+ 143  6906 [129] 
+ 144  6906 [129] proc init_buffers;
+ 145  6906 [130] {****************}
+ 146  6906 [130] var i: integer;
+ 147  6909 [131] begin
+ 148  6909 [131]   if _freepages < ((BUFFER_SIZE * 2 * 65) shr 8) + 8
+ 149  6928 [131]   then begin
+ 150  6932 [131]     writeln('Internal error: reduce BUFFER_SIZE');
+ 151  6976 [131]     _abort;
+ 152  6980 [131]   end;
+ 153  6980 [131] 
+ 154  6980 [131]   for i := 0 to BUFFER_SIZE - 1 do begin
+ 155  7000 [131]     buffer1[i] := _new;
+ 156  7010 [131]     buffer2[i] := _new;
+ 157  7024 [131]   end;
+ 158  7028 [131] 
+ 159  7042 [131]   head1 := 0;
+ 160  7044 [131]   head2 := 0;
+ 161  7050 [131]   count1 := 0;
+ 162  7056 [131]   count2 := 0;
+ 163  7062 [131] end;
+ 164  7066 [131] 
+ 165  7067 [130] func bufindex(head,p:integer):integer;
+ 166  7067 [134] {************************************}
+ 167  7067 [134] var i:integer;
+ 168  7070 [135] begin
+ 169  7070 [135]   i := head + p;
+ 170  7076 [135]   if i >= BUFFER_SIZE then
+ 171  7091 [135]     i := i - BUFFER_SIZE;
+ 172  7101 [135]   bufindex := i;
+ 173  7106 [135] end;
+ 174  7114 [135] 
+ 175  7115 [132] proc advance(n:integer);
+ 176  7115 [134] {*********************}
+ 177  7115 [134] begin
+ 178  7115 [134]   if n = 1 then begin
+ 179  7127 [134]     head1 := bufindex(head1,1);
+ 180  7144 [134]     count1 := count1 - 1;
+ 181  7154 [134]     line1 := line1 + 1;
+ 182  7165 [134]   end
+ 183  7170 [134]   else begin
+ 184  7173 [134]     head2 := bufindex(head2,1);
+ 185  7187 [134]     count2 := count2 - 1;
+ 186  7197 [134]     line2 := line2 + 1;
+ 187  7208 [134]   end;
+ 188  7213 [134] end;
+ 189  7213 [134] 
+ 190  7214 [133] func append_line(n:integer):boolean;
+ 191  7214 [136] {**********************************}
+ 192  7214 [136] var p,length:integer;
+ 193  7217 [138]     b:cpnt;
+ 194  7217 [139] begin
+ 195  7217 [139]   append_line := false;
+ 196  7221 [139] 
+ 197  7225 [139]   if _isesc then begin
+ 198  7231 [139]     writeln('DIFF aborted by ESC');
+ 199  7260 [139]     _abort;
+ 200  7264 [139]   end;
+ 201  7264 [139] 
+ 202  7264 [139]   if n = 1 then begin
+ 203  7271 [139]     if eof1 or (count1 = BUFFER_SIZE) then exit;
+ 204  7290 [139] 
+ 205  7290 [139]     p := bufindex(head1,count1);
+ 206  7306 [139]     b := buffer1[p];
+ 207  7314 [139]     length := _strread(file1,b,eof1);
+ 208  7346 [139]     if eof1 then exit;
+ 209  7358 [139] 
+ 210  7358 [139]     b[STRSIZE] := chr(length);
+ 211  7364 [139]     count1 := count1 + 1;
+ 212  7375 [139]   end
+ 213  7380 [139]   else begin
+ 214  7383 [139]     if eof2 or (count2 = BUFFER_SIZE) then exit;
+ 215  7399 [139] 
+ 216  7399 [139]     p := bufindex(head2,count2);
+ 217  7415 [139]     b := buffer2[p];
+ 218  7423 [139]     length := _strread(file2,b,eof2);
+ 219  7455 [139]     if eof2 then exit;
+ 220  7467 [139] 
+ 221  7467 [139]     b[STRSIZE] := chr(length);
+ 222  7473 [139]     count2 := count2 + 1;
+ 223  7484 [139]   end;
+ 224  7489 [139] 
+ 225  7489 [139]   append_line := true;
+ 226  7491 [139] end;
+ 227  7495 [139] 
+ 228  7496 [135] func getline(n:integer):cpnt;
+ 229  7496 [138] {*************************}
+ 230  7496 [138] var success:boolean;
+ 231  7499 [139] begin
+ 232  7499 [139]   if n = 1 then begin
+ 233  7508 [139]     if count1 = 0 then success := append_line(1);
+ 234  7531 [139]     getline := buffer1[head1];
+ 235  7539 [139]   end
+ 236  7547 [139]   else begin
+ 237  7550 [139]     if count2 = 0 then success := append_line(2);
+ 238  7570 [139]     getline := buffer2[head2];
+ 239  7578 [139]   end;
+ 240  7586 [139] end;
+ 241  7586 [139] 
+ 242  7587 [137] func same_line(s1,s2:cpnt):boolean;
+ 243  7587 [141] {********************************}
+ 244  7587 [141] var i,n:integer;
+ 245  7590 [143] begin
+ 246  7590 [143]   same_line := false;
+ 247  7594 [143] 
+ 248  7598 [143]   { compare lengths first }
+ 249  7598 [143]   if s1[STRSIZE] <> s2[STRSIZE] then exit;
+ 250  7619 [143] 
+ 251  7619 [143]   n := ord(s1[STRSIZE]);
+ 252  7627 [143]   i := 0;
+ 253  7633 [143]   while i < n do begin
+ 254  7649 [143]     if s1[i] <> s2[i] then exit;
+ 255  7674 [143]     i := i + 1;
+ 256  7680 [143]   end;
+ 257  7685 [143] 
+ 258  7688 [143]   same_line := true;
+ 259  7690 [143] end;
+ 260  7694 [143] 
+ 261  7695 [139] proc skip_equal;
+ 262  7695 [140] {**************}
+ 263  7695 [140] var s1, s2: cpnt;
+ 264  7698 [142] begin
+ 265  7698 [142]   while true do begin
+ 266  7705 [142]     if eof1 and (count1 = 0) then exit;
+ 267  7721 [142]     if eof2 and (count2 = 0) then exit;
+ 268  7737 [142] 
+ 269  7737 [142]     s1 := getline(1);
+ 270  7747 [142]     s2 := getline(2);
+ 271  7761 [142] 
+ 272  7765 [142]     if (eof1 and (count1 = 0)) or
+ 273  7777 [142]        (eof2 and (count2 = 0)) then exit;
+ 274  7794 [142] 
+ 275  7794 [142]     if not same_line(s1,s2) then exit;
+ 276  7815 [142] 
+ 277  7815 [142]     advance(1);
+ 278  7823 [142]     advance(2);
+ 279  7831 [142]   end;
+ 280  7831 [142] end;
+ 281  7834 [142] 
+ 282  7835 [140] func buffer_line(n,p:integer):cpnt;
+ 283  7835 [144] {********************************}
+ 284  7835 [144] begin
+ 285  7835 [144]   if n = 1 then
+ 286  7846 [144]     buffer_line := buffer1[bufindex(head1,p)]
+ 287  7866 [144]   else
+ 288  7866 [144]     buffer_line := buffer2[bufindex(head2,p)];
+ 289  7893 [144] end;
+ 290  7901 [144] 
+ 291  7902 [142] func match_sync(p1,p2:integer):boolean;
+ 292  7902 [146] {*************************************}
+ 293  7902 [146] var i:integer;
+ 294  7905 [147]     s1,s2:cpnt;
+ 295  7905 [149] begin
+ 296  7905 [149]   match_sync := false;
+ 297  7909 [149] 
+ 298  7913 [149]   if (p1 < SYNC_LINES - 1) or
+ 299  7923 [149]       (p2 < SYNC_LINES -1) then exit;
+ 300  7938 [149] 
+ 301  7938 [149]   for i := 0 to SYNC_LINES - 1 do begin
+ 302  7958 [149]     s1 := buffer_line(1,p1-i);
+ 303  7977 [149]     s2 := buffer_line(2,p2-i);
+ 304  8000 [149]     if not same_line(s1,s2) then exit;
+ 305  8025 [149]   end;
+ 306  8025 [149] 
+ 307  8039 [149]   match_sync := true;
+ 308  8041 [149] end;
+ 309  8045 [149] 
+ 310  8046 [144] func check_new_line(n:integer):boolean;
+ 311  8046 [147] {***********************************}
+ 312  8046 [147] var p,i:integer;
+ 313  8049 [149] begin
+ 314  8049 [149]   check_new_line := false;
+ 315  8053 [149] 
+ 316  8057 [149]   if (count1 < SYNC_LINES)
+ 317  8063 [149]       or (count2 < SYNC_LINES) then exit;
+ 318  8076 [149] 
+ 319  8076 [149]   if n = 1 then begin
+ 320  8083 [149]     p := count1-1;
+ 321  8092 [149]     for i := SYNC_LINES - 1 to count2-1 do begin
+ 322  8122 [149]       if match_sync(p,i) then begin
+ 323  8138 [149]         sync1 := p - SYNC_LINES + 1;
+ 324  8150 [149]         sync2 := i - SYNC_LINES + 1;
+ 325  8164 [149]         check_new_line := true;
+ 326  8171 [149]         exit;
+ 327  8176 [149]       end;
+ 328  8176 [149]     end;
+ 329  8176 [149]   end
+ 330  8190 [149]   else begin
+ 331  8193 [149]     p := count2-1;
+ 332  8199 [149]     for i := SYNC_LINES - 1 to count1-1 do begin
+ 333  8229 [149]       if match_sync(i,p) then begin
+ 334  8245 [149]         sync1 := i - SYNC_LINES + 1;
+ 335  8257 [149]         sync2 := p - SYNC_LINES + 1;
+ 336  8271 [149]         check_new_line := true;
+ 337  8278 [149]         exit;
+ 338  8283 [149]       end;
+ 339  8283 [149]     end;
+ 340  8283 [149]   end;
+ 341  8297 [149] end;
+ 342  8297 [149] 
+ 343  8298 [146] func find_sync:boolean;
+ 344  8298 [148] {**********************}
+ 345  8298 [148] var success:boolean;
+ 346  8301 [149] begin
+ 347  8301 [149]   find_sync := false;
+ 348  8305 [149] 
+ 349  8309 [149]   while true do begin
+ 350  8314 [149] 
+ 351  8314 [149]     { read from file 1 }
+ 352  8314 [149]     success := append_line(1);
+ 353  8324 [149]     if success then begin
+ 354  8332 [149]       if check_new_line(1) then begin
+ 355  8345 [149]         find_sync := true;
+ 356  8350 [149]         exit;
+ 357  8355 [149]       end;
+ 358  8355 [149]     end;
+ 359  8355 [149] 
+ 360  8355 [149]     { read from file 2 }
+ 361  8355 [149]     success := append_line(2);
+ 362  8365 [149]     if success then begin
+ 363  8373 [149]       if check_new_line(2) then begin
+ 364  8386 [149]         find_sync := true;
+ 365  8391 [149]         exit;
+ 366  8396 [149]       end;
+ 367  8396 [149]     end;
+ 368  8396 [149] 
+ 369  8396 [149]     { stop if neither file can supply another line }
+ 370  8396 [149]     if ((eof1 or (count1 = BUFFER_SIZE)) and
+ 371  8408 [149]         (eof2 or (count2 = BUFFER_SIZE))) then exit;
+ 372  8425 [149] 
+ 373  8425 [149]     { stop if either buffer is full }
+ 374  8425 [149]     if (count1 = BUFFER_SIZE) or
+ 375  8432 [149]        (count2 = BUFFER_SIZE) then exit;
+ 376  8444 [149] 
+ 377  8444 [149]   end;
+ 378  8444 [149] end;
+ 379  8447 [149] 
+ 380  8448 [148] proc finish_diff;
+ 381  8448 [149] {****************}
+ 382  8448 [149] var b:cpnt;
+ 383  8451 [150]     length:integer;
+ 384  8451 [151] begin
+ 385  8451 [151]   { Report all remaining lines from file 1 }
+ 386  8451 [151]   while count1>0 do begin
+ 387  8463 [151]     writeln('-',buffer_line(1,0));
+ 388  8484 [151]     advance(1);
+ 389  8492 [151]   end;
+ 390  8492 [151] 
+ 391  8495 [151]   { Report all remaining lines from file 2 }
+ 392  8495 [151]   while count2>0 do begin
+ 393  8505 [151]     writeln('+',buffer_line(2,0));
+ 394  8526 [151]     advance(2);
+ 395  8534 [151]   end;
+ 396  8534 [151] 
+ 397  8537 [151]   { Read any additional lines from file 1 }
+ 398  8537 [151]   while not eof1 do begin
+ 399  8545 [151]     b:=buffer1[head1];
+ 400  8549 [151]     length:=_strread(file1,b,eof1);
+ 401  8581 [151]     if not eof1 then begin
+ 402  8590 [151]       writeln('-',b);
+ 403  8606 [151]       line1:=line1+1;
+ 404  8612 [151]     end;
+ 405  8617 [151]   end;
+ 406  8617 [151] 
+ 407  8620 [151]   { Read any additional lines from file 2 }
+ 408  8620 [151]   while not eof2 do begin
+ 409  8628 [151]     b:=buffer2[head2];
+ 410  8632 [151]     length:=_strread(file2,b,eof2);
+ 411  8664 [151]     if not eof2 then begin
+ 412  8673 [151]       writeln('+',b);
+ 413  8689 [151]       line2:=line2+1;
+ 414  8695 [151]     end;
+ 415  8700 [151]   end;
+ 416  8700 [151] end;
+ 417  8703 [151] 
+ 418  8704 [149] proc show_different;
+ 419  8704 [150] {******************}
+ 420  8704 [150] var found:boolean;
+ 421  8707 [151]     i:integer;
+ 422  8707 [152] begin
+ 423  8707 [152]   found:=find_sync;
+ 424  8715 [152] 
+ 425  8719 [152]   if found then begin
+ 426  8723 [152]     writeln(INVVID,'@@ -',line1,',',sync1,
+ 427  8741 [152]             ' +',line2,',',sync2,' @@',NORVID);
+ 428  8774 [152] 
+ 429  8774 [152]     for i:=0 to sync1-1 do
+ 430  8786 [152]       writeln('-',buffer_line(1,i));
+ 431  8819 [152] 
+ 432  8833 [152]     for i:=0 to sync2-1 do
+ 433  8845 [152]       writeln('+',buffer_line(2,i));
+ 434  8878 [152] 
+ 435  8892 [152]     for i:=1 to sync1 do advance(1);
+ 436  8919 [152]     for i:=1 to sync2 do advance(2);
+ 437  8960 [152]   end else begin
+ 438  8977 [152]     if eof1 and eof2 then
+ 439  8981 [152]       finish_diff
+ 440  8986 [152]     else begin
+ 441  8996 [152]       writeln(INVVID,
+ 442  8998 [152]         'DIFF: synchronization buffer full',NORVID);
+ 443  9042 [152]       _abort;
+ 444  9046 [152]     end;
+ 445  9046 [152]   end;
+ 446  9046 [152] end;
+ 447  9046 [152] 
+ 448  9047 [150] var i: integer;
+ 449  9047 [151] 
+ 450  9047 [151] begin
+ 451  9047 [151]   init_files;
+ 452  9054 [151]   init_buffers;
+ 453  9058 [151] 
+ 454  9058 [151]   while not (eof1 and eof2 and
+ 455  9062 [151]            (count1 = 0) and (count2 = 0)) do begin
+ 456  9087 [151]     skip_equal;
+ 457  9091 [151] 
+ 458  9091 [151]     if not (eof1 and eof2 and
+ 459  9095 [151]           (count1 = 0) and (count2 = 0)) then
+ 460  9116 [151]       show_different;
+ 461  9124 [151]   end;
+ 462  9124 [151]   close(file1);
+ 463  9133 [151]   close(file2);
+ 464  9139 [151] end.
+ 465  9139 [151] 
+Code length:           9138
+Compiler stack size:   150/320
+Ident stack size:      152/350
