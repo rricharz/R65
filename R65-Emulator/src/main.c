@@ -666,10 +666,16 @@ static void on_key_release(GtkWidget *widget, GdkEventKey *event, gpointer user_
   global_key_is_down = 0;
 }
 
-static gboolean scrolled(GtkWidget *widget,
-                         GdkEventScroll *event,
-                         gpointer data)
+////////////////////////////////////////////////////////
+static gboolean scrolled(GtkWidget *widget,GdkEventScroll *event,gpointer data)
+////////////////////////////////////////////////////////
 {
+  
+#ifdef __APPLE__
+    #define SCROLL_THRESHOLD 20.0
+#else
+    #define SCROLL_THRESHOLD 1.0
+#endif
     static double accumulated_y = 0.0;
     double dx = 0.0, dy = 0.0;
     int ch = 0;
@@ -697,13 +703,13 @@ static gboolean scrolled(GtkWidget *widget,
 
                 accumulated_y += dy;
 
-                if (accumulated_y >= 1.0) {
-                    accumulated_y -= 1.0;
-                    ch = 0x02;  // ROLL DOWN
+                if (accumulated_y >= SCROLL_THRESHOLD) {
+                    accumulated_y -= SCROLL_THRESHOLD;
+                    ch = 0x02;
                 }
-                else if (accumulated_y <= -1.0) {
-                    accumulated_y += 1.0;
-                    ch = 0x08;  // ROLL UP
+                else if (accumulated_y <= -SCROLL_THRESHOLD) {
+                    accumulated_y += SCROLL_THRESHOLD;
+                    ch = 0x08;
                 }
             }
             break;
