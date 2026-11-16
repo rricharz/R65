@@ -30,556 +30,587 @@
   30     4 [  0] of drive in the command is ignored       }
   31     4 [  0] 
   32     4 [  0] program system;
-  33     4 [  0] uses syslib, arglib, filelib, strlib, striolib;
-  34  4231 [110] 
-  35  4231 [110] {$U+}
-  36  4231 [110] 
-  37  4231 [110] const
-  38  4231 [110]   MMAXSEQ   = 8;     {max no of sequential files}
-  39  4234 [111]   CLRSCR    = chr($11);  {clear to end of screen}
-  40  4234 [112]   NHISTORY  = 4; { entries in history }
-  41  4234 [113]   AUTOPR    = $08;
-  42  4234 [114]   SAVAUTOPR = $02;
-  43  4234 [115] 
-  44  4234 [115] mem
-  45  4234 [115]   BUFFPN   = $0015: integer&;
-  46  4234 [116]   FIDRTB   = $0339: array[8] of integer&;
-  47  4234 [117]   MAXSEQ   = $0336: integer&;
-  48  4234 [118]   VFLAG    = $1780: integer&;
-  49  4234 [119]   SFLAG    = $1781: integer&;
-  50  4234 [120] 
-  51  4234 [120]   { persistent SYSTEM memory area }
-  52  4234 [120]   HISTMAG  = $df00: integer&; { initialized }
-  53  4234 [121]   HISTHEAD = $df01: integer&; { next slot }
-  54  4234 [122]   HISTCNT  = $df02: integer&; { current entries }
-  55  4234 [123]   { $df03-$dfc7 are used for history strings }
-  56  4234 [123] 
-  57  4234 [123] var
-  58  4234 [123]   k, m, n,res: integer;
-  59  4234 [127]   ch: char;
-  60  4234 [128]   ok: boolean;
-  61  4234 [129]   argerr: integer;
-  62  4234 [130]   runname,aname: array[15] of char;
-  63  4234 [132]   drive1,drive2: integer;
-  64  4234 [134]   cyclus1,cyclus2: integer;
-  65  4234 [136]   gline: cpnt;
-  66  4234 [137]   histpos: integer;
-  67  4234 [138]   history: array[NHISTORY] of cpnt;
-  68  4234 [139]   spos: integer;
-  69  4234 [140] 
-  70  4234 [140] proc chainprog(name: array[15] of char;
-  71  4234 [142]                cyc: integer; drv: integer);
-  72  4234 [144] {*****************************************}
-  73  4234 [144] var j: integer;
-  74  4237 [145] begin
-  75  4237 [145]   for j:=0 to 15 do FILNM1[j]:=name[j];
-  76  4264 [145]   FILCY1:=cyc;
-  77  4289 [145]   FILDRV:=drv;
-  78  4298 [145]   FILFLG:=$40;
-  79  4308 [145]   chain
-  80  4312 [145] end;
-  81  4313 [145] 
-  82  4314 [141] proc next;
-  83  4314 [142] {********}
-  84  4314 [142] begin
-  85  4314 [142]   if gline[spos] = ENDMARK then
-  86  4331 [142]     ch := CR
-  87  4335 [142]   else begin
-  88  4344 [142]     ch := _uppercase(gline[spos]);
-  89  4362 [142]     spos := spos + 1;
-  90  4372 [142]   end;
-  91  4377 [142] end;
-  92  4377 [142] 
-  93  4378 [142] proc init_persistent;
-  94  4378 [143] {*******************}
-  95  4378 [143] var i: integer;
-  96  4381 [144]     s: cpnt;
-  97  4381 [145] begin
-  98  4381 [145]   history[0] := cpnt($df03);
-  99  4388 [145]   history[1] := cpnt($df34);
- 100  4397 [145]   history[2] := cpnt($df65);
- 101  4406 [145]   history[3] := cpnt($df96);
- 102  4415 [145]   histpos  := 0;
- 103  4421 [145]   if HISTMAG <> $a5 then begin
- 104  4432 [145]     HISTMAG  := $a5;
- 105  4437 [145]     HISTHEAD := 0;
- 106  4444 [145]     HISTCNT  := 0;
- 107  4451 [145]     { This initialization should not be required }
- 108  4456 [145]     for i := 0 to 3 do begin
- 109  4473 [145]       s := history[i];
- 110  4477 [145]       s[0] := ENDMARK;
- 111  4489 [145]     end;
- 112  4493 [145]   end;
- 113  4507 [145] end;
- 114  4507 [145] 
- 115  4508 [143] proc add_history(line: cpnt);
- 116  4508 [145] {***************************}
- 117  4508 [145] begin
- 118  4508 [145]   _strcpy(line, history[HISTHEAD]);
- 119  4531 [145]   HISTHEAD := _mod(HISTHEAD + 1, NHISTORY);
- 120  4548 [145]   if HISTCNT < NHISTORY then
- 121  4559 [145]     HISTCNT := HISTCNT + 1;
- 122  4569 [145] end;
- 123  4575 [145] 
- 124  4576 [144] proc up_history(line: cpnt);
- 125  4576 [146] {**************************}
- 126  4576 [146] var entry: integer;
- 127  4579 [147] begin
- 128  4579 [147]   if HISTCNT = 0 then
- 129  4587 [147]     exit;
- 130  4592 [147]   if histpos < HISTCNT then
- 131  4600 [147]     histpos := histpos + 1;
- 132  4610 [147]   entry := _mod(HISTHEAD - histpos + NHISTORY,
- 133  4628 [147]                 NHISTORY);
- 134  4637 [147] {  writeln('Up history: histpos=', histpos,
- 135  4641 [147]           ' entry=', entry); }
- 136  4641 [147]   _strcpy(history[entry], line);
- 137  4659 [147] end;
- 138  4659 [147] 
- 139  4660 [145] proc down_history(line: cpnt);
- 140  4660 [147] {****************************}
- 141  4660 [147] var entry: integer;
- 142  4663 [148] begin
- 143  4663 [148]   if histpos > 0 then
- 144  4671 [148]     histpos := histpos - 1;
- 145  4681 [148] 
- 146  4686 [148]   if histpos = 0 then
- 147  4692 [148]     line[0] := ENDMARK
- 148  4698 [148]   else begin
- 149  4707 [148]     entry := _mod(HISTHEAD - histpos + NHISTORY,
- 150  4720 [148]                   NHISTORY);
- 151  4729 [148]     _strcpy(history[entry], line);
- 152  4751 [148]   end;
- 153  4751 [148] end;
- 154  4751 [148] 
- 155  4752 [146] proc readline(line: cpnt);
- 156  4752 [148] {************************}
- 157  4752 [148] const CLEFT       = chr($03);
- 158  4755 [149]       CRIGHT      = chr($16);
- 159  4755 [150]       CDOWN       = chr($18);
- 160  4755 [151]       INSCHR      = chr($15);
- 161  4755 [152]       DELCHR      = chr($19);
- 162  4755 [153]       RUBOUT      = chr($7f);
- 163  4755 [154]       SCRUP       = chr($08); {scroll}
- 164  4755 [155]       SCRDOWN     = chr($02);
- 165  4755 [156]       GRSIZE      = chr($0c);
- 166  4755 [157]       ESC         = chr($00);
- 167  4755 [158]       LINELENGTH  = 45;  { 47 - 2 for prompt }
- 168  4755 [159] var lch: char;
- 169  4755 [160]     pos, len, oldvflag: integer;
- 170  4755 [163] begin
- 171  4755 [163]   line[0] := ENDMARK;
- 172  4761 [163]   pos := 0;
- 173  4767 [163]   len := 0;
- 174  4773 [163] 
- 175  4777 [163]   oldvflag := VFLAG;
- 176  4781 [163]   if (VFLAG and AUTOPR) <> 0 then begin
- 177  4795 [163]     VFLAG := VFLAG - AUTOPR;   { clear bit 3 }
- 178  4810 [163]     SFLAG := SFLAG or SAVAUTOPR;
- 179  4816 [163]   end;
- 180  4822 [163] 
- 181  4822 [163]   write(NORVID,'P*',CLRLIN);
- 182  4831 [163] 
- 183  4831 [163]   repeat
- 184  4831 [163]     read(@KEY,lch); { raw read character }
- 185  4840 [163] 
- 186  4840 [163]     if (ord(lch)>=$20) and (ord(lch)<=$7e) then begin
- 187  4855 [163]       if len < LINELENGTH then begin
- 188  4865 [163]         _strinsc(lch,pos,line);
- 189  4886 [163]         len := len + 1;
- 190  4892 [163]         write(INSCHR,lch);
- 191  4905 [163]         pos := pos + 1;
- 192  4911 [163]       end;
- 193  4916 [163]     end else begin
- 194  4919 [163]       case lch of
- 195  4919 [163] 
- 196  4923 [163]         CLEFT:
- 197  4927 [163]           begin
- 198  4930 [163]             if pos > 0 then begin
- 199  4937 [163]               write(CLEFT);
- 200  4943 [163]               pos := pos - 1;
- 201  4949 [163]             end;
- 202  4954 [163]           end;
- 203  4954 [163] 
- 204  4957 [163]         CRIGHT:
- 205  4961 [163]           begin
- 206  4964 [163]             if pos < len then begin
- 207  4973 [163]               write(CRIGHT);
- 208  4979 [163]               pos := pos + 1;
- 209  4985 [163]             end;
- 210  4990 [163]           end;
- 211  4990 [163] 
- 212  4993 [163]         RUBOUT:
- 213  4997 [163]           begin
- 214  5000 [163]             if pos > 0 then begin
- 215  5007 [163]               pos := pos - 1;
- 216  5016 [163]               _strdelc(pos,line);
- 217  5035 [163]               len := len - 1;
- 218  5041 [163]               write(CLEFT,DELCHR);
- 219  5052 [163]             end;
- 220  5052 [163]           end;
- 221  5052 [163] 
- 222  5055 [163]         ESC:
- 223  5059 [163]           begin
- 224  5062 [163]             while pos > 0 do begin
- 225  5072 [163]               write(CLEFT);
- 226  5075 [163]               pos := pos - 1;
- 227  5081 [163]               end;
- 228  5086 [163]             line[0] := ENDMARK;
- 229  5093 [163]             pos := 0;
- 230  5099 [163]             len := 0;
- 231  5105 [163]             write(CLRLIN);
- 232  5112 [163]           end;
- 233  5112 [163] 
- 234  5115 [163]         CUP:
- 235  5119 [163]           begin
- 236  5122 [163]             up_history(line);
- 237  5132 [163]             while pos > 0 do begin
- 238  5142 [163]               write(CLEFT);
- 239  5145 [163]               pos := pos - 1;
- 240  5151 [163]               end;
- 241  5156 [163]             write(CLRLIN, line);
- 242  5167 [163]             len := _strlen(line);
- 243  5179 [163]             pos := len;
- 244  5183 [163]           end;
- 245  5191 [163] 
- 246  5194 [163]         CDOWN:
- 247  5198 [163]           begin
- 248  5201 [163]             down_history(line);
- 249  5211 [163]             while pos > 0 do begin
- 250  5221 [163]               write(CLEFT);
- 251  5224 [163]               pos := pos - 1;
- 252  5230 [163]               end;
- 253  5235 [163]             write(CLRLIN, line);
- 254  5246 [163]             len := _strlen(line);
- 255  5258 [163]             pos := len;
- 256  5262 [163]           end;
- 257  5270 [163] 
- 258  5273 [163]         CR:
- 259  5277 [163]           begin
- 260  5280 [163]           if line[0] <> ENDMARK then
- 261  5290 [163]             add_history(line);
- 262  5304 [163]           end;
- 263  5304 [163] 
- 264  5307 [163]         SCRUP, SCRDOWN, GRSIZE:
- 265  5325 [163]           write(lch) { pass through }
- 266  5333 [163] 
- 267  5333 [163]         else
- 268  5333 [163]           begin
- 269  5336 [163]             { ignore all other control characters }
- 270  5336 [163]           end
- 271  5336 [163] 
- 272  5336 [163]       end {case};
- 273  5338 [163]     end;
- 274  5338 [163]   until lch=CR;
- 275  5344 [163] 
- 276  5348 [163]   write(CLRSCR);
- 277  5351 [163] 
- 278  5351 [163]   if (oldvflag and AUTOPR) <> 0 then
- 279  5360 [163]     write(@PRINTER, 'P*', line);
- 280  5376 [163]   VFLAG := oldvflag;
- 281  5376 [163]   SFLAG := SFLAG and not SAVAUTOPR;
- 282  5391 [163] 
- 283  5398 [163]   writeln;
- 284  5398 [163] end;
- 285  5404 [163] 
- 286  5405 [147] proc getnum(var num: integer);
- 287  5405 [149] {****************************}
- 288  5405 [149] var sign: integer;
- 289  5408 [150] begin
- 290  5408 [150]   sign:=1; num:=0;
- 291  5418 [150]   case ch of
- 292  5422 [150]     '+': next;
- 293  5437 [150]     '-':  begin sign:=-1; next end
- 294  5458 [150]   end; {case}
- 295  5460 [150]   ok:=ok and ((ch>='0') and (ch<='9'));
- 296  5479 [150]   while (ch>='0') and (ch<='9') do begin
- 297  5502 [150]     num:=10*num+ord(ch)-ord('0');
- 298  5516 [150]     next
- 299  5521 [150]   end;
- 300  5525 [150]   num:=sign*num
- 301  5532 [150] end;
- 302  5541 [150] 
- 303  5542 [148] proc getfname
- 304  5542 [148]   (var name: array[15] of char;
- 305  5542 [150]    ptype: char; var isok: boolean;
- 306  5542 [152]    var drv: integer; var cyc: integer);
- 307  5542 [154] {*************************************}
- 308  5542 [154] var i, j: integer;
- 309  5545 [156] 
- 310  5545 [156]   func nexthexdigit: integer;
- 311  5545 [158]   var d: integer;
- 312  5548 [159]   begin
- 313  5548 [159]     next;
- 314  5554 [159]     if (ch>='0') and (ch<='9') then
- 315  5568 [159]       nexthexdigit:= ord(ch)-ord('0')
- 316  5578 [159]     else if (ch>='A') and (ch<='Z') then
- 317  5600 [159]       nexthexdigit:= ord(ch)-ord('A')+10
- 318  5611 [159]     else begin
- 319  5621 [159]       isok:=false;
- 320  5623 [159]     nexthexdigit:=0;
- 321  5629 [159]     end;
- 322  5633 [159]   end;
- 323  5633 [159] 
- 324  5634 [158] begin
- 325  5634 [158]   isok:=((ch>='A') and (ch<='Z'))
- 326  5650 [158]     or (ch='*') or (ch='?') or (ch='/');
- 327  5674 [158]   i:=0;
- 328  5681 [158]   repeat
- 329  5685 [158]     name[i]:=ch; i:=succ(i);
- 330  5701 [158]     next
- 331  5706 [158]     until (i>12) or
- 332  5717 [158]           not (((ch>='A') and (ch<='Z')) or
- 333  5732 [158]                ((ch>='0') and (ch<='9')) or
- 334  5747 [158]                (ch='*') or (ch='?'));
- 335  5764 [158]   for j:=i to 15 do name[j]:=' ';
- 336  5794 [158]   if ch='=' then exit;
- 337  5823 [158]   if ch=':' then begin
- 338  5830 [158]     next;
- 339  5837 [158]     name[i]:=':';
- 340  5843 [158]     name[i+1]:=ch;
- 341  5854 [158]     next
- 342  5862 [158]   end
- 343  5866 [158]   else if ptype <> ' ' then begin
- 344  5876 [158]     name[i]:=':';
- 345  5885 [158]     name[i+1]:=ptype
- 346  5896 [158]   end;
- 347  5904 [158]   if (ch='.') then begin
- 348  5911 [158]     cyc:=nexthexdigit*16+nexthexdigit;
- 349  5929 [158]     next;
- 350  5938 [158]   end
- 351  5938 [158]   else if (ch=',') then begin
- 352  5948 [158]     next;
- 353  5955 [158]     getnum(drv);
- 354  5967 [158]     if (drv<0) or (drv>1) then
- 355  5981 [158]       argerr:=105;
- 356  5987 [158]   end
- 357  5991 [158] end;
- 358  5991 [158] 
- 359  5992 [149] proc clearinput;
- 360  5992 [150] {**************}
- 361  5992 [150] begin
- 362  5992 [150]   BUFFPN:=-1;
- 363  5999 [150] end;
- 364  6004 [150] 
- 365  6005 [150] proc checkrunerr;
- 366  6005 [151] {***************}
- 367  6005 [151] begin
- 368  6005 [151]   write(INVVID);
- 369  6013 [151]   case RUNERR of
- 370  6016 [151]     $01: writeln('File read/write');
- 371  6045 [151]     $03: writeln('Escape during read/write');
- 372  6086 [151]     $04: writeln('Wrong record number');
- 373  6122 [151]     $05: writeln('Wrong file type');
- 374  6154 [151]     $06: writeln('File not found');
- 375  6185 [151]     $07: writeln('Disk not ready');
- 376  6216 [151]     $08: writeln('Directory full, not stored');
- 377  6259 [151]     $23: writeln('Too many open files');
- 378  6295 [151]     $24: writeln('Directory error');
- 379  6327 [151]     $25: writeln('Wrong file number, file not open');
- 380  6376 [151]     $26: writeln('Disk full, not stored');
- 381  6414 [151]     $65: writeln('Argument is not string or default');
- 382  6464 [151]     $66: writeln('Argument is not number or default');
- 383  6514 [151]     $67: writeln('Argument is not starting with /');
- 384  6562 [151]     $68: writeln('Drive is not 0 or 1');
- 385  6598 [151]     $69: writeln('Argument syntax error');
- 386  6636 [151]     $6a: writeln('Too many arguments');
- 387  6671 [151]     $81: writeln('Division by zero');
- 388  6704 [151]     $82: writeln('Stack overflow');
- 389  6735 [151]     $83: writeln('Index out of bounds');
- 390  6771 [151]     $84: writeln('Program not found');
- 391  6805 [151]     $85: writeln('P-code not implemented');
- 392  6844 [151]     $88: writeln('Heap overflow');
- 393  6874 [151]     $89: writeln('Pointer not allocated (NIL)');
- 394  6918 [151]     $90: writeln('Writing to constant string');
- 395  6961 [151]     $91: writeln('String too long');
- 396  6993 [151]     $92: writeln('String cannot be released')
- 397  7029 [151]   end {case}
- 398  7037 [151]   write(NORVID);
- 399  7040 [151]   ENDSTK:=TOPMEM-144;
- 400  7045 [151]   IOCHECK:=true;
- 401  7051 [151]   RUNERR:=0;
- 402  7057 [151] end;
- 403  7061 [151] 
- 404  7062 [151] proc getargline;
- 405  7062 [152] {**************}
- 406  7062 [152] var i, j: integer;
- 407  7065 [154]     s: cpnt;
- 408  7065 [155] begin
- 409  7065 [155]   i := 0;
- 410  7069 [155]   j := 0;
- 411  7075 [155]   s := cpnt($60);
- 412  7081 [155] 
- 413  7085 [155]   { copy parameter name }
- 414  7085 [155]   while (i <= 15) and (aname[i] <> ' ') do begin
- 415  7107 [155]     if (aname[i] = '/') or
- 416  7118 [155]        (aname[i] = '*') or
- 417  7129 [155]        (aname[i] = '?') then begin
- 418  7142 [155]       argerr := 106;
- 419  7147 [155]       exit;
- 420  7152 [155]     end;
- 421  7152 [155]     s[j] := aname[i];
- 422  7160 [155]     i := i + 1;
- 423  7174 [155]     j := j + 1;
- 424  7185 [155]   end;
- 425  7190 [155] 
- 426  7193 [155]   s[j] := '=';
- 427  7199 [155]   j := j + 1;
- 428  7209 [155] 
- 429  7214 [155]   next; { skip '=' }
- 430  7218 [155] 
- 431  7218 [155]   while ch <> CR do begin
- 432  7228 [155]     if j >= 63 then begin
- 433  7235 [155]       argerr := 106;
- 434  7240 [155]       ch := CR;
- 435  7246 [155]     end else begin
- 436  7253 [155]       s[j] := ch;
- 437  7257 [155]       j := j + 1;
- 438  7271 [155]       next;
- 439  7280 [155]     end;
- 440  7280 [155]   end;
- 441  7280 [155]   s[j] := ENDMARK;
- 442  7289 [155]   ARGTYPE[0] := 'l';
- 443  7297 [155] end;
- 444  7303 [155] 
- 445  7304 [152] begin {main}
- 446  7304 [152] {**********}
- 447  7304 [152]   checkrunerr;
- 448  7310 [152]   gline := _new;
- 449  7316 [152]   init_persistent;
- 450  7324 [152] 
- 451  7324 [152]   MAXSEQ := MMAXSEQ - 1;
- 452  7328 [152]   for k:=0 to MMAXSEQ-1 do FIDRTB[k]:=0;
- 453  7360 [152]   clearinput;
- 454  7385 [152]   ok:=true;
- 455  7387 [152]   res :=_emulator(12); { force end raw mode }
- 456  7405 [152] 
- 457  7405 [152]   spos := 0;
- 458  7407 [152]   readline(gline);
- 459  7421 [152]   next;
- 460  7425 [152] 
- 461  7425 [152]   while ch=CR do begin
- 462  7435 [152]     spos := 0;
- 463  7437 [152]     readline(gline);
- 464  7451 [152]     next;
- 465  7455 [152]   end;
- 466  7455 [152]   while (ch=' ') do next;
- 467  7472 [152] 
- 468  7475 [152]   drive1:=1;
- 469  7477 [152]   cyclus1:=0;
- 470  7483 [152]   getfname(runname,'R',ok,drive1,cyclus1);
- 471  7531 [152] 
- 472  7531 [152]   { erase all arguments }
- 473  7531 [152]   for k:=0 to 31 do ARGTYPE[k]:=chr(0);
- 474  7554 [152]   NUMARG:=0;
- 475  7577 [152] 
- 476  7581 [152]   if ok then begin
- 477  7585 [152]     n:=0;
- 478  7590 [152]     argerr:=0;
- 479  7596 [152]     if ch=' ' then begin  {arguments}
- 480  7610 [152]       repeat
- 481  7610 [152]         next;
- 482  7614 [152]         if ch=' ' then
- 483  7620 [152]           argerr:=106
- 484  7624 [152] 
- 485  7626 [152]         { quoted argument }
- 486  7626 [152]         else if ch='"' then begin
- 487  7640 [152]           ARGTYPE[n]:='q';
- 488  7649 [152]           if n>23 then argerr:=107
- 489  7665 [152]           else begin
- 490  7674 [152]             for k:=0 to 15 do aname[k]:=' ';
- 491  7697 [152]             k:=0;
- 492  7717 [152]             next;
- 493  7725 [152]             while (ch<>'"') and (ch<>CR) do begin
- 494  7743 [152]               if k<=15 then begin
- 495  7750 [152]                 aname[k]:=ch;
- 496  7757 [152]                 k:=succ(k);
- 497  7769 [152]               end else
- 498  7774 [152]                 argerr:=106;
- 499  7779 [152]               next;
- 500  7787 [152]             end;
- 501  7787 [152]             if ch<>'"' then
- 502  7796 [152]               argerr:=106
- 503  7800 [152]             else
- 504  7802 [152]               next;
- 505  7813 [152]             for k:=0 to 7 do
- 506  7821 [152]               ARGLIST[n+k]:=
- 507  7839 [152]                   ord(packed(aname[2*k+1],
- 508  7849 [152]                   aname[2*k]));
- 509  7865 [152]             n:=n+7;
- 510  7893 [152]           end
- 511  7898 [152]         end
- 512  7898 [152] 
- 513  7898 [152]         { number }
- 514  7898 [152]         else if (ch>='0') and (ch<='9') then begin
- 515  7916 [152]           getnum(m);
- 516  7931 [152]           ARGLIST[n]:=m;
- 517  7935 [152]           ARGTYPE[n]:='i';
- 518  7953 [152]         end
- 519  7959 [152] 
- 520  7959 [152]         { letter or equivalent }
- 521  7959 [152]         else if ((ch>='A') and (ch<='Z'))
- 522  7976 [152]             or (ch='*') or (ch='?') or (ch='/')
- 523  7999 [152]             then begin {letter}
- 524  8004 [152]           drive2:=255; cyclus2:=0;
- 525  8012 [152]           getfname(aname,' ',ok,drive2,cyclus2);
- 526  8060 [152]           if not ok then argerr:=106;
- 527  8070 [152]           if ch='=' then getargline
- 528  8081 [152]           else begin
- 529  8091 [152]             ARGTYPE[n]:='s';
- 530  8097 [152]             if n>22 then argerr:=107
- 531  8113 [152]             else begin
- 532  8122 [152]               for k:=0 to 7 do
- 533  8130 [152]               ARGLIST[n+k]:=
- 534  8148 [152]                     ord(packed(aname[2*k+1],
- 535  8158 [152]                     aname[2*k]));
- 536  8174 [152]               n:=n+7;
- 537  8202 [152]               end;
- 538  8207 [152]             ARGLIST[n+1]:=cyclus2;
- 539  8214 [152]             ARGTYPE[n+1]:='i';
- 540  8235 [152]             if drive2=255 then begin {default}
- 541  8251 [152]               ARGLIST[n+2]:=1;
- 542  8260 [152]               ARGTYPE[n+2]:='d';
- 543  8277 [152]             end else begin
- 544  8286 [152]               ARGLIST[n+2]:=drive2;
- 545  8293 [152]               ARGTYPE[n+2]:='i';
- 546  8314 [152]             end;
- 547  8320 [152]             n:=n+2;
- 548  8326 [152]           end;
- 549  8331 [152]         end
- 550  8331 [152] 
- 551  8331 [152]         { default drive number }
- 552  8331 [152]         else begin
- 553  8334 [152]           ARGLIST[n]:=0;
- 554  8340 [152]           ARGTYPE[n]:='d';
- 555  8354 [152]         end;
- 556  8360 [152] 
- 557  8360 [152]         n:=n+1;
- 558  8366 [152]         NUMARG:=NUMARG+1;
- 559  8376 [152] 
- 560  8381 [152]       until (argerr<>0) or (n>31)
- 561  8394 [152]             or ((ch<>' ') and (ch<>','));
- 562  8411 [152]       if ch<>CR then argerr:=106;
- 563  8427 [152]     end; {arguments}
- 564  8431 [152]     if ch<>CR then argerr:=106;
- 565  8443 [152]   end {ok}
- 566  8447 [152]     else argerr:=106;
- 567  8452 [152] 
- 568  8456 [152]   if argerr<>0 then begin
- 569  8463 [152]     write(INVVID);
- 570  8469 [152]     case argerr of
- 571  8469 [152]         105: writeln('Unknown drive in argument');
- 572  8512 [152]         106: writeln('Argument syntax error');
- 573  8550 [152]         107: writeln('Too many arguments')
- 574  8579 [152]         end {case};
- 575  8587 [152]     res := _emulator(12); { force end raw mode }
- 576  8601 [152]   end else begin
- 577  8604 [152]     clearinput;
- 578  8608 [152]     ENDSTK:=TOPMEM-144;
- 579  8613 [152]     chainprog(runname, cyclus1, drive1);
- 580  8637 [152]   end;
- 581  8637 [152] end.
- 582  8637 [152] 
-Code length:           8636
-Compiler stack size:   166/300
-Ident stack size:      163/350
+  33     4 [  0] uses syslib, arglib, filelib, strlib, striolib,
+  34  4280 [115]      mouselib;
+  35  4467 [118] 
+  36  4467 [118] const
+  37  4467 [118]   MMAXSEQ   = 8;     {max no of sequential files}
+  38  4470 [119]   CLRSCR    = chr($11);  {clear to end of screen}
+  39  4470 [120]   NHISTORY  = 4; { entries in history }
+  40  4470 [121]   AUTOPR    = $08;
+  41  4470 [122]   SAVAUTOPR = $02;
+  42  4470 [123] 
+  43  4470 [123] mem
+  44  4470 [123]   BUFFPN   = $0015: integer&;
+  45  4470 [124]   FIDRTB   = $0339: array[8] of integer&;
+  46  4470 [125]   MAXSEQ   = $0336: integer&;
+  47  4470 [126]   VFLAG    = $1780: integer&;
+  48  4470 [127]   SFLAG    = $1781: integer&;
+  49  4470 [128] 
+  50  4470 [128]   { persistent SYSTEM memory area }
+  51  4470 [128]   HISTMAG  = $df00: integer&; { initialized }
+  52  4470 [129]   HISTHEAD = $df01: integer&; { next slot }
+  53  4470 [130]   HISTCNT  = $df02: integer&; { current entries }
+  54  4470 [131]   { $df03-$dfc7 are used for history strings }
+  55  4470 [131] 
+  56  4470 [131] var
+  57  4470 [131]   k, m, n,res: integer;
+  58  4470 [135]   ch: char;
+  59  4470 [136]   ok: boolean;
+  60  4470 [137]   argerr: integer;
+  61  4470 [138]   runname,aname: array[15] of char;
+  62  4470 [140]   drive1,drive2: integer;
+  63  4470 [142]   cyclus1,cyclus2: integer;
+  64  4470 [144]   gline: cpnt;
+  65  4470 [145]   histpos: integer;
+  66  4470 [146]   history: array[NHISTORY] of cpnt;
+  67  4470 [147]   spos: integer;
+  68  4470 [148] 
+  69  4470 [148] proc chainprog(name: array[15] of char;
+  70  4470 [150]                cyc: integer; drv: integer);
+  71  4470 [152] {*****************************************}
+  72  4470 [152] var j: integer;
+  73  4473 [153] begin
+  74  4473 [153]   for j:=0 to 15 do FILNM1[j]:=name[j];
+  75  4500 [153]   FILCY1:=cyc;
+  76  4525 [153]   FILDRV:=drv;
+  77  4534 [153]   FILFLG:=$40;
+  78  4544 [153]   chain
+  79  4548 [153] end;
+  80  4549 [153] 
+  81  4550 [149] proc next;
+  82  4550 [150] {********}
+  83  4550 [150] begin
+  84  4550 [150]   if gline[spos] = ENDMARK then
+  85  4567 [150]     ch := CR
+  86  4571 [150]   else begin
+  87  4580 [150]     ch := _uppercase(gline[spos]);
+  88  4598 [150]     spos := spos + 1;
+  89  4608 [150]   end;
+  90  4613 [150] end;
+  91  4613 [150] 
+  92  4614 [150] proc init_persistent;
+  93  4614 [151] {*******************}
+  94  4614 [151] var i: integer;
+  95  4617 [152]     s: cpnt;
+  96  4617 [153] begin
+  97  4617 [153]   history[0] := cpnt($df03);
+  98  4624 [153]   history[1] := cpnt($df34);
+  99  4633 [153]   history[2] := cpnt($df65);
+ 100  4642 [153]   history[3] := cpnt($df96);
+ 101  4651 [153]   histpos  := 0;
+ 102  4657 [153]   if HISTMAG <> $a5 then begin
+ 103  4668 [153]     HISTMAG  := $a5;
+ 104  4673 [153]     HISTHEAD := 0;
+ 105  4680 [153]     HISTCNT  := 0;
+ 106  4687 [153]     { This initialization should not be required }
+ 107  4692 [153]     for i := 0 to 3 do begin
+ 108  4709 [153]       s := history[i];
+ 109  4713 [153]       s[0] := ENDMARK;
+ 110  4725 [153]     end;
+ 111  4729 [153]   end;
+ 112  4743 [153] end;
+ 113  4743 [153] 
+ 114  4744 [151] proc add_history(line: cpnt);
+ 115  4744 [153] {***************************}
+ 116  4744 [153] begin
+ 117  4744 [153]   _strcpy(line, history[HISTHEAD]);
+ 118  4767 [153]   HISTHEAD := _mod(HISTHEAD + 1, NHISTORY);
+ 119  4784 [153]   if HISTCNT < NHISTORY then
+ 120  4795 [153]     HISTCNT := HISTCNT + 1;
+ 121  4805 [153] end;
+ 122  4811 [153] 
+ 123  4812 [152] proc up_history(line: cpnt);
+ 124  4812 [154] {**************************}
+ 125  4812 [154] var entry: integer;
+ 126  4815 [155] begin
+ 127  4815 [155]   if HISTCNT = 0 then
+ 128  4823 [155]     exit;
+ 129  4828 [155]   if histpos < HISTCNT then
+ 130  4836 [155]     histpos := histpos + 1;
+ 131  4846 [155]   entry := _mod(HISTHEAD - histpos + NHISTORY,
+ 132  4864 [155]                 NHISTORY);
+ 133  4873 [155] {  writeln('Up history: histpos=', histpos,
+ 134  4877 [155]           ' entry=', entry); }
+ 135  4877 [155]   _strcpy(history[entry], line);
+ 136  4895 [155] end;
+ 137  4895 [155] 
+ 138  4896 [153] proc down_history(line: cpnt);
+ 139  4896 [155] {****************************}
+ 140  4896 [155] var entry: integer;
+ 141  4899 [156] begin
+ 142  4899 [156]   if histpos > 0 then
+ 143  4907 [156]     histpos := histpos - 1;
+ 144  4917 [156] 
+ 145  4922 [156]   if histpos = 0 then
+ 146  4928 [156]     line[0] := ENDMARK
+ 147  4934 [156]   else begin
+ 148  4943 [156]     entry := _mod(HISTHEAD - histpos + NHISTORY,
+ 149  4956 [156]                   NHISTORY);
+ 150  4965 [156]     _strcpy(history[entry], line);
+ 151  4987 [156]   end;
+ 152  4987 [156] end;
+ 153  4987 [156] 
+ 154  4988 [154] proc readline(line: cpnt);
+ 155  4988 [156] {************************}
+ 156  4988 [156] const CLEFT       = chr($03);
+ 157  4991 [157]       CRIGHT      = chr($16);
+ 158  4991 [158]       CDOWN       = chr($18);
+ 159  4991 [159]       INSCHR      = chr($15);
+ 160  4991 [160]       DELCHR      = chr($19);
+ 161  4991 [161]       RUBOUT      = chr($7f);
+ 162  4991 [162]       SCRUP       = chr($08); {scroll}
+ 163  4991 [163]       SCRDOWN     = chr($02);
+ 164  4991 [164]       GRSIZE      = chr($0c);
+ 165  4991 [165]       ESC         = chr($00);
+ 166  4991 [166]       LINELENGTH  = 45;  { 47 - 2 for prompt }
+ 167  4991 [167] 
+ 168  4991 [167] mem   CURLIN = $00ed: integer&;
+ 169  4991 [168]       OFFSET = $1782: integer&;
+ 170  4991 [169] 
+ 171  4991 [169] var lch: char;
+ 172  4991 [170]     pos, len, oldvflag: integer;
+ 173  4991 [173]     mode, mx, my:       integer;
+ 174  4991 [176] 
+ 175  4991 [176]   proc mouseposition(mx,my:integer);
+ 176  4991 [179]   var newpos:integer;
+ 177  4994 [180]   begin
+ 178  4994 [180]     if my=CURLIN-OFFSET then begin
+ 179  5009 [180]       newpos:=mx-2;
+ 180  5018 [180] 
+ 181  5023 [180]       if newpos<0 then newpos:=0;
+ 182  5035 [180]       if newpos>len then newpos:=len;
+ 183  5051 [180] 
+ 184  5059 [180]       while pos<newpos do begin
+ 185  5071 [180]         write(CRIGHT);
+ 186  5074 [180]         pos:=pos+1;
+ 187  5080 [180]       end;
+ 188  5085 [180] 
+ 189  5088 [180]       while pos>newpos do begin
+ 190  5100 [180]         write(CLEFT);
+ 191  5103 [180]         pos:=pos-1;
+ 192  5109 [180]       end;
+ 193  5114 [180]     end;
+ 194  5117 [180]   end;
+ 195  5117 [180] 
+ 196  5118 [177] begin
+ 197  5118 [177]   line[0] := ENDMARK;
+ 198  5124 [177]   pos := 0;
+ 199  5130 [177]   len := 0;
+ 200  5136 [177] 
+ 201  5140 [177]   oldvflag := VFLAG;
+ 202  5144 [177]   if (VFLAG and AUTOPR) <> 0 then begin
+ 203  5158 [177]     VFLAG := VFLAG - AUTOPR;   { clear bit 3 }
+ 204  5173 [177]     SFLAG := SFLAG or SAVAUTOPR;
+ 205  5179 [177]   end;
+ 206  5185 [177] 
+ 207  5185 [177]   write(NORVID,'P*',CLRLIN);
+ 208  5194 [177] 
+ 209  5194 [177]   repeat
+ 210  5194 [177]     repeat
+ 211  5194 [177]       if _getinput(mode,mx,my,lch) then begin
+ 212  5232 [177]         if (mode=1) then
+ 213  5242 [177]             mouseposition(mx,my);
+ 214  5259 [177]       end;
+ 215  5259 [177]     until lch<>chr(0);
+ 216  5265 [177] 
+ 217  5270 [177]     if (ord(lch)>=$20) and (ord(lch)<=$7e) then begin
+ 218  5285 [177]       if len < LINELENGTH then begin
+ 219  5295 [177]         _strinsc(lch,pos,line);
+ 220  5316 [177]         len := len + 1;
+ 221  5322 [177]         write(INSCHR,lch);
+ 222  5335 [177]         pos := pos + 1;
+ 223  5341 [177]       end;
+ 224  5346 [177]     end else begin
+ 225  5349 [177]       case lch of
+ 226  5349 [177] 
+ 227  5353 [177]         CLEFT:
+ 228  5357 [177]           begin
+ 229  5360 [177]             if pos > 0 then begin
+ 230  5367 [177]               write(CLEFT);
+ 231  5373 [177]               pos := pos - 1;
+ 232  5379 [177]             end;
+ 233  5384 [177]           end;
+ 234  5384 [177] 
+ 235  5387 [177]         CRIGHT:
+ 236  5391 [177]           begin
+ 237  5394 [177]             if pos < len then begin
+ 238  5403 [177]               write(CRIGHT);
+ 239  5409 [177]               pos := pos + 1;
+ 240  5415 [177]             end;
+ 241  5420 [177]           end;
+ 242  5420 [177] 
+ 243  5423 [177]         RUBOUT:
+ 244  5427 [177]           begin
+ 245  5430 [177]             if pos > 0 then begin
+ 246  5437 [177]               pos := pos - 1;
+ 247  5446 [177]               _strdelc(pos,line);
+ 248  5465 [177]               len := len - 1;
+ 249  5471 [177]               write(CLEFT,DELCHR);
+ 250  5482 [177]             end;
+ 251  5482 [177]           end;
+ 252  5482 [177] 
+ 253  5485 [177]         ESC:
+ 254  5489 [177]           begin
+ 255  5492 [177]             while pos > 0 do begin
+ 256  5502 [177]               write(CLEFT);
+ 257  5505 [177]               pos := pos - 1;
+ 258  5511 [177]               end;
+ 259  5516 [177]             line[0] := ENDMARK;
+ 260  5523 [177]             pos := 0;
+ 261  5529 [177]             len := 0;
+ 262  5535 [177]             write(CLRLIN);
+ 263  5542 [177]           end;
+ 264  5542 [177] 
+ 265  5545 [177]         CUP:
+ 266  5549 [177]           begin
+ 267  5552 [177]             up_history(line);
+ 268  5562 [177]             while pos > 0 do begin
+ 269  5572 [177]               write(CLEFT);
+ 270  5575 [177]               pos := pos - 1;
+ 271  5581 [177]               end;
+ 272  5586 [177]             write(CLRLIN, line);
+ 273  5597 [177]             len := _strlen(line);
+ 274  5609 [177]             pos := len;
+ 275  5613 [177]           end;
+ 276  5621 [177] 
+ 277  5624 [177]         CDOWN:
+ 278  5628 [177]           begin
+ 279  5631 [177]             down_history(line);
+ 280  5641 [177]             while pos > 0 do begin
+ 281  5651 [177]               write(CLEFT);
+ 282  5654 [177]               pos := pos - 1;
+ 283  5660 [177]               end;
+ 284  5665 [177]             write(CLRLIN, line);
+ 285  5676 [177]             len := _strlen(line);
+ 286  5688 [177]             pos := len;
+ 287  5692 [177]           end;
+ 288  5700 [177] 
+ 289  5703 [177]         CR:
+ 290  5707 [177]           begin
+ 291  5710 [177]           if line[0] <> ENDMARK then
+ 292  5720 [177]             add_history(line);
+ 293  5734 [177]           end;
+ 294  5734 [177] 
+ 295  5737 [177]         SCRUP, SCRDOWN, GRSIZE:
+ 296  5755 [177]           write(lch) { pass through }
+ 297  5763 [177] 
+ 298  5763 [177]         else
+ 299  5763 [177]           begin
+ 300  5766 [177]             { ignore all other control characters }
+ 301  5766 [177]           end
+ 302  5766 [177] 
+ 303  5766 [177]       end {case};
+ 304  5768 [177]     end;
+ 305  5768 [177]   until lch=CR;
+ 306  5774 [177] 
+ 307  5778 [177]   write(CLRSCR);
+ 308  5781 [177] 
+ 309  5781 [177]   if (oldvflag and AUTOPR) <> 0 then
+ 310  5790 [177]     write(@PRINTER, 'P*', line);
+ 311  5806 [177]   VFLAG := oldvflag;
+ 312  5806 [177]   SFLAG := SFLAG and not SAVAUTOPR;
+ 313  5821 [177] 
+ 314  5828 [177]   writeln;
+ 315  5828 [177] end;
+ 316  5834 [177] 
+ 317  5835 [155] proc getnum(var num: integer);
+ 318  5835 [157] {****************************}
+ 319  5835 [157] var sign: integer;
+ 320  5838 [158] begin
+ 321  5838 [158]   sign:=1; num:=0;
+ 322  5848 [158]   case ch of
+ 323  5852 [158]     '+': next;
+ 324  5867 [158]     '-':  begin sign:=-1; next end
+ 325  5888 [158]   end; {case}
+ 326  5890 [158]   ok:=ok and ((ch>='0') and (ch<='9'));
+ 327  5909 [158]   while (ch>='0') and (ch<='9') do begin
+ 328  5932 [158]     num:=10*num+ord(ch)-ord('0');
+ 329  5946 [158]     next
+ 330  5951 [158]   end;
+ 331  5955 [158]   num:=sign*num
+ 332  5962 [158] end;
+ 333  5971 [158] 
+ 334  5972 [156] proc getfname
+ 335  5972 [156]   (var name: array[15] of char;
+ 336  5972 [158]    ptype: char; var isok: boolean;
+ 337  5972 [160]    var drv: integer; var cyc: integer);
+ 338  5972 [162] {*************************************}
+ 339  5972 [162] var i, j: integer;
+ 340  5975 [164] 
+ 341  5975 [164]   func nexthexdigit: integer;
+ 342  5975 [166]   var d: integer;
+ 343  5978 [167]   begin
+ 344  5978 [167]     next;
+ 345  5984 [167]     if (ch>='0') and (ch<='9') then
+ 346  5998 [167]       nexthexdigit:= ord(ch)-ord('0')
+ 347  6008 [167]     else if (ch>='A') and (ch<='Z') then
+ 348  6030 [167]       nexthexdigit:= ord(ch)-ord('A')+10
+ 349  6041 [167]     else begin
+ 350  6051 [167]       isok:=false;
+ 351  6053 [167]     nexthexdigit:=0;
+ 352  6059 [167]     end;
+ 353  6063 [167]   end;
+ 354  6063 [167] 
+ 355  6064 [166] begin
+ 356  6064 [166]   isok:=((ch>='A') and (ch<='Z'))
+ 357  6080 [166]     or (ch='*') or (ch='?') or (ch='/');
+ 358  6104 [166]   i:=0;
+ 359  6111 [166]   repeat
+ 360  6115 [166]     name[i]:=ch; i:=succ(i);
+ 361  6131 [166]     next
+ 362  6136 [166]     until (i>12) or
+ 363  6147 [166]           not (((ch>='A') and (ch<='Z')) or
+ 364  6162 [166]                ((ch>='0') and (ch<='9')) or
+ 365  6177 [166]                (ch='*') or (ch='?'));
+ 366  6194 [166]   for j:=i to 15 do name[j]:=' ';
+ 367  6224 [166]   if ch='=' then exit;
+ 368  6253 [166]   if ch=':' then begin
+ 369  6260 [166]     next;
+ 370  6267 [166]     name[i]:=':';
+ 371  6273 [166]     name[i+1]:=ch;
+ 372  6284 [166]     next
+ 373  6292 [166]   end
+ 374  6296 [166]   else if ptype <> ' ' then begin
+ 375  6306 [166]     name[i]:=':';
+ 376  6315 [166]     name[i+1]:=ptype
+ 377  6326 [166]   end;
+ 378  6334 [166]   if (ch='.') then begin
+ 379  6341 [166]     cyc:=nexthexdigit*16+nexthexdigit;
+ 380  6359 [166]     next;
+ 381  6368 [166]   end
+ 382  6368 [166]   else if (ch=',') then begin
+ 383  6378 [166]     next;
+ 384  6385 [166]     getnum(drv);
+ 385  6397 [166]     if (drv<0) or (drv>1) then
+ 386  6411 [166]       argerr:=105;
+ 387  6417 [166]   end
+ 388  6421 [166] end;
+ 389  6421 [166] 
+ 390  6422 [157] proc clearinput;
+ 391  6422 [158] {**************}
+ 392  6422 [158] begin
+ 393  6422 [158]   BUFFPN:=-1;
+ 394  6429 [158] end;
+ 395  6434 [158] 
+ 396  6435 [158] proc checkrunerr;
+ 397  6435 [159] {***************}
+ 398  6435 [159] begin
+ 399  6435 [159]   write(INVVID);
+ 400  6443 [159]   case RUNERR of
+ 401  6446 [159]     $01: writeln('File read/write');
+ 402  6475 [159]     $03: writeln('Escape during read/write');
+ 403  6516 [159]     $04: writeln('Wrong record number');
+ 404  6552 [159]     $05: writeln('Wrong file type');
+ 405  6584 [159]     $06: writeln('File not found');
+ 406  6615 [159]     $07: writeln('Disk not ready');
+ 407  6646 [159]     $08: writeln('Directory full, not stored');
+ 408  6689 [159]     $23: writeln('Too many open files');
+ 409  6725 [159]     $24: writeln('Directory error');
+ 410  6757 [159]     $25: writeln('Wrong file number, file not open');
+ 411  6806 [159]     $26: writeln('Disk full, not stored');
+ 412  6844 [159]     $65: writeln('Argument is not string or default');
+ 413  6894 [159]     $66: writeln('Argument is not number or default');
+ 414  6944 [159]     $67: writeln('Argument is not starting with /');
+ 415  6992 [159]     $68: writeln('Drive is not 0 or 1');
+ 416  7028 [159]     $69: writeln('Argument syntax error');
+ 417  7066 [159]     $6a: writeln('Too many arguments');
+ 418  7101 [159]     $81: writeln('Division by zero');
+ 419  7134 [159]     $82: writeln('Stack overflow');
+ 420  7165 [159]     $83: writeln('Index out of bounds');
+ 421  7201 [159]     $84: writeln('Program not found');
+ 422  7235 [159]     $85: writeln('P-code not implemented');
+ 423  7274 [159]     $88: writeln('Heap overflow');
+ 424  7304 [159]     $89: writeln('Pointer not allocated (NIL)');
+ 425  7348 [159]     $90: writeln('Writing to constant string');
+ 426  7391 [159]     $91: writeln('String too long');
+ 427  7423 [159]     $92: writeln('String cannot be released')
+ 428  7459 [159]   end {case}
+ 429  7467 [159]   write(NORVID);
+ 430  7470 [159]   ENDSTK:=TOPMEM-144;
+ 431  7475 [159]   IOCHECK:=true;
+ 432  7481 [159]   RUNERR:=0;
+ 433  7487 [159] end;
+ 434  7491 [159] 
+ 435  7492 [159] proc getargline;
+ 436  7492 [160] {**************}
+ 437  7492 [160] var i, j: integer;
+ 438  7495 [162]     s: cpnt;
+ 439  7495 [163] begin
+ 440  7495 [163]   i := 0;
+ 441  7499 [163]   j := 0;
+ 442  7505 [163]   s := cpnt($60);
+ 443  7511 [163] 
+ 444  7515 [163]   { copy parameter name }
+ 445  7515 [163]   while (i <= 15) and (aname[i] <> ' ') do begin
+ 446  7537 [163]     if (aname[i] = '/') or
+ 447  7548 [163]        (aname[i] = '*') or
+ 448  7559 [163]        (aname[i] = '?') then begin
+ 449  7572 [163]       argerr := 106;
+ 450  7577 [163]       exit;
+ 451  7582 [163]     end;
+ 452  7582 [163]     s[j] := aname[i];
+ 453  7590 [163]     i := i + 1;
+ 454  7604 [163]     j := j + 1;
+ 455  7615 [163]   end;
+ 456  7620 [163] 
+ 457  7623 [163]   s[j] := '=';
+ 458  7629 [163]   j := j + 1;
+ 459  7639 [163] 
+ 460  7644 [163]   next; { skip '=' }
+ 461  7648 [163] 
+ 462  7648 [163]   while ch <> CR do begin
+ 463  7658 [163]     if j >= 63 then begin
+ 464  7665 [163]       argerr := 106;
+ 465  7670 [163]       ch := CR;
+ 466  7676 [163]     end else begin
+ 467  7683 [163]       s[j] := ch;
+ 468  7687 [163]       j := j + 1;
+ 469  7701 [163]       next;
+ 470  7710 [163]     end;
+ 471  7710 [163]   end;
+ 472  7710 [163]   s[j] := ENDMARK;
+ 473  7719 [163]   ARGTYPE[0] := 'l';
+ 474  7727 [163] end;
+ 475  7733 [163] 
+ 476  7734 [160] begin {main}
+ 477  7734 [160] {**********}
+ 478  7734 [160]   checkrunerr;
+ 479  7740 [160]   gline := _new;
+ 480  7746 [160]   init_persistent;
+ 481  7754 [160] 
+ 482  7754 [160]   MAXSEQ := MMAXSEQ - 1;
+ 483  7758 [160]   for k:=0 to MMAXSEQ-1 do FIDRTB[k]:=0;
+ 484  7790 [160]   clearinput;
+ 485  7815 [160]   ok:=true;
+ 486  7817 [160]   res :=_emulator(12); { force end raw mode }
+ 487  7835 [160] 
+ 488  7835 [160]   spos := 0;
+ 489  7837 [160]   readline(gline);
+ 490  7851 [160]   next;
+ 491  7855 [160] 
+ 492  7855 [160]   while ch=CR do begin
+ 493  7865 [160]     spos := 0;
+ 494  7867 [160]     readline(gline);
+ 495  7881 [160]     next;
+ 496  7885 [160]   end;
+ 497  7885 [160]   while (ch=' ') do next;
+ 498  7902 [160] 
+ 499  7905 [160]   drive1:=1;
+ 500  7907 [160]   cyclus1:=0;
+ 501  7913 [160]   getfname(runname,'R',ok,drive1,cyclus1);
+ 502  7961 [160] 
+ 503  7961 [160]   { erase all arguments }
+ 504  7961 [160]   for k:=0 to 31 do ARGTYPE[k]:=chr(0);
+ 505  7984 [160]   NUMARG:=0;
+ 506  8007 [160] 
+ 507  8011 [160]   if ok then begin
+ 508  8015 [160]     n:=0;
+ 509  8020 [160]     argerr:=0;
+ 510  8026 [160]     if ch=' ' then begin  {arguments}
+ 511  8040 [160]       repeat
+ 512  8040 [160]         next;
+ 513  8044 [160]         if ch=' ' then
+ 514  8050 [160]           argerr:=106
+ 515  8054 [160] 
+ 516  8056 [160]         { quoted argument }
+ 517  8056 [160]         else if ch='"' then begin
+ 518  8070 [160]           ARGTYPE[n]:='q';
+ 519  8079 [160]           if n>23 then argerr:=107
+ 520  8095 [160]           else begin
+ 521  8104 [160]             for k:=0 to 15 do aname[k]:=' ';
+ 522  8127 [160]             k:=0;
+ 523  8147 [160]             next;
+ 524  8155 [160]             while (ch<>'"') and (ch<>CR) do begin
+ 525  8173 [160]               if k<=15 then begin
+ 526  8180 [160]                 aname[k]:=ch;
+ 527  8187 [160]                 k:=succ(k);
+ 528  8199 [160]               end else
+ 529  8204 [160]                 argerr:=106;
+ 530  8209 [160]               next;
+ 531  8217 [160]             end;
+ 532  8217 [160]             if ch<>'"' then
+ 533  8226 [160]               argerr:=106
+ 534  8230 [160]             else
+ 535  8232 [160]               next;
+ 536  8243 [160]             for k:=0 to 7 do
+ 537  8251 [160]               ARGLIST[n+k]:=
+ 538  8269 [160]                   ord(packed(aname[2*k+1],
+ 539  8279 [160]                   aname[2*k]));
+ 540  8295 [160]             n:=n+7;
+ 541  8323 [160]           end
+ 542  8328 [160]         end
+ 543  8328 [160] 
+ 544  8328 [160]         { number }
+ 545  8328 [160]         else if (ch>='0') and (ch<='9') then begin
+ 546  8346 [160]           getnum(m);
+ 547  8361 [160]           ARGLIST[n]:=m;
+ 548  8365 [160]           ARGTYPE[n]:='i';
+ 549  8383 [160]         end
+ 550  8389 [160] 
+ 551  8389 [160]         { letter or equivalent }
+ 552  8389 [160]         else if ((ch>='A') and (ch<='Z'))
+ 553  8406 [160]             or (ch='*') or (ch='?') or (ch='/')
+ 554  8429 [160]             then begin {letter}
+ 555  8434 [160]           drive2:=255; cyclus2:=0;
+ 556  8442 [160]           getfname(aname,' ',ok,drive2,cyclus2);
+ 557  8490 [160]           if not ok then argerr:=106;
+ 558  8500 [160]           if ch='=' then getargline
+ 559  8511 [160]           else begin
+ 560  8521 [160]             ARGTYPE[n]:='s';
+ 561  8527 [160]             if n>22 then argerr:=107
+ 562  8543 [160]             else begin
+ 563  8552 [160]               for k:=0 to 7 do
+ 564  8560 [160]               ARGLIST[n+k]:=
+ 565  8578 [160]                     ord(packed(aname[2*k+1],
+ 566  8588 [160]                     aname[2*k]));
+ 567  8604 [160]               n:=n+7;
+ 568  8632 [160]               end;
+ 569  8637 [160]             ARGLIST[n+1]:=cyclus2;
+ 570  8644 [160]             ARGTYPE[n+1]:='i';
+ 571  8665 [160]             if drive2=255 then begin {default}
+ 572  8681 [160]               ARGLIST[n+2]:=1;
+ 573  8690 [160]               ARGTYPE[n+2]:='d';
+ 574  8707 [160]             end else begin
+ 575  8716 [160]               ARGLIST[n+2]:=drive2;
+ 576  8723 [160]               ARGTYPE[n+2]:='i';
+ 577  8744 [160]             end;
+ 578  8750 [160]             n:=n+2;
+ 579  8756 [160]           end;
+ 580  8761 [160]         end
+ 581  8761 [160] 
+ 582  8761 [160]         { default drive number }
+ 583  8761 [160]         else begin
+ 584  8764 [160]           ARGLIST[n]:=0;
+ 585  8770 [160]           ARGTYPE[n]:='d';
+ 586  8784 [160]         end;
+ 587  8790 [160] 
+ 588  8790 [160]         n:=n+1;
+ 589  8796 [160]         NUMARG:=NUMARG+1;
+ 590  8806 [160] 
+ 591  8811 [160]       until (argerr<>0) or (n>31)
+ 592  8824 [160]             or ((ch<>' ') and (ch<>','));
+ 593  8841 [160]       if ch<>CR then argerr:=106;
+ 594  8857 [160]     end; {arguments}
+ 595  8861 [160]     if ch<>CR then argerr:=106;
+ 596  8873 [160]   end {ok}
+ 597  8877 [160]     else argerr:=106;
+ 598  8882 [160] 
+ 599  8886 [160]   if argerr<>0 then begin
+ 600  8893 [160]     write(INVVID);
+ 601  8899 [160]     case argerr of
+ 602  8899 [160]         105: writeln('Unknown drive in argument');
+ 603  8942 [160]         106: writeln('Argument syntax error');
+ 604  8980 [160]         107: writeln('Too many arguments')
+ 605  9009 [160]         end {case};
+ 606  9017 [160]     res := _emulator(12); { force end raw mode }
+ 607  9031 [160]   end else begin
+ 608  9034 [160]     clearinput;
+ 609  9038 [160]     ENDSTK:=TOPMEM-144;
+ 610  9043 [160]     chainprog(runname, cyclus1, drive1);
+ 611  9067 [160]   end;
+ 612  9067 [160] end.
+ 613  9067 [160] 
+Code length:           9066
+Compiler stack size:   179/320
+Ident stack size:      180/350

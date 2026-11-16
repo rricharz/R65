@@ -30,9 +30,8 @@ tries to run it from drive 0. User input
 of drive in the command is ignored       }
 
 program system;
-uses syslib, arglib, filelib, strlib, striolib;
-
-{$U+}
+uses syslib, arglib, filelib, strlib, striolib,
+     mouselib;
 
 const
   MMAXSEQ   = 8;     {max no of sequential files}
@@ -165,8 +164,35 @@ const CLEFT       = chr($03);
       GRSIZE      = chr($0c);
       ESC         = chr($00);
       LINELENGTH  = 45;  { 47 - 2 for prompt }
+
+mem   CURLIN = $00ed: integer&;
+      OFFSET = $1782: integer&;
+
 var lch: char;
     pos, len, oldvflag: integer;
+    mode, mx, my:       integer;
+
+  proc mouseposition(mx,my:integer);
+  var newpos:integer;
+  begin
+    if my=CURLIN-OFFSET then begin
+      newpos:=mx-2;
+
+      if newpos<0 then newpos:=0;
+      if newpos>len then newpos:=len;
+
+      while pos<newpos do begin
+        write(CRIGHT);
+        pos:=pos+1;
+      end;
+
+      while pos>newpos do begin
+        write(CLEFT);
+        pos:=pos-1;
+      end;
+    end;
+  end;
+
 begin
   line[0] := ENDMARK;
   pos := 0;
@@ -181,7 +207,12 @@ begin
   write(NORVID,'P*',CLRLIN);
 
   repeat
-    read(@KEY,lch); { raw read character }
+    repeat
+      if _getinput(mode,mx,my,lch) then begin
+        if (mode=1) then
+            mouseposition(mx,my);
+      end;
+    until lch<>chr(0);
 
     if (ord(lch)>=$20) and (ord(lch)<=$7e) then begin
       if len < LINELENGTH then begin

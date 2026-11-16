@@ -25,6 +25,8 @@ const
       KRIGHT   = chr(22);
       KENTER   = chr(13);
       KBS      = chr(127);
+      RUP      = chr(8);
+      RDOWN    = chr(2);
 
 var  lineptr: array[MAXLINES] of cpnt;
      nlines: integer;
@@ -696,14 +698,22 @@ end;
 proc handlekey;
 begin
   case key of
-  KESC,'q':  stop:=true;
-  KUP:       moveline(-1);
-  KDOWN:     moveline(+1);
-  KLEFT:     moveline(-(2 * PAGELEN) div 3);
-  KRIGHT:    moveline(+(2 * PAGELEN) div 3);
-  '/','f':   dofind;
-  'n':       donextfind;
-  'h','?':   dohelp
+
+  KESC,'q':   stop:=true;
+
+  KUP,RUP:      moveline(-1);
+
+  KDOWN,RDOWN:  moveline(+1);
+
+  KLEFT:        moveline(-(2 * PAGELEN) div 3);
+
+  KRIGHT:       moveline(+(2 * PAGELEN) div 3);
+
+  '/','f':      dofind;
+
+  'n':          donextfind;
+
+  'h','?':      dohelp
   else
     { ignore }
   end {case};
