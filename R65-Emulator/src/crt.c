@@ -675,8 +675,6 @@ void crtUpdate()
                     SETPASCALCOLOR;
               else
                     SETNORMALTEXTCOLOR;
-              if (read6502(global_videoBaseAddress + (NUMCHAR*onscreenCurlin)
-                   + onscreenCurpos) & 0x80) Stroke(0,0,0);
               xx = hcell * onscreenCurpos;
               yy = vcell * (onscreenCurlin + 1) + 3;
               if (hcell < 10) StrokeWidth(2);

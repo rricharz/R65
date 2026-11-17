@@ -6,14 +6,15 @@ program pedit;
 {$U+}
 {$R-}
 
-uses syslib, arglib, strlib, filelib, writelib;
+uses syslib, arglib, strlib, filelib, writelib,
+     mouselib;
 
-const title='R65 PEDIT 2.2'; {max 20 chars}
+const title='R65 PEDIT 3.0'; {max 20 chars}
 
     maxlines= 310;      xmax   = 56;
     scrlins = 16;       mlenght= 19;
     inpx    = 37;       marked = 58;
-    eol     = chr($00); esc    = chr($00);
+    eol     = chr($00); ESC    = chr($00);
     rdown   = chr($02); rup    = chr($08);
     pgdown  = chr($14); pgup   = chr($12);
     cdown   = chr($18); cup    = chr($1a);
@@ -21,6 +22,7 @@ const title='R65 PEDIT 2.2'; {max 20 chars}
     clrlin  = chr($17); cleft  = chr($03);
     inschr  = chr($15); delchr = chr($19);
     rubout  = chr($7f); cright = chr($16);
+    realESC = chr(27);
 
 mem curlin  = $ed: integer&;
     curpos  = $ee: integer&;
@@ -40,6 +42,7 @@ var line,nlines,topline,ig,dummy: integer;
     linepnt: array[maxlines] of cpnt;
     relpnt:  integer;
     stemp,stemp2: cpnt;
+    newlineno: integer;
 
 func printable(ch:char):boolean;
 begin
@@ -70,9 +73,9 @@ begin
   numlin:=l; numchr:=c;
 end;
 
-func column:integer;
+func disprow:integer;
 begin
-  column:=line-topline+1;
+  disprow:=line-topline+1;
 end;
 
 proc goto(xpos, ypos: integer);
@@ -135,7 +138,7 @@ begin
   goto(inpx,0); write(chr(ord(':') or 128));
   {read input}
   read(@KEY,ch); i:=0;
-  while (ch<>chr(13)) and (ch<>esc) do begin
+  while (ch<>chr(13)) and (ch<>ESC) do begin
     if (ch=rubout) then begin
       if i>0 then i:=i-1; goto(i+inpx+1,0);
       write(chr(ord(' ') or 128),cleft);
@@ -270,62 +273,82 @@ begin
   savecx:=p1+2; chkline; chktop(false); showall;
 end;
 
-func edlin(pnt: cpnt): char;
+func edlin(pnt: cpnt; var newlineno0: integer): char;
 var   ch1,lstch1,lstch2: char;
-      stop0: boolean;
+      stop0,bdummy: boolean;
       lstart: integer;
+      mode,mx,my: integer;
 begin
-  goto(savecx,column);
+  newlineno0:=0;
+  goto(savecx,disprow);
   if savecx=1 then write(cright,cleft)
   else write(cleft,cright); {to update cursor}
-  stop0:=false; lstart:=column*xmax;
+  stop0:=false; lstart:=disprow*xmax;
   repeat
-    read(@KEY,ch1);
+    repeat
+      bdummy:=_getinput(mode,mx,my,ch1);
+      if _isesc then ch1:=realESC;
+      if (mode=1) and (my>=1) and (my<=15) then begin
+        if (topline+my-1>=1) and
+           (topline+my-1<nlines) then begin
+          if mx<0 then mx:=0;
+          if mx>=xmax then mx:=xmax-1;
+          newlineno0:=topline+my-1;
+          savecx:=mx+1;
+          stop0:=true;
+        end;
+      end;
+    until (ch1<>chr(0)) or stop0;
+
     lstch1:=' '; lstch2:=' ';
-    case ch1 of
-      delchr,rubout: if (curpos=0) and (line>1)
-             then begin
-               updline(pnt,lstart);join;stop0:=true;
-             end else write(cleft,delchr);
-      cleft: if curpos>0 then write(cleft)
-             else if line>1 then begin
-               updline(pnt,lstart);
-               line:=line-1; curpos:=lastpos(line)+1;
-               stop0:=true;
-             end;
-      cright:if curpos<xmax-1 then begin
-               write(cright);
-             end else if line<nlines-1 then begin
-               updline(pnt,lstart);
-               line:=line+1; curpos:=0;
-               stop0:=true;
-             end;
-      cup,cdown,esc,CR,rup,rdown,
-      pgup,pgdown,HOM,pgend: stop0:=true
-      else begin
-             if printable(ch1) then begin
-               lstch1:=video[lstart+xmax-1];
-               lstch1:=chr(ord(lstch1) and $7f);
-               lstch2:=video[lstart+xmax-2];
-               lstch2:=chr(ord(lstch2) and $7f);
-               if curpos>=xmax-1 then begin
-                 if line>=nlines-1 then newline;
-                 video[lstart+xmax-1]:=ch1;
-                 curpos:=0;
-                 lstch1:=cdown;
-               end else begin
-                 write(inschr); write(ch1);
+    if not stop0 then
+      case ch1 of
+        delchr,rubout: if (curpos=0) and (line>1)
+               then begin
+                 updline(pnt,lstart);join;stop0:=true;
+               end else write(cleft,delchr);
+        cleft: if curpos>0 then write(cleft)
+               else if line>1 then begin
+                 updline(pnt,lstart);
+                 line:=line-1; curpos:=lastpos(line)+1
+;
+                 stop0:=true;
                end;
-               if (lstch1<>' ') or (lstch2<>' ')
-                 then stop0:=true;
-             end;
-           end
-    end {case};
-    until stop0;
+        cright:if curpos<xmax-1 then begin
+                 write(cright);
+               end else if line<nlines-1 then begin
+                 updline(pnt,lstart);
+                 line:=line+1; curpos:=0;
+                 stop0:=true;
+               end;
+        cup,cdown,realESC,CR,rup,rdown,
+        pgup,pgdown,HOM,pgend: stop0:=true
+        else begin
+               if printable(ch1) then begin
+                 lstch1:=video[lstart+xmax-1];
+                 lstch1:=chr(ord(lstch1) and $7f);
+                 lstch2:=video[lstart+xmax-2];
+                 lstch2:=chr(ord(lstch2) and $7f);
+                 if curpos>=xmax-1 then begin
+                   if line>=nlines-1 then newline;
+                   video[lstart+xmax-1]:=ch1;
+                   curpos:=0;
+                   lstch1:=cdown;
+                 end else begin
+                   write(inschr); write(ch1);
+                 end;
+                 if (lstch1<>' ') or (lstch2<>' ')
+                   then stop0:=true;
+               end;
+             end
+      end {case};
+  until stop0;
+
   updline(pnt,lstart);
   if (lstch1<>' ') or (lstch2<>' ') then edlin:=lstch1
   else edlin:=ch1;
-  if (ch1<>delchr) and (ch1<>rubout) then
+  if (newlineno=0) and
+     (ch1<>delchr) and (ch1<>rubout) then
     savecx:=curpos+1;
 end;
 
@@ -646,20 +669,37 @@ end;
 begin {main}
   write(PRTOFF);
   for ig:=0 to maxlines-1 do linepnt[ig]:=nil;
-  stemp:=_new; stemp2:=_new; fs:=_new;
-  setnumlin($0f,$37); write(HOM,clrscr);
+  stemp:=_new;
+  stemp2:=_new;
+  fs:=_new;
+  setnumlin($0f,$37);
+  write(HOM,clrscr);
   putontop('Line xxx of xxx',0,true);
-  relpnt:=maxlines-1; mark:=0; savecx:=1;
-  clrmessage; readinput; fs[0]:=ENDMARK;
+  relpnt:=maxlines-1;
+  mark:=0; savecx:=1;
+  clrmessage;
+  readinput;
+  fs[0]:=ENDMARK;
   putontop(title,36,true);
-  topline:= 1; line:=1; showall; stop:=false;
+  topline:= 1;
+  line:=1;
+  showall;
+  stop:=false;
+
   repeat
-    showtop; chi := edlin(linepnt[line]);
-    if printable(chi) then insert(chi,line+1)
+    showtop;
+    chi:=edlin(linepnt[line],newlineno);
+    if newlineno<>0 then begin
+      line:=newlineno;
+      chktop(true);
+    end
+    else if printable(chi) then insert(chi,line+1)
     else case chi of
-      cup,cdown: begin
-             if chi=cup then line:=line-1
-             else line:=line+1;
+      cup,cdown,rup,rdown: begin
+             if (chi=cup) or (chi=rup)
+               then line:=line-1
+             else
+               line:=line+1;
              chkline;
              if curpos>lastpos(line)+2 then
                savecx:=lastpos(line)+2;
@@ -671,12 +711,6 @@ begin {main}
       pgdown: begin
              line:=line+15; chkline; chktop(true);
            end;
-      rup: if (topline>1) then begin
-             topline:=topline-1;chktop(false);showall;
-           end;
-      rdown: if (topline<nlines-15) then begin
-             topline:=topline+1;chktop(false);showall;
-           end;
       HOM: begin
              line:=1; savecx:=1; chktop(true);
            end;
@@ -684,7 +718,7 @@ begin {main}
              line:=nlines-1; savecx:=1; chktop(true);
            end;
       CR:  insertline;
-      esc: if doesc then stop:=true
+      realESC: if doesc then stop:=true
     end {case};
     until stop;
   setnumlin($54,$2f);
