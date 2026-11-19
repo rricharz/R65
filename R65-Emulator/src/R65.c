@@ -443,6 +443,8 @@ int editor()
         extension = ".help";
     else if (filstp == 'N')
         extension = ".nroff";
+     else if (filstp == 'D')
+        extension = ".db1";
     else
         extension = ".txt";
 

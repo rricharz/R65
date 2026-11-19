@@ -12,6 +12,7 @@
 // linux:                       type subtype subname
 // .asm   assembler source file   S     A      :A
 // .txt   general text file       S     B      :B
+// .txt   data base               S     D      :D
 // .pas   pascal source file      S     P      :P
 // .pa2   pascal binary files     B     R      :R
 // .pb1   pascal lib loader file  S     T      :T
@@ -302,6 +303,11 @@ int main(int argc, char *argv[])
         subtype = 'B';      // Textfile
         subname = 'B';
     }
+        else if ((end = strstr(argv[1],".db1")) != NULL) {
+        type = 'S';
+        subtype = 'D';      // Textfile
+        subname = 'D';
+    }
     else if ((end = strstr(argv[1],".pas")) != NULL) {
         type = 'S';
         subtype = 'P';      // Pascal source file
@@ -335,7 +341,7 @@ int main(int argc, char *argv[])
         subname = 'N';
     }
     else {
-        printf("Filename must end with .asm,.txt,.pas,.pa2,.lib,.li1\n");
+        printf("Filename must end with .asm,.txt,.pas,.pa2,.lib,.li1,.db1\n");
         closeAndExit();
     }
     

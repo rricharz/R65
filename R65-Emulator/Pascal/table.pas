@@ -5,7 +5,8 @@
                                     }
 
 program table;
-uses syslib, arglib, strlib, striolib, txtgrlib;
+uses syslib, arglib, strlib, striolib, txtgrlib,
+     mouselib;
 
 const MAXROWS = 100;
       MAXCOLS = 8;
@@ -20,7 +21,7 @@ const MAXROWS = 100;
 var f: file;
     filename: cpnt;
     datarow: array[MAXROWS] of cpnt;
-    ncols,i: integer;
+    ncols,i,lineno: integer;
     colsize: array[MAXCOLS] of integer;
     coltype: array[MAXCOLS] of integer;
     colx: array[MAXCOLS] of integer;
@@ -28,12 +29,15 @@ var f: file;
     tablewidth, nrows: integer;
     acc1,acc2: cpnt;
     sumcolumn: integer;
+    emptyrow:cpnt;
+    firstrow:integer;
 
 proc showerror(s: cpnt);
 {**********************}
 begin
   write(INVVID,s);
-  if nrows>=0 then write(' at row ',nrows);
+  if nrows>=0 then write(' at line ',lineno,
+                              ', row ',nrows+1);
   writeln(NORVID);
   _abort;
 end;
@@ -69,7 +73,7 @@ begin
   drive :=  1;
   default :=  true;
   _sgetstring(filename, _carg, default);
-  _ssetsubtype(filename,'B', true);
+  _ssetsubtype(filename,'D', true);
   _agetval(cyclus,    default);
   _agetval(drive,     default);
   _strfio(filename, cyclus, drive);
@@ -521,7 +525,7 @@ begin
 
   while not eof do begin
     len:=_strread(f,datarow[nrows],eof);
-    writeln(datarow[nrows]);
+    lineno := lineno + 1;
 
     if len>0 then begin
       if nrows>=MAXROWS then
@@ -612,9 +616,6 @@ begin
 
   if i<>len+1 then
     showerror('TABLE: Wrong number of types');
-
-  for i:=0 to ncols-1 do
-    writeln(i,' TYPE=',coltype[i]);
 end;
 
 proc parse(f:file);
@@ -625,6 +626,7 @@ var s:cpnt;
 begin
   s:=_new;
   len:=_strread(f,s,eof);
+  lineno := lineno + 1;
 
   if _strncmp(s,'SIZE=',5)<>0 then
     showerror('TABLE: SIZE expected');
@@ -661,17 +663,19 @@ begin
   if x>SCREENWIDTH then
     showerror('TABLE: Table too wide');
 
-  writeln('Columns: ',ncols);
   for j:=0 to ncols-1 do
     writeln(j,' SIZE=',colsize[j],' X=',colx[j]);
 
   len:=_strread(f,s,eof);
+  lineno := lineno + 1;
   parsetype(s,len);
 
   len:=_strread(f,s,eof);
+  lineno := lineno + 1;
   parsetitle(s,len);
 
   len:=_strread(f,s,eof);
+  lineno := lineno + 1;
   if _strcmp(s,'DATA=')<>0 then
     showerror('TABLE: DATA expected');
 
@@ -683,13 +687,17 @@ end;
 
 proc showdata;
 {*************}
-var i:integer;
+var i,row:integer;
 begin
-  for i:=0 to 1 do
-    if i<nrows then begin
-      _setcursor(1,i+3);
-      writetableline(datarow[i]);
-    end;
+  for i:=0 to 11 do begin
+    _setcursor(1,i+3);
+    row:=firstrow+i;
+
+    if row<nrows then
+      writetableline(datarow[row])
+    else
+      writetableline(emptyrow);
+  end;
 end;
 
 proc showtable;
@@ -710,26 +718,70 @@ begin
   writetableline(titles);
 
   showdata;
+end;
 
+proc prepareemptyrow;
+{*******************}
+var i:integer;
+begin
+  for i:=0 to tablewidth-3 do
+    emptyrow[i]:=' ';
+
+  for i:=1 to ncols-1 do
+    emptyrow[colx[i]-2]:=',';
+
+  emptyrow[tablewidth-2]:=ENDMARK;
+end;
+
+proc tableinput;
+{**************}
+var mode,x,y:integer;
+    key:char;
+    done:boolean;
+begin
+  done:=false;
   repeat
-    read(@KEY,ch);
-  until ch<>chr(0);
+    _waitinput(mode,x,y,key);
+
+    if key=chr(8) then begin
+      if firstrow+12<nrows then begin
+        firstrow:=firstrow+1;
+        showdata;
+      end;
+    end;
+
+    if key=chr(2) then begin
+      if firstrow>0 then begin
+        firstrow:=firstrow-1;
+        showdata;
+      end;
+    end;
+
+    if (key='q') or (key=chr(27)) then
+      done:=true;
+
+  until done;
 end;
 
 begin
   for i:=0 to MAXROWS do { alloc. MAXROWS+1 strings }
     datarow[i]:=_new;
-  filename:=_new;
+  filename := _new;
   titles := _new;
   acc1 := _new;
   acc2 := _new;
+  emptyrow:=_new;
   f:=initfile;
-  nrows:=-1;
+  nrows := -1;
+  lineno := 0;
   parse(f);
 
+  firstrow := 0;
+  prepareemptyrow;
   setnumlin($0f,$37);
   write(HOM,CSC);
   showtable;
+  tableinput;
 
   setnumlin($54,$2f);
   write(HOM,CSC);

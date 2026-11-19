@@ -498,10 +498,12 @@ int export_file()
             extension = ".pas";
         else if (filstp == 'H')
             extension = ".help";
-       else if (filstp == 'B')
+        else if (filstp == 'B')
             extension = ".txt";
-       else if (filstp == 'N')
+        else if (filstp == 'N')
             extension = ".nroff";
+        else if (filstp == 'D')
+            extension = ".db1";
         else
             extension = ".txt";
     }
@@ -655,6 +657,8 @@ int import_file()
               extension = ".help";
             else if (filstp == 'N')
               extension = ".nroff";
+            else if (filstp == 'D')
+              extension = ".db1";  
             end = i;
         }
         
@@ -664,7 +668,7 @@ int import_file()
     }
     
     s[end] = 0;                                 // add end of string mark
-    
+
     closeDiskFile(drive);   // close file to avoid problems when pushr65 writes to it 
     
     setLed(drive, 1);

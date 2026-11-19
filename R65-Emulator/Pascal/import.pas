@@ -55,9 +55,12 @@ begin { main }
   setsubtype('P');
   _asetfile(name,cyclus,drive,' ');
   FILERR := _emulator(ECIMPORT);
-  if FILERR<>0 then bcderror(FILERR);
+  if FILERR<>0 then begin
+    RUNERR := FILERR;
+    exit;
+  end;
   _write_label;
-  writeln('+')
+  writeln('+');
   free:=_freedrv(FILDRV,true);
 end.
- 
+
