@@ -37,9 +37,11 @@ const
   CSAVE   = chr($13);  { Ctrl+S: save and continue }
   CQUIT   = chr($11);  { Ctrl+Q: save and quit }
   CKILL   = chr($0b);  { Ctrl+K: quit without saving }
+  CPRINT  = chr($10);  { Ctrl+P: print table }
 
 var f:                  file;
     filename:           cpnt;
+    cyclus,drive:       integer;
     datarow:            array[MAXROWS] of cpnt;
     ncols,i,lineno:     integer;
     colsize:            array[MAXCOLS] of integer;
@@ -117,8 +119,7 @@ end;
 
 func initfile: file;
 {******************}
-var cyclus, drive: integer;
-    default: boolean;
+var default: boolean;
 begin
   cyclus  :=  0;
   drive :=  1;
@@ -1156,6 +1157,144 @@ begin
   showdata;
 end;
 
+proc save;
+{********}
+var fr,fw:file;
+    lineno,i,j,k,start,len:integer;
+    ch:char;
+    p:cpnt;
+begin
+  { Open original file }
+  _strfio(filename,cyclus,drive);
+  openr(fr);
+
+  { Create new file cycle }
+  cyclus:=0;
+  _strfio(filename,cyclus,drive);
+  openw(fw);
+
+  { Copy header, including DATA= }
+  lineno:=1;
+  repeat
+    read(@fr,ch);
+    write(@fw,ch);
+    if ch=chr(13) then lineno:=lineno+1;
+  until lineno>4;
+
+  close(fr);
+
+  { Write data rows }
+  for i:=0 to nrows-1 do begin
+    p:=datarow[i];
+
+    for j:=0 to ncols-1 do begin
+      start:=colx[j]-1;
+      len:=colsize[j];
+
+      { Remove leading blanks from numbers }
+      if (coltype[j]=T_INTEGER) or
+         (coltype[j]=T_REAL) then begin
+        while (len>0) and (p[start]=' ') do begin
+          start:=start+1;
+          len:=len-1;
+        end;
+      end;
+
+      { Remove trailing blanks }
+      while (len>0) and
+            (p[start+len-1]=' ') do
+        len:=len-1;
+
+      for k:=0 to len-1 do
+        write(@fw,p[start+k]);
+      end;
+
+    if j<ncols-1 then
+      write(@fw,',');
+
+    writeln(@fw);
+  end;
+
+  close(fw);
+  modified:=false;
+end;
+
+func _hexchar(i0: integer): char;
+{*******************************}
+var i1: integer;
+begin
+  i1 := i0 and $0f;
+  if i1 < 10 then
+    _hexchar := chr(ord('0') + i1)
+  else
+    _hexchar := chr(ord('A') + i1 - 10);
+end;
+
+func hexb(i: integer): cpnt;
+{**************************}
+var cp: cpnt;
+begin
+  cp := cpnt($17d8);
+  cp[0] := _hexchar((i shr 4) and $0f);
+  cp[1] := _hexchar(i and $0f);
+  cp[2] := chr(0);
+  hexb := cp;
+end;
+
+proc printborder;
+{***************}
+var i,j:integer;
+begin
+  write(@PRINTER,'+');
+  for j:=0 to ncols-1 do begin
+    for i:=1 to colsize[j] do
+      write(@PRINTER,'-');
+    write(@PRINTER,'+');
+  end;
+  writeln(@PRINTER);
+end;
+
+proc printline(s:cpnt);
+{*********************}
+var i:integer;
+begin
+  write(@PRINTER,'|');
+  i:=0;
+  while s[i]<>ENDMARK do begin
+    if s[i]=',' then
+      write(@PRINTER,'|')
+    else
+      write(@PRINTER,s[i]);
+    i:=i+1;
+  end;
+  writeln(@PRINTER,'|');
+end;
+
+proc printtable;
+{***************}
+mem FILCYC = $0311: integer&;
+var i:integer;
+begin
+  { Save first to obtain a valid file cycle }
+  if modified then save;
+
+  { Filename and cycle }
+  writeln(@PRINTER,filename,'.',hexb(FILCYC));
+  writeln(@PRINTER);
+
+  { Title }
+  printborder;
+  printline(titles);
+  printborder;
+
+  { Data }
+  for i:=0 to nrows-1 do
+    printline(datarow[i]);
+
+  printborder;
+  writeln(@PRINTER);
+end;
+
 proc tableinput;
 {**************}
 var mode,x,y:integer;
@@ -1211,13 +1350,16 @@ begin
       CDELETE:
         deleterow;
 
-      CSAVE: begin
-        { save table }
-      end;
+      CSAVE:
+        save;
+
+      CPRINT:
+          printtable;
 
       CQUIT: begin
-        { save table and quit }
-      end;
+          if modified then save;
+          done:=true;
+        end;
 
       CKILL:
         done:=true
@@ -1241,6 +1383,7 @@ begin
   nrows := -1;
   lineno := 0;
   parse(f);
+  close(f);
 
   firstrow := 0;
   currow := 0;
@@ -1253,8 +1396,6 @@ begin
 
   setnumlin($54,$2f);
   write(HOM,CSC);
-
-  close(f);
 end.
 
 
