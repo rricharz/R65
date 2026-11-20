@@ -603,6 +603,12 @@ begin
       nrows:=nrows+1;
     end;
   end;
+  if nrows=0 then begin
+    _strcpy(emptyrow,datarow[0]);
+    nrows:=1;
+    currow:=0;
+    firstrow:=0;
+  end;
 end;
 
 proc parsetitle(s:cpnt;len:integer);
@@ -825,6 +831,37 @@ begin
   emptyrow[tablewidth-2]:=ENDMARK;
 end;
 
+proc insertrow(pos:integer);
+{**************************}
+var i:integer;
+    p:cpnt;
+begin
+  if nrows>=MAXROWS then begin
+    signalerror;
+    exit;
+  end;
+
+  { Save spare string pointer }
+  p:=datarow[nrows];
+
+  { Shift pointers down }
+  for i:=nrows downto pos+1 do
+    datarow[i]:=datarow[i-1];
+
+  datarow[pos]:=p;
+  _strcpy(emptyrow,p);
+
+  nrows:=nrows+1;
+  currow:=pos;
+  modified:=true;
+
+  if currow<firstrow then firstrow:=currow;
+  if currow>=firstrow+12 then
+    firstrow:=currow-11;
+
+  showdata;
+end;
+
 proc movecell(key:char);
 {*********************}
 begin
@@ -851,9 +888,12 @@ begin
   if key=TAB then begin
     if curcol<ncols-1 then
       curcol:=curcol+1
-    else if currow<nrows-1 then begin
+    else begin
       curcol:=0;
-      currow:=currow+1;
+      if currow<nrows-1 then
+        currow:=currow+1
+      else if nrows<MAXROWS then
+        insertrow(nrows);
     end;
   end;
 
@@ -1097,36 +1137,6 @@ begin
   end;
 end;
 
-proc insertrow(pos:integer);
-{**************************}
-var i:integer;
-    p:cpnt;
-begin
-  if nrows>=MAXROWS then begin
-    signalerror;
-    exit;
-  end;
-
-  { Save spare string pointer }
-  p:=datarow[nrows];
-
-  { Shift pointers down }
-  for i:=nrows downto pos+1 do
-    datarow[i]:=datarow[i-1];
-
-  datarow[pos]:=p;
-  _strcpy(emptyrow,p);
-
-  nrows:=nrows+1;
-  currow:=pos;
-  modified:=true;
-
-  if currow<firstrow then firstrow:=currow;
-  if currow>=firstrow+12 then
-    firstrow:=currow-11;
-
-  showdata;
-end;
 
 proc deleterow;
 {**************}
@@ -1193,6 +1203,7 @@ begin
 
       { Remove leading blanks from numbers }
       if (coltype[j]=T_INTEGER) or
+         (coltype[i]=T_SUM) or
          (coltype[j]=T_REAL) then begin
         while (len>0) and (p[start]=' ') do begin
           start:=start+1;
@@ -1207,10 +1218,11 @@ begin
 
       for k:=0 to len-1 do
         write(@fw,p[start+k]);
-      end;
 
-    if j<ncols-1 then
-      write(@fw,',');
+      if j<ncols-1 then
+        write(@fw,',');
+
+    end;
 
     writeln(@fw);
   end;
@@ -1341,11 +1353,17 @@ begin
       CUP,CDOWN,CLEFT,CRIGHT,TAB:
         movecell(key);
 
-      CADD:
-        insertrow(currow+1);
+      CADD: begin
+          insertrow(currow+1);
+          curcol:=0;
+          showdata;
+        end;
 
-      CINSERT:
-        insertrow(currow);
+      CINSERT: begin
+          insertrow(currow);
+          curcol:=0;
+          showdata;
+        end;
 
       CDELETE:
         deleterow;
