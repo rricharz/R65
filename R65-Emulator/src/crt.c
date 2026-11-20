@@ -671,10 +671,8 @@ void crtUpdate()
           int onscreenCurpos = (global_curloc - global_videoBaseAddress) % NUMCHAR;
             
           if ((onscreenCurlin >= 0) && (onscreenCurlin < 16) && showCursor) {
-              if (memory[M8_SFLAG] & 1)
-                    SETPASCALCOLOR;
-              else
-                    SETNORMALTEXTCOLOR;
+              unsigned char c = read6502(global_curloc);
+              SetCharacterColor(c);
               xx = hcell * onscreenCurpos;
               yy = vcell * (onscreenCurlin + 1) + 3;
               if (hcell < 10) StrokeWidth(2);

@@ -8,38 +8,69 @@ program table;
 uses syslib, arglib, strlib, striolib, txtgrlib,
      mouselib;
 
-const MAXROWS = 100;
-      MAXCOLS = 8;
-      SCREENWIDTH = 56;
+const
+  MAXROWS     = 100;
+  MAXCOLS     = 8;
+  SCREENWIDTH = 56;
 
-      T_TEXT = 1;
-      T_INTEGER = 2;
-      T_REAL = 3;
-      T_DATE = 4;
-      T_SUM = 5;
+  T_TEXT      = 1;
+  T_INTEGER   = 2;
+  T_REAL      = 3;
+  T_DATE      = 4;
+  T_SUM       = 5;
 
-var f: file;
-    filename: cpnt;
-    datarow: array[MAXROWS] of cpnt;
-    ncols,i,lineno: integer;
-    colsize: array[MAXCOLS] of integer;
-    coltype: array[MAXCOLS] of integer;
-    colx: array[MAXCOLS] of integer;
-    titles: cpnt;
-    tablewidth, nrows: integer;
-    acc1,acc2: cpnt;
-    sumcolumn: integer;
-    emptyrow:cpnt;
-    firstrow:integer;
+  CUP         = chr($1a);
+  CDOWN       = chr($18);
+  CLEFT       = chr($03);
+  CRIGHT      = chr($16);
+  RUP         = chr($02);
+  RDOWN       = chr($08);
+  RUBOUT      = chr($7f);
+  ENTER       = chr($0d);
+  TAB         = chr($09);
 
-proc showerror(s: cpnt);
-{**********************}
+  { TABLE commands }
+  CEDIT   = chr($05);  { Ctrl+E: edit cell }
+  CADD    = chr($01);  { Ctrl+A: add row after }
+  CINSERT = chr($0e);  { Ctrl+N: insert row before }
+  CDELETE = chr($04);  { Ctrl+D: delete row }
+  CSAVE   = chr($13);  { Ctrl+S: save and continue }
+  CQUIT   = chr($11);  { Ctrl+Q: save and quit }
+  CKILL   = chr($0b);  { Ctrl+K: quit without saving }
+
+var f:                  file;
+    filename:           cpnt;
+    datarow:            array[MAXROWS] of cpnt;
+    ncols,i,lineno:     integer;
+    colsize:            array[MAXCOLS] of integer;
+    coltype:            array[MAXCOLS] of integer;
+    colx:               array[MAXCOLS] of integer;
+    titles:             cpnt;
+    tablewidth, nrows:  integer;
+    acc1,acc2:          cpnt;
+    sumcolumn:          integer;
+    emptyrow:           cpnt;
+    firstrow:           integer;
+    currow,curcol:      integer;
+    editing, modified:  boolean;
+    validationfail:     boolean;
+
+proc signalerror; forward;
+
+proc showerror(message:cpnt);
+{***************************}
 begin
-  write(INVVID,s);
-  if nrows>=0 then write(' at line ',lineno,
+  if editing then begin
+    validationfail:=true;
+    signalerror;
+  end
+  else begin
+    write(INVVID,message);
+    if nrows>=0 then write(' at line ',lineno,
                               ', row ',nrows+1);
-  writeln(NORVID);
-  _abort;
+    writeln(NORVID);
+    _abort;
+  end;
 end;
 
 proc setnumlin(l,c:integer);
@@ -50,18 +81,38 @@ begin
   numlin:=l; numchr:=c;
 end;
 
-proc writetableline(s:cpnt);
-{************************}
-var i:integer;
+proc writetableline(s:cpnt; selectedcol:integer);
+{*********************************************}
+var i,j:integer;
 begin
   i:=0;
+  j:=0;
+  if (selectedcol=0) or (selectedcol=-2) then
+    write(INVVID);
+
   while s[i]<>ENDMARK do begin
-    if s[i]=',' then
-      _writetxtgr(TGR_UP+TGR_DOWN)
+    if s[i]=',' then begin
+      write(NORVID);
+      _writetxtgr(TGR_UP+TGR_DOWN);
+      j:=j+1;
+      if (j=selectedcol) or (selectedcol=-2) then
+        write(INVVID);
+    end
     else
       write(s[i]);
     i:=i+1;
   end;
+  write(NORVID);
+end;
+
+proc _delay10msec(time:integer);
+{******************************}
+mem
+{$I IHIDDENMEM}
+var i:integer;
+begin
+  for i:=1 to time do
+    emucom:=6;
 end;
 
 func initfile: file;
@@ -186,7 +237,7 @@ begin
 end;
 
 func validatereal(s:cpnt;pos:integer):boolean;
-{******************************************}
+{********************************************}
 var i,j,k,n,decimals:integer;
     negative:boolean;
 begin
@@ -426,9 +477,10 @@ begin
 
       { Ignore empty fields }
       if (p[0]<>',') and (p[0]<>ENDMARK) then begin
-        if not add(a,p,b,16) then
+        if not add(a,p,b,16) then begin
           showerror('TABLE: SUM overflow');
-
+          exit;
+        end;
         t:=a;
         a:=b;
         b:=t;
@@ -442,8 +494,10 @@ begin
 
   { Check result fits }
   n:=_strlen(a);
-  if n>colsize[sumcolumn] then
+  if n>colsize[sumcolumn] then begin
     showerror('TABLE: SUM field too small');
+     exit;
+  end;
 
   { Write right-justified result }
   for k:=0 to colsize[sumcolumn]-1 do
@@ -465,16 +519,22 @@ begin
 
     { Validate field }
     if coltype[j]=T_DATE then
-      if not validatedate(s,start) then
+      if not validatedate(s,start) then begin
         showerror('TABLE: Invalid date');
+        exit;
+      end;
 
     if coltype[j]=T_INTEGER then
-      if not validateinteger(s+start) then
+      if not validateinteger(s+start) then begin
         showerror('TABLE: Invalid integer');
+        exit;
+      end;
 
     if coltype[j]=T_REAL then
-      if not validatereal(s,start) then
+      if not validatereal(s,start) then begin
         showerror('TABLE: Invalid real');
+        exit;
+      end;
 
     { Find end of current field }
     while (s[i]<>',') and (s[i]<>ENDMARK) do begin
@@ -483,17 +543,23 @@ begin
     end;
 
     { Check field width }
-    if k>colsize[j] then
+    if k>colsize[j] then begin
       showerror('TABLE: Field width');
+      exit;
+    end;
 
     { Check separator }
     if j<ncols-1 then begin
-      if s[i]<>',' then
+      if s[i]<>',' then begin
         showerror('TABLE: Missing field');
+        exit;
+      end;
     end
     else
-      if s[i]<>ENDMARK then
+      if s[i]<>ENDMARK then begin
         showerror('TABLE: Too many fields');
+        exit;
+      end;
 
     len:=k;
 
@@ -663,9 +729,6 @@ begin
   if x>SCREENWIDTH then
     showerror('TABLE: Table too wide');
 
-  for j:=0 to ncols-1 do
-    writeln(j,' SIZE=',colsize[j],' X=',colx[j]);
-
   len:=_strread(f,s,eof);
   lineno := lineno + 1;
   parsetype(s,len);
@@ -693,11 +756,39 @@ begin
     _setcursor(1,i+3);
     row:=firstrow+i;
 
-    if row<nrows then
-      writetableline(datarow[row])
+    if row<nrows then begin
+      if row=currow then
+        writetableline(datarow[row],curcol)
+      else
+        writetableline(datarow[row],-1);
+    end
     else
-      writetableline(emptyrow);
+      writetableline(emptyrow,-1);
   end;
+  if (currow>=firstrow) and
+     (currow<firstrow+12) and
+     (currow<nrows) then
+    _setcursor(colx[curcol],currow-firstrow+3)
+  else
+    _parkcursor;
+end;
+
+proc signalerror;
+{***************}
+var i:integer;
+begin
+  for i:=1 to 3 do begin
+    _setcursor(1,currow-firstrow+3);
+    writetableline(datarow[currow],-2);
+    {_syncscreen;}
+    _delay10msec(10);
+
+    _setcursor(1,currow-firstrow+3);
+    writetableline(datarow[currow],-1);
+    {_syncscreen;}
+    _delay10msec(10);
+  end;
+  showdata;
 end;
 
 proc showtable;
@@ -715,7 +806,7 @@ begin
     _vtxtgr(colx[i]-1,0,15,CYAN);
 
   _setcursor(1,1);
-  writetableline(titles);
+  writetableline(titles,-1);
 
   showdata;
 end;
@@ -733,32 +824,404 @@ begin
   emptyrow[tablewidth-2]:=ENDMARK;
 end;
 
+proc movecell(key:char);
+{*********************}
+begin
+  if key=CUP then begin
+    if currow>0 then
+      currow:=currow-1;
+  end;
+
+  if key=CDOWN then begin
+    if currow<nrows-1 then
+      currow:=currow+1;
+  end;
+
+  if key=CLEFT then begin
+    if curcol>0 then
+      curcol:=curcol-1;
+  end;
+
+  if key=CRIGHT then begin
+    if curcol<ncols-1 then
+      curcol:=curcol+1;
+  end;
+
+  if key=TAB then begin
+    if curcol<ncols-1 then
+      curcol:=curcol+1
+    else if currow<nrows-1 then begin
+      curcol:=0;
+      currow:=currow+1;
+    end;
+  end;
+
+  if currow<firstrow then
+    firstrow:=currow;
+
+  if currow>=firstrow+12 then
+    firstrow:=currow-11;
+
+  showdata;
+end;
+
+proc draweditcell(s:cpnt; len:integer);
+{***********************************}
+var i:integer;
+begin
+  _setcursor(colx[curcol],currow-firstrow+3);
+  write(INVVID);
+
+  for i:=0 to colsize[curcol]-1 do begin
+    if i<len then
+      write(s[i])
+    else
+      write(' ');
+  end;
+
+  write(NORVID);
+
+{  if len<colsize[curcol] then }
+    _setcursor(colx[curcol]+len,currow-firstrow+3)
+{  else
+    _parkcursor; }
+end;
+
+proc geteditcell(s:cpnt);
+{***********************}
+var i,start,len:integer;
+    rowpnt:cpnt;
+begin
+  start:=colx[curcol]-1;
+  len:=colsize[curcol];
+  rowpnt:=datarow[currow];
+
+  { Skip leading spaces }
+  if (coltype[curcol]=T_INTEGER) or
+     (coltype[curcol]=T_REAL) then begin
+    while (len>0) and (rowpnt[start]=' ')
+    do begin
+      start:=start+1;
+      len:=len-1;
+    end;
+  end
+  else begin
+    { Remove trailing spaces }
+    while (len>0) and
+          (rowpnt[start+len-1]=' ') do
+      len:=len-1;
+  end;
+
+  for i:=0 to len-1 do
+    s[i]:=rowpnt[start+i];
+
+  s[len]:=ENDMARK;
+end;
+
+func acceptcell(editstr:cpnt):boolean;
+{***********************************}
+var s,rowpnt:cpnt;
+    i,j,k,n,start,len:integer;
+begin
+  acceptcell:=false;
+  s:=_new;
+  rowpnt:=datarow[currow];
+  k:=0;
+
+  for j:=0 to ncols-1 do begin
+    if j=curcol then begin
+      { Copy edited field }
+      i:=0;
+      while editstr[i]<>ENDMARK do begin
+        s[k]:=editstr[i];
+        k:=k+1;
+        i:=i+1;
+      end;
+    end
+    else begin
+      { Copy existing field without padding }
+      start:=colx[j]-1;
+      len:=colsize[j];
+
+      { Remove leading spaces from numeric fields }
+      if (coltype[j]=T_INTEGER) or
+         (coltype[j]=T_REAL) or
+         (coltype[j]=T_SUM) then begin
+        while (len>0) and (rowpnt[start]=' ') do begin
+          start:=start+1;
+          len:=len-1;
+        end;
+      end;
+
+      { Remove trailing spaces }
+      while (len>0) and
+            (rowpnt[start+len-1]=' ') do
+        len:=len-1;
+
+      for n:=0 to len-1 do begin
+        s[k]:=rowpnt[start+n];
+        k:=k+1;
+      end;
+    end;
+
+    { Add field separator }
+    if j<ncols-1 then begin
+      s[k]:=',';
+      k:=k+1;
+    end;
+  end;
+
+  s[k]:=ENDMARK;
+
+  { Validate and normalize temporary row }
+  validationfail:=false;
+  validaterow(s);
+
+  if not validationfail then begin
+    _strcpy(s,rowpnt);
+    acceptcell:=true;
+  end;
+
+  _release(s);
+end;
+
+func editcell(firstkey:char;
+        var mode,x,y:integer):char;
+{*********************************}
+var editstr:cpnt;
+    key:char;
+    done,finish,scrollerror:boolean;
+    len:integer;
+begin
+  editstr:=_new;
+  scrollerror:=false;
+
+  if firstkey=ENTER then
+    geteditcell(editstr)
+  else if firstkey=chr(0) then
+    editstr[0]:=ENDMARK
+  else begin
+    editstr[0]:=firstkey;
+    editstr[1]:=ENDMARK;
+  end;
+
+  len:=_strlen(editstr);
+  done:=false;
+  draweditcell(editstr,len);
+
+  repeat
+    _waitinput(mode,x,y,key);
+    finish:=false;
+
+    if _isesc then begin
+      key:=chr(0);
+      mode:=0;
+      done:=true;
+    end
+    else begin
+
+      { Ignore repeated scrolling after an error }
+      if scrollerror and
+         ((key=RUP) or (key=RDOWN)) then begin
+        key:=chr(0);
+        mode:=0;
+      end;
+
+      case key of
+        RUBOUT: begin
+          if len>0 then begin
+            len:=len-1;
+            editstr[len]:=ENDMARK;
+            scrollerror:=false;
+          end;
+        end
+
+        else begin
+          if (key>=' ') and (key<chr(127)) then begin
+            if len<colsize[curcol] then begin
+              editstr[len]:=key;
+              len:=len+1;
+              editstr[len]:=ENDMARK;
+              scrollerror:=false;
+            end;
+          end
+          else if key<>chr(0) then
+            finish:=true;
+        end
+      end;
+
+      { Mouse click also terminates editing }
+      if mode=1 then finish:=true;
+
+      if finish then begin
+        if key=CKILL then
+          done:=true
+        else if acceptcell(editstr) then begin
+          modified:=true;
+          done:=true;
+        end
+        else begin
+          if (key=RUP) or (key=RDOWN) then
+            scrollerror:=true;
+          draweditcell(editstr,len);
+        end;
+      end
+      else
+        draweditcell(editstr,len);
+    end;
+  until done;
+
+  _release(editstr);
+  showdata;
+  editcell:=key;
+end;
+
+proc selectcell(x,y:integer);
+{************************}
+var j,r:integer;
+begin
+  if (y<3) or (y>14) then exit;
+
+  r:=firstrow+y-3;
+  if r>=nrows then exit;
+
+  for j:=0 to ncols-1 do begin
+    if (x>=colx[j]) and
+       (x<colx[j]+colsize[j]) then begin
+      currow:=r;
+      curcol:=j;
+      showdata;
+      exit;
+    end;
+  end;
+end;
+
+proc insertrow(pos:integer);
+{**************************}
+var i:integer;
+    p:cpnt;
+begin
+  if nrows>=MAXROWS then begin
+    signalerror;
+    exit;
+  end;
+
+  { Save spare string pointer }
+  p:=datarow[nrows];
+
+  { Shift pointers down }
+  for i:=nrows downto pos+1 do
+    datarow[i]:=datarow[i-1];
+
+  datarow[pos]:=p;
+  _strcpy(emptyrow,p);
+
+  nrows:=nrows+1;
+  currow:=pos;
+  modified:=true;
+
+  if currow<firstrow then firstrow:=currow;
+  if currow>=firstrow+12 then
+    firstrow:=currow-11;
+
+  showdata;
+end;
+
+proc deleterow;
+{**************}
+var i:integer;
+    p:cpnt;
+begin
+  if nrows=0 then exit;
+
+  p:=datarow[currow];
+
+  { Shift pointers up }
+  for i:=currow to nrows-2 do
+    datarow[i]:=datarow[i+1];
+
+  nrows:=nrows-1;
+  datarow[nrows]:=p;
+
+  if currow>=nrows then
+    currow:=nrows-1;
+
+  if currow<0 then currow:=0;
+
+  if firstrow>0 then
+    if firstrow+12>nrows then
+      firstrow:=firstrow-1;
+
+  modified:=true;
+  showdata;
+end;
+
 proc tableinput;
 {**************}
 var mode,x,y:integer;
     key:char;
     done:boolean;
 begin
-  done:=false;
+  done := false;
+  editing := true;
+
   repeat
     _waitinput(mode,x,y,key);
 
-    if key=chr(8) then begin
-      if firstrow+12<nrows then begin
-        firstrow:=firstrow+1;
-        showdata;
-      end;
+    { Start editing if required }
+    if key=CEDIT then begin
+      if coltype[curcol]=T_SUM then
+        signalerror
+      else
+        key:=editcell(ENTER,mode,x,y);
+    end
+    else if (key>=' ') and (key<chr(127)) then begin
+      if coltype[curcol]=T_SUM then
+        signalerror
+      else
+        key:=editcell(key,mode,x,y);
     end;
 
-    if key=chr(2) then begin
-      if firstrow>0 then begin
-        firstrow:=firstrow-1;
-        showdata;
-      end;
-    end;
+    if mode=1 then
+      selectcell(x,y);
 
-    if (key='q') or (key=chr(27)) then
-      done:=true;
+    { Execute the returned command }
+    case key of
+      RDOWN:
+        if firstrow+12<nrows then begin
+          firstrow:=firstrow+1;
+          showdata;
+        end;
+
+      RUP:
+        if firstrow>0 then begin
+          firstrow:=firstrow-1;
+          showdata;
+        end;
+
+      CUP,CDOWN,CLEFT,CRIGHT,TAB:
+        movecell(key);
+
+      CADD:
+        insertrow(currow+1);
+
+      CINSERT:
+        insertrow(currow);
+
+      CDELETE:
+        deleterow;
+
+      CSAVE: begin
+        { save table }
+      end;
+
+      CQUIT: begin
+        { save table and quit }
+      end;
+
+      CKILL:
+        done:=true
+    end;
 
   until done;
 end;
@@ -771,12 +1234,17 @@ begin
   acc1 := _new;
   acc2 := _new;
   emptyrow:=_new;
+  editing := false;
+  validationfail:= false;
+  modified := false;
   f:=initfile;
   nrows := -1;
   lineno := 0;
   parse(f);
 
   firstrow := 0;
+  currow := 0;
+  curcol := 0;
   prepareemptyrow;
   setnumlin($0f,$37);
   write(HOM,CSC);

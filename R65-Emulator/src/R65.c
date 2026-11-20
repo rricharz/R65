@@ -199,7 +199,7 @@ int translateKey(int key)
     int chr;
     switch (key) {
         case 0xFF08: chr = 0x7F; break;     // rubout
-        case 0xFF09: chr = 0x08; break;     // tab key
+        case 0xFF09: chr = 0x09; break;     // tab key
         case 0xFF51: chr = 0x03; break;     // cursor left key
         case 0xFF53: chr = 0x16; break;     // cursor right key
         case 0xFF52: chr = 0x1A; in_quote = 0; break;     // cursor up key
