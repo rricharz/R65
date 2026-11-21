@@ -39,1387 +39,1631 @@
   39  4531 [137]   CKILL   = chr($0b);  { Ctrl+K: quit without saving }
   40  4531 [138]   CPRINT  = chr($10);  { Ctrl+P: print table }
   41  4531 [139] 
-  42  4531 [139] var f:                  file;
-  43  4531 [140]     filename:           cpnt;
-  44  4531 [141]     cyclus,drive:       integer;
-  45  4531 [143]     datarow:            array[MAXROWS] of cpnt;
-  46  4531 [144]     ncols,i,lineno:     integer;
-  47  4531 [147]     colsize:            array[MAXCOLS] of integer;
-  48  4531 [148]     coltype:            array[MAXCOLS] of integer;
-  49  4531 [149]     colx:               array[MAXCOLS] of integer;
-  50  4531 [150]     titles:             cpnt;
-  51  4531 [151]     tablewidth, nrows:  integer;
-  52  4531 [153]     acc1,acc2:          cpnt;
-  53  4531 [155]     sumcolumn:          integer;
-  54  4531 [156]     emptyrow:           cpnt;
-  55  4531 [157]     firstrow:           integer;
-  56  4531 [158]     currow,curcol:      integer;
-  57  4531 [160]     editing, modified:  boolean;
-  58  4531 [162]     validationfail:     boolean;
-  59  4531 [163] 
-  60  4531 [163] proc signalerror; forward;
-  61  4534 [164] 
-  62  4534 [164] proc showerror(message:cpnt);
-  63  4534 [166] {***************************}
-  64  4534 [166] begin
-  65  4534 [166]   if editing then begin
-  66  4543 [166]     validationfail:=true;
-  67  4548 [166]     signalerror;
-  68  4556 [166]   end
-  69  4556 [166]   else begin
-  70  4559 [166]     write(INVVID,message);
-  71  4567 [166]     if nrows>=0 then write(' at line ',lineno,
-  72  4587 [166]                               ', row ',nrows+1);
-  73  4607 [166]     writeln(NORVID);
-  74  4616 [166]     _abort;
-  75  4620 [166]   end;
-  76  4620 [166] end;
-  77  4620 [166] 
-  78  4621 [165] proc setnumlin(l,c:integer);
-  79  4621 [168] {**************************}
-  80  4621 [168] mem numlin=$1789: integer&;
-  81  4624 [169]     numchr=$178a: integer&;
-  82  4624 [170] begin
-  83  4624 [170]   numlin:=l; numchr:=c;
-  84  4635 [170] end;
-  85  4644 [170] 
-  86  4645 [166] proc writetableline(s:cpnt; selectedcol:integer);
-  87  4645 [169] {*********************************************}
-  88  4645 [169] var i,j:integer;
-  89  4648 [171] begin
-  90  4648 [171]   i:=0;
-  91  4652 [171]   j:=0;
-  92  4658 [171]   if (selectedcol=0) or (selectedcol=-2) then
-  93  4677 [171]     write(INVVID);
-  94  4684 [171] 
-  95  4684 [171]   while s[i]<>ENDMARK do begin
-  96  4700 [171]     if s[i]=',' then begin
-  97  4713 [171]       write(NORVID);
-  98  4719 [171]       _writetxtgr(TGR_UP+TGR_DOWN);
-  99  4730 [171]       j:=j+1;
- 100  4736 [171]       if (j=selectedcol) or (selectedcol=-2) then
- 101  4758 [171]         write(INVVID);
- 102  4765 [171]     end
- 103  4765 [171]     else
- 104  4765 [171]       write(s[i]);
- 105  4779 [171]     i:=i+1;
- 106  4785 [171]   end;
- 107  4790 [171]   write(NORVID);
- 108  4796 [171] end;
- 109  4796 [171] 
- 110  4797 [167] proc _delay10msec(time:integer);
- 111  4797 [169] {******************************}
- 112  4797 [169] mem
- 113  4797 [169] {$I IHIDDENMEM}
-{I:IHIDDE}  1  4800 [169] { Shared memory between libraries and system }
-{I:IHIDDE}  2  4800 [169] { Not exposed to user program }
-{I:IHIDDE}  3  4800 [169]     emucom = $1430:integer&;
-{I:IHIDDE}  4  4800 [170]     emures = $1431: integer&;
- 114  4800 [171] var i:integer;
- 115  4800 [172] begin
- 116  4800 [172]   for i:=1 to time do
- 117  4808 [172]     emucom:=6;
- 118  4823 [172] end;
- 119  4842 [172] 
- 120  4843 [168] func initfile: file;
- 121  4843 [170] {******************}
- 122  4843 [170] var default: boolean;
- 123  4846 [171] begin
- 124  4846 [171]   cyclus  :=  0;
- 125  4850 [171]   drive :=  1;
- 126  4856 [171]   default :=  true;
- 127  4862 [171]   _sgetstring(filename, _carg, default);
- 128  4892 [171]   _ssetsubtype(filename,'D', true);
- 129  4906 [171]   _agetval(cyclus,    default);
- 130  4926 [171]   _agetval(drive,     default);
- 131  4946 [171]   _strfio(filename, cyclus, drive);
- 132  4964 [171]   openr(f);
- 133  4970 [171]   initfile  :=  f;
- 134  4970 [171] end;
- 135  4978 [171] 
- 136  4979 [170] func validatedate(s:cpnt;pos:integer):boolean;
- 137  4979 [174] {*******************************************}
- 138  4979 [174] var i,j,n,limit:integer;
- 139  4982 [178]     sep:char;
- 140  4982 [179] begin
- 141  4982 [179]   validatedate:=false;
- 142  4986 [179]   i:=pos;
- 143  4990 [179] 
- 144  4998 [179]   { Empty date is allowed }
- 145  4998 [179]   if (s[i]=',') or (s[i]=ENDMARK) then begin
- 146  5025 [179]     validatedate:=true;
- 147  5030 [179]     exit;
- 148  5035 [179]   end;
- 149  5035 [179] 
- 150  5035 [179]   { First component: day or month }
- 151  5035 [179]   j:=i;
- 152  5035 [179]   n:=0;
- 153  5045 [179]   while (s[i]>='0') and (s[i]<='9') do begin
- 154  5079 [179]     n:=n*10+ord(s[i])-ord('0');
- 155  5099 [179]     i:=i+1;
- 156  5110 [179]   end;
- 157  5115 [179] 
- 158  5118 [179]   sep:=s[i];
- 159  5126 [179]   if (sep<>'.') and (sep<>'/') then exit;
- 160  5151 [179]   if (i-j<1) or (i-j>2) then exit;
- 161  5180 [179] 
- 162  5180 [179]   if sep='.' then limit:=31 else limit:=12;
- 163  5201 [179]   if (n<1) or (n>limit) then exit;
- 164  5226 [179] 
- 165  5226 [179]   if i-j=1 then begin
- 166  5238 [179]     _strinsc('0',j,s);
- 167  5257 [179]     i:=i+1;
- 168  5263 [179]   end;
- 169  5268 [179] 
- 170  5268 [179]   i:=i+1;
- 171  5274 [179]   j:=i;
- 172  5279 [179]   n:=0;
- 173  5289 [179] 
- 174  5293 [179]   { Second component: month or day }
- 175  5293 [179]   while (s[i]>='0') and (s[i]<='9') do begin
- 176  5323 [179]     n:=n*10+ord(s[i])-ord('0');
- 177  5343 [179]     i:=i+1;
- 178  5354 [179]   end;
- 179  5359 [179] 
- 180  5362 [179]   if s[i]<>sep then exit;
- 181  5381 [179]   if (i-j<1) or (i-j>2) then exit;
- 182  5410 [179] 
- 183  5410 [179]   if sep='.' then limit:=12 else limit:=31;
- 184  5431 [179]   if (n<1) or (n>limit) then exit;
- 185  5456 [179] 
- 186  5456 [179]   if i-j=1 then begin
- 187  5468 [179]     _strinsc('0',j,s);
- 188  5487 [179]     i:=i+1;
- 189  5493 [179]   end;
- 190  5498 [179] 
- 191  5498 [179]   i:=i+1;
- 192  5504 [179] 
- 193  5509 [179]   { Year: exactly four digits }
- 194  5509 [179]   for j:=1 to 4 do begin
- 195  5526 [179]     if (s[i]<'0') or (s[i]>'9') then exit;
- 196  5557 [179]     i:=i+1;
- 197  5563 [179]   end;
- 198  5568 [179] 
- 199  5582 [179]   if (s[i]<>',') and (s[i]<>ENDMARK) then exit;
- 200  5613 [179] 
- 201  5613 [179]   validatedate:=true;
- 202  5615 [179] end;
- 203  5619 [179] 
- 204  5620 [172] func validateinteger(s:cpnt):boolean;
- 205  5620 [175] {***********************************}
- 206  5620 [175] var i:integer;
- 207  5623 [176] begin
- 208  5623 [176]   validateinteger:=false;
- 209  5627 [176]   i:=0;
- 210  5633 [176] 
- 211  5637 [176]   if s[i]='-' then i:=i+1;
- 212  5659 [176] 
- 213  5664 [176]   if (s[i]=',') or (s[i]=ENDMARK) then begin
- 214  5691 [176]     if i<>0 then exit;
- 215  5705 [176]     validateinteger:=true;
- 216  5707 [176]     exit;
- 217  5712 [176]   end;
- 218  5712 [176] 
- 219  5712 [176]   while (s[i]<>',') and (s[i]<>ENDMARK) do begin
- 220  5742 [176]     if (s[i]<'0') or (s[i]>'9') then exit;
- 221  5773 [176]     i:=i+1;
- 222  5779 [176]   end;
- 223  5784 [176] 
- 224  5787 [176]   validateinteger:=true;
- 225  5789 [176] end;
- 226  5793 [176] 
- 227  5794 [174] proc rightjustify(s:cpnt;start,len,width:integer);
- 228  5794 [179] {**********************************************}
- 229  5794 [179] var i,n:integer;
- 230  5797 [181] begin
- 231  5797 [181]   n:=width-len;
- 232  5803 [181] 
- 233  5812 [181]   for i:=len-1 downto 0 do
- 234  5825 [181]     s[start+i+n]:=s[start+i];
- 235  5861 [181] 
- 236  5881 [181]   for i:=0 to n-1 do
- 237  5893 [181]     s[start+i]:=' ';
- 238  5914 [181] end;
- 239  5932 [181] 
- 240  5933 [175] func validatereal(s:cpnt;pos:integer):boolean;
- 241  5933 [179] {********************************************}
- 242  5933 [179] var i,j,k,n,decimals:integer;
- 243  5936 [184]     negative:boolean;
- 244  5936 [185] begin
- 245  5936 [185]   validatereal:=false;
- 246  5940 [185]   i:=pos;
- 247  5944 [185]   negative:=false;
- 248  5954 [185] 
- 249  5958 [185]   { Empty field }
- 250  5958 [185]   if (s[i]=',') or (s[i]=ENDMARK) then begin
- 251  5985 [185]     validatereal:=true;
- 252  5990 [185]     exit;
- 253  5995 [185]   end;
- 254  5995 [185] 
- 255  5995 [185]   { Optional minus }
- 256  5995 [185]   if s[i]='-' then begin
- 257  6008 [185]     negative:=true;
- 258  6013 [185]     i:=i+1;
- 259  6023 [185]   end;
- 260  6028 [185] 
- 261  6028 [185]   { Count integer digits }
- 262  6028 [185]   j:=i;
- 263  6028 [185]   while (s[i]>='0') and (s[i]<='9') do
- 264  6062 [185]     i:=i+1;
- 265  6072 [185] 
- 266  6080 [185]   { Insert zero before decimal point if needed }
- 267  6080 [185]   if i=j then begin
- 268  6089 [185]     if s[i]<>'.' then exit;
- 269  6109 [185]     _strinsc('0',i,s);
- 270  6125 [185]     i:=i+1;
- 271  6131 [185]   end;
- 272  6136 [185] 
- 273  6136 [185]   { Remove unnecessary leading zeros }
- 274  6136 [185]   j:=pos;
- 275  6136 [185]   if negative then j:=j+1;
- 276  6157 [185] 
- 277  6162 [185]   while (s[j]='0') and
- 278  6175 [185]         (s[j+1]>='0') and (s[j+1]<='9') do
- 279  6208 [185]     _strdelc(j,s);
- 280  6226 [185] 
- 281  6229 [185]   { Find decimal point or end of field }
- 282  6229 [185]   i:=j;
- 283  6229 [185]   while (s[i]>='0') and (s[i]<='9') do
- 284  6263 [185]     i:=i+1;
- 285  6273 [185] 
- 286  6281 [185]   if (s[i]=',') or (s[i]=ENDMARK) then
- 287  6307 [185]     _strinsc('.',i,s)
- 288  6317 [185]   else if s[i]<>'.' then exit;
- 289  6347 [185] 
- 290  6347 [185]   i:=i+1;
- 291  6353 [185]   decimals:=0;
- 292  6360 [185] 
- 293  6364 [185]   while (s[i]>='0') and (s[i]<='9') do begin
- 294  6394 [185]     decimals:=decimals+1;
- 295  6400 [185]     i:=i+1;
- 296  6411 [185]   end;
- 297  6416 [185] 
- 298  6419 [185]   if decimals>2 then exit;
- 299  6430 [185]   if (s[i]<>',') and (s[i]<>ENDMARK) then exit;
- 300  6461 [185] 
- 301  6461 [185]   { Complete two decimal places }
- 302  6461 [185]   while decimals<2 do begin
- 303  6471 [185]     _strinsc('0',i,s);
- 304  6487 [185]     i:=i+1;
- 305  6493 [185]     decimals:=decimals+1;
- 306  6504 [185]   end;
- 307  6509 [185] 
- 308  6512 [185]   { Remove minus sign from zero }
- 309  6512 [185]   if negative then begin
- 310  6516 [185]     j:=pos+1;
- 311  6525 [185]     while (s[j]='0') or (s[j]='.') do
- 312  6556 [185]       j:=j+1;
- 313  6566 [185] 
- 314  6574 [185]     if (s[j]=',') or (s[j]=ENDMARK) then
- 315  6600 [185]       _strdelc(pos,s);
- 316  6618 [185]   end;
- 317  6618 [185] 
- 318  6618 [185]   validatereal:=true;
- 319  6620 [185] end;
- 320  6624 [185] 
- 321  6625 [177] func add(a,b,r:cpnt;size:integer):boolean;
- 322  6625 [183] {****************************************}
- 323  6625 [183] var
- 324  6625 [183]   a1,b1,t:cpnt;
- 325  6628 [186]   i,j,k,n,carry,cmp:integer;
- 326  6628 [192]   sa,sb,negative,subtract:boolean;
- 327  6628 [196] begin
- 328  6628 [196]   add:=false;
- 329  6632 [196]   if (size<4) or (size>16) then exit;
- 330  6655 [196] 
- 331  6655 [196]   { Determine signs }
- 332  6655 [196]   a1:=a;
- 333  6655 [196]   b1:=b;
- 334  6663 [196]   sa:=false;
- 335  6673 [196]   sb:=false;
- 336  6679 [196]   if a1[0]='-' then begin
- 337  6694 [196]     sa:=true;
- 338  6699 [196]     a1:=a1+1;
- 339  6709 [196]   end;
- 340  6714 [196]   if b1[0]='-' then begin
- 341  6725 [196]     sb:=true;
- 342  6730 [196]     b1:=b1+1;
- 343  6740 [196]   end;
- 344  6745 [196] 
- 345  6745 [196]   { Find ends of input fields }
- 346  6745 [196]   i:=0;
- 347  6747 [196]   while (a1[i]<>ENDMARK) and (a1[i]<>',') do i:=i+1;
- 348  6787 [196]   j:=0;
- 349  6797 [196]   while (b1[j]<>ENDMARK) and (b1[j]<>',') do j:=j+1;
- 350  6837 [196] 
- 351  6845 [196]   { Check decimal points }
- 352  6845 [196]   if (i<4) or (j<4) then exit;
- 353  6864 [196]   if (a1[i-3]<>'.') or (b1[j-3]<>'.') then exit;
- 354  6901 [196] 
- 355  6901 [196]   subtract:=sa<>sb;
- 356  6905 [196]   negative:=sa;
- 357  6914 [196] 
- 358  6922 [196]   { For subtraction, larger magnitude first }
- 359  6922 [196]   if subtract then begin
- 360  6926 [196]     if i>j then
- 361  6933 [196]       cmp:=1
- 362  6941 [196]     else if i<j then
- 363  6954 [196]       cmp:=-1
- 364  6962 [196]     else
- 365  6964 [196]       cmp:=_strncmp(a1,b1,i);
- 366  6992 [196] 
- 367  6996 [196]     if cmp<0 then begin
- 368  7003 [196]       t:=a1;
- 369  7006 [196]       a1:=b1;
- 370  7014 [196]       b1:=t;
- 371  7022 [196]       k:=i;
- 372  7030 [196]       i:=j;
- 373  7038 [196]       j:=k;
- 374  7046 [196]       negative:=sb;
- 375  7054 [196]     end;
- 376  7062 [196]   end;
- 377  7062 [196] 
- 378  7062 [196]   { Prepare result }
- 379  7062 [196]   for k:=0 to size-1 do r[k]:='0';
- 380  7090 [196]   r[size]:=ENDMARK;
- 381  7114 [196]   r[size-3]:='.';
- 382  7127 [196] 
- 383  7131 [196]   { Add or subtract digits from right to left }
- 384  7131 [196]   i:=i-1;
- 385  7137 [196]   j:=j-1;
- 386  7148 [196]   k:=size-1;
- 387  7159 [196]   carry:=0;
- 388  7166 [196] 
- 389  7170 [196]   while k>=0 do begin
- 390  7180 [196]     if k=size-3 then
- 391  7190 [196]       k:=k-1
- 392  7199 [196]     else begin
- 393  7209 [196]       if (i>=0) and (a1[i]='.') then i:=i-1;
- 394  7239 [196]       if (j>=0) and (b1[j]='.') then j:=j-1;
- 395  7274 [196] 
- 396  7279 [196]       n:=carry;
- 397  7279 [196] 
- 398  7287 [196]       if i>=0 then begin
- 399  7294 [196]         if (a1[i]<'0') or (a1[i]>'9') then exit;
- 400  7328 [196]         n:=n+ord(a1[i])-ord('0');
- 401  7345 [196]         i:=i-1;
- 402  7356 [196]       end;
- 403  7361 [196] 
- 404  7361 [196]       if j>=0 then begin
- 405  7368 [196]         if (b1[j]<'0') or (b1[j]>'9') then exit;
- 406  7402 [196]         if subtract then
- 407  7402 [196]           n:=n-ord(b1[j])+ord('0')
- 408  7426 [196]         else
- 409  7426 [196]           n:=n+ord(b1[j])-ord('0');
- 410  7451 [196]         j:=j-1;
- 411  7462 [196]       end;
- 412  7467 [196] 
- 413  7467 [196]       if n<0 then begin
- 414  7474 [196]         n:=n+10;
- 415  7483 [196]         carry:=-1;
- 416  7490 [196]       end
- 417  7495 [196]       else begin
- 418  7498 [196]         carry:=n div 10;
- 419  7504 [196]         n:=_mod(n,10);
- 420  7523 [196]       end;
- 421  7527 [196] 
- 422  7527 [196]       r[k]:=chr(ord('0')+n);
- 423  7538 [196]       k:=k-1;
- 424  7549 [196]     end;
- 425  7554 [196]   end;
- 426  7554 [196] 
- 427  7557 [196]   { Overflow or unprocessed input }
- 428  7557 [196]   if (i>=0) or (j>=0) or (carry<>0) then exit;
- 429  7584 [196] 
- 430  7584 [196]   { Remove leading zeros, keeping one integer digit }
- 431  7584 [196]   k:=0;
- 432  7586 [196]   while (r[k]='0') and (k<size-4) do k:=k+1;
- 433  7625 [196] 
- 434  7633 [196]   { Check if result is zero }
- 435  7633 [196]   if r[k]='0' then begin
- 436  7646 [196]     if (r[k+2]='0') and (r[k+3]='0') then
- 437  7681 [196]       negative:=false;
- 438  7687 [196]   end;
- 439  7691 [196] 
- 440  7691 [196]   { Check width including possible minus sign }
- 441  7691 [196]   if negative and (size-k+1>size) then exit;
- 442  7717 [196] 
- 443  7717 [196]   { Move result to beginning }
- 444  7717 [196]   i:=0;
- 445  7719 [196]   if negative then begin
- 446  7727 [196]     r[0]:='-';
- 447  7734 [196]     i:=1;
- 448  7740 [196]   end;
- 449  7744 [196] 
- 450  7744 [196]   while r[k]<>ENDMARK do begin
- 451  7760 [196]     r[i]:=r[k];
- 452  7772 [196]     i:=i+1;
- 453  7784 [196]     k:=k+1;
- 454  7795 [196]   end;
- 455  7800 [196]   r[i]:=ENDMARK;
- 456  7809 [196] 
- 457  7813 [196]   add:=true;
- 458  7815 [196] end;
- 459  7819 [196] 
- 460  7820 [179] proc calculatesum(s:cpnt);
- 461  7820 [181] {***********************}
- 462  7820 [181] var a,b,t,p:cpnt;
- 463  7823 [185]     i,k,n,start:integer;
- 464  7823 [189] begin
- 465  7823 [189]   if sumcolumn<0 then exit;
- 466  7836 [189] 
- 467  7836 [189]   a:=acc1;
- 468  7836 [189]   b:=acc2;
- 469  7844 [189]   _strcpy('0.00',a);
- 470  7869 [189] 
- 471  7869 [189]   for i:=0 to ncols-1 do begin
- 472  7891 [189]     if coltype[i]=T_REAL then begin
- 473  7902 [189]       start:=colx[i]-1;
- 474  7915 [189]       p:=s+start;
- 475  7924 [189] 
- 476  7933 [189]       { Skip leading blanks }
- 477  7933 [189]       while p[0]=' ' do p:=p+1;
- 478  7953 [189] 
- 479  7961 [189]       { Ignore empty fields }
- 480  7961 [189]       if (p[0]<>',') and (p[0]<>ENDMARK) then begin
- 481  7984 [189]         if not add(a,p,b,16) then begin
- 482  8010 [189]           showerror('TABLE: SUM overflow');
- 483  8041 [189]           exit;
- 484  8042 [189]         end;
- 485  8042 [189]         t:=a;
- 486  8042 [189]         a:=b;
- 487  8050 [189]         b:=t;
- 488  8058 [189]       end;
- 489  8066 [189]     end;
- 490  8066 [189]   end;
- 491  8066 [189] 
- 492  8080 [189]   { Locate SUM field }
- 493  8080 [189]   start:=colx[sumcolumn]-1;
- 494  8090 [189] 
- 495  8095 [189] 
- 496  8095 [189]   { Check result fits }
- 497  8095 [189]   n:=_strlen(a);
- 498  8107 [189]   if n>colsize[sumcolumn] then begin
- 499  8124 [189]     showerror('TABLE: SUM field too small');
- 500  8162 [189]      exit;
- 501  8163 [189]   end;
- 502  8163 [189] 
- 503  8163 [189]   { Write right-justified result }
- 504  8163 [189]   for k:=0 to colsize[sumcolumn]-1 do
- 505  8179 [189]     s[start+k]:=' ';
- 506  8200 [189] 
- 507  8218 [189]   for k:=0 to n-1 do
- 508  8230 [189]     s[start+colsize[sumcolumn]-n+k]:=a[k];
- 509  8271 [189] end;
- 510  8291 [189] 
- 511  8292 [180] proc validaterow(s:cpnt);
- 512  8292 [182] {***********************}
- 513  8292 [182] var i,j,k,start,len:integer;
- 514  8295 [187] begin
- 515  8295 [187]   i:=0;
- 516  8299 [187] 
- 517  8303 [187]   for j:=0 to ncols-1 do begin
- 518  8325 [187]     k:=0;
- 519  8327 [187]     start:=i;
- 520  8331 [187] 
- 521  8339 [187]     { Validate field }
- 522  8339 [187]     if coltype[j]=T_DATE then
- 523  8349 [187]       if not validatedate(s,start) then begin
- 524  8370 [187]         showerror('TABLE: Invalid date');
- 525  8401 [187]         exit;
- 526  8402 [187]       end;
- 527  8402 [187] 
- 528  8402 [187]     if coltype[j]=T_INTEGER then
- 529  8412 [187]       if not validateinteger(s+start) then begin
- 530  8434 [187]         showerror('TABLE: Invalid integer');
- 531  8468 [187]         exit;
- 532  8469 [187]       end;
- 533  8469 [187] 
- 534  8469 [187]     if coltype[j]=T_REAL then
- 535  8479 [187]       if not validatereal(s,start) then begin
- 536  8500 [187]         showerror('TABLE: Invalid real');
- 537  8531 [187]         exit;
- 538  8532 [187]       end;
- 539  8532 [187] 
- 540  8532 [187]     { Find end of current field }
- 541  8532 [187]     while (s[i]<>',') and (s[i]<>ENDMARK) do begin
- 542  8562 [187]       k:=k+1;
- 543  8568 [187]       i:=i+1;
- 544  8579 [187]     end;
- 545  8584 [187] 
- 546  8587 [187]     { Check field width }
- 547  8587 [187]     if k>colsize[j] then begin
- 548  8600 [187]       showerror('TABLE: Field width');
- 549  8630 [187]       exit;
- 550  8631 [187]     end;
- 551  8631 [187] 
- 552  8631 [187]     { Check separator }
- 553  8631 [187]     if j<ncols-1 then begin
- 554  8643 [187]       if s[i]<>',' then begin
- 555  8659 [187]         showerror('TABLE: Missing field');
- 556  8691 [187]         exit;
- 557  8692 [187]       end;
- 558  8692 [187]     end
- 559  8692 [187]     else
- 560  8692 [187]       if s[i]<>ENDMARK then begin
- 561  8708 [187]         showerror('TABLE: Too many fields');
- 562  8742 [187]         exit;
- 563  8743 [187]       end;
- 564  8743 [187] 
- 565  8743 [187]     len:=k;
- 566  8743 [187] 
- 567  8751 [187]     { Expand field with trailing blanks }
- 568  8751 [187]     while k<colsize[j] do begin
- 569  8767 [187]       _strinsc(' ',i,s);
- 570  8783 [187]       i:=i+1;
- 571  8789 [187]       k:=k+1;
- 572  8800 [187]     end;
- 573  8805 [187] 
- 574  8808 [187]     { Right justify numeric fields }
- 575  8808 [187]     if (coltype[j]=T_INTEGER) or (coltype[j]=T_REAL)
- 576  8829 [187]     then
- 577  8830 [187]       rightjustify(s,start,len,colsize[j]);
- 578  8860 [187] 
- 579  8860 [187]     { Advance past separator }
- 580  8860 [187]     if j<ncols-1 then i:=i+1;
- 581  8881 [187]   end;
- 582  8886 [187]   calculatesum(s);
- 583  8910 [187] end;
- 584  8910 [187] 
- 585  8911 [181] proc readrows(f:file);
- 586  8911 [183] {********************}
- 587  8911 [183] var eof:boolean;
- 588  8914 [184]     len:integer;
- 589  8914 [185] begin
- 590  8914 [185]   nrows:=0;
- 591  8918 [185]   eof:=false;
- 592  8924 [185] 
- 593  8928 [185]   while not eof do begin
- 594  8936 [185]     len:=_strread(f,datarow[nrows],eof);
- 595  8964 [185]     lineno := lineno + 1;
- 596  8974 [185] 
- 597  8979 [185]     if len>0 then begin
- 598  8986 [185]       if nrows>=MAXROWS then
- 599  8995 [185]         showerror('TABLE: Too many rows');
- 600  9028 [185] 
- 601  9028 [185]       validaterow(datarow[nrows]);
- 602  9042 [185] 
- 603  9042 [185]       nrows:=nrows+1;
- 604  9048 [185]     end;
- 605  9053 [185]   end;
- 606  9053 [185]   if nrows=0 then begin
- 607  9063 [185]     _strcpy(emptyrow,datarow[0]);
- 608  9082 [185]     nrows:=1;
- 609  9084 [185]     currow:=0;
- 610  9090 [185]     firstrow:=0;
- 611  9096 [185]   end;
- 612  9100 [185] end;
- 613  9100 [185] 
- 614  9101 [182] proc parsetitle(s:cpnt;len:integer);
- 615  9101 [185] {*********************************}
- 616  9101 [185] var i,j,k,x:integer;
- 617  9104 [189] begin
- 618  9104 [189]   if _strncmp(s,'TITLE=',6)<>0 then
- 619  9131 [189]     showerror('TABLE: TITLE expected');
- 620  9165 [189] 
- 621  9165 [189] 
- 622  9165 [189]   i:=6;
- 623  9167 [189]   for j:=0 to ncols-1 do begin
- 624  9193 [189]     x:=colx[j]-1;
- 625  9203 [189]     k:=0;
- 626  9210 [189] 
- 627  9214 [189]     while (i<len) and (s[i]<>',') do begin
- 628  9240 [189]       if k>=colsize[j] then
- 629  9248 [189]         showerror('TABLE: Title too long');
- 630  9286 [189] 
- 631  9286 [189]       titles[x+k]:=s[i];
- 632  9303 [189]       k:=k+1;
- 633  9315 [189]       i:=i+1;
- 634  9326 [189]     end;
- 635  9331 [189] 
- 636  9334 [189]     while k<colsize[j] do begin
- 637  9350 [189]       titles[x+k]:=' ';
- 638  9361 [189]       k:=k+1;
- 639  9371 [189]     end;
- 640  9376 [189] 
- 641  9379 [189]     if j<ncols-1 then begin
- 642  9391 [189]       if (i>=len) or (s[i]<>',') then
- 643  9416 [189]         showerror('TABLE: Missing title');
- 644  9449 [189] 
- 645  9449 [189]       titles[x+colsize[j]]:=',';
- 646  9464 [189]       i:=i+1;
- 647  9474 [189]     end;
- 648  9479 [189]   end;
- 649  9479 [189] 
- 650  9493 [189]   if i<>len then
- 651  9497 [189]     showerror('TABLE: Too many titles');
- 652  9536 [189] 
- 653  9536 [189]   titles[tablewidth-2]:=ENDMARK;
- 654  9545 [189] end;
- 655  9549 [189] 
- 656  9550 [183] proc parsetype(s:cpnt;len:integer);
- 657  9550 [186] {********************************}
- 658  9550 [186] var i,j,k,t:integer;
- 659  9553 [190] begin
- 660  9553 [190]   sumcolumn := -1;
- 661  9557 [190]   if _strncmp(s,'TYPE=',5)<>0 then
- 662  9586 [190]     showerror('TABLE: TYPE expected');
- 663  9619 [190] 
- 664  9619 [190]   i:=5;
- 665  9621 [190]   for j:=0 to ncols-1 do begin
- 666  9647 [190]     k:=i;
- 667  9647 [190]     while (i<len) and (s[i]<>',') do i:=i+1;
- 668  9687 [190] 
- 669  9695 [190]     s[i]:=ENDMARK;
- 670  9701 [190] 
- 671  9705 [190]     t:=0;
- 672  9707 [190]     if _strcmp(s+k,'TEXT')=0 then t:=T_TEXT
- 673  9741 [190]     else if _strcmp(s+k,'INTEGER')=0 then t:=T_INTEGER
- 674  9783 [190]     else if _strcmp(s+k,'REAL')=0 then t:=T_REAL
- 675  9822 [190]     else if _strcmp(s+k,'DATE')=0 then t:=T_DATE
- 676  9861 [190]     else if _strcmp(s+k,'SUM')=0 then t:=T_SUM;
- 677  9901 [190] 
- 678  9905 [190]     if t=0 then
- 679  9911 [190]       showerror('TABLE: Invalid TYPE');
- 680  9943 [190] 
- 681  9943 [190]     coltype[j]:=t;
- 682  9947 [190]     if t=T_SUM then begin
- 683  9962 [190]       if sumcolumn>=0 then
- 684  9971 [190]         showerror('TABLE: Multiple SUM columns');
- 685 10011 [190]       sumcolumn:=j;
- 686 10011 [190]     end;
- 687 10019 [190]     i:=i+1;
- 688 10025 [190]   end;
- 689 10030 [190] 
- 690 10044 [190]   if i<>len+1 then
- 691 10054 [190]     showerror('TABLE: Wrong number of types');
- 692 10096 [190] end;
- 693 10096 [190] 
- 694 10097 [184] proc parse(f:file);
- 695 10097 [186] {*****************}
- 696 10097 [186] var s:cpnt;
- 697 10100 [187]     eof:boolean;
- 698 10100 [188]     len,i,j,n,x:integer;
- 699 10100 [193] begin
- 700 10100 [193]   s:=_new;
- 701 10108 [193]   len:=_strread(f,s,eof);
- 702 10136 [193]   lineno := lineno + 1;
- 703 10146 [193] 
- 704 10151 [193]   if _strncmp(s,'SIZE=',5)<>0 then
- 705 10175 [193]     showerror('TABLE: SIZE expected');
- 706 10208 [193] 
- 707 10208 [193]   i:=5;
- 708 10210 [193]   ncols:=0;
- 709 10216 [193]   x:=1;
- 710 10222 [193] 
- 711 10226 [193]   while (i<len) and (ncols<MAXCOLS) do begin
- 712 10246 [193] 
- 713 10246 [193]     { Read decimal column width }
- 714 10246 [193]     n:=0;
- 715 10248 [193]     while (i<len) and (s[i]<>',') do begin
- 716 10278 [193]       if (s[i]<'0') or (s[i]>'9') then
- 717 10304 [193]         showerror('TABLE: Invalid SIZE');
- 718 10336 [193] 
- 719 10336 [193]       n:=n*10+ord(s[i])-ord('0');
- 720 10356 [193]       i:=i+1;
- 721 10367 [193]     end;
- 722 10372 [193] 
- 723 10375 [193]     if n=0 then
- 724 10381 [193]       showerror('TABLE: Invalid column width');
- 725 10421 [193] 
- 726 10421 [193]     colsize[ncols]:=n;
- 727 10425 [193]     colx[ncols]:=x;
- 728 10437 [193]     x:=x+n+1;
- 729 10456 [193]     ncols:=ncols+1;
- 730 10467 [193] 
- 731 10472 [193]     if (i<len) and (s[i]=',') then i:=i+1;
- 732 10504 [193]   end;
- 733 10509 [193] 
- 734 10512 [193]   tablewidth:=x;
- 735 10512 [193] 
- 736 10520 [193]   if x>SCREENWIDTH then
- 737 10526 [193]     showerror('TABLE: Table too wide');
- 738 10560 [193] 
- 739 10560 [193]   len:=_strread(f,s,eof);
- 740 10584 [193]   lineno := lineno + 1;
- 741 10594 [193]   parsetype(s,len);
- 742 10613 [193] 
- 743 10613 [193]   len:=_strread(f,s,eof);
- 744 10637 [193]   lineno := lineno + 1;
- 745 10647 [193]   parsetitle(s,len);
- 746 10666 [193] 
- 747 10666 [193]   len:=_strread(f,s,eof);
- 748 10690 [193]   lineno := lineno + 1;
- 749 10700 [193]   if _strcmp(s,'DATA=')<>0 then
- 750 10727 [193]     showerror('TABLE: DATA expected');
- 751 10760 [193] 
- 752 10760 [193]   nrows := 0;
- 753 10762 [193]   readrows(f);
- 754 10776 [193] 
- 755 10776 [193]   _release(s);
- 756 10786 [193] end;
- 757 10786 [193] 
- 758 10787 [185] proc showdata;
- 759 10787 [186] {*************}
- 760 10787 [186] var i,row:integer;
- 761 10790 [188] begin
- 762 10790 [188]   for i:=0 to 11 do begin
- 763 10809 [188]     _setcursor(1,i+3);
- 764 10824 [188]     row:=firstrow+i;
- 765 10828 [188] 
- 766 10837 [188]     if row<nrows then begin
- 767 10846 [188]       if row=currow then
- 768 10853 [188]         writetableline(datarow[row],curcol)
- 769 10869 [188]       else
- 770 10879 [188]         writetableline(datarow[row],-1);
- 771 10899 [188]     end
- 772 10899 [188]     else
- 773 10899 [188]       writetableline(emptyrow,-1);
- 774 10915 [188]   end;
- 775 10915 [188]   if (currow>=firstrow) and
- 776 10938 [188]      (currow<firstrow+12) and
- 777 10950 [188]      (currow<nrows) then
- 778 10960 [188]     _setcursor(colx[curcol],currow-firstrow+3)
- 779 10983 [188]   else
- 780 10990 [188]     _parkcursor;
- 781 10997 [188] end;
- 782 10997 [188] 
- 783 10998 [186] proc signalerror;
- 784 10998 [186] {***************}
- 785 10998 [186] var i:integer;
- 786 11001 [187] begin
- 787 11001 [187]   for i:=1 to 3 do begin
- 788 11020 [187]     _setcursor(1,currow-firstrow+3);
- 789 11040 [187]     writetableline(datarow[currow],-2);
- 790 11057 [187]     {_syncscreen;}
- 791 11057 [187]     _delay10msec(10);
- 792 11065 [187] 
- 793 11065 [187]     _setcursor(1,currow-firstrow+3);
- 794 11085 [187]     writetableline(datarow[currow],-1);
- 795 11102 [187]     {_syncscreen;}
- 796 11102 [187]     _delay10msec(10);
- 797 11110 [187]   end;
- 798 11110 [187]   showdata;
- 799 11128 [187] end;
- 800 11128 [187] 
- 801 11129 [186] proc showtable;
- 802 11129 [187] {*************}
- 803 11129 [187] var i: integer;
- 804 11132 [188]     ch: char;
- 805 11132 [189] begin
- 806 11132 [189]   _htxtgr(0,tablewidth-1,0,CYAN);
- 807 11153 [189]   _htxtgr(0,tablewidth-1,2,CYAN);
- 808 11172 [189]   _htxtgr(0,tablewidth-1,15,CYAN);
- 809 11191 [189] 
- 810 11191 [189]   _vtxtgr(tablewidth-1,0,15,CYAN);
- 811 11210 [189] 
- 812 11210 [189]   for i:=0 to ncols-1 do
- 813 11222 [189]     _vtxtgr(colx[i]-1,0,15,CYAN);
- 814 11255 [189] 
- 815 11269 [189]   _setcursor(1,1);
- 816 11279 [189]   writetableline(titles,-1);
- 817 11292 [189] 
- 818 11292 [189]   showdata;
- 819 11296 [189] end;
- 820 11296 [189] 
- 821 11297 [187] proc prepareemptyrow;
- 822 11297 [188] {*******************}
- 823 11297 [188] var i:integer;
- 824 11300 [189] begin
- 825 11300 [189]   for i:=0 to tablewidth-3 do
- 826 11314 [189]     emptyrow[i]:=' ';
- 827 11330 [189] 
- 828 11348 [189]   for i:=1 to ncols-1 do
- 829 11360 [189]     emptyrow[colx[i]-2]:=',';
- 830 11383 [189] 
- 831 11401 [189]   emptyrow[tablewidth-2]:=ENDMARK;
- 832 11410 [189] end;
- 833 11414 [189] 
- 834 11415 [188] proc insertrow(pos:integer);
- 835 11415 [190] {**************************}
- 836 11415 [190] var i:integer;
- 837 11418 [191]     p:cpnt;
- 838 11418 [192] begin
- 839 11418 [192]   if nrows>=MAXROWS then begin
- 840 11427 [192]     signalerror;
- 841 11434 [192]     exit;
- 842 11435 [192]   end;
- 843 11435 [192] 
- 844 11435 [192]   { Save spare string pointer }
- 845 11435 [192]   p:=datarow[nrows];
- 846 11439 [192] 
- 847 11447 [192]   { Shift pointers down }
- 848 11447 [192]   for i:=nrows downto pos+1 do
- 849 11461 [192]     datarow[i]:=datarow[i-1];
- 850 11482 [192] 
- 851 11504 [192]   datarow[pos]:=p;
- 852 11508 [192]   _strcpy(emptyrow,p);
- 853 11530 [192] 
- 854 11530 [192]   nrows:=nrows+1;
- 855 11536 [192]   currow:=pos;
- 856 11541 [192]   modified:=true;
- 857 11551 [192] 
- 858 11555 [192]   if currow<firstrow then firstrow:=currow;
- 859 11567 [192]   if currow>=firstrow+12 then
- 860 11585 [192]     firstrow:=currow-11;
- 861 11596 [192] 
- 862 11601 [192]   showdata;
- 863 11605 [192] end;
- 864 11605 [192] 
- 865 11606 [189] proc movecell(key:char);
- 866 11606 [191] {*********************}
- 867 11606 [191] begin
- 868 11606 [191]   if key=CUP then begin
- 869 11618 [191]     if currow>0 then
- 870 11627 [191]       currow:=currow-1;
- 871 11637 [191]   end;
- 872 11642 [191] 
- 873 11642 [191]   if key=CDOWN then begin
- 874 11649 [191]     if currow<nrows-1 then
- 875 11662 [191]       currow:=currow+1;
- 876 11673 [191]   end;
- 877 11678 [191] 
- 878 11678 [191]   if key=CLEFT then begin
- 879 11685 [191]     if curcol>0 then
- 880 11694 [191]       curcol:=curcol-1;
- 881 11704 [191]   end;
- 882 11709 [191] 
- 883 11709 [191]   if key=CRIGHT then begin
- 884 11716 [191]     if curcol<ncols-1 then
- 885 11729 [191]       curcol:=curcol+1;
- 886 11740 [191]   end;
- 887 11745 [191] 
- 888 11745 [191]   if key=TAB then begin
- 889 11752 [191]     if curcol<ncols-1 then
- 890 11765 [191]       curcol:=curcol+1
- 891 11774 [191]     else begin
- 892 11784 [191]       curcol:=0;
- 893 11786 [191]       if currow<nrows-1 then
- 894 11800 [191]         currow:=currow+1
- 895 11809 [191]       else if nrows<MAXROWS then
- 896 11825 [191]         insertrow(nrows);
- 897 11839 [191]     end;
- 898 11839 [191]   end;
- 899 11839 [191] 
- 900 11839 [191]   if currow<firstrow then
- 901 11843 [191]     firstrow:=currow;
- 902 11851 [191] 
- 903 11859 [191]   if currow>=firstrow+12 then
- 904 11869 [191]     firstrow:=currow-11;
- 905 11880 [191] 
- 906 11885 [191]   showdata;
- 907 11889 [191] end;
- 908 11889 [191] 
- 909 11890 [190] proc draweditcell(s:cpnt; len:integer);
- 910 11890 [193] {***********************************}
- 911 11890 [193] var i:integer;
- 912 11893 [194] begin
- 913 11893 [194]   _setcursor(colx[curcol],currow-firstrow+3);
- 914 11921 [194]   write(INVVID);
- 915 11924 [194] 
- 916 11924 [194]   for i:=0 to colsize[curcol]-1 do begin
- 917 11950 [194]     if i<len then
- 918 11954 [194]       write(s[i])
- 919 11970 [194]     else
- 920 11973 [194]       write(' ');
- 921 11978 [194]   end;
- 922 11978 [194] 
- 923 11992 [194]   write(NORVID);
- 924 11995 [194] 
- 925 11995 [194] {  if len<colsize[curcol] then }
- 926 11995 [194]     _setcursor(colx[curcol]+len,currow-firstrow+3)
- 927 12019 [194] {  else
- 928 12026 [194]     _parkcursor; }
- 929 12026 [194] end;
- 930 12026 [194] 
- 931 12027 [191] proc geteditcell(s:cpnt);
- 932 12027 [193] {***********************}
- 933 12027 [193] var i,start,len:integer;
- 934 12030 [196]     rowpnt:cpnt;
- 935 12030 [197] begin
- 936 12030 [197]   start:=colx[curcol]-1;
- 937 12042 [197]   len:=colsize[curcol];
- 938 12051 [197]   rowpnt:=datarow[currow];
- 939 12063 [197] 
- 940 12071 [197]   { Skip leading spaces }
- 941 12071 [197]   if (coltype[curcol]=T_INTEGER) or
- 942 12082 [197]      (coltype[curcol]=T_REAL) then begin
- 943 12094 [197]     while (len>0) and (rowpnt[start]=' ')
- 944 12116 [197]     do begin
- 945 12121 [197]       start:=start+1;
- 946 12127 [197]       len:=len-1;
- 947 12138 [197]     end;
- 948 12143 [197]   end
- 949 12146 [197]   else begin
- 950 12149 [197]     { Remove trailing spaces }
- 951 12149 [197]     while (len>0) and
- 952 12156 [197]           (rowpnt[start+len-1]=' ') do
- 953 12177 [197]       len:=len-1;
- 954 12187 [197]   end;
- 955 12195 [197] 
- 956 12195 [197]   for i:=0 to len-1 do
- 957 12207 [197]     s[i]:=rowpnt[start+i];
- 958 12234 [197] 
- 959 12254 [197]   s[len]:=ENDMARK;
- 960 12260 [197] end;
- 961 12264 [197] 
- 962 12265 [192] func acceptcell(editstr:cpnt):boolean;
- 963 12265 [195] {***********************************}
- 964 12265 [195] var s,rowpnt:cpnt;
- 965 12268 [197]     i,j,k,n,start,len:integer;
- 966 12268 [203] begin
- 967 12268 [203]   acceptcell:=false;
- 968 12272 [203]   s:=_new;
- 969 12282 [203]   rowpnt:=datarow[currow];
- 970 12290 [203]   k:=0;
- 971 12300 [203] 
- 972 12304 [203]   for j:=0 to ncols-1 do begin
- 973 12326 [203]     if j=curcol then begin
- 974 12335 [203]       { Copy edited field }
- 975 12338 [203]       i:=0;
- 976 12340 [203]       while editstr[i]<>ENDMARK do begin
- 977 12360 [203]         s[k]:=editstr[i];
- 978 12372 [203]         k:=k+1;
- 979 12384 [203]         i:=i+1;
- 980 12395 [203]       end;
- 981 12400 [203]     end
- 982 12403 [203]     else begin
- 983 12406 [203]       { Copy existing field without padding }
- 984 12406 [203]       start:=colx[j]-1;
- 985 12416 [203]       len:=colsize[j];
- 986 12425 [203] 
- 987 12433 [203]       { Remove leading spaces from numeric fields }
- 988 12433 [203]       if (coltype[j]=T_INTEGER) or
- 989 12444 [203]          (coltype[j]=T_REAL) or
- 990 12455 [203]          (coltype[j]=T_SUM) then begin
- 991 12468 [203]         while (len>0) and (rowpnt[start]=' ') do begin
- 992 12495 [203]           start:=start+1;
- 993 12501 [203]           len:=len-1;
- 994 12512 [203]         end;
- 995 12517 [203]       end;
- 996 12520 [203] 
- 997 12520 [203]       { Remove trailing spaces }
- 998 12520 [203]       while (len>0) and
- 999 12527 [203]             (rowpnt[start+len-1]=' ') do
-1000 12548 [203]         len:=len-1;
-1001 12558 [203] 
-1002 12566 [203]       for n:=0 to len-1 do begin
-1003 12588 [203]         s[k]:=rowpnt[start+n];
-1004 12605 [203]         k:=k+1;
-1005 12617 [203]       end;
-1006 12622 [203]     end;
-1007 12636 [203] 
-1008 12636 [203]     { Add field separator }
-1009 12636 [203]     if j<ncols-1 then begin
-1010 12648 [203]       s[k]:=',';
-1011 12657 [203]       k:=k+1;
-1012 12667 [203]     end;
-1013 12672 [203]   end;
-1014 12672 [203] 
-1015 12686 [203]   s[k]:=ENDMARK;
-1016 12692 [203] 
-1017 12696 [203]   { Validate and normalize temporary row }
-1018 12696 [203]   validationfail:=false;
-1019 12698 [203]   validaterow(s);
-1020 12712 [203] 
-1021 12712 [203]   if not validationfail then begin
-1022 12717 [203]     _strcpy(s,rowpnt);
-1023 12734 [203]     acceptcell:=true;
-1024 12736 [203]   end;
-1025 12740 [203] 
-1026 12740 [203]   _release(s);
-1027 12750 [203] end;
-1028 12750 [203] 
-1029 12751 [194] func editcell(firstkey:char;
-1030 12751 [197]         var mode,x,y:integer):char;
-1031 12751 [200] {*********************************}
-1032 12751 [200] var editstr:cpnt;
-1033 12754 [201]     key:char;
-1034 12754 [202]     done,finish,scrollerror:boolean;
-1035 12754 [205]     len:integer;
-1036 12754 [206] begin
-1037 12754 [206]   editstr:=_new;
-1038 12762 [206]   scrollerror:=false;
-1039 12768 [206] 
-1040 12772 [206]   if firstkey=ENTER then
-1041 12778 [206]     geteditcell(editstr)
-1042 12782 [206]   else if firstkey=chr(0) then
-1043 12801 [206]     editstr[0]:=ENDMARK
-1044 12808 [206]   else begin
-1045 12817 [206]     editstr[0]:=firstkey;
-1046 12819 [206]     editstr[1]:=ENDMARK;
-1047 12831 [206]   end;
-1048 12835 [206] 
-1049 12835 [206]   len:=_strlen(editstr);
-1050 12847 [206]   done:=false;
-1051 12853 [206]   draweditcell(editstr,len);
-1052 12871 [206] 
-1053 12871 [206]   repeat
-1054 12871 [206]     _waitinput(mode,x,y,key);
-1055 12907 [206]     finish:=false;
-1056 12909 [206] 
-1057 12913 [206]     if _isesc then begin
-1058 12919 [206]       key:=chr(0);
-1059 12924 [206]       mode:=0;
-1060 12931 [206]       done:=true;
-1061 12937 [206]     end
-1062 12941 [206]     else begin
-1063 12944 [206] 
-1064 12944 [206]       { Ignore repeated scrolling after an error }
-1065 12944 [206]       if scrollerror and
-1066 12944 [206]          ((key=RUP) or (key=RDOWN)) then begin
-1067 12964 [206]         key:=chr(0);
-1068 12969 [206]         mode:=0;
-1069 12976 [206]       end;
-1070 12980 [206] 
-1071 12980 [206]       case key of
-1072 12980 [206]         RUBOUT: begin
-1073 12991 [206]           if len>0 then begin
-1074 12998 [206]             len:=len-1;
-1075 13007 [206]             editstr[len]:=ENDMARK;
-1076 13018 [206]             scrollerror:=false;
-1077 13024 [206]           end;
-1078 13028 [206]         end
-1079 13028 [206] 
-1080 13028 [206]         else begin
-1081 13031 [206]           if (key>=' ') and (key<chr(127)) then begin
-1082 13047 [206]             if len<colsize[curcol] then begin
-1083 13063 [206]               editstr[len]:=key;
-1084 13070 [206]               len:=len+1;
-1085 13084 [206]               editstr[len]:=ENDMARK;
-1086 13095 [206]               scrollerror:=false;
-1087 13101 [206]             end;
-1088 13105 [206]           end
-1089 13105 [206]           else if key<>chr(0) then
-1090 13114 [206]             finish:=true;
-1091 13121 [206]         end
-1092 13125 [206]       end;
-1093 13127 [206] 
-1094 13127 [206]       { Mouse click also terminates editing }
-1095 13127 [206]       if mode=1 then finish:=true;
-1096 13139 [206] 
-1097 13143 [206]       if finish then begin
-1098 13147 [206]         if key=CKILL then
-1099 13156 [206]           done:=true
-1100 13160 [206]         else if acceptcell(editstr) then begin
-1101 13181 [206]           modified:=true;
-1102 13186 [206]           done:=true;
-1103 13192 [206]         end
-1104 13196 [206]         else begin
-1105 13199 [206]           if (key=RUP) or (key=RDOWN) then
-1106 13213 [206]             scrollerror:=true;
-1107 13219 [206]           draweditcell(editstr,len);
-1108 13237 [206]         end;
-1109 13237 [206]       end
-1110 13237 [206]       else
-1111 13237 [206]         draweditcell(editstr,len);
-1112 13254 [206]     end;
-1113 13254 [206]   until done;
-1114 13254 [206] 
-1115 13261 [206]   _release(editstr);
-1116 13271 [206]   showdata;
-1117 13275 [206]   editcell:=key;
-1118 13275 [206] end;
-1119 13283 [206] 
-1120 13284 [196] proc selectcell(x,y:integer);
-1121 13284 [199] {************************}
-1122 13284 [199] var j,r:integer;
-1123 13287 [201] begin
-1124 13287 [201]   if (y<3) or (y>14) then exit;
-1125 13308 [201] 
-1126 13308 [201]   r:=firstrow+y-3;
-1127 13319 [201]   if r>=nrows then exit;
-1128 13337 [201] 
-1129 13337 [201]   for j:=0 to ncols-1 do begin
-1130 13359 [201]     if (x>=colx[j]) and
-1131 13372 [201]        (x<colx[j]+colsize[j]) then begin
-1132 13395 [201]       currow:=r;
-1133 13398 [201]       curcol:=j;
-1134 13406 [201]       showdata;
-1135 13418 [201]       exit;
-1136 13419 [201]     end;
-1137 13419 [201]   end;
-1138 13419 [201] end;
-1139 13433 [201] 
-1140 13434 [197] 
-1141 13434 [197] proc deleterow;
-1142 13434 [198] {**************}
-1143 13434 [198] var i:integer;
-1144 13437 [199]     p:cpnt;
-1145 13437 [200] begin
-1146 13437 [200]   if nrows=0 then exit;
-1147 13450 [200] 
-1148 13450 [200]   p:=datarow[currow];
-1149 13454 [200] 
-1150 13462 [200]   { Shift pointers up }
-1151 13462 [200]   for i:=currow to nrows-2 do
-1152 13476 [200]     datarow[i]:=datarow[i+1];
-1153 13497 [200] 
-1154 13519 [200]   nrows:=nrows-1;
-1155 13525 [200]   datarow[nrows]:=p;
-1156 13534 [200] 
-1157 13542 [200]   if currow>=nrows then
-1158 13546 [200]     currow:=nrows-1;
-1159 13560 [200] 
-1160 13565 [200]   if currow<0 then currow:=0;
-1161 13577 [200] 
-1162 13581 [200]   if firstrow>0 then
-1163 13587 [200]     if firstrow+12>nrows then
-1164 13598 [200]       firstrow:=firstrow-1;
-1165 13612 [200] 
-1166 13617 [200]   modified:=true;
-1167 13619 [200]   showdata;
-1168 13627 [200] end;
-1169 13627 [200] 
-1170 13628 [198] proc save;
-1171 13628 [199] {********}
-1172 13628 [199] var fr,fw:file;
-1173 13631 [201]     lineno,i,j,k,start,len:integer;
-1174 13631 [207]     ch:char;
-1175 13631 [208]     p:cpnt;
-1176 13631 [209] begin
-1177 13631 [209]   { Open original file }
-1178 13631 [209]   _strfio(filename,cyclus,drive);
-1179 13651 [209]   openr(fr);
-1180 13657 [209] 
-1181 13657 [209]   { Create new file cycle }
-1182 13657 [209]   cyclus:=0;
-1183 13659 [209]   _strfio(filename,cyclus,drive);
-1184 13681 [209]   openw(fw);
-1185 13687 [209] 
-1186 13687 [209]   { Copy header, including DATA= }
-1187 13687 [209]   lineno:=1;
-1188 13689 [209]   repeat
-1189 13693 [209]     read(@fr,ch);
-1190 13703 [209]     write(@fw,ch);
-1191 13715 [209]     if ch=chr(13) then lineno:=lineno+1;
-1192 13732 [209]   until lineno>4;
-1193 13743 [209] 
-1194 13747 [209]   close(fr);
-1195 13753 [209] 
-1196 13753 [209]   { Write data rows }
-1197 13753 [209]   for i:=0 to nrows-1 do begin
-1198 13775 [209]     p:=datarow[i];
-1199 13779 [209] 
-1200 13787 [209]     for j:=0 to ncols-1 do begin
-1201 13809 [209]       start:=colx[j]-1;
-1202 13819 [209]       len:=colsize[j];
-1203 13828 [209] 
-1204 13836 [209]       { Remove leading blanks from numbers }
-1205 13836 [209]       if (coltype[j]=T_INTEGER) or
-1206 13847 [209]          (coltype[i]=T_SUM) or
-1207 13858 [209]          (coltype[j]=T_REAL) then begin
-1208 13871 [209]         while (len>0) and (p[start]=' ') do begin
-1209 13898 [209]           start:=start+1;
-1210 13904 [209]           len:=len-1;
-1211 13915 [209]         end;
-1212 13920 [209]       end;
-1213 13923 [209] 
-1214 13923 [209]       { Remove trailing blanks }
-1215 13923 [209]       while (len>0) and
-1216 13930 [209]             (p[start+len-1]=' ') do
-1217 13951 [209]         len:=len-1;
-1218 13961 [209] 
-1219 13969 [209]       for k:=0 to len-1 do
-1220 13981 [209]         write(@fw,p[start+k]);
-1221 14013 [209] 
-1222 14027 [209]       if j<ncols-1 then
-1223 14037 [209]         write(@fw,',');
-1224 14050 [209] 
-1225 14050 [209]     end;
-1226 14050 [209] 
-1227 14064 [209]     writeln(@fw);
-1228 14076 [209]   end;
-1229 14076 [209] 
-1230 14090 [209]   close(fw);
-1231 14096 [209]   modified:=false;
-1232 14098 [209] end;
-1233 14102 [209] 
-1234 14103 [199] func _hexchar(i0: integer): char;
-1235 14103 [202] {*******************************}
-1236 14103 [202] var i1: integer;
-1237 14106 [203] begin
-1238 14106 [203]   i1 := i0 and $0f;
-1239 14114 [203]   if i1 < 10 then
-1240 14125 [203]     _hexchar := chr(ord('0') + i1)
-1241 14131 [203]   else
-1242 14136 [203]     _hexchar := chr(ord('A') + i1 - 10);
-1243 14154 [203] end;
-1244 14159 [203] 
-1245 14160 [201] func hexb(i: integer): cpnt;
-1246 14160 [204] {**************************}
-1247 14160 [204] var cp: cpnt;
-1248 14163 [205] begin
-1249 14163 [205]   cp := cpnt($17d8);
-1250 14168 [205]   cp[0] := _hexchar((i shr 4) and $0f);
-1251 14192 [205]   cp[1] := _hexchar(i and $0f);
-1252 14213 [205]   cp[2] := chr(0);
-1253 14221 [205]   hexb := cp;
-1254 14226 [205] end;
-1255 14234 [205] 
-1256 14235 [203] proc printborder;
-1257 14235 [204] {***************}
-1258 14235 [204] var i,j:integer;
-1259 14238 [206] begin
-1260 14238 [206]   write(@PRINTER,'+');
-1261 14246 [206]   for j:=0 to ncols-1 do begin
-1262 14268 [206]     for i:=1 to colsize[j] do
-1263 14278 [206]       write(@PRINTER,'-');
-1264 14297 [206]     write(@PRINTER,'+');
-1265 14317 [206]   end;
-1266 14317 [206]   writeln(@PRINTER);
-1267 14341 [206] end;
-1268 14341 [206] 
-1269 14342 [204] proc printline(s:cpnt);
-1270 14342 [206] {*********************}
-1271 14342 [206] var i:integer;
-1272 14345 [207] begin
-1273 14345 [207]   write(@PRINTER,'|');
-1274 14353 [207]   i:=0;
-1275 14355 [207]   while s[i]<>ENDMARK do begin
-1276 14375 [207]     if s[i]=',' then
-1277 14387 [207]       write(@PRINTER,'|')
-1278 14396 [207]     else
-1279 14397 [207]       write(@PRINTER,s[i]);
-1280 14415 [207]     i:=i+1;
-1281 14421 [207]   end;
-1282 14426 [207]   writeln(@PRINTER,'|');
-1283 14441 [207] end;
-1284 14441 [207] 
-1285 14442 [205] proc printtable;
-1286 14442 [206] {***************}
-1287 14442 [206] mem FILCYC = $0311: integer&;
-1288 14445 [207] var i:integer;
-1289 14445 [208] begin
-1290 14445 [208]   { Save first to obtain a valid file cycle }
-1291 14445 [208]   if modified then save;
-1292 14458 [208] 
-1293 14458 [208]   { Filename and cycle }
-1294 14458 [208]   writeln(@PRINTER,filename,'.',hexb(FILCYC));
-1295 14488 [208]   writeln(@PRINTER);
-1296 14498 [208] 
-1297 14498 [208]   { Title }
-1298 14498 [208]   printborder;
-1299 14502 [208]   printline(titles);
-1300 14512 [208]   printborder;
-1301 14516 [208] 
-1302 14516 [208]   { Data }
-1303 14516 [208]   for i:=0 to nrows-1 do
-1304 14528 [208]     printline(datarow[i]);
-1305 14552 [208] 
-1306 14566 [208]   printborder;
-1307 14570 [208]   writeln(@PRINTER);
-1308 14580 [208] end;
-1309 14580 [208] 
-1310 14581 [206] proc tableinput;
-1311 14581 [207] {**************}
-1312 14581 [207] var mode,x,y:integer;
-1313 14584 [210]     key:char;
-1314 14584 [211]     done:boolean;
-1315 14584 [212] begin
-1316 14584 [212]   done := false;
-1317 14588 [212]   editing := true;
-1318 14594 [212] 
-1319 14598 [212]   repeat
-1320 14598 [212]     _waitinput(mode,x,y,key);
-1321 14634 [212] 
-1322 14634 [212]     { Start editing if required }
-1323 14634 [212]     if key=CEDIT then begin
-1324 14641 [212]       if coltype[curcol]=T_SUM then
-1325 14654 [212]         signalerror
-1326 14655 [212]       else
-1327 14662 [212]         key:=editcell(ENTER,mode,x,y);
-1328 14699 [212]     end
-1329 14703 [212]     else if (key>=' ') and (key<chr(127)) then begin
-1330 14722 [212]       if coltype[curcol]=T_SUM then
-1331 14735 [212]         signalerror
-1332 14736 [212]       else
-1333 14743 [212]         key:=editcell(key,mode,x,y);
-1334 14782 [212]     end;
-1335 14786 [212] 
-1336 14786 [212]     if mode=1 then
-1337 14792 [212]       selectcell(x,y);
-1338 14810 [212] 
-1339 14810 [212]     { Execute the returned command }
-1340 14810 [212]     case key of
-1341 14810 [212]       RDOWN:
-1342 14818 [212]         if firstrow+12<nrows then begin
-1343 14833 [212]           firstrow:=firstrow+1;
-1344 14842 [212]           showdata;
-1345 14851 [212]         end;
-1346 14851 [212] 
-1347 14854 [212]       RUP:
-1348 14858 [212]         if firstrow>0 then begin
-1349 14868 [212]           firstrow:=firstrow-1;
-1350 14877 [212]           showdata;
-1351 14886 [212]         end;
-1352 14886 [212] 
-1353 14889 [212]       CUP,CDOWN,CLEFT,CRIGHT,TAB:
-1354 14921 [212]         movecell(key);
-1355 14934 [212] 
-1356 14937 [212]       CADD: begin
-1357 14944 [212]           insertrow(currow+1);
-1358 14957 [212]           curcol:=0;
-1359 14959 [212]           showdata;
-1360 14967 [212]         end;
-1361 14967 [212] 
-1362 14970 [212]       CINSERT: begin
-1363 14977 [212]           insertrow(currow);
-1364 14987 [212]           curcol:=0;
-1365 14989 [212]           showdata;
-1366 14997 [212]         end;
-1367 14997 [212] 
-1368 15000 [212]       CDELETE:
-1369 15004 [212]         deleterow;
-1370 15011 [212] 
-1371 15014 [212]       CSAVE:
-1372 15018 [212]         save;
-1373 15025 [212] 
-1374 15028 [212]       CPRINT:
-1375 15032 [212]           printtable;
-1376 15039 [212] 
-1377 15042 [212]       CQUIT: begin
-1378 15049 [212]           if modified then save;
-1379 15060 [212]           done:=true;
-1380 15062 [212]         end;
-1381 15066 [212] 
-1382 15069 [212]       CKILL:
-1383 15073 [212]         done:=true
-1384 15076 [212]     end;
-1385 15084 [212] 
-1386 15084 [212]   until done;
-1387 15084 [212] end;
-1388 15091 [212] 
-1389 15092 [207] begin
-1390 15092 [207]   for i:=0 to MAXROWS do { alloc. MAXROWS+1 strings }
-1391 15112 [207]     datarow[i]:=_new;
-1392 15122 [207]   filename := _new;
-1393 15146 [207]   titles := _new;
-1394 15156 [207]   acc1 := _new;
-1395 15166 [207]   acc2 := _new;
-1396 15176 [207]   emptyrow:=_new;
-1397 15186 [207]   editing := false;
-1398 15192 [207]   validationfail:= false;
-1399 15198 [207]   modified := false;
-1400 15204 [207]   f:=initfile;
-1401 15214 [207]   nrows := -1;
-1402 15220 [207]   lineno := 0;
-1403 15227 [207]   parse(f);
-1404 15241 [207]   close(f);
-1405 15247 [207] 
-1406 15247 [207]   firstrow := 0;
-1407 15249 [207]   currow := 0;
-1408 15255 [207]   curcol := 0;
-1409 15261 [207]   prepareemptyrow;
-1410 15269 [207]   setnumlin($0f,$37);
-1411 15279 [207]   write(HOM,CSC);
-1412 15285 [207]   showtable;
-1413 15289 [207]   tableinput;
-1414 15293 [207] 
-1415 15293 [207]   setnumlin($54,$2f);
-1416 15303 [207]   write(HOM,CSC);
-1417 15309 [207] end.
-1418 15309 [207] 
-Code length:           15308
-Compiler stack size:   212/320
-Ident stack size:      212/350
+  42  4531 [139] mem LEDREG=$1432: array[7] of char&;
+  43  4531 [140] 
+  44  4531 [140] var f:                  file;
+  45  4531 [141]     filename:           cpnt;
+  46  4531 [142]     cyclus,drive:       integer;
+  47  4531 [144]     datarow:            array[MAXROWS] of cpnt;
+  48  4531 [145]     ncols,i,lineno:     integer;
+  49  4531 [148]     colsize:            array[MAXCOLS] of integer;
+  50  4531 [149]     coltype:            array[MAXCOLS] of integer;
+  51  4531 [150]     colx:               array[MAXCOLS] of integer;
+  52  4531 [151]     totalcol:           array[MAXCOLS] of boolean;
+  53  4531 [152]     titles:             cpnt;
+  54  4531 [153]     tablewidth, nrows:  integer;
+  55  4531 [155]     acc1,acc2:          cpnt;
+  56  4531 [157]     sumcolumn:          integer;
+  57  4531 [158]     emptyrow:           cpnt;
+  58  4531 [159]     firstrow:           integer;
+  59  4531 [160]     currow,curcol:      integer;
+  60  4531 [162]     editing, modified:  boolean;
+  61  4531 [164]     validationfail:     boolean;
+  62  4531 [165]     hastotals:          boolean;
+  63  4531 [166]     totalrow:           cpnt;
+  64  4531 [167]     datalines:          integer;
+  65  4531 [168]     status:             char;
+  66  4531 [169] 
+  67  4531 [169] proc signalerror; forward;
+  68  4534 [170] 
+  69  4534 [170] proc showerror(message:cpnt);
+  70  4534 [172] {***************************}
+  71  4534 [172] begin
+  72  4534 [172]   if editing then begin
+  73  4543 [172]     validationfail:=true;
+  74  4548 [172]     signalerror;
+  75  4556 [172]   end
+  76  4556 [172]   else begin
+  77  4559 [172]     write(INVVID,message);
+  78  4567 [172]     if nrows>=0 then write(' at line ',lineno,
+  79  4587 [172]                               ', row ',nrows+1);
+  80  4607 [172]     writeln(NORVID);
+  81  4616 [172]     _abort;
+  82  4620 [172]   end;
+  83  4620 [172] end;
+  84  4620 [172] 
+  85  4621 [171] proc setnumlin(l,c:integer);
+  86  4621 [174] {**************************}
+  87  4621 [174] mem numlin=$1789: integer&;
+  88  4624 [175]     numchr=$178a: integer&;
+  89  4624 [176] begin
+  90  4624 [176]   numlin:=l; numchr:=c;
+  91  4635 [176] end;
+  92  4644 [176] 
+  93  4645 [172] proc writetableline(s:cpnt; selectedcol:integer);
+  94  4645 [175] {*********************************************}
+  95  4645 [175] var i,j:integer;
+  96  4648 [177] begin
+  97  4648 [177]   i:=0;
+  98  4652 [177]   j:=0;
+  99  4658 [177] 
+ 100  4662 [177]   { Left border }
+ 101  4662 [177]   if (selectedcol=0) or (selectedcol=-2) then
+ 102  4677 [177]     write(INVVID);
+ 103  4684 [177]   _writetxtgr(TGR_UP+TGR_DOWN);
+ 104  4695 [177] 
+ 105  4695 [177]   { First field }
+ 106  4695 [177]   if (selectedcol<>0) and (selectedcol<>-2) then
+ 107  4710 [177]     write(NORVID);
+ 108  4717 [177] 
+ 109  4717 [177]   while s[i]<>ENDMARK do begin
+ 110  4733 [177]     if s[i]=',' then begin
+ 111  4746 [177]       { Separator belongs to both adjacent cells }
+ 112  4749 [177]       if (j=selectedcol) or
+ 113  4758 [177]          (j=selectedcol-1) or
+ 114  4770 [177]          (selectedcol=-2) then
+ 115  4779 [177]         write(INVVID)
+ 116  4785 [177]       else
+ 117  4786 [177]         write(NORVID);
+ 118  4792 [177] 
+ 119  4792 [177]       _writetxtgr(TGR_UP+TGR_DOWN);
+ 120  4803 [177]       j:=j+1;
+ 121  4809 [177] 
+ 122  4814 [177]       if (j=selectedcol) or (selectedcol=-2) then
+ 123  4831 [177]         write(INVVID)
+ 124  4837 [177]       else
+ 125  4838 [177]         write(NORVID);
+ 126  4844 [177]     end
+ 127  4844 [177]     else
+ 128  4844 [177]       write(s[i]);
+ 129  4858 [177]     i:=i+1;
+ 130  4864 [177]   end;
+ 131  4869 [177] 
+ 132  4872 [177]   { Right border }
+ 133  4872 [177]   if (selectedcol=ncols-1) or (selectedcol=-2) then
+ 134  4892 [177]     write(INVVID)
+ 135  4898 [177]   else
+ 136  4899 [177]     write(NORVID);
+ 137  4905 [177] 
+ 138  4905 [177]   _writetxtgr(TGR_UP+TGR_DOWN);
+ 139  4916 [177]   write(NORVID);
+ 140  4919 [177] end;
+ 141  4919 [177] 
+ 142  4920 [173] proc _delay10msec(time:integer);
+ 143  4920 [175] {******************************}
+ 144  4920 [175] mem
+ 145  4920 [175] {$I IHIDDENMEM}
+{I:IHIDDE}  1  4923 [175] { Shared memory between libraries and system }
+{I:IHIDDE}  2  4923 [175] { Not exposed to user program }
+{I:IHIDDE}  3  4923 [175]     emucom = $1430:integer&;
+{I:IHIDDE}  4  4923 [176]     emures = $1431: integer&;
+ 146  4923 [177] var i:integer;
+ 147  4923 [178] begin
+ 148  4923 [178]   for i:=1 to time do
+ 149  4931 [178]     emucom:=6;
+ 150  4946 [178] end;
+ 151  4965 [178] 
+ 152  4966 [174] func initfile: file;
+ 153  4966 [176] {******************}
+ 154  4966 [176] var default: boolean;
+ 155  4969 [177] begin
+ 156  4969 [177]   cyclus  :=  0;
+ 157  4973 [177]   drive :=  1;
+ 158  4979 [177]   default :=  true;
+ 159  4985 [177]   _sgetstring(filename, _carg, default);
+ 160  5015 [177]   _ssetsubtype(filename,'D', true);
+ 161  5029 [177]   _agetval(cyclus,    default);
+ 162  5049 [177]   _agetval(drive,     default);
+ 163  5069 [177]   _strfio(filename, cyclus, drive);
+ 164  5087 [177]   openr(f);
+ 165  5093 [177]   initfile  :=  f;
+ 166  5093 [177] end;
+ 167  5101 [177] 
+ 168  5102 [176] func validatedate(s:cpnt;pos:integer):boolean;
+ 169  5102 [180] {*******************************************}
+ 170  5102 [180] var i,j,n,limit:integer;
+ 171  5105 [184]     sep:char;
+ 172  5105 [185] begin
+ 173  5105 [185]   validatedate:=false;
+ 174  5109 [185]   i:=pos;
+ 175  5113 [185] 
+ 176  5121 [185]   { Empty date is allowed }
+ 177  5121 [185]   if (s[i]=',') or (s[i]=ENDMARK) then begin
+ 178  5148 [185]     validatedate:=true;
+ 179  5153 [185]     exit;
+ 180  5158 [185]   end;
+ 181  5158 [185] 
+ 182  5158 [185]   { First component: day or month }
+ 183  5158 [185]   j:=i;
+ 184  5158 [185]   n:=0;
+ 185  5168 [185]   while (s[i]>='0') and (s[i]<='9') do begin
+ 186  5202 [185]     n:=n*10+ord(s[i])-ord('0');
+ 187  5222 [185]     i:=i+1;
+ 188  5233 [185]   end;
+ 189  5238 [185] 
+ 190  5241 [185]   sep:=s[i];
+ 191  5249 [185]   if (sep<>'.') and (sep<>'/') then exit;
+ 192  5274 [185]   if (i-j<1) or (i-j>2) then exit;
+ 193  5303 [185] 
+ 194  5303 [185]   if sep='.' then limit:=31 else limit:=12;
+ 195  5324 [185]   if (n<1) or (n>limit) then exit;
+ 196  5349 [185] 
+ 197  5349 [185]   if i-j=1 then begin
+ 198  5361 [185]     _strinsc('0',j,s);
+ 199  5380 [185]     i:=i+1;
+ 200  5386 [185]   end;
+ 201  5391 [185] 
+ 202  5391 [185]   i:=i+1;
+ 203  5397 [185]   j:=i;
+ 204  5402 [185]   n:=0;
+ 205  5412 [185] 
+ 206  5416 [185]   { Second component: month or day }
+ 207  5416 [185]   while (s[i]>='0') and (s[i]<='9') do begin
+ 208  5446 [185]     n:=n*10+ord(s[i])-ord('0');
+ 209  5466 [185]     i:=i+1;
+ 210  5477 [185]   end;
+ 211  5482 [185] 
+ 212  5485 [185]   if s[i]<>sep then exit;
+ 213  5504 [185]   if (i-j<1) or (i-j>2) then exit;
+ 214  5533 [185] 
+ 215  5533 [185]   if sep='.' then limit:=12 else limit:=31;
+ 216  5554 [185]   if (n<1) or (n>limit) then exit;
+ 217  5579 [185] 
+ 218  5579 [185]   if i-j=1 then begin
+ 219  5591 [185]     _strinsc('0',j,s);
+ 220  5610 [185]     i:=i+1;
+ 221  5616 [185]   end;
+ 222  5621 [185] 
+ 223  5621 [185]   i:=i+1;
+ 224  5627 [185] 
+ 225  5632 [185]   { Year: exactly four digits }
+ 226  5632 [185]   for j:=1 to 4 do begin
+ 227  5649 [185]     if (s[i]<'0') or (s[i]>'9') then exit;
+ 228  5680 [185]     i:=i+1;
+ 229  5686 [185]   end;
+ 230  5691 [185] 
+ 231  5705 [185]   if (s[i]<>',') and (s[i]<>ENDMARK) then exit;
+ 232  5736 [185] 
+ 233  5736 [185]   validatedate:=true;
+ 234  5738 [185] end;
+ 235  5742 [185] 
+ 236  5743 [178] func validateinteger(s:cpnt):boolean;
+ 237  5743 [181] {***********************************}
+ 238  5743 [181] var i:integer;
+ 239  5746 [182] begin
+ 240  5746 [182]   validateinteger:=false;
+ 241  5750 [182]   i:=0;
+ 242  5756 [182] 
+ 243  5760 [182]   if s[i]='-' then i:=i+1;
+ 244  5782 [182] 
+ 245  5787 [182]   if (s[i]=',') or (s[i]=ENDMARK) then begin
+ 246  5814 [182]     if i<>0 then exit;
+ 247  5828 [182]     validateinteger:=true;
+ 248  5830 [182]     exit;
+ 249  5835 [182]   end;
+ 250  5835 [182] 
+ 251  5835 [182]   while (s[i]<>',') and (s[i]<>ENDMARK) do begin
+ 252  5865 [182]     if (s[i]<'0') or (s[i]>'9') then exit;
+ 253  5896 [182]     i:=i+1;
+ 254  5902 [182]   end;
+ 255  5907 [182] 
+ 256  5910 [182]   validateinteger:=true;
+ 257  5912 [182] end;
+ 258  5916 [182] 
+ 259  5917 [180] proc rightjustify(s:cpnt;start,len,width:integer);
+ 260  5917 [185] {**********************************************}
+ 261  5917 [185] var i,n:integer;
+ 262  5920 [187] begin
+ 263  5920 [187]   n:=width-len;
+ 264  5926 [187] 
+ 265  5935 [187]   for i:=len-1 downto 0 do
+ 266  5948 [187]     s[start+i+n]:=s[start+i];
+ 267  5984 [187] 
+ 268  6004 [187]   for i:=0 to n-1 do
+ 269  6016 [187]     s[start+i]:=' ';
+ 270  6037 [187] end;
+ 271  6055 [187] 
+ 272  6056 [181] func validatereal(s:cpnt;pos:integer):boolean;
+ 273  6056 [185] {********************************************}
+ 274  6056 [185] var i,j,k,n,decimals:integer;
+ 275  6059 [190]     negative:boolean;
+ 276  6059 [191] begin
+ 277  6059 [191]   validatereal:=false;
+ 278  6063 [191]   i:=pos;
+ 279  6067 [191]   negative:=false;
+ 280  6077 [191] 
+ 281  6081 [191]   { Empty field }
+ 282  6081 [191]   if (s[i]=',') or (s[i]=ENDMARK) then begin
+ 283  6108 [191]     validatereal:=true;
+ 284  6113 [191]     exit;
+ 285  6118 [191]   end;
+ 286  6118 [191] 
+ 287  6118 [191]   { Optional minus }
+ 288  6118 [191]   if s[i]='-' then begin
+ 289  6131 [191]     negative:=true;
+ 290  6136 [191]     i:=i+1;
+ 291  6146 [191]   end;
+ 292  6151 [191] 
+ 293  6151 [191]   { Count integer digits }
+ 294  6151 [191]   j:=i;
+ 295  6151 [191]   while (s[i]>='0') and (s[i]<='9') do
+ 296  6185 [191]     i:=i+1;
+ 297  6195 [191] 
+ 298  6203 [191]   { Insert zero before decimal point if needed }
+ 299  6203 [191]   if i=j then begin
+ 300  6212 [191]     if s[i]<>'.' then exit;
+ 301  6232 [191]     _strinsc('0',i,s);
+ 302  6248 [191]     i:=i+1;
+ 303  6254 [191]   end;
+ 304  6259 [191] 
+ 305  6259 [191]   { Remove unnecessary leading zeros }
+ 306  6259 [191]   j:=pos;
+ 307  6259 [191]   if negative then j:=j+1;
+ 308  6280 [191] 
+ 309  6285 [191]   while (s[j]='0') and
+ 310  6298 [191]         (s[j+1]>='0') and (s[j+1]<='9') do
+ 311  6331 [191]     _strdelc(j,s);
+ 312  6349 [191] 
+ 313  6352 [191]   { Find decimal point or end of field }
+ 314  6352 [191]   i:=j;
+ 315  6352 [191]   while (s[i]>='0') and (s[i]<='9') do
+ 316  6386 [191]     i:=i+1;
+ 317  6396 [191] 
+ 318  6404 [191]   if (s[i]=',') or (s[i]=ENDMARK) then
+ 319  6430 [191]     _strinsc('.',i,s)
+ 320  6440 [191]   else if s[i]<>'.' then exit;
+ 321  6470 [191] 
+ 322  6470 [191]   i:=i+1;
+ 323  6476 [191]   decimals:=0;
+ 324  6483 [191] 
+ 325  6487 [191]   while (s[i]>='0') and (s[i]<='9') do begin
+ 326  6517 [191]     decimals:=decimals+1;
+ 327  6523 [191]     i:=i+1;
+ 328  6534 [191]   end;
+ 329  6539 [191] 
+ 330  6542 [191]   if decimals>2 then exit;
+ 331  6553 [191]   if (s[i]<>',') and (s[i]<>ENDMARK) then exit;
+ 332  6584 [191] 
+ 333  6584 [191]   { Complete two decimal places }
+ 334  6584 [191]   while decimals<2 do begin
+ 335  6594 [191]     _strinsc('0',i,s);
+ 336  6610 [191]     i:=i+1;
+ 337  6616 [191]     decimals:=decimals+1;
+ 338  6627 [191]   end;
+ 339  6632 [191] 
+ 340  6635 [191]   { Remove minus sign from zero }
+ 341  6635 [191]   if negative then begin
+ 342  6639 [191]     j:=pos+1;
+ 343  6648 [191]     while (s[j]='0') or (s[j]='.') do
+ 344  6679 [191]       j:=j+1;
+ 345  6689 [191] 
+ 346  6697 [191]     if (s[j]=',') or (s[j]=ENDMARK) then
+ 347  6723 [191]       _strdelc(pos,s);
+ 348  6741 [191]   end;
+ 349  6741 [191] 
+ 350  6741 [191]   validatereal:=true;
+ 351  6743 [191] end;
+ 352  6747 [191] 
+ 353  6748 [183] func add(a,b,r:cpnt;size:integer):boolean;
+ 354  6748 [189] {****************************************}
+ 355  6748 [189] var
+ 356  6748 [189]   a1,b1,t:cpnt;
+ 357  6751 [192]   i,j,k,n,carry,cmp:integer;
+ 358  6751 [198]   sa,sb,negative,subtract:boolean;
+ 359  6751 [202] begin
+ 360  6751 [202]   add:=false;
+ 361  6755 [202]   if (size<4) or (size>16) then exit;
+ 362  6778 [202] 
+ 363  6778 [202]   { Determine signs }
+ 364  6778 [202]   a1:=a;
+ 365  6778 [202]   b1:=b;
+ 366  6786 [202]   sa:=false;
+ 367  6796 [202]   sb:=false;
+ 368  6802 [202]   if a1[0]='-' then begin
+ 369  6817 [202]     sa:=true;
+ 370  6822 [202]     a1:=a1+1;
+ 371  6832 [202]   end;
+ 372  6837 [202]   if b1[0]='-' then begin
+ 373  6848 [202]     sb:=true;
+ 374  6853 [202]     b1:=b1+1;
+ 375  6863 [202]   end;
+ 376  6868 [202] 
+ 377  6868 [202]   { Find ends of input fields }
+ 378  6868 [202]   i:=0;
+ 379  6870 [202]   while (a1[i]<>ENDMARK) and (a1[i]<>',') do i:=i+1;
+ 380  6910 [202]   j:=0;
+ 381  6920 [202]   while (b1[j]<>ENDMARK) and (b1[j]<>',') do j:=j+1;
+ 382  6960 [202] 
+ 383  6968 [202]   { Check decimal points }
+ 384  6968 [202]   if (i<4) or (j<4) then exit;
+ 385  6987 [202]   if (a1[i-3]<>'.') or (b1[j-3]<>'.') then exit;
+ 386  7024 [202] 
+ 387  7024 [202]   subtract:=sa<>sb;
+ 388  7028 [202]   negative:=sa;
+ 389  7037 [202] 
+ 390  7045 [202]   { For subtraction, larger magnitude first }
+ 391  7045 [202]   if subtract then begin
+ 392  7049 [202]     if i>j then
+ 393  7056 [202]       cmp:=1
+ 394  7064 [202]     else if i<j then
+ 395  7077 [202]       cmp:=-1
+ 396  7085 [202]     else
+ 397  7087 [202]       cmp:=_strncmp(a1,b1,i);
+ 398  7115 [202] 
+ 399  7119 [202]     if cmp<0 then begin
+ 400  7126 [202]       t:=a1;
+ 401  7129 [202]       a1:=b1;
+ 402  7137 [202]       b1:=t;
+ 403  7145 [202]       k:=i;
+ 404  7153 [202]       i:=j;
+ 405  7161 [202]       j:=k;
+ 406  7169 [202]       negative:=sb;
+ 407  7177 [202]     end;
+ 408  7185 [202]   end;
+ 409  7185 [202] 
+ 410  7185 [202]   { Prepare result }
+ 411  7185 [202]   for k:=0 to size-1 do r[k]:='0';
+ 412  7213 [202]   r[size]:=ENDMARK;
+ 413  7237 [202]   r[size-3]:='.';
+ 414  7250 [202] 
+ 415  7254 [202]   { Add or subtract digits from right to left }
+ 416  7254 [202]   i:=i-1;
+ 417  7260 [202]   j:=j-1;
+ 418  7271 [202]   k:=size-1;
+ 419  7282 [202]   carry:=0;
+ 420  7289 [202] 
+ 421  7293 [202]   while k>=0 do begin
+ 422  7303 [202]     if k=size-3 then
+ 423  7313 [202]       k:=k-1
+ 424  7322 [202]     else begin
+ 425  7332 [202]       if (i>=0) and (a1[i]='.') then i:=i-1;
+ 426  7362 [202]       if (j>=0) and (b1[j]='.') then j:=j-1;
+ 427  7397 [202] 
+ 428  7402 [202]       n:=carry;
+ 429  7402 [202] 
+ 430  7410 [202]       if i>=0 then begin
+ 431  7417 [202]         if (a1[i]<'0') or (a1[i]>'9') then exit;
+ 432  7451 [202]         n:=n+ord(a1[i])-ord('0');
+ 433  7468 [202]         i:=i-1;
+ 434  7479 [202]       end;
+ 435  7484 [202] 
+ 436  7484 [202]       if j>=0 then begin
+ 437  7491 [202]         if (b1[j]<'0') or (b1[j]>'9') then exit;
+ 438  7525 [202]         if subtract then
+ 439  7525 [202]           n:=n-ord(b1[j])+ord('0')
+ 440  7549 [202]         else
+ 441  7549 [202]           n:=n+ord(b1[j])-ord('0');
+ 442  7574 [202]         j:=j-1;
+ 443  7585 [202]       end;
+ 444  7590 [202] 
+ 445  7590 [202]       if n<0 then begin
+ 446  7597 [202]         n:=n+10;
+ 447  7606 [202]         carry:=-1;
+ 448  7613 [202]       end
+ 449  7618 [202]       else begin
+ 450  7621 [202]         carry:=n div 10;
+ 451  7627 [202]         n:=_mod(n,10);
+ 452  7646 [202]       end;
+ 453  7650 [202] 
+ 454  7650 [202]       r[k]:=chr(ord('0')+n);
+ 455  7661 [202]       k:=k-1;
+ 456  7672 [202]     end;
+ 457  7677 [202]   end;
+ 458  7677 [202] 
+ 459  7680 [202]   { Overflow or unprocessed input }
+ 460  7680 [202]   if (i>=0) or (j>=0) or (carry<>0) then exit;
+ 461  7707 [202] 
+ 462  7707 [202]   { Remove leading zeros, keeping one integer digit }
+ 463  7707 [202]   k:=0;
+ 464  7709 [202]   while (r[k]='0') and (k<size-4) do k:=k+1;
+ 465  7748 [202] 
+ 466  7756 [202]   { Check if result is zero }
+ 467  7756 [202]   if r[k]='0' then begin
+ 468  7769 [202]     if (r[k+2]='0') and (r[k+3]='0') then
+ 469  7804 [202]       negative:=false;
+ 470  7810 [202]   end;
+ 471  7814 [202] 
+ 472  7814 [202]   { Check width including possible minus sign }
+ 473  7814 [202]   if negative and (size-k+1>size) then exit;
+ 474  7840 [202] 
+ 475  7840 [202]   { Move result to beginning }
+ 476  7840 [202]   i:=0;
+ 477  7842 [202]   if negative then begin
+ 478  7850 [202]     r[0]:='-';
+ 479  7857 [202]     i:=1;
+ 480  7863 [202]   end;
+ 481  7867 [202] 
+ 482  7867 [202]   while r[k]<>ENDMARK do begin
+ 483  7883 [202]     r[i]:=r[k];
+ 484  7895 [202]     i:=i+1;
+ 485  7907 [202]     k:=k+1;
+ 486  7918 [202]   end;
+ 487  7923 [202]   r[i]:=ENDMARK;
+ 488  7932 [202] 
+ 489  7936 [202]   add:=true;
+ 490  7938 [202] end;
+ 491  7942 [202] 
+ 492  7943 [185] proc calculatesum(s:cpnt);
+ 493  7943 [187] {***********************}
+ 494  7943 [187] var a,b,t,p:cpnt;
+ 495  7946 [191]     i,k,n,start:integer;
+ 496  7946 [195] begin
+ 497  7946 [195]   if sumcolumn<0 then exit;
+ 498  7959 [195] 
+ 499  7959 [195]   a:=acc1;
+ 500  7959 [195]   b:=acc2;
+ 501  7967 [195]   _strcpy('0.00',a);
+ 502  7992 [195] 
+ 503  7992 [195]   for i:=0 to ncols-1 do begin
+ 504  8014 [195]     if coltype[i]=T_REAL then begin
+ 505  8025 [195]       start:=colx[i]-1;
+ 506  8038 [195]       p:=s+start;
+ 507  8047 [195] 
+ 508  8056 [195]       { Skip leading blanks }
+ 509  8056 [195]       while p[0]=' ' do p:=p+1;
+ 510  8076 [195] 
+ 511  8084 [195]       { Ignore empty fields }
+ 512  8084 [195]       if (p[0]<>',') and (p[0]<>ENDMARK) then begin
+ 513  8107 [195]         if not add(a,p,b,16) then begin
+ 514  8133 [195]           showerror('TABLE: SUM overflow');
+ 515  8164 [195]           exit;
+ 516  8165 [195]         end;
+ 517  8165 [195]         t:=a;
+ 518  8165 [195]         a:=b;
+ 519  8173 [195]         b:=t;
+ 520  8181 [195]       end;
+ 521  8189 [195]     end;
+ 522  8189 [195]   end;
+ 523  8189 [195] 
+ 524  8203 [195]   { Locate SUM field }
+ 525  8203 [195]   start:=colx[sumcolumn]-1;
+ 526  8213 [195] 
+ 527  8218 [195] 
+ 528  8218 [195]   { Check result fits }
+ 529  8218 [195]   n:=_strlen(a);
+ 530  8230 [195]   if n>colsize[sumcolumn] then begin
+ 531  8247 [195]     showerror('TABLE: SUM field too small');
+ 532  8285 [195]      exit;
+ 533  8286 [195]   end;
+ 534  8286 [195] 
+ 535  8286 [195]   { Write right-justified result }
+ 536  8286 [195]   for k:=0 to colsize[sumcolumn]-1 do
+ 537  8302 [195]     s[start+k]:=' ';
+ 538  8323 [195] 
+ 539  8341 [195]   for k:=0 to n-1 do
+ 540  8353 [195]     s[start+colsize[sumcolumn]-n+k]:=a[k];
+ 541  8394 [195] end;
+ 542  8414 [195] 
+ 543  8415 [186] proc calculatetotals;
+ 544  8415 [187] {*******************}
+ 545  8415 [187] var a,b,t,p,s:cpnt;
+ 546  8418 [192]     i,j,k,n,start:integer;
+ 547  8418 [197]     overflow:boolean;
+ 548  8418 [198] begin
+ 549  8418 [198]   if not hastotals then exit;
+ 550  8429 [198] 
+ 551  8429 [198]   _strcpy(emptyrow,totalrow);
+ 552  8443 [198] 
+ 553  8443 [198]   for j:=0 to ncols-1 do begin
+ 554  8465 [198]     if totalcol[j] then begin
+ 555  8473 [198]       a:=acc1;
+ 556  8476 [198]       b:=acc2;
+ 557  8484 [198]       _strcpy('0.00',a);
+ 558  8509 [198]       overflow:=false;
+ 559  8511 [198]       start:=colx[j]-1;
+ 560  8525 [198] 
+ 561  8530 [198]       i:=0;
+ 562  8532 [198]       while (i<nrows) and not overflow do begin
+ 563  8554 [198]         s:=datarow[i];
+ 564  8558 [198]         p:=s+start;
+ 565  8570 [198] 
+ 566  8579 [198]         { Skip leading blanks }
+ 567  8579 [198]         while p[0]=' ' do p:=p+1;
+ 568  8599 [198] 
+ 569  8607 [198]         { Ignore empty fields }
+ 570  8607 [198]         if (p[0]<>',') and (p[0]<>ENDMARK) then begin
+ 571  8630 [198]           if add(a,p,b,16) then begin
+ 572  8655 [198]             t:=a;
+ 573  8658 [198]             a:=b;
+ 574  8666 [198]             b:=t;
+ 575  8674 [198]           end
+ 576  8682 [198]           else
+ 577  8682 [198]             overflow:=true;
+ 578  8687 [198]         end;
+ 579  8691 [198] 
+ 580  8691 [198]         i:=i+1;
+ 581  8697 [198]       end;
+ 582  8702 [198] 
+ 583  8705 [198]       n:=_strlen(a);
+ 584  8717 [198] 
+ 585  8721 [198]       { Check result fits }
+ 586  8721 [198]       if overflow or (n>colsize[j]) then begin
+ 587  8739 [198]         for k:=0 to colsize[j]-1 do
+ 588  8758 [198]           totalrow[start+k]:='*';
+ 589  8779 [198]       end
+ 590  8797 [198]       else begin
+ 591  8800 [198]         { Write right-justified result }
+ 592  8800 [198]         for k:=0 to n-1 do
+ 593  8812 [198]           totalrow[start+colsize[j]-n+k]:=a[k];
+ 594  8853 [198]       end;
+ 595  8873 [198]     end;
+ 596  8873 [198]   end;
+ 597  8873 [198] end;
+ 598  8887 [198] 
+ 599  8888 [187] proc validaterow(s:cpnt);
+ 600  8888 [189] {***********************}
+ 601  8888 [189] var i,j,k,start,len:integer;
+ 602  8891 [194] begin
+ 603  8891 [194]   i:=0;
+ 604  8895 [194] 
+ 605  8899 [194]   for j:=0 to ncols-1 do begin
+ 606  8921 [194]     k:=0;
+ 607  8923 [194]     start:=i;
+ 608  8927 [194] 
+ 609  8935 [194]     { Validate field }
+ 610  8935 [194]     if coltype[j]=T_DATE then
+ 611  8945 [194]       if not validatedate(s,start) then begin
+ 612  8966 [194]         showerror('TABLE: Invalid date');
+ 613  8997 [194]         exit;
+ 614  8998 [194]       end;
+ 615  8998 [194] 
+ 616  8998 [194]     if coltype[j]=T_INTEGER then
+ 617  9008 [194]       if not validateinteger(s+start) then begin
+ 618  9030 [194]         showerror('TABLE: Invalid integer');
+ 619  9064 [194]         exit;
+ 620  9065 [194]       end;
+ 621  9065 [194] 
+ 622  9065 [194]     if coltype[j]=T_REAL then
+ 623  9075 [194]       if not validatereal(s,start) then begin
+ 624  9096 [194]         showerror('TABLE: Invalid real');
+ 625  9127 [194]         exit;
+ 626  9128 [194]       end;
+ 627  9128 [194] 
+ 628  9128 [194]     { Find end of current field }
+ 629  9128 [194]     while (s[i]<>',') and (s[i]<>ENDMARK) do begin
+ 630  9158 [194]       k:=k+1;
+ 631  9164 [194]       i:=i+1;
+ 632  9175 [194]     end;
+ 633  9180 [194] 
+ 634  9183 [194]     { Check field width }
+ 635  9183 [194]     if k>colsize[j] then begin
+ 636  9196 [194]       showerror('TABLE: Field width');
+ 637  9226 [194]       exit;
+ 638  9227 [194]     end;
+ 639  9227 [194] 
+ 640  9227 [194]     { Check separator }
+ 641  9227 [194]     if j<ncols-1 then begin
+ 642  9239 [194]       if s[i]<>',' then begin
+ 643  9255 [194]         showerror('TABLE: Missing field');
+ 644  9287 [194]         exit;
+ 645  9288 [194]       end;
+ 646  9288 [194]     end
+ 647  9288 [194]     else
+ 648  9288 [194]       if s[i]<>ENDMARK then begin
+ 649  9304 [194]         showerror('TABLE: Too many fields');
+ 650  9338 [194]         exit;
+ 651  9339 [194]       end;
+ 652  9339 [194] 
+ 653  9339 [194]     len:=k;
+ 654  9339 [194] 
+ 655  9347 [194]     { Expand field with trailing blanks }
+ 656  9347 [194]     while k<colsize[j] do begin
+ 657  9363 [194]       _strinsc(' ',i,s);
+ 658  9379 [194]       i:=i+1;
+ 659  9385 [194]       k:=k+1;
+ 660  9396 [194]     end;
+ 661  9401 [194] 
+ 662  9404 [194]     { Right justify numeric fields }
+ 663  9404 [194]     if (coltype[j]=T_INTEGER) or (coltype[j]=T_REAL)
+ 664  9425 [194]     then
+ 665  9426 [194]       rightjustify(s,start,len,colsize[j]);
+ 666  9456 [194] 
+ 667  9456 [194]     { Advance past separator }
+ 668  9456 [194]     if j<ncols-1 then i:=i+1;
+ 669  9477 [194]   end;
+ 670  9482 [194]   calculatesum(s);
+ 671  9506 [194] end;
+ 672  9506 [194] 
+ 673  9507 [188] proc readrows(f:file);
+ 674  9507 [190] {********************}
+ 675  9507 [190] var eof:boolean;
+ 676  9510 [191]     len:integer;
+ 677  9510 [192] begin
+ 678  9510 [192]   nrows:=0;
+ 679  9514 [192]   eof:=false;
+ 680  9520 [192] 
+ 681  9524 [192]   while not eof do begin
+ 682  9532 [192]     len:=_strread(f,datarow[nrows],eof);
+ 683  9560 [192]     lineno := lineno + 1;
+ 684  9570 [192] 
+ 685  9575 [192]     if len>0 then begin
+ 686  9582 [192]       if nrows>=MAXROWS then
+ 687  9591 [192]         showerror('TABLE: Too many rows');
+ 688  9624 [192] 
+ 689  9624 [192]       validaterow(datarow[nrows]);
+ 690  9638 [192] 
+ 691  9638 [192]       nrows:=nrows+1;
+ 692  9644 [192]     end;
+ 693  9649 [192]   end;
+ 694  9649 [192]   if nrows=0 then begin
+ 695  9659 [192]     _strcpy(emptyrow,datarow[0]);
+ 696  9678 [192]     nrows:=1;
+ 697  9680 [192]     currow:=0;
+ 698  9686 [192]     firstrow:=0;
+ 699  9692 [192]   end;
+ 700  9696 [192] end;
+ 701  9696 [192] 
+ 702  9697 [189] proc parsetitle(s:cpnt;len:integer);
+ 703  9697 [192] {*********************************}
+ 704  9697 [192] var i,j,k,x:integer;
+ 705  9700 [196] begin
+ 706  9700 [196]   if _strncmp(s,'TITLE=',6)<>0 then
+ 707  9727 [196]     showerror('TABLE: TITLE expected');
+ 708  9761 [196] 
+ 709  9761 [196] 
+ 710  9761 [196]   i:=6;
+ 711  9763 [196]   for j:=0 to ncols-1 do begin
+ 712  9789 [196]     x:=colx[j]-1;
+ 713  9799 [196]     k:=0;
+ 714  9806 [196] 
+ 715  9810 [196]     while (i<len) and (s[i]<>',') do begin
+ 716  9836 [196]       if k>=colsize[j] then
+ 717  9844 [196]         showerror('TABLE: Title too long');
+ 718  9882 [196] 
+ 719  9882 [196]       titles[x+k]:=s[i];
+ 720  9899 [196]       k:=k+1;
+ 721  9911 [196]       i:=i+1;
+ 722  9922 [196]     end;
+ 723  9927 [196] 
+ 724  9930 [196]     while k<colsize[j] do begin
+ 725  9946 [196]       titles[x+k]:=' ';
+ 726  9957 [196]       k:=k+1;
+ 727  9967 [196]     end;
+ 728  9972 [196] 
+ 729  9975 [196]     if j<ncols-1 then begin
+ 730  9987 [196]       if (i>=len) or (s[i]<>',') then
+ 731 10012 [196]         showerror('TABLE: Missing title');
+ 732 10045 [196] 
+ 733 10045 [196]       titles[x+colsize[j]]:=',';
+ 734 10060 [196]       i:=i+1;
+ 735 10070 [196]     end;
+ 736 10075 [196]   end;
+ 737 10075 [196] 
+ 738 10089 [196]   if i<>len then
+ 739 10093 [196]     showerror('TABLE: Too many titles');
+ 740 10132 [196] 
+ 741 10132 [196]   titles[tablewidth-2]:=ENDMARK;
+ 742 10141 [196] end;
+ 743 10145 [196] 
+ 744 10146 [190] proc parsetype(s:cpnt;len:integer);
+ 745 10146 [193] {********************************}
+ 746 10146 [193] var i,j,k,t:integer;
+ 747 10149 [197] begin
+ 748 10149 [197]   sumcolumn := -1;
+ 749 10153 [197]   if _strncmp(s,'TYPE=',5)<>0 then
+ 750 10182 [197]     showerror('TABLE: TYPE expected');
+ 751 10215 [197] 
+ 752 10215 [197]   i:=5;
+ 753 10217 [197]   for j:=0 to ncols-1 do begin
+ 754 10243 [197]     k:=i;
+ 755 10243 [197]     while (i<len) and (s[i]<>',') do i:=i+1;
+ 756 10283 [197] 
+ 757 10291 [197]     s[i]:=ENDMARK;
+ 758 10297 [197] 
+ 759 10301 [197]     t:=0;
+ 760 10303 [197]     if _strcmp(s+k,'TEXT')=0 then t:=T_TEXT
+ 761 10337 [197]     else if _strcmp(s+k,'INTEGER')=0 then t:=T_INTEGER
+ 762 10379 [197]     else if _strcmp(s+k,'REAL')=0 then t:=T_REAL
+ 763 10418 [197]     else if _strcmp(s+k,'DATE')=0 then t:=T_DATE
+ 764 10457 [197]     else if _strcmp(s+k,'SUM')=0 then t:=T_SUM;
+ 765 10497 [197] 
+ 766 10501 [197]     if t=0 then
+ 767 10507 [197]       showerror('TABLE: Invalid TYPE');
+ 768 10539 [197] 
+ 769 10539 [197]     coltype[j]:=t;
+ 770 10543 [197]     if t=T_SUM then begin
+ 771 10558 [197]       if sumcolumn>=0 then
+ 772 10567 [197]         showerror('TABLE: Multiple SUM columns');
+ 773 10607 [197]       sumcolumn:=j;
+ 774 10607 [197]     end;
+ 775 10615 [197]     i:=i+1;
+ 776 10621 [197]   end;
+ 777 10626 [197] 
+ 778 10640 [197]   if i<>len+1 then
+ 779 10650 [197]     showerror('TABLE: Wrong number of types');
+ 780 10692 [197] end;
+ 781 10692 [197] 
+ 782 10693 [191] proc parsetotal(s:cpnt; len:integer);
+ 783 10693 [194] {*********************************}
+ 784 10693 [194] var i,j,start:integer;
+ 785 10696 [197] begin
+ 786 10696 [197]   i:=6;
+ 787 10700 [197]   j:=0;
+ 788 10706 [197] 
+ 789 10710 [197]   while j<ncols do begin
+ 790 10722 [197]     start:=i;
+ 791 10722 [197] 
+ 792 10730 [197]     while (i<len) and (s[i]<>',') do
+ 793 10752 [197]       i:=i+1;
+ 794 10762 [197] 
+ 795 10770 [197]     if i>start then begin
+ 796 10779 [197]       if (i-start<>3) or
+ 797 10794 [197]          (s[start]<>'S') or
+ 798 10807 [197]          (s[start+1]<>'U') or
+ 799 10824 [197]          (s[start+2]<>'M') then
+ 800 10841 [197]         showerror('TABLE: Invalid TOTAL');
+ 801 10874 [197] 
+ 802 10874 [197]       if ((coltype[j]<>T_REAL) and
+ 803 10885 [197]          (coltype[j]<>T_SUM)) then
+ 804 10897 [197]         showerror('TABLE: Invalid total type');
+ 805 10934 [197] 
+ 806 10934 [197]       totalcol[j]:=true;
+ 807 10940 [197]       hastotals:=true;
+ 808 10946 [197]     end;
+ 809 10950 [197] 
+ 810 10950 [197]     j:=j+1;
+ 811 10956 [197] 
+ 812 10961 [197]     if j<ncols then begin
+ 813 10970 [197]       if (i>=len) or (s[i]<>',') then
+ 814 10995 [197]         showerror('TABLE: Invalid TOTAL');
+ 815 11028 [197]       i:=i+1;
+ 816 11034 [197]     end;
+ 817 11039 [197]   end;
+ 818 11039 [197] 
+ 819 11042 [197]   if i<>len then
+ 820 11046 [197]     showerror('TABLE: Invalid TOTAL');
+ 821 11083 [197] end;
+ 822 11083 [197] 
+ 823 11084 [192] proc parse(f:file);
+ 824 11084 [194] {*****************}
+ 825 11084 [194] var s:cpnt;
+ 826 11087 [195]     eof:boolean;
+ 827 11087 [196]     len,i,j,n,x:integer;
+ 828 11087 [201] begin
+ 829 11087 [201]   s:=_new;
+ 830 11095 [201]   len:=_strread(f,s,eof);
+ 831 11123 [201]   lineno := lineno + 1;
+ 832 11133 [201] 
+ 833 11138 [201]   if _strncmp(s,'SIZE=',5)<>0 then
+ 834 11162 [201]     showerror('TABLE: SIZE expected');
+ 835 11195 [201] 
+ 836 11195 [201]   i:=5;
+ 837 11197 [201]   ncols:=0;
+ 838 11203 [201]   x:=1;
+ 839 11209 [201] 
+ 840 11213 [201]   while (i<len) and (ncols<MAXCOLS) do begin
+ 841 11233 [201] 
+ 842 11233 [201]     { Read decimal column width }
+ 843 11233 [201]     n:=0;
+ 844 11235 [201]     while (i<len) and (s[i]<>',') do begin
+ 845 11265 [201]       if (s[i]<'0') or (s[i]>'9') then
+ 846 11291 [201]         showerror('TABLE: Invalid SIZE');
+ 847 11323 [201] 
+ 848 11323 [201]       n:=n*10+ord(s[i])-ord('0');
+ 849 11343 [201]       i:=i+1;
+ 850 11354 [201]     end;
+ 851 11359 [201] 
+ 852 11362 [201]     if n=0 then
+ 853 11368 [201]       showerror('TABLE: Invalid column width');
+ 854 11408 [201] 
+ 855 11408 [201]     colsize[ncols]:=n;
+ 856 11412 [201]     colx[ncols]:=x;
+ 857 11424 [201]     x:=x+n+1;
+ 858 11443 [201]     ncols:=ncols+1;
+ 859 11454 [201] 
+ 860 11459 [201]     if (i<len) and (s[i]=',') then i:=i+1;
+ 861 11491 [201]   end;
+ 862 11496 [201] 
+ 863 11499 [201]   tablewidth:=x;
+ 864 11499 [201] 
+ 865 11507 [201]   if x>SCREENWIDTH then
+ 866 11513 [201]     showerror('TABLE: Table too wide');
+ 867 11547 [201] 
+ 868 11547 [201]   len:=_strread(f,s,eof);
+ 869 11571 [201]   lineno := lineno + 1;
+ 870 11581 [201]   parsetype(s,len);
+ 871 11600 [201] 
+ 872 11600 [201]   len:=_strread(f,s,eof);
+ 873 11624 [201]   lineno := lineno + 1;
+ 874 11634 [201]   parsetitle(s,len);
+ 875 11653 [201] 
+ 876 11653 [201]   { Optional TOTAL specification }
+ 877 11653 [201]   hastotals:=false;
+ 878 11655 [201]   for j:=0 to ncols-1 do
+ 879 11671 [201]     totalcol[j]:=false;
+ 880 11687 [201] 
+ 881 11705 [201]   len:=_strread(f,s,eof);
+ 882 11729 [201]   lineno:=lineno+1;
+ 883 11739 [201] 
+ 884 11744 [201]   if _strncmp(s,'TOTAL=',6)=0 then begin
+ 885 11770 [201]     parsetotal(s,len);
+ 886 11787 [201] 
+ 887 11787 [201]     len:=_strread(f,s,eof);
+ 888 11811 [201]     lineno:=lineno+1;
+ 889 11821 [201]   end;
+ 890 11826 [201] 
+ 891 11826 [201]   datalines:=12;
+ 892 11828 [201]   if hastotals then datalines:=10;
+ 893 11841 [201] 
+ 894 11845 [201]   if _strcmp(s,'DATA=')<>0 then
+ 895 11867 [201]     showerror('TABLE: DATA expected');
+ 896 11900 [201] 
+ 897 11900 [201]   nrows:=0;
+ 898 11902 [201]   readrows(f);
+ 899 11916 [201] 
+ 900 11916 [201]   _release(s);
+ 901 11926 [201] end;
+ 902 11926 [201] 
+ 903 11927 [193] proc showstatus;
+ 904 11927 [194] {**************}
+ 905 11927 [194] var r,c:integer;
+ 906 11930 [196] begin
+ 907 11930 [196]   r:=currow+1;
+ 908 11938 [196]   c:=curcol+1;
+ 909 11949 [196] 
+ 910 11954 [196]   LEDREG[0]:=chr(ord('0')+r div 100);
+ 911 11966 [196]   LEDREG[1]:=chr(ord('0')+_mod(r div 10,10));
+ 912 11996 [196]   LEDREG[2]:=chr(ord('0')+_mod(r,10));
+ 913 12023 [196]   LEDREG[3]:='-';
+ 914 12035 [196]   LEDREG[4]:=chr(ord('0')+c div 10);
+ 915 12054 [196]   LEDREG[5]:=chr(ord('0')+_mod(c,10));
+ 916 12081 [196]   LEDREG[6]:=' ';
+ 917 12093 [196]   LEDREG[7]:=status;
+ 918 12102 [196] end;
+ 919 12113 [196] 
+ 920 12114 [194] proc showdata;
+ 921 12114 [195] {*************}
+ 922 12114 [195] var i,row:integer;
+ 923 12117 [197] begin
+ 924 12117 [197]   for i:=0 to datalines-1 do begin
+ 925 12141 [197]     _setcursor(0,i+3);
+ 926 12156 [197]     row:=firstrow+i;
+ 927 12160 [197] 
+ 928 12169 [197]     if row<nrows then begin
+ 929 12178 [197]       if row=currow then
+ 930 12185 [197]         writetableline(datarow[row],curcol)
+ 931 12201 [197]       else
+ 932 12211 [197]         writetableline(datarow[row],-1);
+ 933 12231 [197]     end
+ 934 12231 [197]     else
+ 935 12231 [197]       writetableline(emptyrow,-1);
+ 936 12247 [197]   end;
+ 937 12247 [197] 
+ 938 12261 [197]   showstatus;
+ 939 12265 [197]   _parkcursor;
+ 940 12269 [197] end;
+ 941 12269 [197] 
+ 942 12270 [195] proc signalerror;
+ 943 12270 [195] {***************}
+ 944 12270 [195] var i:integer;
+ 945 12273 [196] begin
+ 946 12273 [196]   for i:=1 to 3 do begin
+ 947 12292 [196]     _setcursor(0,currow-firstrow+3);
+ 948 12312 [196]     writetableline(datarow[currow],-2);
+ 949 12329 [196]     {_syncscreen;}
+ 950 12329 [196]     _delay10msec(10);
+ 951 12337 [196] 
+ 952 12337 [196]     _setcursor(0,currow-firstrow+3);
+ 953 12357 [196]     writetableline(datarow[currow],-1);
+ 954 12374 [196]     {_syncscreen;}
+ 955 12374 [196]     _delay10msec(10);
+ 956 12382 [196]   end;
+ 957 12382 [196]   showdata;
+ 958 12400 [196] end;
+ 959 12400 [196] 
+ 960 12401 [195] proc showtotals;
+ 961 12401 [196] {***************}
+ 962 12401 [196] begin
+ 963 12401 [196]   if hastotals then begin
+ 964 12410 [196]     _setcursor(0,14);
+ 965 12423 [196]     writetableline(totalrow,-1);
+ 966 12436 [196]     _parkcursor;
+ 967 12440 [196]   end;
+ 968 12440 [196] end;
+ 969 12440 [196] 
+ 970 12441 [196] proc showtable;
+ 971 12441 [197] {*************}
+ 972 12441 [197] var i:integer;
+ 973 12444 [198] begin
+ 974 12444 [198]   _htxtgr(0,tablewidth-1,0,CYAN);
+ 975 12465 [198]   _htxtgr(0,tablewidth-1,2,CYAN);
+ 976 12484 [198]   _htxtgr(0,tablewidth-1,15,CYAN);
+ 977 12503 [198] 
+ 978 12503 [198]   if hastotals then
+ 979 12503 [198]     _htxtgr(0,tablewidth-1,13,CYAN);
+ 980 12529 [198] 
+ 981 12529 [198]   _vtxtgr(tablewidth-1,0,15,CYAN);
+ 982 12548 [198] 
+ 983 12548 [198]   for i:=0 to ncols-1 do
+ 984 12560 [198]     _vtxtgr(colx[i]-1,0,15,CYAN);
+ 985 12593 [198] 
+ 986 12607 [198]   _setcursor(0,1);
+ 987 12617 [198]   writetableline(titles,-1);
+ 988 12630 [198] 
+ 989 12630 [198]   if hastotals then begin
+ 990 12634 [198]     calculatetotals;
+ 991 12641 [198]     showtotals;
+ 992 12645 [198]   end;
+ 993 12645 [198] 
+ 994 12645 [198]   showdata;
+ 995 12649 [198] end;
+ 996 12649 [198] 
+ 997 12650 [197] proc prepareemptyrow;
+ 998 12650 [198] {*******************}
+ 999 12650 [198] var i:integer;
+1000 12653 [199] begin
+1001 12653 [199]   for i:=0 to tablewidth-3 do
+1002 12667 [199]     emptyrow[i]:=' ';
+1003 12683 [199] 
+1004 12701 [199]   for i:=1 to ncols-1 do
+1005 12713 [199]     emptyrow[colx[i]-2]:=',';
+1006 12736 [199] 
+1007 12754 [199]   emptyrow[tablewidth-2]:=ENDMARK;
+1008 12763 [199] end;
+1009 12767 [199] 
+1010 12768 [198] proc insertrow(pos:integer);
+1011 12768 [200] {**************************}
+1012 12768 [200] var i:integer;
+1013 12771 [201]     p:cpnt;
+1014 12771 [202] begin
+1015 12771 [202]   if nrows>=MAXROWS then begin
+1016 12780 [202]     signalerror;
+1017 12787 [202]     exit;
+1018 12788 [202]   end;
+1019 12788 [202] 
+1020 12788 [202]   { Save spare string pointer }
+1021 12788 [202]   p:=datarow[nrows];
+1022 12792 [202] 
+1023 12800 [202]   { Shift pointers down }
+1024 12800 [202]   for i:=nrows downto pos+1 do
+1025 12814 [202]     datarow[i]:=datarow[i-1];
+1026 12835 [202] 
+1027 12857 [202]   datarow[pos]:=p;
+1028 12861 [202]   _strcpy(emptyrow,p);
+1029 12883 [202] 
+1030 12883 [202]   nrows:=nrows+1;
+1031 12889 [202]   currow:=pos;
+1032 12894 [202]   modified:=true;
+1033 12904 [202]   status:='M';
+1034 12910 [202]   showstatus;
+1035 12918 [202] 
+1036 12918 [202]   if currow<firstrow then firstrow:=currow;
+1037 12930 [202]   if currow>=firstrow+datalines then
+1038 12946 [202]     firstrow:=currow-datalines+1;
+1039 12966 [202] 
+1040 12971 [202]   calculatetotals
+1041 12971 [202]   showtotals;
+1042 12979 [202]   showdata;
+1043 12983 [202] end;
+1044 12983 [202] 
+1045 12984 [199] proc movecell(key:char);
+1046 12984 [201] {*********************}
+1047 12984 [201] begin
+1048 12984 [201]   if key=CUP then begin
+1049 12996 [201]     if currow>0 then
+1050 13005 [201]       currow:=currow-1;
+1051 13015 [201]   end;
+1052 13020 [201] 
+1053 13020 [201]   if key=CDOWN then begin
+1054 13027 [201]     if currow<nrows-1 then
+1055 13040 [201]       currow:=currow+1;
+1056 13051 [201]   end;
+1057 13056 [201] 
+1058 13056 [201]   if key=CLEFT then begin
+1059 13063 [201]     if curcol>0 then
+1060 13072 [201]       curcol:=curcol-1;
+1061 13082 [201]   end;
+1062 13087 [201] 
+1063 13087 [201]   if key=CRIGHT then begin
+1064 13094 [201]     if curcol<ncols-1 then
+1065 13107 [201]       curcol:=curcol+1;
+1066 13118 [201]   end;
+1067 13123 [201] 
+1068 13123 [201]   if key=TAB then begin
+1069 13130 [201]     if curcol<ncols-1 then
+1070 13143 [201]       curcol:=curcol+1
+1071 13152 [201]     else begin
+1072 13162 [201]       curcol:=0;
+1073 13164 [201]       if currow<nrows-1 then
+1074 13178 [201]         currow:=currow+1
+1075 13187 [201]       else if nrows<MAXROWS then
+1076 13203 [201]         insertrow(nrows);
+1077 13217 [201]     end;
+1078 13217 [201]   end;
+1079 13217 [201] 
+1080 13217 [201]   if currow<firstrow then
+1081 13221 [201]     firstrow:=currow;
+1082 13229 [201] 
+1083 13237 [201]   if currow>=firstrow+datalines then
+1084 13245 [201]     firstrow:=currow-datalines+1;
+1085 13265 [201] 
+1086 13270 [201]   showdata;
+1087 13274 [201] end;
+1088 13274 [201] 
+1089 13275 [200] proc draweditcell(s:cpnt; len,cursorpos:integer);
+1090 13275 [204] {***********************************************}
+1091 13275 [204] var i:integer;
+1092 13278 [205] begin
+1093 13278 [205]   _setcursor(colx[curcol],currow-firstrow+3);
+1094 13306 [205]   write(INVVID);
+1095 13309 [205] 
+1096 13309 [205]   for i:=0 to colsize[curcol]-1 do begin
+1097 13335 [205]     if i<len then
+1098 13339 [205]       write(s[i])
+1099 13355 [205]     else
+1100 13358 [205]       write(' ');
+1101 13363 [205]   end;
+1102 13363 [205] 
+1103 13377 [205]   write(NORVID);
+1104 13380 [205] 
+1105 13380 [205]   _setcursor(colx[curcol]+cursorpos,
+1106 13388 [205]              currow-firstrow+3);
+1107 13411 [205] end;
+1108 13411 [205] 
+1109 13412 [201] proc geteditcell(s:cpnt);
+1110 13412 [203] {***********************}
+1111 13412 [203] var i,start,len:integer;
+1112 13415 [206]     rowpnt:cpnt;
+1113 13415 [207] begin
+1114 13415 [207]   start:=colx[curcol]-1;
+1115 13427 [207]   len:=colsize[curcol];
+1116 13436 [207]   rowpnt:=datarow[currow];
+1117 13448 [207] 
+1118 13456 [207]   { Skip leading spaces }
+1119 13456 [207]   if (coltype[curcol]=T_INTEGER) or
+1120 13467 [207]      (coltype[curcol]=T_REAL) then begin
+1121 13479 [207]     while (len>0) and (rowpnt[start]=' ')
+1122 13501 [207]     do begin
+1123 13506 [207]       start:=start+1;
+1124 13512 [207]       len:=len-1;
+1125 13523 [207]     end;
+1126 13528 [207]   end
+1127 13531 [207]   else begin
+1128 13534 [207]     { Remove trailing spaces }
+1129 13534 [207]     while (len>0) and
+1130 13541 [207]           (rowpnt[start+len-1]=' ') do
+1131 13562 [207]       len:=len-1;
+1132 13572 [207]   end;
+1133 13580 [207] 
+1134 13580 [207]   for i:=0 to len-1 do
+1135 13592 [207]     s[i]:=rowpnt[start+i];
+1136 13619 [207] 
+1137 13639 [207]   s[len]:=ENDMARK;
+1138 13645 [207] end;
+1139 13649 [207] 
+1140 13650 [202] func acceptcell(editstr:cpnt):boolean;
+1141 13650 [205] {***********************************}
+1142 13650 [205] var s,rowpnt:cpnt;
+1143 13653 [207]     i,j,k,n,start,len:integer;
+1144 13653 [213] begin
+1145 13653 [213]   acceptcell:=false;
+1146 13657 [213]   s:=_new;
+1147 13667 [213]   rowpnt:=datarow[currow];
+1148 13675 [213]   k:=0;
+1149 13685 [213] 
+1150 13689 [213]   for j:=0 to ncols-1 do begin
+1151 13711 [213]     if j=curcol then begin
+1152 13720 [213]       { Copy edited field }
+1153 13723 [213]       i:=0;
+1154 13725 [213]       while editstr[i]<>ENDMARK do begin
+1155 13745 [213]         s[k]:=editstr[i];
+1156 13757 [213]         k:=k+1;
+1157 13769 [213]         i:=i+1;
+1158 13780 [213]       end;
+1159 13785 [213]     end
+1160 13788 [213]     else begin
+1161 13791 [213]       { Copy existing field without padding }
+1162 13791 [213]       start:=colx[j]-1;
+1163 13801 [213]       len:=colsize[j];
+1164 13810 [213] 
+1165 13818 [213]       { Remove leading spaces from numeric fields }
+1166 13818 [213]       if (coltype[j]=T_INTEGER) or
+1167 13829 [213]          (coltype[j]=T_REAL) or
+1168 13840 [213]          (coltype[j]=T_SUM) then begin
+1169 13853 [213]         while (len>0) and (rowpnt[start]=' ') do begin
+1170 13880 [213]           start:=start+1;
+1171 13886 [213]           len:=len-1;
+1172 13897 [213]         end;
+1173 13902 [213]       end;
+1174 13905 [213] 
+1175 13905 [213]       { Remove trailing spaces }
+1176 13905 [213]       while (len>0) and
+1177 13912 [213]             (rowpnt[start+len-1]=' ') do
+1178 13933 [213]         len:=len-1;
+1179 13943 [213] 
+1180 13951 [213]       for n:=0 to len-1 do begin
+1181 13973 [213]         s[k]:=rowpnt[start+n];
+1182 13990 [213]         k:=k+1;
+1183 14002 [213]       end;
+1184 14007 [213]     end;
+1185 14021 [213] 
+1186 14021 [213]     { Add field separator }
+1187 14021 [213]     if j<ncols-1 then begin
+1188 14033 [213]       s[k]:=',';
+1189 14042 [213]       k:=k+1;
+1190 14052 [213]     end;
+1191 14057 [213]   end;
+1192 14057 [213] 
+1193 14071 [213]   s[k]:=ENDMARK;
+1194 14077 [213] 
+1195 14081 [213]   { Validate and normalize temporary row }
+1196 14081 [213]   validationfail:=false;
+1197 14083 [213]   validaterow(s);
+1198 14097 [213] 
+1199 14097 [213]   if not validationfail then begin
+1200 14102 [213]     _strcpy(s,rowpnt);
+1201 14119 [213]     acceptcell:=true;
+1202 14121 [213]   end;
+1203 14125 [213] 
+1204 14125 [213]   _release(s);
+1205 14135 [213] end;
+1206 14135 [213] 
+1207 14136 [204] func editcell(firstkey:char; clickpos:integer;
+1208 14136 [208]         var mode,x,y:integer):char;
+1209 14136 [211] {*********************************************}
+1210 14136 [211] var editstr:cpnt;
+1211 14139 [212]     key:char;
+1212 14139 [213]     done,finish,scrollerror:boolean;
+1213 14139 [216]     len,cursorpos,i:integer;
+1214 14139 [219] begin
+1215 14139 [219]   LEDREG[7]:='E';
+1216 14145 [219]   editstr:=_new;
+1217 14158 [219]   scrollerror:=false;
+1218 14164 [219] 
+1219 14168 [219]   if firstkey=ENTER then
+1220 14174 [219]     geteditcell(editstr)
+1221 14178 [219]   else if firstkey=chr(0) then
+1222 14197 [219]     editstr[0]:=ENDMARK
+1223 14204 [219]   else begin
+1224 14213 [219]     editstr[0]:=firstkey;
+1225 14215 [219]     editstr[1]:=ENDMARK;
+1226 14227 [219]   end;
+1227 14231 [219] 
+1228 14231 [219]   len:=_strlen(editstr);
+1229 14243 [219]   cursorpos:=len;
+1230 14247 [219]   if clickpos>=0 then begin
+1231 14262 [219]     cursorpos:=clickpos;
+1232 14265 [219]     if cursorpos>len then cursorpos:=len;
+1233 14285 [219]   end;
+1234 14293 [219] 
+1235 14293 [219]   done:=false;
+1236 14295 [219]   draweditcell(editstr,len,cursorpos);
+1237 14317 [219] 
+1238 14317 [219]   repeat
+1239 14317 [219]     _waitinput(mode,x,y,key);
+1240 14353 [219]     finish:=false;
+1241 14355 [219] 
+1242 14359 [219]     if _isesc then begin
+1243 14365 [219]       key:=chr(0);
+1244 14370 [219]       mode:=0;
+1245 14377 [219]       done:=true;
+1246 14383 [219]     end
+1247 14387 [219]     else begin
+1248 14390 [219] 
+1249 14390 [219]       { Ignore repeated scrolling after an error }
+1250 14390 [219]       if scrollerror and
+1251 14390 [219]          ((key=RUP) or (key=RDOWN)) then begin
+1252 14410 [219]         key:=chr(0);
+1253 14415 [219]         mode:=0;
+1254 14422 [219]       end;
+1255 14426 [219] 
+1256 14426 [219]       case key of
+1257 14426 [219]         RUBOUT: begin
+1258 14437 [219]           if cursorpos>0 then begin
+1259 14444 [219]             for i:=cursorpos-1 to len-1 do
+1260 14464 [219]               editstr[i]:=editstr[i+1];
+1261 14489 [219]             len:=len-1;
+1262 14515 [219]             cursorpos:=cursorpos-1;
+1263 14526 [219]             scrollerror:=false;
+1264 14533 [219]           end;
+1265 14537 [219]         end;
+1266 14537 [219] 
+1267 14540 [219]         CLEFT: begin
+1268 14547 [219]           if cursorpos>0 then
+1269 14553 [219]             cursorpos:=cursorpos-1
+1270 14561 [219]           else
+1271 14563 [219]             finish:=true;
+1272 14573 [219]         end;
+1273 14577 [219] 
+1274 14580 [219]         CRIGHT: begin
+1275 14587 [219]           if cursorpos<len then
+1276 14591 [219]             cursorpos:=cursorpos+1
+1277 14603 [219]           else
+1278 14605 [219]             finish:=true;
+1279 14615 [219]         end
+1280 14619 [219] 
+1281 14619 [219]         else begin
+1282 14622 [219]           if (key>=' ') and (key<chr(127)) then begin
+1283 14638 [219]             if len<colsize[curcol] then begin
+1284 14654 [219]               for i:=len downto cursorpos do
+1285 14665 [219]                 editstr[i+1]:=editstr[i];
+1286 14693 [219] 
+1287 14713 [219]               editstr[cursorpos]:=key;
+1288 14717 [219]               len:=len+1;
+1289 14731 [219]               cursorpos:=cursorpos+1;
+1290 14742 [219]               scrollerror:=false;
+1291 14749 [219]             end;
+1292 14753 [219]           end
+1293 14753 [219]           else if key<>chr(0) then
+1294 14762 [219]             finish:=true;
+1295 14769 [219]         end
+1296 14773 [219]       end;
+1297 14775 [219] 
+1298 14775 [219]       { Mouse click within the editing cell }
+1299 14775 [219]       if mode=1 then begin
+1300 14782 [219]         if (y=currow-firstrow+3) and
+1301 14802 [219]           (x>=colx[curcol]) and
+1302 14815 [219]           (x<=colx[curcol]+colsize[curcol]) then begin
+1303 14839 [219]           cursorpos:=x-colx[curcol];
+1304 14850 [219]           if cursorpos>len then cursorpos:=len;
+1305 14871 [219]           key:=chr(0);
+1306 14881 [219]           mode:=0;
+1307 14888 [219]         end
+1308 14892 [219]         else
+1309 14892 [219]           finish:=true;
+1310 14897 [219]       end;
+1311 14901 [219] 
+1312 14901 [219]       if finish then begin
+1313 14905 [219]         if key=CKILL then
+1314 14914 [219]           done:=true
+1315 14918 [219]         else if acceptcell(editstr) then begin
+1316 14939 [219]           modified:=true;
+1317 14944 [219]           status:='M';
+1318 14950 [219]           showstatus;
+1319 14958 [219]           calculatetotals;
+1320 14962 [219]           showtotals;
+1321 14966 [219]           done:=true;
+1322 14968 [219]         end
+1323 14972 [219]         else begin
+1324 14975 [219]           if (key=RUP) or (key=RDOWN) then
+1325 14989 [219]             scrollerror:=true;
+1326 14995 [219]           draweditcell(editstr,len,cursorpos);
+1327 15017 [219]         end;
+1328 15017 [219]       end
+1329 15017 [219]       else
+1330 15017 [219]         draweditcell(editstr,len,cursorpos);
+1331 15038 [219]     end;
+1332 15038 [219]   until done;
+1333 15038 [219] 
+1334 15045 [219]   _release(editstr);
+1335 15055 [219]   showdata;
+1336 15059 [219]   editcell:=key;
+1337 15059 [219] end;
+1338 15067 [219] 
+1339 15068 [206] proc selectcell(x,y:integer);
+1340 15068 [209] {************************}
+1341 15068 [209] var j,r:integer;
+1342 15071 [211] begin
+1343 15071 [211]   if (y<3) or (y>14) then exit;
+1344 15092 [211] 
+1345 15092 [211]   r:=firstrow+y-3;
+1346 15103 [211]   if r>=nrows then exit;
+1347 15121 [211] 
+1348 15121 [211]   for j:=0 to ncols-1 do begin
+1349 15143 [211]     if (x>=colx[j]) and
+1350 15156 [211]        (x<colx[j]+colsize[j]) then begin
+1351 15179 [211]       currow:=r;
+1352 15182 [211]       curcol:=j;
+1353 15190 [211]       showdata;
+1354 15202 [211]       exit;
+1355 15203 [211]     end;
+1356 15203 [211]   end;
+1357 15203 [211] end;
+1358 15217 [211] 
+1359 15218 [207] 
+1360 15218 [207] proc deleterow;
+1361 15218 [208] {**************}
+1362 15218 [208] var i:integer;
+1363 15221 [209]     p:cpnt;
+1364 15221 [210] begin
+1365 15221 [210]   if nrows=0 then exit;
+1366 15234 [210] 
+1367 15234 [210]   p:=datarow[currow];
+1368 15238 [210] 
+1369 15246 [210]   { Shift pointers up }
+1370 15246 [210]   for i:=currow to nrows-2 do
+1371 15260 [210]     datarow[i]:=datarow[i+1];
+1372 15281 [210] 
+1373 15303 [210]   nrows:=nrows-1;
+1374 15309 [210]   datarow[nrows]:=p;
+1375 15318 [210] 
+1376 15326 [210]   if currow>=nrows then
+1377 15330 [210]     currow:=nrows-1;
+1378 15344 [210] 
+1379 15349 [210]   if currow<0 then currow:=0;
+1380 15361 [210] 
+1381 15365 [210]   if firstrow>0 then
+1382 15371 [210]     if firstrow+datalines>nrows then
+1383 15384 [210]       firstrow:=firstrow-1;
+1384 15398 [210] 
+1385 15403 [210]   modified:=true;
+1386 15405 [210]   status:='M';
+1387 15411 [210]   showstatus;
+1388 15419 [210]   calculatetotals;
+1389 15423 [210]   showtotals;
+1390 15427 [210]   showdata;
+1391 15431 [210] end;
+1392 15431 [210] 
+1393 15432 [208] proc save;
+1394 15432 [209] {********}
+1395 15432 [209] var fr,fw:file;
+1396 15435 [211]     i,j,k,start,len:integer;
+1397 15435 [216]     p:cpnt;
+1398 15435 [217]     eof: boolean;
+1399 15435 [218] begin
+1400 15435 [218]   { Open original file }
+1401 15435 [218]   _strfio(filename,cyclus,drive);
+1402 15455 [218]   openr(fr);
+1403 15461 [218] 
+1404 15461 [218]   { Create new file cycle }
+1405 15461 [218]   cyclus:=0;
+1406 15463 [218]   _strfio(filename,cyclus,drive);
+1407 15485 [218]   openw(fw);
+1408 15491 [218] 
+1409 15491 [218]   { Copy complete header, including DATA= }
+1410 15491 [218]   p:=_new;
+1411 15497 [218]   repeat
+1412 15501 [218]     len:=_strread(fr,p,eof);
+1413 15525 [218]     writeln(@fw,p);
+1414 15546 [218]   until _strcmp(p,'DATA=')=0;
+1415 15568 [218]   _release(p);
+1416 15582 [218] 
+1417 15582 [218]   close(fr);
+1418 15588 [218] 
+1419 15588 [218]   { Write data rows }
+1420 15588 [218]   for i:=0 to nrows-1 do begin
+1421 15610 [218]     p:=datarow[i];
+1422 15614 [218] 
+1423 15622 [218]     for j:=0 to ncols-1 do begin
+1424 15644 [218]       start:=colx[j]-1;
+1425 15654 [218]       len:=colsize[j];
+1426 15663 [218] 
+1427 15671 [218]       { Remove leading blanks from numbers }
+1428 15671 [218]       if (coltype[j]=T_INTEGER) or
+1429 15682 [218]          (coltype[i]=T_SUM) or
+1430 15693 [218]          (coltype[j]=T_REAL) then begin
+1431 15706 [218]         while (len>0) and (p[start]=' ') do begin
+1432 15733 [218]           start:=start+1;
+1433 15739 [218]           len:=len-1;
+1434 15750 [218]         end;
+1435 15755 [218]       end;
+1436 15758 [218] 
+1437 15758 [218]       { Remove trailing blanks }
+1438 15758 [218]       while (len>0) and
+1439 15765 [218]             (p[start+len-1]=' ') do
+1440 15786 [218]         len:=len-1;
+1441 15796 [218] 
+1442 15804 [218]       for k:=0 to len-1 do
+1443 15816 [218]         write(@fw,p[start+k]);
+1444 15848 [218] 
+1445 15862 [218]       if j<ncols-1 then
+1446 15872 [218]         write(@fw,',');
+1447 15885 [218] 
+1448 15885 [218]     end;
+1449 15885 [218] 
+1450 15899 [218]     writeln(@fw);
+1451 15911 [218]   end;
+1452 15911 [218] 
+1453 15925 [218]   close(fw);
+1454 15931 [218]   modified:=false;
+1455 15933 [218]   status:='5';
+1456 15939 [218]   showstatus;
+1457 15947 [218] end;
+1458 15947 [218] 
+1459 15948 [209] func _hexchar(i0: integer): char;
+1460 15948 [212] {*******************************}
+1461 15948 [212] var i1: integer;
+1462 15951 [213] begin
+1463 15951 [213]   i1 := i0 and $0f;
+1464 15959 [213]   if i1 < 10 then
+1465 15970 [213]     _hexchar := chr(ord('0') + i1)
+1466 15976 [213]   else
+1467 15981 [213]     _hexchar := chr(ord('A') + i1 - 10);
+1468 15999 [213] end;
+1469 16004 [213] 
+1470 16005 [211] func hexb(i: integer): cpnt;
+1471 16005 [214] {**************************}
+1472 16005 [214] var cp: cpnt;
+1473 16008 [215] begin
+1474 16008 [215]   cp := cpnt($17d8);
+1475 16013 [215]   cp[0] := _hexchar((i shr 4) and $0f);
+1476 16037 [215]   cp[1] := _hexchar(i and $0f);
+1477 16058 [215]   cp[2] := chr(0);
+1478 16066 [215]   hexb := cp;
+1479 16071 [215] end;
+1480 16079 [215] 
+1481 16080 [213] proc printborder;
+1482 16080 [214] {****************}
+1483 16080 [214] var i,j:integer;
+1484 16083 [216] begin
+1485 16083 [216]   write(@PRINTER,'     +');
+1486 16096 [216]   for i:=0 to ncols-1 do begin
+1487 16118 [216]     for j:=1 to colsize[i]+2 do
+1488 16134 [216]       write(@PRINTER,'-');
+1489 16150 [216]     write(@PRINTER,'+');
+1490 16170 [216]   end;
+1491 16170 [216]   writeln(@PRINTER);
+1492 16194 [216] end;
+1493 16194 [216] 
+1494 16195 [214] proc printline(s:cpnt);
+1495 16195 [216] {*********************}
+1496 16195 [216] var i:integer;
+1497 16198 [217] begin
+1498 16198 [217]   write(@PRINTER,'     | ');
+1499 16212 [217]   i:=0;
+1500 16214 [217]   while s[i]<>ENDMARK do begin
+1501 16234 [217]     if s[i]=',' then
+1502 16246 [217]       write(@PRINTER,' | ')
+1503 16257 [217]     else
+1504 16258 [217]       write(@PRINTER,s[i]);
+1505 16276 [217]     i:=i+1;
+1506 16282 [217]   end;
+1507 16287 [217]   writeln(@PRINTER,' |');
+1508 16303 [217] end;
+1509 16303 [217] 
+1510 16304 [215] proc printtable;
+1511 16304 [216] {***************}
+1512 16304 [216] mem FILCYC = $0311: integer&;
+1513 16307 [217] var i:integer;
+1514 16307 [218] begin
+1515 16307 [218]   { Save first to obtain a valid file cycle }
+1516 16307 [218]   if modified then save;
+1517 16320 [218] 
+1518 16320 [218]   { Filename and cycle }
+1519 16320 [218]   writeln(@PRINTER,'     ',filename,'.',hexb(FILCYC));
+1520 16356 [218]   writeln(@PRINTER);
+1521 16366 [218] 
+1522 16366 [218]   { Title }
+1523 16366 [218]   printborder;
+1524 16370 [218]   printline(titles);
+1525 16380 [218]   printborder;
+1526 16384 [218] 
+1527 16384 [218]   { Data }
+1528 16384 [218]   for i:=0 to nrows-1 do
+1529 16396 [218]     printline(datarow[i]);
+1530 16420 [218] 
+1531 16434 [218]   { Totals }
+1532 16434 [218]   if hastotals then begin
+1533 16438 [218]     printborder;
+1534 16445 [218]     printline(totalrow);
+1535 16455 [218]   end;
+1536 16455 [218] 
+1537 16455 [218]   printborder;
+1538 16459 [218]   writeln(@PRINTER);
+1539 16469 [218]   status:='P';
+1540 16471 [218]   showstatus;
+1541 16479 [218] end;
+1542 16479 [218] 
+1543 16480 [216] proc tableinput;
+1544 16480 [217] {**************}
+1545 16480 [217] var mode,x,y:integer;
+1546 16483 [220]     key:char;
+1547 16483 [221]     done:boolean;
+1548 16483 [222] begin
+1549 16483 [222]   done := false;
+1550 16487 [222]   editing := true;
+1551 16493 [222] 
+1552 16497 [222]   repeat
+1553 16497 [222]     _waitinput(mode,x,y,key);
+1554 16533 [222] 
+1555 16533 [222]     { Start editing if required }
+1556 16533 [222]     if key=CEDIT then begin
+1557 16540 [222]       if coltype[curcol]=T_SUM then
+1558 16553 [222]         signalerror
+1559 16554 [222]       else
+1560 16561 [222]         key:=editcell(ENTER,-1,mode,x,y);
+1561 16601 [222]     end
+1562 16605 [222]     else if (key>=' ') and (key<chr(127)) then begin
+1563 16624 [222]       if coltype[curcol]=T_SUM then
+1564 16637 [222]         signalerror
+1565 16638 [222]       else
+1566 16645 [222]         key:=editcell(key,-1,mode,x,y);
+1567 16687 [222]     end;
+1568 16691 [222] 
+1569 16691 [222]     if mode=1 then begin
+1570 16698 [222]       if (y=currow-firstrow+3) and
+1571 16718 [222]         (x>=colx[curcol]) and
+1572 16731 [222]         (x<=colx[curcol]+colsize[curcol]) then begin
+1573 16755 [222]         key:=editcell(ENTER,x-colx[curcol],mode,x,y);
+1574 16805 [222]       end
+1575 16809 [222]       else
+1576 16809 [222]         selectcell(x,y);
+1577 16826 [222]     end;
+1578 16826 [222] 
+1579 16826 [222]     { Execute the returned command }
+1580 16826 [222]     case key of
+1581 16826 [222]       RDOWN:
+1582 16834 [222]         if firstrow+datalines<nrows then begin
+1583 16851 [222]           firstrow:=firstrow+1;
+1584 16860 [222]           showdata;
+1585 16869 [222]         end;
+1586 16869 [222] 
+1587 16872 [222]       RUP:
+1588 16876 [222]         if firstrow>0 then begin
+1589 16886 [222]           firstrow:=firstrow-1;
+1590 16895 [222]           showdata;
+1591 16904 [222]         end;
+1592 16904 [222] 
+1593 16907 [222]       CUP,CDOWN,CLEFT,CRIGHT,TAB:
+1594 16939 [222]         movecell(key);
+1595 16952 [222] 
+1596 16955 [222]       CADD: begin
+1597 16962 [222]           insertrow(currow+1);
+1598 16975 [222]           curcol:=0;
+1599 16977 [222]           showdata;
+1600 16985 [222]         end;
+1601 16985 [222] 
+1602 16988 [222]       CINSERT: begin
+1603 16995 [222]           insertrow(currow);
+1604 17005 [222]           curcol:=0;
+1605 17007 [222]           showdata;
+1606 17015 [222]         end;
+1607 17015 [222] 
+1608 17018 [222]       CDELETE:
+1609 17022 [222]         deleterow;
+1610 17029 [222] 
+1611 17032 [222]       CSAVE:
+1612 17036 [222]         save;
+1613 17043 [222] 
+1614 17046 [222]       CPRINT:
+1615 17050 [222]           printtable;
+1616 17057 [222] 
+1617 17060 [222]       CQUIT: begin
+1618 17067 [222]           if modified then save;
+1619 17078 [222]           done:=true;
+1620 17080 [222]         end;
+1621 17084 [222] 
+1622 17087 [222]       CKILL:
+1623 17091 [222]         done:=true
+1624 17094 [222]     end;
+1625 17102 [222] 
+1626 17102 [222]   until done;
+1627 17102 [222] end;
+1628 17109 [222] 
+1629 17110 [217] begin
+1630 17110 [217]   for i:=0 to MAXROWS do { alloc. MAXROWS+1 strings }
+1631 17130 [217]     datarow[i]:=_new;
+1632 17140 [217]   filename := _new;
+1633 17164 [217]   titles := _new;
+1634 17174 [217]   acc1 := _new;
+1635 17184 [217]   acc2 := _new;
+1636 17194 [217]   emptyrow:=_new;
+1637 17204 [217]   totalrow:=_new;
+1638 17214 [217]   status:=' ';
+1639 17220 [217]   editing := false;
+1640 17226 [217]   validationfail:= false;
+1641 17232 [217]   modified := false;
+1642 17238 [217]   f:=initfile;
+1643 17248 [217]   nrows := -1;
+1644 17254 [217]   lineno := 0;
+1645 17261 [217]   parse(f);
+1646 17275 [217]   close(f);
+1647 17281 [217] 
+1648 17281 [217]   firstrow := 0;
+1649 17283 [217]   currow := 0;
+1650 17289 [217]   curcol := 0;
+1651 17295 [217]   prepareemptyrow;
+1652 17303 [217]   setnumlin($0f,$37);
+1653 17313 [217]   write(HOM,CSC);
+1654 17319 [217]   showtable;
+1655 17323 [217]   tableinput;
+1656 17327 [217] 
+1657 17327 [217]   for i:=0 to 7 do
+1658 17335 [217]     LEDREG[i]:=' ';
+1659 17350 [217]   setnumlin($54,$2f);
+1660 17381 [217]   write(HOM,CSC);
+1661 17387 [217] end.
+1662 17387 [217] 
+Code length:           17386
+Compiler stack size:   217/320
+Ident stack size:      222/350

@@ -652,8 +652,13 @@ static void on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_da
         return;
     }
     else {
+        // Accept GTK special keys, reject non-ASCII characters
+        if (event->keyval > 0x7F &&
+            event->keyval < 0xFF00)
+            return;
+
         global_char = event->keyval;
-    }
+    } 
 
     setKeyboardInterrupt();
     global_key_is_down = 1;

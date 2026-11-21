@@ -39,6 +39,8 @@ const
   CKILL   = chr($0b);  { Ctrl+K: quit without saving }
   CPRINT  = chr($10);  { Ctrl+P: print table }
 
+mem LEDREG=$1432: array[7] of char&;
+
 var f:                  file;
     filename:           cpnt;
     cyclus,drive:       integer;
@@ -47,6 +49,7 @@ var f:                  file;
     colsize:            array[MAXCOLS] of integer;
     coltype:            array[MAXCOLS] of integer;
     colx:               array[MAXCOLS] of integer;
+    totalcol:           array[MAXCOLS] of boolean;
     titles:             cpnt;
     tablewidth, nrows:  integer;
     acc1,acc2:          cpnt;
@@ -56,6 +59,10 @@ var f:                  file;
     currow,curcol:      integer;
     editing, modified:  boolean;
     validationfail:     boolean;
+    hastotals:          boolean;
+    totalrow:           cpnt;
+    datalines:          integer;
+    status:             char;
 
 proc signalerror; forward;
 
@@ -89,21 +96,46 @@ var i,j:integer;
 begin
   i:=0;
   j:=0;
+
+  { Left border }
   if (selectedcol=0) or (selectedcol=-2) then
     write(INVVID);
+  _writetxtgr(TGR_UP+TGR_DOWN);
+
+  { First field }
+  if (selectedcol<>0) and (selectedcol<>-2) then
+    write(NORVID);
 
   while s[i]<>ENDMARK do begin
     if s[i]=',' then begin
-      write(NORVID);
+      { Separator belongs to both adjacent cells }
+      if (j=selectedcol) or
+         (j=selectedcol-1) or
+         (selectedcol=-2) then
+        write(INVVID)
+      else
+        write(NORVID);
+
       _writetxtgr(TGR_UP+TGR_DOWN);
       j:=j+1;
+
       if (j=selectedcol) or (selectedcol=-2) then
-        write(INVVID);
+        write(INVVID)
+      else
+        write(NORVID);
     end
     else
       write(s[i]);
     i:=i+1;
   end;
+
+  { Right border }
+  if (selectedcol=ncols-1) or (selectedcol=-2) then
+    write(INVVID)
+  else
+    write(NORVID);
+
+  _writetxtgr(TGR_UP+TGR_DOWN);
   write(NORVID);
 end;
 
@@ -508,6 +540,62 @@ begin
     s[start+colsize[sumcolumn]-n+k]:=a[k];
 end;
 
+proc calculatetotals;
+{*******************}
+var a,b,t,p,s:cpnt;
+    i,j,k,n,start:integer;
+    overflow:boolean;
+begin
+  if not hastotals then exit;
+
+  _strcpy(emptyrow,totalrow);
+
+  for j:=0 to ncols-1 do begin
+    if totalcol[j] then begin
+      a:=acc1;
+      b:=acc2;
+      _strcpy('0.00',a);
+      overflow:=false;
+      start:=colx[j]-1;
+
+      i:=0;
+      while (i<nrows) and not overflow do begin
+        s:=datarow[i];
+        p:=s+start;
+
+        { Skip leading blanks }
+        while p[0]=' ' do p:=p+1;
+
+        { Ignore empty fields }
+        if (p[0]<>',') and (p[0]<>ENDMARK) then begin
+          if add(a,p,b,16) then begin
+            t:=a;
+            a:=b;
+            b:=t;
+          end
+          else
+            overflow:=true;
+        end;
+
+        i:=i+1;
+      end;
+
+      n:=_strlen(a);
+
+      { Check result fits }
+      if overflow or (n>colsize[j]) then begin
+        for k:=0 to colsize[j]-1 do
+          totalrow[start+k]:='*';
+      end
+      else begin
+        { Write right-justified result }
+        for k:=0 to n-1 do
+          totalrow[start+colsize[j]-n+k]:=a[k];
+      end;
+    end;
+  end;
+end;
+
 proc validaterow(s:cpnt);
 {***********************}
 var i,j,k,start,len:integer;
@@ -691,6 +779,47 @@ begin
     showerror('TABLE: Wrong number of types');
 end;
 
+proc parsetotal(s:cpnt; len:integer);
+{*********************************}
+var i,j,start:integer;
+begin
+  i:=6;
+  j:=0;
+
+  while j<ncols do begin
+    start:=i;
+
+    while (i<len) and (s[i]<>',') do
+      i:=i+1;
+
+    if i>start then begin
+      if (i-start<>3) or
+         (s[start]<>'S') or
+         (s[start+1]<>'U') or
+         (s[start+2]<>'M') then
+        showerror('TABLE: Invalid TOTAL');
+
+      if ((coltype[j]<>T_REAL) and
+         (coltype[j]<>T_SUM)) then
+        showerror('TABLE: Invalid total type');
+
+      totalcol[j]:=true;
+      hastotals:=true;
+    end;
+
+    j:=j+1;
+
+    if j<ncols then begin
+      if (i>=len) or (s[i]<>',') then
+        showerror('TABLE: Invalid TOTAL');
+      i:=i+1;
+    end;
+  end;
+
+  if i<>len then
+    showerror('TABLE: Invalid TOTAL');
+end;
+
 proc parse(f:file);
 {*****************}
 var s:cpnt;
@@ -744,23 +873,56 @@ begin
   lineno := lineno + 1;
   parsetitle(s,len);
 
+  { Optional TOTAL specification }
+  hastotals:=false;
+  for j:=0 to ncols-1 do
+    totalcol[j]:=false;
+
   len:=_strread(f,s,eof);
-  lineno := lineno + 1;
+  lineno:=lineno+1;
+
+  if _strncmp(s,'TOTAL=',6)=0 then begin
+    parsetotal(s,len);
+
+    len:=_strread(f,s,eof);
+    lineno:=lineno+1;
+  end;
+
+  datalines:=12;
+  if hastotals then datalines:=10;
+
   if _strcmp(s,'DATA=')<>0 then
     showerror('TABLE: DATA expected');
 
-  nrows := 0;
+  nrows:=0;
   readrows(f);
 
   _release(s);
+end;
+
+proc showstatus;
+{**************}
+var r,c:integer;
+begin
+  r:=currow+1;
+  c:=curcol+1;
+
+  LEDREG[0]:=chr(ord('0')+r div 100);
+  LEDREG[1]:=chr(ord('0')+_mod(r div 10,10));
+  LEDREG[2]:=chr(ord('0')+_mod(r,10));
+  LEDREG[3]:='-';
+  LEDREG[4]:=chr(ord('0')+c div 10);
+  LEDREG[5]:=chr(ord('0')+_mod(c,10));
+  LEDREG[6]:=' ';
+  LEDREG[7]:=status;
 end;
 
 proc showdata;
 {*************}
 var i,row:integer;
 begin
-  for i:=0 to 11 do begin
-    _setcursor(1,i+3);
+  for i:=0 to datalines-1 do begin
+    _setcursor(0,i+3);
     row:=firstrow+i;
 
     if row<nrows then begin
@@ -772,12 +934,9 @@ begin
     else
       writetableline(emptyrow,-1);
   end;
-  if (currow>=firstrow) and
-     (currow<firstrow+12) and
-     (currow<nrows) then
-    _setcursor(colx[curcol],currow-firstrow+3)
-  else
-    _parkcursor;
+
+  showstatus;
+  _parkcursor;
 end;
 
 proc signalerror;
@@ -785,12 +944,12 @@ proc signalerror;
 var i:integer;
 begin
   for i:=1 to 3 do begin
-    _setcursor(1,currow-firstrow+3);
+    _setcursor(0,currow-firstrow+3);
     writetableline(datarow[currow],-2);
     {_syncscreen;}
     _delay10msec(10);
 
-    _setcursor(1,currow-firstrow+3);
+    _setcursor(0,currow-firstrow+3);
     writetableline(datarow[currow],-1);
     {_syncscreen;}
     _delay10msec(10);
@@ -798,22 +957,39 @@ begin
   showdata;
 end;
 
+proc showtotals;
+{***************}
+begin
+  if hastotals then begin
+    _setcursor(0,14);
+    writetableline(totalrow,-1);
+    _parkcursor;
+  end;
+end;
+
 proc showtable;
 {*************}
-var i: integer;
-    ch: char;
+var i:integer;
 begin
   _htxtgr(0,tablewidth-1,0,CYAN);
   _htxtgr(0,tablewidth-1,2,CYAN);
   _htxtgr(0,tablewidth-1,15,CYAN);
+
+  if hastotals then
+    _htxtgr(0,tablewidth-1,13,CYAN);
 
   _vtxtgr(tablewidth-1,0,15,CYAN);
 
   for i:=0 to ncols-1 do
     _vtxtgr(colx[i]-1,0,15,CYAN);
 
-  _setcursor(1,1);
+  _setcursor(0,1);
   writetableline(titles,-1);
+
+  if hastotals then begin
+    calculatetotals;
+    showtotals;
+  end;
 
   showdata;
 end;
@@ -854,11 +1030,15 @@ begin
   nrows:=nrows+1;
   currow:=pos;
   modified:=true;
+  status:='M';
+  showstatus;
 
   if currow<firstrow then firstrow:=currow;
-  if currow>=firstrow+12 then
-    firstrow:=currow-11;
+  if currow>=firstrow+datalines then
+    firstrow:=currow-datalines+1;
 
+  calculatetotals
+  showtotals;
   showdata;
 end;
 
@@ -900,14 +1080,14 @@ begin
   if currow<firstrow then
     firstrow:=currow;
 
-  if currow>=firstrow+12 then
-    firstrow:=currow-11;
+  if currow>=firstrow+datalines then
+    firstrow:=currow-datalines+1;
 
   showdata;
 end;
 
-proc draweditcell(s:cpnt; len:integer);
-{***********************************}
+proc draweditcell(s:cpnt; len,cursorpos:integer);
+{***********************************************}
 var i:integer;
 begin
   _setcursor(colx[curcol],currow-firstrow+3);
@@ -922,10 +1102,8 @@ begin
 
   write(NORVID);
 
-{  if len<colsize[curcol] then }
-    _setcursor(colx[curcol]+len,currow-firstrow+3)
-{  else
-    _parkcursor; }
+  _setcursor(colx[curcol]+cursorpos,
+             currow-firstrow+3);
 end;
 
 proc geteditcell(s:cpnt);
@@ -1026,14 +1204,15 @@ begin
   _release(s);
 end;
 
-func editcell(firstkey:char;
+func editcell(firstkey:char; clickpos:integer;
         var mode,x,y:integer):char;
-{*********************************}
+{*********************************************}
 var editstr:cpnt;
     key:char;
     done,finish,scrollerror:boolean;
-    len:integer;
+    len,cursorpos,i:integer;
 begin
+  LEDREG[7]:='E';
   editstr:=_new;
   scrollerror:=false;
 
@@ -1047,8 +1226,14 @@ begin
   end;
 
   len:=_strlen(editstr);
+  cursorpos:=len;
+  if clickpos>=0 then begin
+    cursorpos:=clickpos;
+    if cursorpos>len then cursorpos:=len;
+  end;
+
   done:=false;
-  draweditcell(editstr,len);
+  draweditcell(editstr,len,cursorpos);
 
   repeat
     _waitinput(mode,x,y,key);
@@ -1070,19 +1255,38 @@ begin
 
       case key of
         RUBOUT: begin
-          if len>0 then begin
+          if cursorpos>0 then begin
+            for i:=cursorpos-1 to len-1 do
+              editstr[i]:=editstr[i+1];
             len:=len-1;
-            editstr[len]:=ENDMARK;
+            cursorpos:=cursorpos-1;
             scrollerror:=false;
           end;
+        end;
+
+        CLEFT: begin
+          if cursorpos>0 then
+            cursorpos:=cursorpos-1
+          else
+            finish:=true;
+        end;
+
+        CRIGHT: begin
+          if cursorpos<len then
+            cursorpos:=cursorpos+1
+          else
+            finish:=true;
         end
 
         else begin
           if (key>=' ') and (key<chr(127)) then begin
             if len<colsize[curcol] then begin
-              editstr[len]:=key;
+              for i:=len downto cursorpos do
+                editstr[i+1]:=editstr[i];
+
+              editstr[cursorpos]:=key;
               len:=len+1;
-              editstr[len]:=ENDMARK;
+              cursorpos:=cursorpos+1;
               scrollerror:=false;
             end;
           end
@@ -1091,24 +1295,39 @@ begin
         end
       end;
 
-      { Mouse click also terminates editing }
-      if mode=1 then finish:=true;
+      { Mouse click within the editing cell }
+      if mode=1 then begin
+        if (y=currow-firstrow+3) and
+          (x>=colx[curcol]) and
+          (x<=colx[curcol]+colsize[curcol]) then begin
+          cursorpos:=x-colx[curcol];
+          if cursorpos>len then cursorpos:=len;
+          key:=chr(0);
+          mode:=0;
+        end
+        else
+          finish:=true;
+      end;
 
       if finish then begin
         if key=CKILL then
           done:=true
         else if acceptcell(editstr) then begin
           modified:=true;
+          status:='M';
+          showstatus;
+          calculatetotals;
+          showtotals;
           done:=true;
         end
         else begin
           if (key=RUP) or (key=RDOWN) then
             scrollerror:=true;
-          draweditcell(editstr,len);
+          draweditcell(editstr,len,cursorpos);
         end;
       end
       else
-        draweditcell(editstr,len);
+        draweditcell(editstr,len,cursorpos);
     end;
   until done;
 
@@ -1160,19 +1379,23 @@ begin
   if currow<0 then currow:=0;
 
   if firstrow>0 then
-    if firstrow+12>nrows then
+    if firstrow+datalines>nrows then
       firstrow:=firstrow-1;
 
   modified:=true;
+  status:='M';
+  showstatus;
+  calculatetotals;
+  showtotals;
   showdata;
 end;
 
 proc save;
 {********}
 var fr,fw:file;
-    lineno,i,j,k,start,len:integer;
-    ch:char;
+    i,j,k,start,len:integer;
     p:cpnt;
+    eof: boolean;
 begin
   { Open original file }
   _strfio(filename,cyclus,drive);
@@ -1183,13 +1406,13 @@ begin
   _strfio(filename,cyclus,drive);
   openw(fw);
 
-  { Copy header, including DATA= }
-  lineno:=1;
+  { Copy complete header, including DATA= }
+  p:=_new;
   repeat
-    read(@fr,ch);
-    write(@fw,ch);
-    if ch=chr(13) then lineno:=lineno+1;
-  until lineno>4;
+    len:=_strread(fr,p,eof);
+    writeln(@fw,p);
+  until _strcmp(p,'DATA=')=0;
+  _release(p);
 
   close(fr);
 
@@ -1229,6 +1452,8 @@ begin
 
   close(fw);
   modified:=false;
+  status:='5';
+  showstatus;
 end;
 
 func _hexchar(i0: integer): char;
@@ -1254,12 +1479,12 @@ begin
 end;
 
 proc printborder;
-{***************}
+{****************}
 var i,j:integer;
 begin
-  write(@PRINTER,'+');
-  for j:=0 to ncols-1 do begin
-    for i:=1 to colsize[j] do
+  write(@PRINTER,'     +');
+  for i:=0 to ncols-1 do begin
+    for j:=1 to colsize[i]+2 do
       write(@PRINTER,'-');
     write(@PRINTER,'+');
   end;
@@ -1270,16 +1495,16 @@ proc printline(s:cpnt);
 {*********************}
 var i:integer;
 begin
-  write(@PRINTER,'|');
+  write(@PRINTER,'     | ');
   i:=0;
   while s[i]<>ENDMARK do begin
     if s[i]=',' then
-      write(@PRINTER,'|')
+      write(@PRINTER,' | ')
     else
       write(@PRINTER,s[i]);
     i:=i+1;
   end;
-  writeln(@PRINTER,'|');
+  writeln(@PRINTER,' |');
 end;
 
 proc printtable;
@@ -1291,7 +1516,7 @@ begin
   if modified then save;
 
   { Filename and cycle }
-  writeln(@PRINTER,filename,'.',hexb(FILCYC));
+  writeln(@PRINTER,'     ',filename,'.',hexb(FILCYC));
   writeln(@PRINTER);
 
   { Title }
@@ -1303,8 +1528,16 @@ begin
   for i:=0 to nrows-1 do
     printline(datarow[i]);
 
+  { Totals }
+  if hastotals then begin
+    printborder;
+    printline(totalrow);
+  end;
+
   printborder;
   writeln(@PRINTER);
+  status:='P';
+  showstatus;
 end;
 
 proc tableinput;
@@ -1324,22 +1557,29 @@ begin
       if coltype[curcol]=T_SUM then
         signalerror
       else
-        key:=editcell(ENTER,mode,x,y);
+        key:=editcell(ENTER,-1,mode,x,y);
     end
     else if (key>=' ') and (key<chr(127)) then begin
       if coltype[curcol]=T_SUM then
         signalerror
       else
-        key:=editcell(key,mode,x,y);
+        key:=editcell(key,-1,mode,x,y);
     end;
 
-    if mode=1 then
-      selectcell(x,y);
+    if mode=1 then begin
+      if (y=currow-firstrow+3) and
+        (x>=colx[curcol]) and
+        (x<=colx[curcol]+colsize[curcol]) then begin
+        key:=editcell(ENTER,x-colx[curcol],mode,x,y);
+      end
+      else
+        selectcell(x,y);
+    end;
 
     { Execute the returned command }
     case key of
       RDOWN:
-        if firstrow+12<nrows then begin
+        if firstrow+datalines<nrows then begin
           firstrow:=firstrow+1;
           showdata;
         end;
@@ -1394,6 +1634,8 @@ begin
   acc1 := _new;
   acc2 := _new;
   emptyrow:=_new;
+  totalrow:=_new;
+  status:=' ';
   editing := false;
   validationfail:= false;
   modified := false;
@@ -1412,6 +1654,8 @@ begin
   showtable;
   tableinput;
 
+  for i:=0 to 7 do
+    LEDREG[i]:=' ';
   setnumlin($54,$2f);
   write(HOM,CSC);
 end.
