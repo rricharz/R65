@@ -1,4 +1,193 @@
+{   ********************************            }
+{   *                              *            }
+{   *   R65 Micro Pascal Compiler  *            }
+{   *            Pass 1            *            }
+{   *                              *            }
+{   ********************************            }
 
+{ First version  1978 by rricharz                }
+{ Version 3.7 (20K)  01/08/82 rricharz          }
+{ Recovered 2018 by rricharz (r77@bluewin.ch)   }
+{ Improved 2018-2026 by rricharz                }
+{ 2026/5 chain COMPILE2                        }
+
+{ Original derived from the publication by      }
+{ Kin-Man Chung and Herbert Yen in              }
+{ Byte, Volume 3, Number 9 and Number 10, 1978  }
+
+{ usage:                                        }
+{ compile1 name[.cy[,drv]] [xxx]                }
+{  where x:       l,p: no hard copy print       }
+{                 i,r: index bound checking     }
+{                 n: no loader file             }
+
+program compile;
+
+uses syslib, arglib, filelib;
+
+const
+    IDLENGTH  = 64;   {max. length of ident buffer}
+    IDSIZE    = 16;   {chars per identifier in s_id}
+    PIDSIZE   = 8;    {packed chars per identifier}
+    SYMBSIZE  = 350;  {id table entries}
+    IDTABSIZE = 2800; {SYMBSIZE * PIDSIZE}
+
+    STACKSIZE = 320;   {stack size}
+    PAGELENGHT= 60;    {no of lines per page}
+    MAXFI     = 3;     {max n  of nested input files}
+    NRESW     = 64;    {number of reserved words - 1}
+
+    SAT_EXPORT = 1;    {Bit mask for s_attr}
+    NOTOPEN   = @129;
+
+var reswtab: array[ 528] of char; {8*(NRESW+1)}
+
+    ident:   array[IDLENGTH] of char;
+    idpack:  array[PIDSIZE] of packed char;
+
+    tpos,pc,level,line,offset,dpnt,spnt,fipnt,
+    npara,i,stackpnt,stackmax,spntmax,
+    lineinc: integer;
+    scyclus,sdrive,cdrive: integer;
+    pname: array[15] of char;
+    value: array[1] of integer;
+    ch,restype,vartype:char;
+    token: packed char;
+    libflg,rcheck,ateof: boolean;
+    ucheck,lineflg,nlflg: boolean;
+    makeoutput, chaincheckb: boolean;
+    fno,ofno,savefno,lpr: file;
+    incname: array[15] of char;
+    filstk: array[MAXFI] of file;
+    debugmode,makecode: boolean;
+
+{ ****. START IF IDENTIFIER TABLE ****}
+
+    s_id:   array[IDTABSIZE] of packed char;
+    { flat array of symbol names }
+
+    s_typ: array[SYMBSIZE] of packed char;
+{  Type of symbol
+   High letter:
+     a: arrayc:constant
+     d: const parameter
+     e: constant array parameter
+     f: function
+     g: array function
+     h: 8-bit memory variable
+     i: 8-bit array memory variable
+     m: 16-bit memory variable
+     n: 16-bit array memory variable
+     p: procedure
+     q: indexed cpnt
+     r,t: function result
+     s,u: array function result
+     v: variable,
+     w: variable parameter
+     x: variable array parameter
+   Low letter:
+     b: boolean
+     c: char
+     f: file
+     i: integer
+     p: packed char
+     q: cpnt (pointer to chars)
+     r: real(array of two)
+     s: const cpnt
+     u: undefined         }
+
+    s_lvl: array[SYMBSIZE] of integer;
+    {level}
+
+    s_vda: array[SYMBSIZE] of integer;
+    {val,dis,addr}
+
+    s_spz: array[SYMBSIZE] of integer;
+    {stack pointer,size of array}
+
+{ **** END OF IDENTIFIER TABLE ****}
+
+    reswcod: array[NRESW] of packed char;
+    stack:   array[STACKSIZE] of integer;
+
+{###################}
+{ savebyte (global) }
+{###################}
+
+proc savebyte(x: integer);
+begin
+    if makeoutput then begin
+      write(@ofno,
+        chr(((x and 255) shr 4)+ord('0')));
+      write(@ofno,chr((x and 15)+ord('0')))
+    end
+end {savebyte};
+
+{###############}
+{ crlf (global) }
+{###############}
+
+proc crlf;
+begin
+  if makeoutput then
+    writeln(@lpr);
+  line:=succ(line); lineinc:=succ(lineinc);
+  tpos := 0;
+end {crlf};
+
+{*******************}
+{ __writef (global) }
+{*******************}
+{ This procedure is copied here from writelib
+  because writelib is too big to be used in compile }
+
+
+proc __wrintf(value, width: integer);
+{ Write value right justified in a field of width.
+  This procedure is a helper for the compiler. I is
+  used in the write and writeln commands for
+  justified numbers. Do not change the format.     }
+var
+  buf: array [5] of char;
+  { 0..5, enough for -32768..32767 }
+  i, len, n, w, q, r: integer;
+  neg: boolean;
+begin
+  w := width;
+  { Special case, because -(-32768) would overflow
+    on a 16-bit machine, -32768 cannot be entered }
+  if value = $8000 then begin
+    len := 6;
+    while w > len do begin
+      write(' ');
+      w := w - 1
+    end;
+    write('-32768');
+    exit
+  end;
+  neg := value < 0;
+  if neg then
+    n := -value
+  else
+    n := value;
+  i := 5;
+  { Generate digits backwards into buf }
+  repeat
+    q := n div 10;
+    r := n - q*10;
+    buf[i] := chr(ord('0') + r);
+    n := q;
+    i := i - 1
+  until n = 0;
+  if neg then begin
+    buf[i] := '-';
+    i := i - 1
+  end;
+  { Characters are now in buf[i+1..5] }
+  len := 5 - i;
+  while w > len do begin
+    write(' ');
+    w := w - 1
   end;
   while i < 5 do begin
     i := i + 1;
@@ -371,7 +560,7 @@ var r: real;
   end;
 
 begin
-  r:=0.0;
+  r:=conv(0);
   iv:=0;
 
   repeat
@@ -433,7 +622,7 @@ begin
 
     while n<0 do begin
       n:=succ(n);
-      r:=0.1*r
+      r:=r/conv(10);
     end;
 
     splitconv(r,value);
