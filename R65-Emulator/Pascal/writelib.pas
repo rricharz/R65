@@ -271,19 +271,21 @@ begin
   flo := cp;
 end;
 
-proc _writef0(r: real; fl, d:integer;
+proc _writef0(r:real; fl,d:integer;
     centered:boolean);
 {***********************************}
 { write real in fixed point format
   right justified or centered in field
   of fl chars (more if necessary)
-  d digits after decimal point
-  Real output is reliable to about 6 digits. }
+  d digits after decimal point.
+  Up to 5 digits before decimal point.
+  Real output is reliable to about 6
+  significant digits. The seventh digit
+  may be inaccurate. }
 
-var m,rnd,p: real;
-    d1,i1,digit,ndig,width,n,n1,fl1: integer;
-    sign: char;
-    started: boolean;
+var m,rnd,p:real;
+    d1,i1,digit,ndig,width,n,n1,fl1:integer;
+    sign:char;
 begin
   d1:=d;
   if d1<0 then d1:=0;
@@ -308,17 +310,21 @@ begin
 
   m:=m+rnd; { round }
 
-  { avoid printing -0.000 etc. }
-  if m < 2.*rnd then sign:=' ';
+  { Avoid printing -0.000 etc. }
+  if m<2.*rnd then sign:=' ';
 
-  if m >= 9999.9 then write(flo(r,fl1))
+  if m>=100000. then write(flo(r,fl1))
   else begin
-    if m<10. then ndig:=1
-    else if m<100. then ndig:=2
-    else if m<1000. then ndig:=3
-    else if m<10000. then ndig:=4
-    else ndig:=5;
 
+    { Determine number of integer digits }
+    ndig:=1;
+    p:=1.;
+    while (m>=10.*p) and (ndig<5) do begin
+      p:=10.*p;
+      ndig:=ndig+1;
+    end;
+
+    { Determine required field width }
     width:=ndig;
     if d1>0 then width:=width+d1+1;
     if sign='-' then width:=width+1;
@@ -332,20 +338,17 @@ begin
 
     if sign='-' then write('-');
 
-    p:=10000.;
-    started:=false;
-    for i1:=1 to 5 do begin
+    { Write integer digits }
+    for i1:=1 to ndig do begin
       digit:=floor(m/p);
-      if (digit<>0) or started or (i1=5) then begin
-        write(digit);
-        started:=true;
-      end;
+      write(digit);
       m:=m-conv(digit)*p;
       p:=p/10.;
     end;
 
     if d1>0 then write('.');
 
+    { Write fractional digits }
     for i1:=1 to d1 do begin
       m:=10.*m;
       digit:=floor(m);
@@ -369,4 +372,4 @@ begin
 end;
 
 begin
-end. 
+end.

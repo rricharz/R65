@@ -6,7 +6,7 @@
 
 program table;
 uses syslib, arglib, strlib, striolib, txtgrlib,
-     mouselib;
+     mouselib,writelib;
 
 const
   MAXROWS     = 100;
@@ -49,7 +49,7 @@ var f:                  file;
     colsize:            array[MAXCOLS] of integer;
     coltype:            array[MAXCOLS] of integer;
     colx:               array[MAXCOLS] of integer;
-    totalcol:           array[MAXCOLS] of boolean;
+    totalmode:          array[MAXCOLS] of integer;
     titles:             cpnt;
     tablewidth, nrows:  integer;
     acc1,acc2:          cpnt;
@@ -540,59 +540,236 @@ begin
     s[start+colsize[sumcolumn]-n+k]:=a[k];
 end;
 
+proc calculatesumt(j:integer);
+{************* **************}
+var a,b,t,p,s:cpnt;
+    i,k,n,start:integer;
+    overflow:boolean;
+begin
+  a:=acc1;
+  b:=acc2;
+  _strcpy('0.00',a);
+  overflow:=false;
+  start:=colx[j]-1;
+
+  i:=0;
+  while (i<nrows) and not overflow do begin
+    s:=datarow[i];
+    p:=s+start;
+
+    { Skip leading blanks }
+    while p[0]=' ' do p:=p+1;
+
+    { Ignore empty fields }
+    if (p[0]<>',') and (p[0]<>ENDMARK) then begin
+      if add(a,p,b,16) then begin
+        t:=a;
+        a:=b;
+        b:=t;
+      end
+      else
+        overflow:=true;
+    end;
+
+    i:=i+1;
+  end;
+
+  n:=_strlen(a);
+
+  { Check result fits }
+  if overflow or (n>colsize[j]) then begin
+    for k:=0 to colsize[j]-1 do
+      totalrow[start+k]:='*';
+  end
+  else begin
+    { Write right-justified result }
+    for k:=0 to n-1 do
+      totalrow[start+colsize[j]-n+k]:=a[k];
+  end;
+end;
+
+func fieldreal(p0:cpnt):real;
+{***************************}
+var a:real;
+    negative:boolean;
+    p: cpnt;
+begin
+  a:=0.0;
+  p:=p0;
+  negative:=p[0]='-';
+  if negative then p:=p+1;
+
+  while (p[0]<>',') and (p[0]<>ENDMARK) do begin
+    if p[0]<>'.' then
+      a:=a*10.0+conv(ord(p[0])-ord('0'));
+    p:=p+1;
+  end;
+
+  a:=a/100.0;
+
+  if negative then a:=-a;
+  fieldreal:=a;
+end;
+
+proc writetrend(j:integer; b0:real);
+{********************************}
+var p:cpnt;
+    i,n,start:integer;
+    direction:char;
+    b: real;
+begin
+  b:=b0;
+  start:=colx[j]-1;
+
+  direction:='^';
+  if b<0.0 then begin
+    direction:='v';
+    b:=-b;
+  end;
+
+  acc1[0]:=ENDMARK;
+  write(@acc1,b:colsize[j]-1:2);
+  writeln(@PRINTER,'b=',b,' ',acc1);
+
+  { Skip leading blanks }
+  p:=acc1;
+  while p[0]=' ' do p:=p+1;
+
+  { Determine zero trend after rounding }
+  if _strcmp(p,'0.00')=0 then
+    direction:='=';
+
+  totalrow[start]:=direction;
+
+  n:=_strlen(p);
+
+  { Check width, reserving one character }
+  if n>colsize[j]-1 then begin
+    for i:=1 to colsize[j]-1 do
+      totalrow[start+i]:='*';
+  end
+  else begin
+    { Write right-justified result }
+    for i:=0 to n-1 do
+      totalrow[start+colsize[j]-n+i]:=p[i];
+  end;
+end;
+
+func datevalue(s:cpnt):real;
+{**************************}
+var d,m,y,i,n:integer;
+    days:real;
+    leap:boolean;
+begin
+  d:=10*(ord(s[0])-ord('0'))+ord(s[1])-ord('0');
+  m:=10*(ord(s[3])-ord('0'))+ord(s[4])-ord('0');
+
+  { American date format }
+  if s[2]='/' then begin
+    i:=d;
+    d:=m;
+    m:=i;
+  end;
+
+  y:=0;
+  for i:=6 to 9 do
+    y:=10*y+ord(s[i])-ord('0');
+
+  { Days in preceding years }
+  n:=y-1;
+  days:=365.0*conv(n)+conv(n div 4)
+        -conv(n div 100)+conv(n div 400);
+
+  { Determine leap year }
+  leap:=(_mod(y,4)=0) and
+        ((_mod(y,100)<>0) or (_mod(y,400)=0));
+
+  { Days in preceding months }
+  for i:=1 to m-1 do begin
+    if i=2 then begin
+      days:=days+28.0;
+      if leap then days:=days+1.0;
+    end
+    else if (i=4) or (i=6) or (i=9) or (i=11) then
+      days:=days+30.0
+    else
+      days:=days+31.0;
+  end;
+
+  datevalue:=days+conv(d);
+end;
+
+proc calculatetrend(j:integer);
+{*****************************}
+var i,n,start,first:integer;
+    s,p:cpnt;
+    x,y,sx,sy,sxx,sxy,d,b,basedate:real;
+begin
+  start:=colx[j]-1;
+  totalrow[start]:='?';
+
+  first:=nrows-totalmode[j];
+  if first<0 then first:=0;
+
+  n:=0;
+  sx:=0.0;
+  sy:=0.0;
+  sxx:=0.0;
+  sxy:=0.0;
+
+  for i:=first to nrows-1 do begin
+    s:=datarow[i];
+    p:=s+start;
+
+    { Skip leading blanks }
+    while p[0]=' ' do p:=p+1;
+
+    { Ignore empty fields }
+    if (p[0]<>',') and (p[0]<>ENDMARK) then begin
+      if coltype[0]=T_DATE then begin
+        x:=datevalue(s+(colx[0]-1));
+        if n=0 then basedate:=x;
+        x:=(x-basedate)/365.25;
+      end
+      else
+        x:=conv(i-first);
+      y:=fieldreal(p);
+     writeln(@PRINTER,'j=',j,' i=',i,' x=',x,' y=',y);
+
+      sx:=sx+x;
+      sy:=sy+y;
+      sxx:=sxx+x*x;
+      sxy:=sxy+x*y;
+      n:=n+1;
+    end;
+  end;
+
+  { Check sufficient observations }
+  if n<2 then exit;
+
+  { Calculate slope }
+  d:=conv(n)*sxx-sx*sx;
+  if d=0.0 then exit;
+
+  b:=(conv(n)*sxy-sx*sy)/d;
+
+  { Format and display result }
+  writetrend(j,b);
+end;
+
 proc calculatetotals;
 {*******************}
-var a,b,t,p,s:cpnt;
-    i,j,k,n,start:integer;
-    overflow:boolean;
+var j:integer;
 begin
   if not hastotals then exit;
 
   _strcpy(emptyrow,totalrow);
 
   for j:=0 to ncols-1 do begin
-    if totalcol[j] then begin
-      a:=acc1;
-      b:=acc2;
-      _strcpy('0.00',a);
-      overflow:=false;
-      start:=colx[j]-1;
-
-      i:=0;
-      while (i<nrows) and not overflow do begin
-        s:=datarow[i];
-        p:=s+start;
-
-        { Skip leading blanks }
-        while p[0]=' ' do p:=p+1;
-
-        { Ignore empty fields }
-        if (p[0]<>',') and (p[0]<>ENDMARK) then begin
-          if add(a,p,b,16) then begin
-            t:=a;
-            a:=b;
-            b:=t;
-          end
-          else
-            overflow:=true;
-        end;
-
-        i:=i+1;
-      end;
-
-      n:=_strlen(a);
-
-      { Check result fits }
-      if overflow or (n>colsize[j]) then begin
-        for k:=0 to colsize[j]-1 do
-          totalrow[start+k]:='*';
-      end
-      else begin
-        { Write right-justified result }
-        for k:=0 to n-1 do
-          totalrow[start+colsize[j]-n+k]:=a[k];
-      end;
-    end;
+    if totalmode[j]=1 then
+      calculatesumt(j)
+    else if totalmode[j]>1 then
+      calculatetrend(j);
   end;
 end;
 
@@ -781,36 +958,49 @@ end;
 
 proc parsetotal(s:cpnt; len:integer);
 {*********************************}
-var i,j,start:integer;
+var i,j,k,n,t:integer;
 begin
   i:=6;
-  j:=0;
 
-  while j<ncols do begin
-    start:=i;
+  for j:=0 to ncols-1 do begin
+    k:=i;
+    while (i<len) and (s[i]<>',') do i:=i+1;
 
-    while (i<len) and (s[i]<>',') do
-      i:=i+1;
+    s[i]:=ENDMARK;
 
-    if i>start then begin
-      if (i-start<>3) or
-         (s[start]<>'S') or
-         (s[start+1]<>'U') or
-         (s[start+2]<>'M') then
+    t:=0;
+    if i>k then begin
+      if _strcmp(s+k,'SUM')=0 then
+        t:=1
+      else if _strncmp(s+k,'TREND',5)=0 then begin
+        k:=k+5;
+        n:=0;
+        while k<i do begin
+          if (s[k]<'0') or (s[k]>'9') then
+            showerror('TABLE: Invalid TREND');
+          n:=10*n+ord(s[k])-ord('0');
+          if n>MAXROWS then
+            showerror('TABLE: Invalid TREND');
+          k:=k+1;
+        end;
+        if n<2 then
+          showerror('TABLE: Invalid TREND');
+        t:=n;
+      end
+      else
         showerror('TABLE: Invalid TOTAL');
 
-      if ((coltype[j]<>T_REAL) and
-         (coltype[j]<>T_SUM)) then
+      if (coltype[j]<>T_REAL) and
+         (coltype[j]<>T_SUM) then
         showerror('TABLE: Invalid total type');
 
-      totalcol[j]:=true;
       hastotals:=true;
     end;
 
-    j:=j+1;
+    totalmode[j]:=t;
 
-    if j<ncols then begin
-      if (i>=len) or (s[i]<>',') then
+    if j<ncols-1 then begin
+      if i>=len then
         showerror('TABLE: Invalid TOTAL');
       i:=i+1;
     end;
@@ -875,8 +1065,7 @@ begin
 
   { Optional TOTAL specification }
   hastotals:=false;
-  for j:=0 to ncols-1 do
-    totalcol[j]:=false;
+  for j:=0 to ncols-1 do totalmode[j]:=0;
 
   len:=_strread(f,s,eof);
   lineno:=lineno+1;
@@ -1030,7 +1219,7 @@ begin
   nrows:=nrows+1;
   currow:=pos;
   modified:=true;
-  status:='M';
+  status:='U';
   showstatus;
 
   if currow<firstrow then firstrow:=currow;
@@ -1314,7 +1503,7 @@ begin
           done:=true
         else if acceptcell(editstr) then begin
           modified:=true;
-          status:='M';
+          status:='U';
           showstatus;
           calculatetotals;
           showtotals;
@@ -1383,7 +1572,7 @@ begin
       firstrow:=firstrow-1;
 
   modified:=true;
-  status:='M';
+  status:='U';
   showstatus;
   calculatetotals;
   showtotals;
@@ -1454,28 +1643,6 @@ begin
   modified:=false;
   status:='5';
   showstatus;
-end;
-
-func _hexchar(i0: integer): char;
-{*******************************}
-var i1: integer;
-begin
-  i1 := i0 and $0f;
-  if i1 < 10 then
-    _hexchar := chr(ord('0') + i1)
-  else
-    _hexchar := chr(ord('A') + i1 - 10);
-end;
-
-func hexb(i: integer): cpnt;
-{**************************}
-var cp: cpnt;
-begin
-  cp := cpnt($17d8);
-  cp[0] := _hexchar((i shr 4) and $0f);
-  cp[1] := _hexchar(i and $0f);
-  cp[2] := chr(0);
-  hexb := cp;
 end;
 
 proc printborder;

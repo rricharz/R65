@@ -24,902 +24,902 @@
   24     4 [  0] 
   25     4 [  0] program paint;
   26     4 [  0] uses  syslib,arglib,wildlib,plotlib,strlib,filelib,
-  27  6204 [137]       mouselib,txtgrlib,writelib,mathlib;
-  28 12316 [189] 
-  29 12316 [189] const startcanvas=$700;
-  30 12319 [190]       sizecanvas=3304; {224x118/8}
-  31 12319 [191]       rdfile=$e815;
-  32 12319 [192]       wrfile=$e81b;
-  33 12319 [193] 
-  34 12319 [193]       CLEFT       = chr($03);
-  35 12319 [194]       CRIGHT      = chr($16);
-  36 12319 [195]       CUP         = chr($1a);
-  37 12319 [196]       CDOWN       = chr($18);
-  38 12319 [197]       RUBOUT      = chr($7f);
-  39 12319 [198] 
-  40 12319 [198]       dpoint      = 0;
-  41 12319 [199]       dline       = 1;
-  42 12319 [200]       drect       = 2;
-  43 12319 [201]       dtext       = 3;
-  44 12319 [202]       dflood      = 4;
-  45 12319 [203]       djoin       = 5;
-  46 12319 [204]       derase      = 6;
-  47 12319 [205]       dcircle     = 7;
-  48 12319 [206] 
-  49 12319 [206] mem   FILFLG=$da:       char&;
-  50 12319 [207]       FILSA=$031a:      integer;
-  51 12319 [208]       FILEA=$031c:      integer;
-  52 12319 [209]       FILSA1=$0331:     integer;
-  53 12319 [210]       FILTYP=$0300:     char&;
-  54 12319 [211]       MOUSEDRAGX=$170b: integer&;
-  55 12319 [212]       MOUSEDRAGY=$170c: integer&;
-  56 12319 [213] 
-  57 12319 [213] var cyclus,drive:       integer;
-  58 12319 [215]     x,y,cmode:          integer;
-  59 12319 [218]     startx,starty:      integer;
-  60 12319 [220]     name:               array[15] of char;
-  61 12319 [221]     ch,nextch:          char;
-  62 12319 [223]     dmode:              integer;
-  63 12319 [224] 
-  64 12319 [224] 
-  65 12319 [224] const CANVASSIZE  = 1652;   {words}
-  66 12319 [225]       LASTINDEX   = 1651;   {- 1}
-  67 12319 [226] mem   canvas      = $700:  array[1652] of integer;
-  68 12319 [227]       canvasbytes = $700:array[3304] of integer&;
-  69 12319 [228] var   undobuf:     array[1652] of integer;
-  70 12319 [229]       undovalid:  boolean;
-  71 12319 [230] 
-  72 12319 [230] const STACKSIZE=512;
-  73 12319 [231] 
-  74 12319 [231] var stack:array[STACKSIZE] of packed char;
-  75 12319 [232]     sp,maxsp,overflows,pushes:integer;
-  76 12319 [236] 
-  77 12319 [236] proc initstack;
-  78 12319 [237] {*************}
-  79 12319 [237] begin
-  80 12319 [237]   sp:=0;
-  81 12326 [237]   maxsp:=0;
-  82 12332 [237]   overflows:=0;
-  83 12338 [237]   pushes:=0;
-  84 12344 [237] end;
-  85 12348 [237] 
-  86 12349 [237] proc push(x,y:integer);
-  87 12349 [240] {*********************}
-  88 12349 [240] begin
-  89 12349 [240]   if sp<STACKSIZE then begin
-  90 12362 [240]     stack[sp]:=packed(chr(y),chr(x));
-  91 12380 [240]     sp:=sp+1;
-  92 12390 [240]     if sp>maxsp then maxsp:=sp;
-  93 12407 [240]     pushes:=pushes+1;
-  94 12421 [240]   end else
-  95 12426 [240]     overflows:=overflows+1;
-  96 12435 [240] end;
-  97 12440 [240] 
-  98 12441 [238] proc pop(var x,y:integer);
-  99 12441 [241] {************************}
- 100 12441 [241] begin
- 101 12441 [241]   if sp>0 then begin
- 102 12453 [241]     sp:=sp-1;
- 103 12462 [241]     x:=ord(low(stack[sp]));
- 104 12476 [241]     y:=ord(high(stack[sp]));
- 105 12489 [241]   end;
- 106 12493 [241] end;
- 107 12493 [241] 
- 108 12494 [239] proc hline(xl,xr,y,c:integer);
- 109 12494 [244] {****************************}
- 110 12494 [244] var x:integer;
- 111 12497 [245] begin
- 112 12497 [245]   _move(xl,y);
- 113 12513 [245]   _draw(xr,y,c);
- 114 12531 [245] end;
- 115 12531 [245] 
- 116 12532 [240] proc findrun(x,y:integer; var xl,xr:integer);
- 117 12532 [245] {*******************************************}
- 118 12532 [245] var color,full,row,i,mask:integer;
- 119 12535 [250]     searching:boolean;
- 120 12535 [251] begin
- 121 12535 [251]   color:=_getpixel(x,y);
- 122 12553 [251]   if color=WHITE then full:=$ff
- 123 12567 [251]   else full:=0;
- 124 12578 [251] 
- 125 12582 [251]   row:=28*y;
- 126 12584 [251]   xl:=x;
- 127 12593 [251]   xr:=x;
- 128 12601 [251] 
- 129 12609 [251]   { search left }
- 130 12609 [251]   i:=x;
- 131 12609 [251]   searching:=true;
- 132 12619 [251]   while (i>0) and searching do begin
- 133 12638 [251]     if (i and 7)=0 then begin
- 134 12648 [251]       { previous byte is entirely the same color? }
- 135 12651 [251]       if canvasbytes[row+(i shr 3)-1]=full then
- 136 12671 [251]         i:=i-8
- 137 12683 [251]       else begin
- 138 12693 [251]         mask:=$80 shr ((i-1) and 7);
- 139 12705 [251]         if (canvasbytes[row+((i-1) shr 3)] and mask)=
- 140 12735 [251]            (full and mask) then
- 141 12744 [251]           i:=i-1
- 142 12752 [251]         else
- 143 12754 [251]           searching:=false;
- 144 12764 [251]       end;
- 145 12768 [251]     end else begin
- 146 12771 [251]       mask:=$80 shr ((i-1) and 7);
- 147 12783 [251]       if (canvasbytes[row+((i-1) shr 3)] and mask)=
- 148 12813 [251]          (full and mask) then
- 149 12822 [251]         i:=i-1
- 150 12830 [251]       else
- 151 12832 [251]         searching:=false;
- 152 12842 [251]     end;
- 153 12846 [251]   end;
- 154 12846 [251]   xl:=i;
- 155 12849 [251] 
- 156 12857 [251]   { search right }
- 157 12857 [251]   i:=x;
- 158 12857 [251]   searching:=true;
- 159 12867 [251]   while (i<XSIZE) and searching do begin
- 160 12886 [251]     if (i<=XSIZE-8) and ((i and 7)=7) then begin
- 161 12907 [251]       { next byte is entirely the same color? }
- 162 12910 [251]       if canvasbytes[row+(i shr 3)+1]=full then
- 163 12930 [251]         i:=i+8
- 164 12942 [251]       else begin
- 165 12952 [251]         mask:=$80 shr ((i+1) and 7);
- 166 12964 [251]         if (canvasbytes[row+((i+1) shr 3)] and mask)=
- 167 12994 [251]            (full and mask) then
- 168 13003 [251]           i:=i+1
- 169 13011 [251]         else
- 170 13013 [251]           searching:=false;
- 171 13023 [251]       end;
- 172 13027 [251]     end else begin
- 173 13030 [251]       mask:=$80 shr ((i+1) and 7);
- 174 13042 [251]       if (canvasbytes[row+((i+1) shr 3)] and mask)=
- 175 13072 [251]          (full and mask) then
- 176 13081 [251]         i:=i+1
- 177 13089 [251]       else
- 178 13091 [251]         searching:=false;
- 179 13101 [251]     end;
- 180 13105 [251]   end;
- 181 13105 [251]   xr:=i;
- 182 13108 [251] end;
- 183 13116 [251] 
- 184 13117 [241] proc scanruns(xl,xr,y:integer);
- 185 13117 [245] {*****************************}
- 186 13117 [245] var x,left,right:integer;
- 187 13120 [248] begin
- 188 13120 [248]   x:=xl;
- 189 13122 [248]   while x<=xr do begin
- 190 13142 [248]     if _getpixel(x,y)=BLACK then begin
- 191 13161 [248]       push(x,y);
- 192 13178 [248]     end;
- 193 13178 [248]     findrun(x,y,left,right);
- 194 13208 [248]     x:=right+1;
- 195 13214 [248]   end;
- 196 13219 [248] end;
- 197 13222 [248] 
- 198 13223 [242] proc fillrun(x,y:integer);
- 199 13223 [245] {************************}
- 200 13223 [245] var xl,xr:integer;
- 201 13226 [247] begin
- 202 13226 [247]   if _getpixel(x,y)=BLACK then begin
- 203 13247 [247]     findrun(x,y,xl,xr);
- 204 13280 [247]     hline(xl,xr,y,WHITE);
- 205 13300 [247] 
- 206 13300 [247]     if y<YSIZE then
- 207 13306 [247]       scanruns(xl,xr,y+1);
- 208 13331 [247] 
- 209 13331 [247]     if y>0 then
- 210 13337 [247]       scanruns(xl,xr,y-1);
- 211 13362 [247]   end;
- 212 13362 [247] end;
- 213 13362 [247] 
- 214 13363 [243] proc floodfill(x,y:integer);
- 215 13363 [246] {**************************}
- 216 13363 [246] var px,py:integer;
- 217 13366 [248] begin
- 218 13366 [248]   initstack;
- 219 13372 [248] 
- 220 13372 [248]   if _getpixel(x,y)=BLACK then begin
- 221 13391 [248]     push(x,y);
- 222 13408 [248] 
- 223 13408 [248]     while sp>0 do begin
- 224 13418 [248]       pop(px,py);
- 225 13438 [248]       fillrun(px,py);
- 226 13452 [248]     end;
- 227 13452 [248]   end;
- 228 13455 [248] end;
- 229 13455 [248] 
- 230 13456 [244] proc saveundo;
- 231 13456 [245] {************}
- 232 13456 [245] var i: integer;
- 233 13459 [246] begin
- 234 13459 [246]   for i:=0 to CANVASSIZE-1 do
- 235 13472 [246]     undobuf[i]:=canvas[i];
- 236 13493 [246]   undovalid:=true;
- 237 13518 [246] end;
- 238 13522 [246] 
- 239 13523 [245] proc restoreundo;
- 240 13523 [246] {***************}
- 241 13523 [246] var i: integer;
- 242 13526 [247] begin
- 243 13526 [247]   if undovalid then begin
- 244 13532 [247]     for i:=0 to CANVASSIZE-1 do
- 245 13546 [247]       canvas[i]:=undobuf[i];
- 246 13564 [247]     undovalid:=false;
- 247 13593 [247]   end;
- 248 13597 [247] end;
- 249 13597 [247] 
- 250 13598 [246] proc forcesubtype(subtype:char);
- 251 13598 [248] {******************************}
- 252 13598 [248] var i:integer;
- 253 13601 [249] begin
- 254 13601 [249]   i:=0;
- 255 13605 [249]   repeat
- 256 13609 [249]     i:=i+1;
- 257 13615 [249]   until (name[i]=':') or
- 258 13631 [249]     (name[i]=' ') or (i>=14);
- 259 13650 [249]   name[i]:=':';
- 260 13660 [249]   name[i+1]:=subtype;
- 261 13671 [249] end;
- 262 13679 [249] 
- 263 13680 [247] proc loadcanvas;
- 264 13680 [248] {**************}
- 265 13680 [248] var entry: integer;
- 266 13683 [249]     last,found,default:  boolean;
- 267 13683 [252] begin
- 268 13683 [252]   cyclus:=0; drive:=1;
- 269 13693 [252]   _agetstring(name,default,cyclus,drive);
- 270 13737 [252]   if default then begin
- 271 13741 [252]     _grend;
- 272 13748 [252]     writeln(INVVID,'No file specified',NORVID);
- 273 13778 [252]     writeln('Usage: PAINT filename');
- 274 13806 [252]     _abort;
- 275 13810 [252]   end;
- 276 13810 [252]   { check whether file exists, wildcards allowed }
- 277 13810 [252]   entry:=0;
- 278 13812 [252]   forcesubtype('I');
- 279 13824 [252]   _findentry(name,drive,entry,found,last);
- 280 13870 [252]   if (not found) or last then exit;
- 281 13884 [252]   _asetfile(name,cyclus,drive,'I');
- 282 13906 [252]   FILFLG:=chr($40); { silent load }
- 283 13913 [252]   FILSA:=startcanvas;
- 284 13916 [252]   FILEA:=startcanvas+sizecanvas;
- 285 13926 [252]   FILSA1:=startcanvas;
- 286 13934 [252]   FILTYP:='I';
- 287 13940 [252]   FILERR:=0;
- 288 13947 [252]   call(rdfile);
- 289 13955 [252]   writeln;
- 290 13955 [252]   if FILERR<>0 then
- 291 13966 [252]     writeln(INVVID,'File error ',FILERR shr 4,
- 292 13990 [252]       FILERR and 15,NORVID);
- 293 14008 [252] end;
- 294 14008 [252] 
- 295 14009 [248] proc savecanvas;
- 296 14009 [249] {**************}
- 297 14009 [249] { save the canvas on disk }
- 298 14009 [249] begin
- 299 14009 [249]   _asetfile(name,cyclus,drive,'I');
- 300 14036 [249]   FILFLG:=chr($40); { silent store }
- 301 14043 [249]   FILSA:=startcanvas;
- 302 14046 [249]   FILEA:=startcanvas+sizecanvas;
- 303 14056 [249]   FILSA1:=startcanvas;
- 304 14064 [249]   FILTYP:='I';
- 305 14070 [249]   FILERR:=0;
- 306 14077 [249]   call(wrfile);
- 307 14085 [249]   if FILERR<>0 then
- 308 14090 [249]     writeln(INVVID,'File error ',FILERR shr 4,
- 309 14114 [249]       FILERR and 15,NORVID);
- 310 14132 [249] end;
- 311 14132 [249] 
- 312 14133 [249] proc drawline;
- 313 14133 [250] {************}
- 314 14133 [250] begin
- 315 14133 [250]   _move(startx,starty); _draw(x,y,cmode);
- 316 14170 [250]   startx:=x; starty:=y;
- 317 14178 [250] end;
- 318 14186 [250] 
- 319 14187 [250] proc drawrect;
- 320 14187 [251] begin
- 321 14187 [251]    _move(startx,starty);
- 322 14206 [251]    _draw(x,starty,cmode);
- 323 14224 [251]    _draw(x,y,cmode);
- 324 14242 [251]    _draw(startx,y,cmode);
- 325 14260 [251]    _draw(startx,starty,cmode);
- 326 14278 [251] end;
- 327 14278 [251] 
- 328 14279 [251] proc drawchar;
- 329 14279 [252] {************}
- 330 14279 [252] begin
- 331 14279 [252]   _move(x,y); write(@PLOTDEV,ch);
- 332 14307 [252]   x:=x+8;
- 333 14313 [252]   if (x>XSIZE-8) then begin
- 334 14328 [252]     x:=0; y:=y-10;
- 335 14343 [252]     if y<2 then y:=YSIZE-10;
- 336 14362 [252]   end;
- 337 14367 [252] end;
- 338 14367 [252] 
- 339 14368 [252] func printable:boolean;
- 340 14368 [254] {*********************}
- 341 14368 [254] var a:integer;
- 342 14371 [255] begin
- 343 14371 [255]   a:=ord(ch);
- 344 14377 [255]   if (a>ord('Z')) then a:=a-32;
- 345 14397 [255]   printable:=(a>=ord('A')) and (a<=ord('Z'));
- 346 14416 [255] end;
- 347 14421 [255] 
- 348 14422 [254] proc status;
- 349 14422 [255] {**********}
- 350 14422 [255] begin
- 351 14422 [255]   _setcursor(0,15);
- 352 14437 [255]   write(CSC);
- 353 14440 [255] 
- 354 14440 [255]   case dmode of
- 355 14440 [255]     dpoint:  write('POINT  ');
- 356 14459 [255]     dline:   write('LINE   ');
- 357 14477 [255]     drect:   write('RECT   ');
- 358 14495 [255]     dtext:   write('TEXT   ');
- 359 14513 [255]     dflood:  write('FLOOD  ');
- 360 14531 [255]     djoin:   write('JOIN   ');
- 361 14549 [255]     derase:  write('ERASE  ');
- 362 14567 [255]     dcircle: write('CIRCLE ')
- 363 14585 [255]   end;
- 364 14587 [255] 
- 365 14587 [255]   case cmode of
- 366 14587 [255]     WHITE:   write('WHITE   ');
- 367 14607 [255]     BLACK:   write('BLACK   ');
- 368 14626 [255]     INVERSE: write('INVERSE ')
- 369 14645 [255]   end;
- 370 14647 [255] 
- 371 14647 [255]   _setcursor(18,15);
- 372 14657 [255] 
- 373 14657 [255]   case dmode of
- 374 14657 [255]     dpoint:  write('Click or drag to paint');
- 375 14691 [255]     dline:   write('Drag to draw line');
- 376 14719 [255]     drect:   write('Drag to draw rectangle');
- 377 14752 [255]     dtext:   write('Type text; ESC exits');
- 378 14783 [255]     dflood:  write('Click inside area');
- 379 14811 [255]     djoin:   write('Drag connected lines');
- 380 14842 [255]     derase:  write('Drag area to erase');
- 381 14871 [255]     dcircle: write('Drag radius from center')
- 382 14905 [255]   end;
- 383 14907 [255] 
- 384 14907 [255]   _parkcursor;
- 385 14911 [255] end;
- 386 14911 [255] 
- 387 14912 [255] proc initpanel;
- 388 14912 [256] {*************}
- 389 14912 [256] begin
- 390 14912 [256]   _setcursor(0,11);
- 391 14927 [256]   write(CSC);
- 392 14930 [256] 
- 393 14930 [256]   _setcursor(0,11);
- 394 14940 [256]   write(INVVID,'P',NORVID,'oint');
- 395 14953 [256]   _setcursor(10,11);
- 396 14963 [256]   write(INVVID,'L',NORVID,'ine');
- 397 14975 [256]   _setcursor(20,11);
- 398 14985 [256]   write(INVVID,'J',NORVID,'oin');
- 399 14997 [256]   _setcursor(30,11);
- 400 15007 [256]   write(INVVID,'R',NORVID,'ect');
- 401 15019 [256]   _setcursor(40,11);
- 402 15029 [256]   write(INVVID,'O',NORVID,'circle');
- 403 15044 [256] 
- 404 15044 [256]   _setcursor(0,12);
- 405 15054 [256]   write(INVVID,'T',NORVID,'ext');
- 406 15066 [256]   _setcursor(10,12);
- 407 15076 [256]   write(INVVID,'F',NORVID,'lood');
- 408 15089 [256]   _setcursor(20,12);
- 409 15099 [256]   write(INVVID,'E',NORVID,'rase');
- 410 15112 [256]   _setcursor(30,12);
- 411 15122 [256]   write(INVVID,'C',NORVID,'lear');
- 412 15135 [256]   _setcursor(40,12);
- 413 15145 [256]   write(INVVID,'M',NORVID,'ode');
- 414 15157 [256] 
- 415 15157 [256]   _setcursor(0,13);
- 416 15167 [256]   write(INVVID,'ESC',NORVID,':Exit');
- 417 15183 [256]   _setcursor(10,13);
- 418 15193 [256]   write(INVVID,'DEL',NORVID,':Undo');
- 419 15209 [256]   _setcursor(20,13);
- 420 15219 [256]   write(INVVID,'W',NORVID,':Save');
- 421 15233 [256]   _setcursor(30,13);
- 422 15243 [256]   write(INVVID,'Q',NORVID,':Quit');
- 423 15257 [256]   _setcursor(40,13);
- 424 15267 [256]   write(INVVID,'K',NORVID,':Kill');
- 425 15281 [256] 
- 426 15281 [256]   _htxtgr(0,47,14,CYAN);
- 427 15295 [256] end;
- 428 15295 [256] 
- 429 15296 [256] proc eraserect(x,y,sx,sy:integer);
- 430 15296 [261] {********************************}
- 431 15296 [261] var xmin,xmax,ymin,ymax,yy:integer;
- 432 15299 [266] begin
- 433 15299 [266]   if sx>=0 then begin
- 434 15308 [266]     xmin:=x;
- 435 15311 [266]     xmax:=x+sx;
- 436 15323 [266]   end else begin
- 437 15335 [266]     xmin:=x+sx;
- 438 15339 [266]     xmax:=x;
- 439 15348 [266]   end;
- 440 15356 [266] 
- 441 15356 [266]   if sy>=0 then begin
- 442 15363 [266]     ymin:=y;
- 443 15366 [266]     ymax:=y+sy;
- 444 15378 [266]   end else begin
- 445 15390 [266]     ymin:=y+sy;
- 446 15394 [266]     ymax:=y;
- 447 15403 [266]   end;
- 448 15411 [266] 
- 449 15411 [266]   for yy:=ymin to ymax do begin
- 450 15432 [266]     _move(xmin,yy);
- 451 15446 [266]     _draw(xmax,yy,BLACK);
- 452 15462 [266]   end;
- 453 15462 [266] end;
- 454 15476 [266] 
- 455 15477 [257] proc drawshape(mode:integer);
- 456 15477 [259] {***************************}
- 457 15477 [259] var dx,dy,r:integer;
- 458 15480 [262] begin
- 459 15480 [262]   if dmode=dcircle then begin
- 460 15489 [262]     dx:=x-startx;
- 461 15496 [262]     dy:=y-starty;
- 462 15509 [262]     r:=floor(sqrt(conv(dx*dx+dy*dy)+0.5));
- 463 15553 [262]     _circle(startx,starty,r,mode);
- 464 15580 [262]   end else
- 465 15580 [262]     _rectangle(startx,starty,
- 466 15587 [262]       x-startx,y-starty,mode);
- 467 15619 [262] end;
- 468 15619 [262] 
- 469 15620 [258] proc shapemode;
- 470 15620 [259] {*************}
- 471 15620 [259] var mode,mx,my:integer;
- 472 15623 [262]     key:char;
- 473 15623 [263]     found, visible:boolean;
- 474 15623 [265] begin
- 475 15623 [265]   if _isesc then begin end;
- 476 15634 [265]   saveundo;
- 477 15638 [265]   repeat
- 478 15638 [265]     if _isesc then exit;
- 479 15648 [265]     mode:=0;
- 480 15650 [265]     found:=_getinput(mode,mx,my,key);
- 481 15692 [265] 
- 482 15696 [265]     if found then begin
- 483 15700 [265]       if mode=2 then begin
- 484 15710 [265]         startx:=mx;
- 485 15713 [265]         starty:=my;
- 486 15721 [265]       end;
- 487 15729 [265] 
- 488 15729 [265]       if key<>chr(0) then begin
- 489 15737 [265]         nextch:=key;
- 490 15740 [265]         exit;
- 491 15749 [265]       end;
- 492 15749 [265]     end else
- 493 15749 [265]       _delay10msec(1);
- 494 15760 [265]   until mode=2;
- 495 15766 [265] 
- 496 15770 [265]   { Drag rectangle }
- 497 15770 [265]   visible:=false;
- 498 15772 [265] 
- 499 15776 [265]   mx:=MOUSEDRAGX;
- 500 15780 [265]   my:=MOUSEDRAGY;
- 501 15788 [265]   while (mx<>$ff) and (my<>$ff)
- 502 15805 [265]   do begin
- 503 15810 [265]     if _isesc then begin
- 504 15816 [265]       { Remove the current XOR preview }
- 505 15819 [265]       if visible then
- 506 15819 [265]         drawshape(INVERSE);
- 507 15834 [265]       exit;
- 508 15835 [265]     end;
- 509 15835 [265] 
- 510 15835 [265]     if (not visible) or (mx<>x) or (my<>y) then begin
- 511 15860 [265] 
- 512 15863 [265]       { Erase previous XOR rectangle }
- 513 15863 [265]       if visible then
- 514 15863 [265]         drawshape(INVERSE);
- 515 15878 [265] 
- 516 15878 [265]       x:=mx;
- 517 15878 [265]       y:=my;
- 518 15886 [265] 
- 519 15894 [265]       { Draw new XOR rectangle }
- 520 15894 [265]       drawshape(INVERSE);
- 521 15902 [265]       visible:=true;
- 522 15904 [265]     end;
- 523 15908 [265]     mx:=MOUSEDRAGX;
- 524 15912 [265]     my:=MOUSEDRAGY;
- 525 15920 [265]   end;
- 526 15924 [265] 
- 527 15927 [265]   { Erase the temporary XOR rectangle }
- 528 15927 [265]   if visible then
- 529 15927 [265]     drawshape(INVERSE);
- 530 15942 [265] 
- 531 15942 [265]   { Draw permanent rectangle or erase area }
- 532 15942 [265]   if visible then begin
- 533 15946 [265]     if dmode=derase then
- 534 15955 [265]       eraserect(startx,starty,x-startx,y-starty)
- 535 15980 [265]     else
- 536 15991 [265]       drawshape(cmode);
- 537 16004 [265]   end;
- 538 16004 [265] end;
- 539 16004 [265] 
- 540 16005 [259] proc linemode(join:boolean);
- 541 16005 [261] {***************************}
- 542 16005 [261] var mode,mx,my:integer;
- 543 16008 [264]     key:char;
- 544 16008 [265]     found,visible,first:boolean;
- 545 16008 [268] begin
- 546 16008 [268]   if _isesc then begin end;
- 547 16019 [268]   saveundo;
- 548 16023 [268]   first:=true;
- 549 16025 [268] 
- 550 16029 [268]   repeat
- 551 16029 [268] 
- 552 16029 [268]     { Wait for mouse click }
- 553 16029 [268]     repeat
- 554 16029 [268]       if _isesc then exit;
- 555 16039 [268]       mode:=0;
- 556 16041 [268]       found:=_getinput(mode,mx,my,key);
- 557 16083 [268] 
- 558 16087 [268]       if found then begin
- 559 16091 [268]         if mode=2 then begin
- 560 16101 [268]           if first then begin
- 561 16108 [268]             startx:=mx;
- 562 16111 [268]             starty:=my;
- 563 16119 [268]           end;
- 564 16127 [268]         end;
- 565 16127 [268] 
- 566 16127 [268]         if key<>chr(0) then begin
- 567 16135 [268]           nextch:=key;
- 568 16138 [268]           exit;
- 569 16147 [268]         end;
- 570 16147 [268]       end else
- 571 16147 [268]         _delay10msec(1);
- 572 16158 [268]     until mode=2;
- 573 16164 [268] 
- 574 16168 [268]     { Drag line }
- 575 16168 [268]     visible:=false;
- 576 16170 [268] 
- 577 16174 [268]     mx:=MOUSEDRAGX;
- 578 16178 [268]     my:=MOUSEDRAGY;
- 579 16186 [268]     while (mx<>$ff) and (my<>$ff) do begin
- 580 16208 [268]       if _isesc then begin
- 581 16214 [268]         { Remove current XOR preview }
- 582 16217 [268]         if visible then begin
- 583 16221 [268]           _move(startx,starty);
- 584 16238 [268]           _draw(x,y,INVERSE);
- 585 16254 [268]         end;
- 586 16254 [268]         exit;
- 587 16255 [268]       end;
- 588 16255 [268] 
- 589 16255 [268]       if (not visible) or (mx<>x) or (my<>y)
- 590 16274 [268]       then begin
- 591 16280 [268] 
- 592 16283 [268]         { Erase previous XOR line }
- 593 16283 [268]         if visible then begin
- 594 16287 [268]           _move(startx,starty);
- 595 16304 [268]           _draw(x,y,INVERSE);
- 596 16320 [268]         end;
- 597 16320 [268] 
- 598 16320 [268]         x:=mx;
- 599 16320 [268]         y:=my;
- 600 16328 [268] 
- 601 16336 [268]         { Draw new XOR line }
- 602 16336 [268]         _move(startx,starty);
- 603 16350 [268]         _draw(x,y,INVERSE);
- 604 16366 [268] 
- 605 16366 [268]         visible:=true;
- 606 16368 [268]       end;
- 607 16372 [268] 
- 608 16372 [268]       mx:=MOUSEDRAGX;
- 609 16376 [268]       my:=MOUSEDRAGY;
- 610 16384 [268]     end;
- 611 16388 [268] 
- 612 16391 [268]     { Erase temporary XOR line }
- 613 16391 [268]     if visible then begin
- 614 16395 [268]       _move(startx,starty);
- 615 16412 [268]       _draw(x,y,INVERSE);
- 616 16428 [268]     end;
- 617 16428 [268] 
- 618 16428 [268]     { Draw permanent line }
- 619 16428 [268]     if visible then begin
- 620 16432 [268]       _move(startx,starty);
- 621 16449 [268]       _draw(x,y,cmode);
- 622 16467 [268] 
- 623 16467 [268]       { Endpoint becomes start of next segment }
- 624 16467 [268]       startx:=x;
- 625 16467 [268]       starty:=y;
- 626 16475 [268]     end;
- 627 16483 [268] 
- 628 16483 [268]     first:=false;
- 629 16485 [268] 
- 630 16489 [268]   until not join;
- 631 16489 [268] end;
- 632 16497 [268] 
- 633 16498 [260] proc pointmode(mx,my:integer);
- 634 16498 [263] {***************************}
- 635 16498 [263] var nx,ny:integer;
- 636 16501 [265] begin
- 637 16501 [265]   saveundo;
- 638 16507 [265] 
- 639 16507 [265]   { Draw the first point }
- 640 16507 [265]   _plot(mx,my,cmode);
- 641 16525 [265]   x:=mx;
- 642 16525 [265]   y:=my;
- 643 16533 [265] 
- 644 16541 [265]   if cmode=INVERSE then exit;
- 645 16552 [265] 
- 646 16552 [265]   { Follow the mouse while the button is down }
- 647 16552 [265]   nx:=MOUSEDRAGX;
- 648 16556 [265]   ny:=MOUSEDRAGY;
- 649 16564 [265] 
- 650 16568 [265]   while (nx<>$ff) and (ny<>$ff) do begin
- 651 16586 [265]     if (nx<>x) or (ny<>y) then begin
- 652 16605 [265]       _move(x,y);
- 653 16622 [265]       _draw(nx,ny,cmode);
- 654 16640 [265]       x:=nx;
- 655 16640 [265]       y:=ny;
- 656 16648 [265]     end;
- 657 16656 [265] 
- 658 16656 [265]     nx:=MOUSEDRAGX;
- 659 16660 [265]     ny:=MOUSEDRAGY;
- 660 16668 [265]   end;
- 661 16672 [265] end;
- 662 16675 [265] 
- 663 16676 [261] proc textmode;
- 664 16676 [262] {*************}
- 665 16676 [262] const LEFTMARGIN   = 2;
- 666 16679 [263]       RIGHTMARGIN  = 216;
- 667 16679 [264]       TOPMARGIN    = 108;
- 668 16679 [265]       BOTTOMMARGIN = 2;
- 669 16679 [266]       CHARWIDTH    = 8;
- 670 16679 [267]       CHARHEIGHT   = 8;
- 671 16679 [268] 
- 672 16679 [268] var mode,mx,my:   integer;
- 673 16679 [271]     ch:           char;
- 674 16679 [272]     found,visible:boolean;
- 675 16679 [274]     count:        integer;
- 676 16679 [275]     textstartx:   integer;
- 677 16679 [276] begin
- 678 16679 [276]   if _isesc then begin end;
- 679 16690 [276]   saveundo;
- 680 16694 [276] 
- 681 16694 [276]   { Keep the initial position within the margins }
- 682 16694 [276]   if x<LEFTMARGIN then x:=LEFTMARGIN;
- 683 16706 [276]   if x>RIGHTMARGIN then x:=RIGHTMARGIN;
- 684 16722 [276]   if y<BOTTOMMARGIN then y:=BOTTOMMARGIN;
- 685 16738 [276]   if y>TOPMARGIN then y:=TOPMARGIN;
- 686 16754 [276]   textstartx:=x;
- 687 16758 [276] 
- 688 16766 [276]   visible:=false;
- 689 16768 [276]   count:=0;
- 690 16774 [276] 
- 691 16778 [276]   repeat
- 692 16778 [276]     mode:=0;
- 693 16780 [276]     found:=_getinput(mode,mx,my,ch);
- 694 16822 [276] 
- 695 16826 [276]     if found then begin
- 696 16830 [276] 
- 697 16833 [276]       { Remove cursor }
- 698 16833 [276]       if visible then begin
- 699 16837 [276]         _move(x+1,y);
- 700 16857 [276]         _draw(x+5,y,INVERSE);
- 701 16876 [276]         visible:=false;
- 702 16878 [276]       end;
- 703 16882 [276] 
- 704 16882 [276]       { RUBOUT exits TEXT and requests Undo }
- 705 16882 [276]       if ch=RUBOUT then begin
- 706 16889 [276]         nextch:=ch;
- 707 16892 [276]         exit;
- 708 16901 [276]       end;
- 709 16901 [276] 
- 710 16901 [276]       { Mouse selects new text position }
- 711 16901 [276]       if mode=2 then begin
- 712 16908 [276]         x:=mx;
- 713 16911 [276]         y:=my;
- 714 16919 [276]         if x<LEFTMARGIN then x:=LEFTMARGIN;
- 715 16939 [276]         if x>RIGHTMARGIN then x:=RIGHTMARGIN;
- 716 16955 [276]         if y<BOTTOMMARGIN then y:=BOTTOMMARGIN;
- 717 16971 [276]         if y>TOPMARGIN then y:=TOPMARGIN;
- 718 16987 [276]         textstartx:=x;
- 719 16991 [276]       end;
- 720 16999 [276] 
- 721 16999 [276]       { Cursor movement and character input }
- 722 16999 [276]       case ch of
- 723 16999 [276] 
- 724 17003 [276]         CLEFT:
- 725 17007 [276]           if x>=LEFTMARGIN+CHARWIDTH then
- 726 17018 [276]             x:=x-CHARWIDTH;
- 727 17029 [276] 
- 728 17037 [276]         CRIGHT:
- 729 17041 [276]           if x<=RIGHTMARGIN-CHARWIDTH then
- 730 17052 [276]             x:=x+CHARWIDTH;
- 731 17063 [276] 
- 732 17071 [276]         CUP:
- 733 17075 [276]           if y<=TOPMARGIN-CHARHEIGHT then
- 734 17086 [276]             y:=y+CHARHEIGHT;
- 735 17097 [276] 
- 736 17105 [276]         CDOWN:
- 737 17109 [276]           if y>=BOTTOMMARGIN+CHARHEIGHT then
- 738 17120 [276]             y:=y-CHARHEIGHT;
- 739 17131 [276] 
- 740 17139 [276]         CR:
- 741 17143 [276]           begin
- 742 17146 [276]             x:=textstartx;
- 743 17146 [276]             if y>=BOTTOMMARGIN+CHARHEIGHT then
- 744 17162 [276]             y:=y-CHARHEIGHT;
- 745 17173 [276]           end
- 746 17178 [276] 
- 747 17178 [276]         else
- 748 17178 [276]           if (ch>=' ') and (ch<='~') then begin
- 749 17196 [276]             _move(x-2,y);
- 750 17216 [276]             write(@PLOTDEV,ch);
- 751 17225 [276] 
- 752 17225 [276]             if x<=RIGHTMARGIN-CHARWIDTH then
- 753 17233 [276]               x:=x+CHARWIDTH;
- 754 17244 [276]           end
- 755 17249 [276]       end;
- 756 17251 [276] 
- 757 17251 [276]       count:=0;
- 758 17253 [276] 
- 759 17257 [276]     end else begin
- 760 17260 [276]       _delay10msec(1);
- 761 17268 [276]       count:=count+1;
- 762 17274 [276] 
- 763 17279 [276]       if count>=30 then begin
- 764 17286 [276]         _move(x+1,y);
- 765 17306 [276]         _draw(x+5,y,INVERSE);
- 766 17325 [276]         visible:=not visible;
- 767 17325 [276]         count:=0;
- 768 17336 [276]       end;
- 769 17340 [276]     end;
- 770 17340 [276] 
- 771 17340 [276]   until _isesc;
- 772 17346 [276] 
- 773 17349 [276]   { Remove cursor before leaving }
- 774 17349 [276]   if visible then begin
- 775 17353 [276]     _move(x+1,y);
- 776 17373 [276]     _draw(x+5,y,INVERSE);
- 777 17392 [276]   end;
- 778 17392 [276] 
- 779 17392 [276] end;
- 780 17392 [276] 
- 781 17393 [262] proc floodmode;
- 782 17393 [263] {*************}
- 783 17393 [263] var mode,mx,my:integer;
- 784 17396 [266]     key:char;
- 785 17396 [267]     found:boolean;
- 786 17396 [268] begin
- 787 17396 [268]   if _isesc then begin end;
- 788 17407 [268] 
- 789 17407 [268]   repeat
- 790 17407 [268]     if _isesc then exit;
- 791 17417 [268]     mode:=0;
- 792 17419 [268]     found:=_getinput(mode,mx,my,key);
- 793 17461 [268] 
- 794 17465 [268]     if found then begin
- 795 17469 [268]       if mode=2 then begin
- 796 17479 [268]         saveundo;
- 797 17486 [268]         floodfill(mx,my);
- 798 17500 [268]         exit;
- 799 17501 [268]       end;
- 800 17501 [268] 
- 801 17501 [268]       if key<>chr(0) then begin
- 802 17509 [268]         nextch:=key;
- 803 17512 [268]         exit;
- 804 17521 [268]       end;
- 805 17521 [268]     end else
- 806 17521 [268]       _delay10msec(1);
- 807 17532 [268]   until false;
- 808 17534 [268] end;
- 809 17537 [268] 
- 810 17538 [263] proc paint;
- 811 17538 [264] {*********}
- 812 17538 [264] { This is the main painting loop }
- 813 17538 [264] var mode,mx,my:integer;
- 814 17541 [267]     found:boolean;
- 815 17541 [268] begin
- 816 17541 [268]   x:=XSIZE div 2;
- 817 17547 [268]   y:=YSIZE div 2;
- 818 17556 [268]   cmode:=WHITE;
- 819 17563 [268]   dmode:=dpoint;
- 820 17569 [268]   initpanel;
- 821 17577 [268]   status;
- 822 17581 [268]   nextch:=chr(0);
- 823 17583 [268]   repeat
- 824 17588 [268]     if nextch<>chr(0) then begin
- 825 17596 [268]       ch:=nextch;
- 826 17599 [268]       nextch:=chr(0);
- 827 17609 [268]     end else begin
- 828 17617 [268]       repeat
- 829 17617 [268]         found:=_getinput(mode,mx,my,ch);
- 830 17655 [268]         if not found then _delay10msec(1);
- 831 17675 [268]         until found;
- 832 17675 [268]     end;
- 833 17682 [268] 
- 834 17682 [268]     if (mode=2) and (dmode=dpoint) then
- 835 17696 [268]       pointmode(mx,my);
- 836 17714 [268] 
- 837 17714 [268]       case ch of
- 838 17714 [268] 
- 839 17718 [268]       'C':    begin
- 840 17725 [268]                 saveundo;
- 841 17729 [268]                 _cleargr;
- 842 17733 [268]               end;
- 843 17733 [268] 
- 844 17736 [268]       'M':    begin
- 845 17743 [268]                 cmode:=cmode+1;
- 846 17749 [268]                 if cmode>2 then cmode:=0;
- 847 17766 [268]               end;
- 848 17770 [268] 
- 849 17773 [268]       'P':    begin
- 850 17780 [268]                 dmode:=dpoint;
- 851 17782 [268]               end;
- 852 17786 [268] 
- 853 17789 [268]       'L':    begin
- 854 17796 [268]                 dmode:=dline;
- 855 17798 [268]                 status;
- 856 17806 [268]                 linemode(false);
- 857 17814 [268]                 dmode:=dpoint;
- 858 17816 [268]               end;
- 859 17820 [268] 
- 860 17823 [268]       'F':    begin
- 861 17830 [268]                 dmode:=dflood;
- 862 17832 [268]                 status;
- 863 17840 [268]                 floodmode;
- 864 17844 [268]                 dmode:=dpoint;
- 865 17846 [268]               end;
- 866 17850 [268] 
- 867 17853 [268]       'R':    begin
- 868 17860 [268]                 dmode:=drect;
- 869 17862 [268]                 status;
- 870 17870 [268]                 shapemode;
- 871 17874 [268]                 dmode:=dpoint;
- 872 17876 [268]               end;
- 873 17880 [268] 
- 874 17883 [268]       'E':    begin
- 875 17890 [268]                 dmode:=derase;
- 876 17892 [268]                 status;
- 877 17900 [268]                 shapemode;
- 878 17904 [268]                 dmode:=dpoint;
- 879 17906 [268]               end;
- 880 17910 [268] 
- 881 17913 [268]       'O':    begin
- 882 17920 [268]                 dmode:=dcircle;
- 883 17922 [268]                 status;
- 884 17930 [268]                 shapemode;
- 885 17934 [268]                 dmode:=dpoint;
- 886 17936 [268]               end;
- 887 17940 [268] 
- 888 17943 [268]       'J':    begin
- 889 17950 [268]                 dmode:=djoin;
- 890 17952 [268]                 status;
- 891 17960 [268]                 linemode(true);
- 892 17968 [268]                 dmode:=dpoint;
- 893 17970 [268]               end;
- 894 17974 [268] 
- 895 17977 [268]       'T':    begin
- 896 17984 [268]                 dmode:=dtext;
- 897 17986 [268]                 status;
- 898 17994 [268]                 textmode;
- 899 17998 [268]                 dmode:=dpoint;
- 900 18000 [268]               end;
- 901 18004 [268] 
- 902 18007 [268]       'S':    savecanvas;
- 903 18018 [268] 
- 904 18021 [268]       RUBOUT: restoreundo;
- 905 18032 [268] 
- 906 18035 [268]       'W','Q': begin
- 907 18049 [268]                  savecanvas;
- 908 18053 [268]                  _setcursor(2,14);
- 909 18063 [268]               end
- 910 18063 [268]     end; {case}
- 911 18065 [268]     if (ch<>'W') and (ch<>'Q') then status;
- 912 18087 [268]   until (ch='Q') or (ch='K');
- 913 18101 [268] end;
- 914 18105 [268] 
- 915 18106 [264] begin
- 916 18106 [264]   _grinit; _cleargr; _fullview;
- 917 18121 [264]   undovalid:=false;
- 918 18123 [264]   loadcanvas;
- 919 18131 [264]   paint;
- 920 18135 [264]   _grend;
- 921 18139 [264] end.
- 922 18139 [264] 
-Code length:           18138
+  27  6176 [139]       mouselib,txtgrlib,writelib,mathlib;
+  28 12219 [191] 
+  29 12219 [191] const startcanvas=$700;
+  30 12222 [192]       sizecanvas=3304; {224x118/8}
+  31 12222 [193]       rdfile=$e815;
+  32 12222 [194]       wrfile=$e81b;
+  33 12222 [195] 
+  34 12222 [195]       CLEFT       = chr($03);
+  35 12222 [196]       CRIGHT      = chr($16);
+  36 12222 [197]       CUP         = chr($1a);
+  37 12222 [198]       CDOWN       = chr($18);
+  38 12222 [199]       RUBOUT      = chr($7f);
+  39 12222 [200] 
+  40 12222 [200]       dpoint      = 0;
+  41 12222 [201]       dline       = 1;
+  42 12222 [202]       drect       = 2;
+  43 12222 [203]       dtext       = 3;
+  44 12222 [204]       dflood      = 4;
+  45 12222 [205]       djoin       = 5;
+  46 12222 [206]       derase      = 6;
+  47 12222 [207]       dcircle     = 7;
+  48 12222 [208] 
+  49 12222 [208] mem   FILFLG=$da:       char&;
+  50 12222 [209]       FILSA=$031a:      integer;
+  51 12222 [210]       FILEA=$031c:      integer;
+  52 12222 [211]       FILSA1=$0331:     integer;
+  53 12222 [212]       FILTYP=$0300:     char&;
+  54 12222 [213]       MOUSEDRAGX=$170b: integer&;
+  55 12222 [214]       MOUSEDRAGY=$170c: integer&;
+  56 12222 [215] 
+  57 12222 [215] var cyclus,drive:       integer;
+  58 12222 [217]     x,y,cmode:          integer;
+  59 12222 [220]     startx,starty:      integer;
+  60 12222 [222]     name:               array[15] of char;
+  61 12222 [223]     ch,nextch:          char;
+  62 12222 [225]     dmode:              integer;
+  63 12222 [226] 
+  64 12222 [226] 
+  65 12222 [226] const CANVASSIZE  = 1652;   {words}
+  66 12222 [227]       LASTINDEX   = 1651;   {- 1}
+  67 12222 [228] mem   canvas      = $700:  array[1652] of integer;
+  68 12222 [229]       canvasbytes = $700:array[3304] of integer&;
+  69 12222 [230] var   undobuf:     array[1652] of integer;
+  70 12222 [231]       undovalid:  boolean;
+  71 12222 [232] 
+  72 12222 [232] const STACKSIZE=512;
+  73 12222 [233] 
+  74 12222 [233] var stack:array[STACKSIZE] of packed char;
+  75 12222 [234]     sp,maxsp,overflows,pushes:integer;
+  76 12222 [238] 
+  77 12222 [238] proc initstack;
+  78 12222 [239] {*************}
+  79 12222 [239] begin
+  80 12222 [239]   sp:=0;
+  81 12229 [239]   maxsp:=0;
+  82 12235 [239]   overflows:=0;
+  83 12241 [239]   pushes:=0;
+  84 12247 [239] end;
+  85 12251 [239] 
+  86 12252 [239] proc push(x,y:integer);
+  87 12252 [242] {*********************}
+  88 12252 [242] begin
+  89 12252 [242]   if sp<STACKSIZE then begin
+  90 12265 [242]     stack[sp]:=packed(chr(y),chr(x));
+  91 12283 [242]     sp:=sp+1;
+  92 12293 [242]     if sp>maxsp then maxsp:=sp;
+  93 12310 [242]     pushes:=pushes+1;
+  94 12324 [242]   end else
+  95 12329 [242]     overflows:=overflows+1;
+  96 12338 [242] end;
+  97 12343 [242] 
+  98 12344 [240] proc pop(var x,y:integer);
+  99 12344 [243] {************************}
+ 100 12344 [243] begin
+ 101 12344 [243]   if sp>0 then begin
+ 102 12356 [243]     sp:=sp-1;
+ 103 12365 [243]     x:=ord(low(stack[sp]));
+ 104 12379 [243]     y:=ord(high(stack[sp]));
+ 105 12392 [243]   end;
+ 106 12396 [243] end;
+ 107 12396 [243] 
+ 108 12397 [241] proc hline(xl,xr,y,c:integer);
+ 109 12397 [246] {****************************}
+ 110 12397 [246] var x:integer;
+ 111 12400 [247] begin
+ 112 12400 [247]   _move(xl,y);
+ 113 12416 [247]   _draw(xr,y,c);
+ 114 12434 [247] end;
+ 115 12434 [247] 
+ 116 12435 [242] proc findrun(x,y:integer; var xl,xr:integer);
+ 117 12435 [247] {*******************************************}
+ 118 12435 [247] var color,full,row,i,mask:integer;
+ 119 12438 [252]     searching:boolean;
+ 120 12438 [253] begin
+ 121 12438 [253]   color:=_getpixel(x,y);
+ 122 12456 [253]   if color=WHITE then full:=$ff
+ 123 12470 [253]   else full:=0;
+ 124 12481 [253] 
+ 125 12485 [253]   row:=28*y;
+ 126 12487 [253]   xl:=x;
+ 127 12496 [253]   xr:=x;
+ 128 12504 [253] 
+ 129 12512 [253]   { search left }
+ 130 12512 [253]   i:=x;
+ 131 12512 [253]   searching:=true;
+ 132 12522 [253]   while (i>0) and searching do begin
+ 133 12541 [253]     if (i and 7)=0 then begin
+ 134 12551 [253]       { previous byte is entirely the same color? }
+ 135 12554 [253]       if canvasbytes[row+(i shr 3)-1]=full then
+ 136 12574 [253]         i:=i-8
+ 137 12586 [253]       else begin
+ 138 12596 [253]         mask:=$80 shr ((i-1) and 7);
+ 139 12608 [253]         if (canvasbytes[row+((i-1) shr 3)] and mask)=
+ 140 12638 [253]            (full and mask) then
+ 141 12647 [253]           i:=i-1
+ 142 12655 [253]         else
+ 143 12657 [253]           searching:=false;
+ 144 12667 [253]       end;
+ 145 12671 [253]     end else begin
+ 146 12674 [253]       mask:=$80 shr ((i-1) and 7);
+ 147 12686 [253]       if (canvasbytes[row+((i-1) shr 3)] and mask)=
+ 148 12716 [253]          (full and mask) then
+ 149 12725 [253]         i:=i-1
+ 150 12733 [253]       else
+ 151 12735 [253]         searching:=false;
+ 152 12745 [253]     end;
+ 153 12749 [253]   end;
+ 154 12749 [253]   xl:=i;
+ 155 12752 [253] 
+ 156 12760 [253]   { search right }
+ 157 12760 [253]   i:=x;
+ 158 12760 [253]   searching:=true;
+ 159 12770 [253]   while (i<XSIZE) and searching do begin
+ 160 12789 [253]     if (i<=XSIZE-8) and ((i and 7)=7) then begin
+ 161 12810 [253]       { next byte is entirely the same color? }
+ 162 12813 [253]       if canvasbytes[row+(i shr 3)+1]=full then
+ 163 12833 [253]         i:=i+8
+ 164 12845 [253]       else begin
+ 165 12855 [253]         mask:=$80 shr ((i+1) and 7);
+ 166 12867 [253]         if (canvasbytes[row+((i+1) shr 3)] and mask)=
+ 167 12897 [253]            (full and mask) then
+ 168 12906 [253]           i:=i+1
+ 169 12914 [253]         else
+ 170 12916 [253]           searching:=false;
+ 171 12926 [253]       end;
+ 172 12930 [253]     end else begin
+ 173 12933 [253]       mask:=$80 shr ((i+1) and 7);
+ 174 12945 [253]       if (canvasbytes[row+((i+1) shr 3)] and mask)=
+ 175 12975 [253]          (full and mask) then
+ 176 12984 [253]         i:=i+1
+ 177 12992 [253]       else
+ 178 12994 [253]         searching:=false;
+ 179 13004 [253]     end;
+ 180 13008 [253]   end;
+ 181 13008 [253]   xr:=i;
+ 182 13011 [253] end;
+ 183 13019 [253] 
+ 184 13020 [243] proc scanruns(xl,xr,y:integer);
+ 185 13020 [247] {*****************************}
+ 186 13020 [247] var x,left,right:integer;
+ 187 13023 [250] begin
+ 188 13023 [250]   x:=xl;
+ 189 13025 [250]   while x<=xr do begin
+ 190 13045 [250]     if _getpixel(x,y)=BLACK then begin
+ 191 13064 [250]       push(x,y);
+ 192 13081 [250]     end;
+ 193 13081 [250]     findrun(x,y,left,right);
+ 194 13111 [250]     x:=right+1;
+ 195 13117 [250]   end;
+ 196 13122 [250] end;
+ 197 13125 [250] 
+ 198 13126 [244] proc fillrun(x,y:integer);
+ 199 13126 [247] {************************}
+ 200 13126 [247] var xl,xr:integer;
+ 201 13129 [249] begin
+ 202 13129 [249]   if _getpixel(x,y)=BLACK then begin
+ 203 13150 [249]     findrun(x,y,xl,xr);
+ 204 13183 [249]     hline(xl,xr,y,WHITE);
+ 205 13203 [249] 
+ 206 13203 [249]     if y<YSIZE then
+ 207 13209 [249]       scanruns(xl,xr,y+1);
+ 208 13234 [249] 
+ 209 13234 [249]     if y>0 then
+ 210 13240 [249]       scanruns(xl,xr,y-1);
+ 211 13265 [249]   end;
+ 212 13265 [249] end;
+ 213 13265 [249] 
+ 214 13266 [245] proc floodfill(x,y:integer);
+ 215 13266 [248] {**************************}
+ 216 13266 [248] var px,py:integer;
+ 217 13269 [250] begin
+ 218 13269 [250]   initstack;
+ 219 13275 [250] 
+ 220 13275 [250]   if _getpixel(x,y)=BLACK then begin
+ 221 13294 [250]     push(x,y);
+ 222 13311 [250] 
+ 223 13311 [250]     while sp>0 do begin
+ 224 13321 [250]       pop(px,py);
+ 225 13341 [250]       fillrun(px,py);
+ 226 13355 [250]     end;
+ 227 13355 [250]   end;
+ 228 13358 [250] end;
+ 229 13358 [250] 
+ 230 13359 [246] proc saveundo;
+ 231 13359 [247] {************}
+ 232 13359 [247] var i: integer;
+ 233 13362 [248] begin
+ 234 13362 [248]   for i:=0 to CANVASSIZE-1 do
+ 235 13375 [248]     undobuf[i]:=canvas[i];
+ 236 13396 [248]   undovalid:=true;
+ 237 13421 [248] end;
+ 238 13425 [248] 
+ 239 13426 [247] proc restoreundo;
+ 240 13426 [248] {***************}
+ 241 13426 [248] var i: integer;
+ 242 13429 [249] begin
+ 243 13429 [249]   if undovalid then begin
+ 244 13435 [249]     for i:=0 to CANVASSIZE-1 do
+ 245 13449 [249]       canvas[i]:=undobuf[i];
+ 246 13467 [249]     undovalid:=false;
+ 247 13496 [249]   end;
+ 248 13500 [249] end;
+ 249 13500 [249] 
+ 250 13501 [248] proc forcesubtype(subtype:char);
+ 251 13501 [250] {******************************}
+ 252 13501 [250] var i:integer;
+ 253 13504 [251] begin
+ 254 13504 [251]   i:=0;
+ 255 13508 [251]   repeat
+ 256 13512 [251]     i:=i+1;
+ 257 13518 [251]   until (name[i]=':') or
+ 258 13534 [251]     (name[i]=' ') or (i>=14);
+ 259 13553 [251]   name[i]:=':';
+ 260 13563 [251]   name[i+1]:=subtype;
+ 261 13574 [251] end;
+ 262 13582 [251] 
+ 263 13583 [249] proc loadcanvas;
+ 264 13583 [250] {**************}
+ 265 13583 [250] var entry: integer;
+ 266 13586 [251]     last,found,default:  boolean;
+ 267 13586 [254] begin
+ 268 13586 [254]   cyclus:=0; drive:=1;
+ 269 13596 [254]   _agetstring(name,default,cyclus,drive);
+ 270 13640 [254]   if default then begin
+ 271 13644 [254]     _grend;
+ 272 13651 [254]     writeln(INVVID,'No file specified',NORVID);
+ 273 13681 [254]     writeln('Usage: PAINT filename');
+ 274 13709 [254]     _abort;
+ 275 13713 [254]   end;
+ 276 13713 [254]   { check whether file exists, wildcards allowed }
+ 277 13713 [254]   entry:=0;
+ 278 13715 [254]   forcesubtype('I');
+ 279 13727 [254]   _findentry(name,drive,entry,found,last);
+ 280 13773 [254]   if (not found) or last then exit;
+ 281 13787 [254]   _asetfile(name,cyclus,drive,'I');
+ 282 13809 [254]   FILFLG:=chr($40); { silent load }
+ 283 13816 [254]   FILSA:=startcanvas;
+ 284 13819 [254]   FILEA:=startcanvas+sizecanvas;
+ 285 13829 [254]   FILSA1:=startcanvas;
+ 286 13837 [254]   FILTYP:='I';
+ 287 13843 [254]   FILERR:=0;
+ 288 13850 [254]   call(rdfile);
+ 289 13858 [254]   writeln;
+ 290 13858 [254]   if FILERR<>0 then
+ 291 13869 [254]     writeln(INVVID,'File error ',FILERR shr 4,
+ 292 13893 [254]       FILERR and 15,NORVID);
+ 293 13911 [254] end;
+ 294 13911 [254] 
+ 295 13912 [250] proc savecanvas;
+ 296 13912 [251] {**************}
+ 297 13912 [251] { save the canvas on disk }
+ 298 13912 [251] begin
+ 299 13912 [251]   _asetfile(name,cyclus,drive,'I');
+ 300 13939 [251]   FILFLG:=chr($40); { silent store }
+ 301 13946 [251]   FILSA:=startcanvas;
+ 302 13949 [251]   FILEA:=startcanvas+sizecanvas;
+ 303 13959 [251]   FILSA1:=startcanvas;
+ 304 13967 [251]   FILTYP:='I';
+ 305 13973 [251]   FILERR:=0;
+ 306 13980 [251]   call(wrfile);
+ 307 13988 [251]   if FILERR<>0 then
+ 308 13993 [251]     writeln(INVVID,'File error ',FILERR shr 4,
+ 309 14017 [251]       FILERR and 15,NORVID);
+ 310 14035 [251] end;
+ 311 14035 [251] 
+ 312 14036 [251] proc drawline;
+ 313 14036 [252] {************}
+ 314 14036 [252] begin
+ 315 14036 [252]   _move(startx,starty); _draw(x,y,cmode);
+ 316 14073 [252]   startx:=x; starty:=y;
+ 317 14081 [252] end;
+ 318 14089 [252] 
+ 319 14090 [252] proc drawrect;
+ 320 14090 [253] begin
+ 321 14090 [253]    _move(startx,starty);
+ 322 14109 [253]    _draw(x,starty,cmode);
+ 323 14127 [253]    _draw(x,y,cmode);
+ 324 14145 [253]    _draw(startx,y,cmode);
+ 325 14163 [253]    _draw(startx,starty,cmode);
+ 326 14181 [253] end;
+ 327 14181 [253] 
+ 328 14182 [253] proc drawchar;
+ 329 14182 [254] {************}
+ 330 14182 [254] begin
+ 331 14182 [254]   _move(x,y); write(@PLOTDEV,ch);
+ 332 14210 [254]   x:=x+8;
+ 333 14216 [254]   if (x>XSIZE-8) then begin
+ 334 14231 [254]     x:=0; y:=y-10;
+ 335 14246 [254]     if y<2 then y:=YSIZE-10;
+ 336 14265 [254]   end;
+ 337 14270 [254] end;
+ 338 14270 [254] 
+ 339 14271 [254] func printable:boolean;
+ 340 14271 [256] {*********************}
+ 341 14271 [256] var a:integer;
+ 342 14274 [257] begin
+ 343 14274 [257]   a:=ord(ch);
+ 344 14280 [257]   if (a>ord('Z')) then a:=a-32;
+ 345 14300 [257]   printable:=(a>=ord('A')) and (a<=ord('Z'));
+ 346 14319 [257] end;
+ 347 14324 [257] 
+ 348 14325 [256] proc status;
+ 349 14325 [257] {**********}
+ 350 14325 [257] begin
+ 351 14325 [257]   _setcursor(0,15);
+ 352 14340 [257]   write(CSC);
+ 353 14343 [257] 
+ 354 14343 [257]   case dmode of
+ 355 14343 [257]     dpoint:  write('POINT  ');
+ 356 14362 [257]     dline:   write('LINE   ');
+ 357 14380 [257]     drect:   write('RECT   ');
+ 358 14398 [257]     dtext:   write('TEXT   ');
+ 359 14416 [257]     dflood:  write('FLOOD  ');
+ 360 14434 [257]     djoin:   write('JOIN   ');
+ 361 14452 [257]     derase:  write('ERASE  ');
+ 362 14470 [257]     dcircle: write('CIRCLE ')
+ 363 14488 [257]   end;
+ 364 14490 [257] 
+ 365 14490 [257]   case cmode of
+ 366 14490 [257]     WHITE:   write('WHITE   ');
+ 367 14510 [257]     BLACK:   write('BLACK   ');
+ 368 14529 [257]     INVERSE: write('INVERSE ')
+ 369 14548 [257]   end;
+ 370 14550 [257] 
+ 371 14550 [257]   _setcursor(18,15);
+ 372 14560 [257] 
+ 373 14560 [257]   case dmode of
+ 374 14560 [257]     dpoint:  write('Click or drag to paint');
+ 375 14594 [257]     dline:   write('Drag to draw line');
+ 376 14622 [257]     drect:   write('Drag to draw rectangle');
+ 377 14655 [257]     dtext:   write('Type text; ESC exits');
+ 378 14686 [257]     dflood:  write('Click inside area');
+ 379 14714 [257]     djoin:   write('Drag connected lines');
+ 380 14745 [257]     derase:  write('Drag area to erase');
+ 381 14774 [257]     dcircle: write('Drag radius from center')
+ 382 14808 [257]   end;
+ 383 14810 [257] 
+ 384 14810 [257]   _parkcursor;
+ 385 14814 [257] end;
+ 386 14814 [257] 
+ 387 14815 [257] proc initpanel;
+ 388 14815 [258] {*************}
+ 389 14815 [258] begin
+ 390 14815 [258]   _setcursor(0,11);
+ 391 14830 [258]   write(CSC);
+ 392 14833 [258] 
+ 393 14833 [258]   _setcursor(0,11);
+ 394 14843 [258]   write(INVVID,'P',NORVID,'oint');
+ 395 14856 [258]   _setcursor(10,11);
+ 396 14866 [258]   write(INVVID,'L',NORVID,'ine');
+ 397 14878 [258]   _setcursor(20,11);
+ 398 14888 [258]   write(INVVID,'J',NORVID,'oin');
+ 399 14900 [258]   _setcursor(30,11);
+ 400 14910 [258]   write(INVVID,'R',NORVID,'ect');
+ 401 14922 [258]   _setcursor(40,11);
+ 402 14932 [258]   write(INVVID,'O',NORVID,'circle');
+ 403 14947 [258] 
+ 404 14947 [258]   _setcursor(0,12);
+ 405 14957 [258]   write(INVVID,'T',NORVID,'ext');
+ 406 14969 [258]   _setcursor(10,12);
+ 407 14979 [258]   write(INVVID,'F',NORVID,'lood');
+ 408 14992 [258]   _setcursor(20,12);
+ 409 15002 [258]   write(INVVID,'E',NORVID,'rase');
+ 410 15015 [258]   _setcursor(30,12);
+ 411 15025 [258]   write(INVVID,'C',NORVID,'lear');
+ 412 15038 [258]   _setcursor(40,12);
+ 413 15048 [258]   write(INVVID,'M',NORVID,'ode');
+ 414 15060 [258] 
+ 415 15060 [258]   _setcursor(0,13);
+ 416 15070 [258]   write(INVVID,'ESC',NORVID,':Exit');
+ 417 15086 [258]   _setcursor(10,13);
+ 418 15096 [258]   write(INVVID,'DEL',NORVID,':Undo');
+ 419 15112 [258]   _setcursor(20,13);
+ 420 15122 [258]   write(INVVID,'W',NORVID,':Save');
+ 421 15136 [258]   _setcursor(30,13);
+ 422 15146 [258]   write(INVVID,'Q',NORVID,':Quit');
+ 423 15160 [258]   _setcursor(40,13);
+ 424 15170 [258]   write(INVVID,'K',NORVID,':Kill');
+ 425 15184 [258] 
+ 426 15184 [258]   _htxtgr(0,47,14,CYAN);
+ 427 15198 [258] end;
+ 428 15198 [258] 
+ 429 15199 [258] proc eraserect(x,y,sx,sy:integer);
+ 430 15199 [263] {********************************}
+ 431 15199 [263] var xmin,xmax,ymin,ymax,yy:integer;
+ 432 15202 [268] begin
+ 433 15202 [268]   if sx>=0 then begin
+ 434 15211 [268]     xmin:=x;
+ 435 15214 [268]     xmax:=x+sx;
+ 436 15226 [268]   end else begin
+ 437 15238 [268]     xmin:=x+sx;
+ 438 15242 [268]     xmax:=x;
+ 439 15251 [268]   end;
+ 440 15259 [268] 
+ 441 15259 [268]   if sy>=0 then begin
+ 442 15266 [268]     ymin:=y;
+ 443 15269 [268]     ymax:=y+sy;
+ 444 15281 [268]   end else begin
+ 445 15293 [268]     ymin:=y+sy;
+ 446 15297 [268]     ymax:=y;
+ 447 15306 [268]   end;
+ 448 15314 [268] 
+ 449 15314 [268]   for yy:=ymin to ymax do begin
+ 450 15335 [268]     _move(xmin,yy);
+ 451 15349 [268]     _draw(xmax,yy,BLACK);
+ 452 15365 [268]   end;
+ 453 15365 [268] end;
+ 454 15379 [268] 
+ 455 15380 [259] proc drawshape(mode:integer);
+ 456 15380 [261] {***************************}
+ 457 15380 [261] var dx,dy,r:integer;
+ 458 15383 [264] begin
+ 459 15383 [264]   if dmode=dcircle then begin
+ 460 15392 [264]     dx:=x-startx;
+ 461 15399 [264]     dy:=y-starty;
+ 462 15412 [264]     r:=floor(sqrt(conv(dx*dx+dy*dy)+0.5));
+ 463 15456 [264]     _circle(startx,starty,r,mode);
+ 464 15483 [264]   end else
+ 465 15483 [264]     _rectangle(startx,starty,
+ 466 15490 [264]       x-startx,y-starty,mode);
+ 467 15522 [264] end;
+ 468 15522 [264] 
+ 469 15523 [260] proc shapemode;
+ 470 15523 [261] {*************}
+ 471 15523 [261] var mode,mx,my:integer;
+ 472 15526 [264]     key:char;
+ 473 15526 [265]     found, visible:boolean;
+ 474 15526 [267] begin
+ 475 15526 [267]   if _isesc then begin end;
+ 476 15537 [267]   saveundo;
+ 477 15541 [267]   repeat
+ 478 15541 [267]     if _isesc then exit;
+ 479 15551 [267]     mode:=0;
+ 480 15553 [267]     found:=_getinput(mode,mx,my,key);
+ 481 15595 [267] 
+ 482 15599 [267]     if found then begin
+ 483 15603 [267]       if mode=2 then begin
+ 484 15613 [267]         startx:=mx;
+ 485 15616 [267]         starty:=my;
+ 486 15624 [267]       end;
+ 487 15632 [267] 
+ 488 15632 [267]       if key<>chr(0) then begin
+ 489 15640 [267]         nextch:=key;
+ 490 15643 [267]         exit;
+ 491 15652 [267]       end;
+ 492 15652 [267]     end else
+ 493 15652 [267]       _delay10msec(1);
+ 494 15663 [267]   until mode=2;
+ 495 15669 [267] 
+ 496 15673 [267]   { Drag rectangle }
+ 497 15673 [267]   visible:=false;
+ 498 15675 [267] 
+ 499 15679 [267]   mx:=MOUSEDRAGX;
+ 500 15683 [267]   my:=MOUSEDRAGY;
+ 501 15691 [267]   while (mx<>$ff) and (my<>$ff)
+ 502 15708 [267]   do begin
+ 503 15713 [267]     if _isesc then begin
+ 504 15719 [267]       { Remove the current XOR preview }
+ 505 15722 [267]       if visible then
+ 506 15722 [267]         drawshape(INVERSE);
+ 507 15737 [267]       exit;
+ 508 15738 [267]     end;
+ 509 15738 [267] 
+ 510 15738 [267]     if (not visible) or (mx<>x) or (my<>y) then begin
+ 511 15763 [267] 
+ 512 15766 [267]       { Erase previous XOR rectangle }
+ 513 15766 [267]       if visible then
+ 514 15766 [267]         drawshape(INVERSE);
+ 515 15781 [267] 
+ 516 15781 [267]       x:=mx;
+ 517 15781 [267]       y:=my;
+ 518 15789 [267] 
+ 519 15797 [267]       { Draw new XOR rectangle }
+ 520 15797 [267]       drawshape(INVERSE);
+ 521 15805 [267]       visible:=true;
+ 522 15807 [267]     end;
+ 523 15811 [267]     mx:=MOUSEDRAGX;
+ 524 15815 [267]     my:=MOUSEDRAGY;
+ 525 15823 [267]   end;
+ 526 15827 [267] 
+ 527 15830 [267]   { Erase the temporary XOR rectangle }
+ 528 15830 [267]   if visible then
+ 529 15830 [267]     drawshape(INVERSE);
+ 530 15845 [267] 
+ 531 15845 [267]   { Draw permanent rectangle or erase area }
+ 532 15845 [267]   if visible then begin
+ 533 15849 [267]     if dmode=derase then
+ 534 15858 [267]       eraserect(startx,starty,x-startx,y-starty)
+ 535 15883 [267]     else
+ 536 15894 [267]       drawshape(cmode);
+ 537 15907 [267]   end;
+ 538 15907 [267] end;
+ 539 15907 [267] 
+ 540 15908 [261] proc linemode(join:boolean);
+ 541 15908 [263] {***************************}
+ 542 15908 [263] var mode,mx,my:integer;
+ 543 15911 [266]     key:char;
+ 544 15911 [267]     found,visible,first:boolean;
+ 545 15911 [270] begin
+ 546 15911 [270]   if _isesc then begin end;
+ 547 15922 [270]   saveundo;
+ 548 15926 [270]   first:=true;
+ 549 15928 [270] 
+ 550 15932 [270]   repeat
+ 551 15932 [270] 
+ 552 15932 [270]     { Wait for mouse click }
+ 553 15932 [270]     repeat
+ 554 15932 [270]       if _isesc then exit;
+ 555 15942 [270]       mode:=0;
+ 556 15944 [270]       found:=_getinput(mode,mx,my,key);
+ 557 15986 [270] 
+ 558 15990 [270]       if found then begin
+ 559 15994 [270]         if mode=2 then begin
+ 560 16004 [270]           if first then begin
+ 561 16011 [270]             startx:=mx;
+ 562 16014 [270]             starty:=my;
+ 563 16022 [270]           end;
+ 564 16030 [270]         end;
+ 565 16030 [270] 
+ 566 16030 [270]         if key<>chr(0) then begin
+ 567 16038 [270]           nextch:=key;
+ 568 16041 [270]           exit;
+ 569 16050 [270]         end;
+ 570 16050 [270]       end else
+ 571 16050 [270]         _delay10msec(1);
+ 572 16061 [270]     until mode=2;
+ 573 16067 [270] 
+ 574 16071 [270]     { Drag line }
+ 575 16071 [270]     visible:=false;
+ 576 16073 [270] 
+ 577 16077 [270]     mx:=MOUSEDRAGX;
+ 578 16081 [270]     my:=MOUSEDRAGY;
+ 579 16089 [270]     while (mx<>$ff) and (my<>$ff) do begin
+ 580 16111 [270]       if _isesc then begin
+ 581 16117 [270]         { Remove current XOR preview }
+ 582 16120 [270]         if visible then begin
+ 583 16124 [270]           _move(startx,starty);
+ 584 16141 [270]           _draw(x,y,INVERSE);
+ 585 16157 [270]         end;
+ 586 16157 [270]         exit;
+ 587 16158 [270]       end;
+ 588 16158 [270] 
+ 589 16158 [270]       if (not visible) or (mx<>x) or (my<>y)
+ 590 16177 [270]       then begin
+ 591 16183 [270] 
+ 592 16186 [270]         { Erase previous XOR line }
+ 593 16186 [270]         if visible then begin
+ 594 16190 [270]           _move(startx,starty);
+ 595 16207 [270]           _draw(x,y,INVERSE);
+ 596 16223 [270]         end;
+ 597 16223 [270] 
+ 598 16223 [270]         x:=mx;
+ 599 16223 [270]         y:=my;
+ 600 16231 [270] 
+ 601 16239 [270]         { Draw new XOR line }
+ 602 16239 [270]         _move(startx,starty);
+ 603 16253 [270]         _draw(x,y,INVERSE);
+ 604 16269 [270] 
+ 605 16269 [270]         visible:=true;
+ 606 16271 [270]       end;
+ 607 16275 [270] 
+ 608 16275 [270]       mx:=MOUSEDRAGX;
+ 609 16279 [270]       my:=MOUSEDRAGY;
+ 610 16287 [270]     end;
+ 611 16291 [270] 
+ 612 16294 [270]     { Erase temporary XOR line }
+ 613 16294 [270]     if visible then begin
+ 614 16298 [270]       _move(startx,starty);
+ 615 16315 [270]       _draw(x,y,INVERSE);
+ 616 16331 [270]     end;
+ 617 16331 [270] 
+ 618 16331 [270]     { Draw permanent line }
+ 619 16331 [270]     if visible then begin
+ 620 16335 [270]       _move(startx,starty);
+ 621 16352 [270]       _draw(x,y,cmode);
+ 622 16370 [270] 
+ 623 16370 [270]       { Endpoint becomes start of next segment }
+ 624 16370 [270]       startx:=x;
+ 625 16370 [270]       starty:=y;
+ 626 16378 [270]     end;
+ 627 16386 [270] 
+ 628 16386 [270]     first:=false;
+ 629 16388 [270] 
+ 630 16392 [270]   until not join;
+ 631 16392 [270] end;
+ 632 16400 [270] 
+ 633 16401 [262] proc pointmode(mx,my:integer);
+ 634 16401 [265] {***************************}
+ 635 16401 [265] var nx,ny:integer;
+ 636 16404 [267] begin
+ 637 16404 [267]   saveundo;
+ 638 16410 [267] 
+ 639 16410 [267]   { Draw the first point }
+ 640 16410 [267]   _plot(mx,my,cmode);
+ 641 16428 [267]   x:=mx;
+ 642 16428 [267]   y:=my;
+ 643 16436 [267] 
+ 644 16444 [267]   if cmode=INVERSE then exit;
+ 645 16455 [267] 
+ 646 16455 [267]   { Follow the mouse while the button is down }
+ 647 16455 [267]   nx:=MOUSEDRAGX;
+ 648 16459 [267]   ny:=MOUSEDRAGY;
+ 649 16467 [267] 
+ 650 16471 [267]   while (nx<>$ff) and (ny<>$ff) do begin
+ 651 16489 [267]     if (nx<>x) or (ny<>y) then begin
+ 652 16508 [267]       _move(x,y);
+ 653 16525 [267]       _draw(nx,ny,cmode);
+ 654 16543 [267]       x:=nx;
+ 655 16543 [267]       y:=ny;
+ 656 16551 [267]     end;
+ 657 16559 [267] 
+ 658 16559 [267]     nx:=MOUSEDRAGX;
+ 659 16563 [267]     ny:=MOUSEDRAGY;
+ 660 16571 [267]   end;
+ 661 16575 [267] end;
+ 662 16578 [267] 
+ 663 16579 [263] proc textmode;
+ 664 16579 [264] {*************}
+ 665 16579 [264] const LEFTMARGIN   = 2;
+ 666 16582 [265]       RIGHTMARGIN  = 216;
+ 667 16582 [266]       TOPMARGIN    = 108;
+ 668 16582 [267]       BOTTOMMARGIN = 2;
+ 669 16582 [268]       CHARWIDTH    = 8;
+ 670 16582 [269]       CHARHEIGHT   = 8;
+ 671 16582 [270] 
+ 672 16582 [270] var mode,mx,my:   integer;
+ 673 16582 [273]     ch:           char;
+ 674 16582 [274]     found,visible:boolean;
+ 675 16582 [276]     count:        integer;
+ 676 16582 [277]     textstartx:   integer;
+ 677 16582 [278] begin
+ 678 16582 [278]   if _isesc then begin end;
+ 679 16593 [278]   saveundo;
+ 680 16597 [278] 
+ 681 16597 [278]   { Keep the initial position within the margins }
+ 682 16597 [278]   if x<LEFTMARGIN then x:=LEFTMARGIN;
+ 683 16609 [278]   if x>RIGHTMARGIN then x:=RIGHTMARGIN;
+ 684 16625 [278]   if y<BOTTOMMARGIN then y:=BOTTOMMARGIN;
+ 685 16641 [278]   if y>TOPMARGIN then y:=TOPMARGIN;
+ 686 16657 [278]   textstartx:=x;
+ 687 16661 [278] 
+ 688 16669 [278]   visible:=false;
+ 689 16671 [278]   count:=0;
+ 690 16677 [278] 
+ 691 16681 [278]   repeat
+ 692 16681 [278]     mode:=0;
+ 693 16683 [278]     found:=_getinput(mode,mx,my,ch);
+ 694 16725 [278] 
+ 695 16729 [278]     if found then begin
+ 696 16733 [278] 
+ 697 16736 [278]       { Remove cursor }
+ 698 16736 [278]       if visible then begin
+ 699 16740 [278]         _move(x+1,y);
+ 700 16760 [278]         _draw(x+5,y,INVERSE);
+ 701 16779 [278]         visible:=false;
+ 702 16781 [278]       end;
+ 703 16785 [278] 
+ 704 16785 [278]       { RUBOUT exits TEXT and requests Undo }
+ 705 16785 [278]       if ch=RUBOUT then begin
+ 706 16792 [278]         nextch:=ch;
+ 707 16795 [278]         exit;
+ 708 16804 [278]       end;
+ 709 16804 [278] 
+ 710 16804 [278]       { Mouse selects new text position }
+ 711 16804 [278]       if mode=2 then begin
+ 712 16811 [278]         x:=mx;
+ 713 16814 [278]         y:=my;
+ 714 16822 [278]         if x<LEFTMARGIN then x:=LEFTMARGIN;
+ 715 16842 [278]         if x>RIGHTMARGIN then x:=RIGHTMARGIN;
+ 716 16858 [278]         if y<BOTTOMMARGIN then y:=BOTTOMMARGIN;
+ 717 16874 [278]         if y>TOPMARGIN then y:=TOPMARGIN;
+ 718 16890 [278]         textstartx:=x;
+ 719 16894 [278]       end;
+ 720 16902 [278] 
+ 721 16902 [278]       { Cursor movement and character input }
+ 722 16902 [278]       case ch of
+ 723 16902 [278] 
+ 724 16906 [278]         CLEFT:
+ 725 16910 [278]           if x>=LEFTMARGIN+CHARWIDTH then
+ 726 16921 [278]             x:=x-CHARWIDTH;
+ 727 16932 [278] 
+ 728 16940 [278]         CRIGHT:
+ 729 16944 [278]           if x<=RIGHTMARGIN-CHARWIDTH then
+ 730 16955 [278]             x:=x+CHARWIDTH;
+ 731 16966 [278] 
+ 732 16974 [278]         CUP:
+ 733 16978 [278]           if y<=TOPMARGIN-CHARHEIGHT then
+ 734 16989 [278]             y:=y+CHARHEIGHT;
+ 735 17000 [278] 
+ 736 17008 [278]         CDOWN:
+ 737 17012 [278]           if y>=BOTTOMMARGIN+CHARHEIGHT then
+ 738 17023 [278]             y:=y-CHARHEIGHT;
+ 739 17034 [278] 
+ 740 17042 [278]         CR:
+ 741 17046 [278]           begin
+ 742 17049 [278]             x:=textstartx;
+ 743 17049 [278]             if y>=BOTTOMMARGIN+CHARHEIGHT then
+ 744 17065 [278]             y:=y-CHARHEIGHT;
+ 745 17076 [278]           end
+ 746 17081 [278] 
+ 747 17081 [278]         else
+ 748 17081 [278]           if (ch>=' ') and (ch<='~') then begin
+ 749 17099 [278]             _move(x-2,y);
+ 750 17119 [278]             write(@PLOTDEV,ch);
+ 751 17128 [278] 
+ 752 17128 [278]             if x<=RIGHTMARGIN-CHARWIDTH then
+ 753 17136 [278]               x:=x+CHARWIDTH;
+ 754 17147 [278]           end
+ 755 17152 [278]       end;
+ 756 17154 [278] 
+ 757 17154 [278]       count:=0;
+ 758 17156 [278] 
+ 759 17160 [278]     end else begin
+ 760 17163 [278]       _delay10msec(1);
+ 761 17171 [278]       count:=count+1;
+ 762 17177 [278] 
+ 763 17182 [278]       if count>=30 then begin
+ 764 17189 [278]         _move(x+1,y);
+ 765 17209 [278]         _draw(x+5,y,INVERSE);
+ 766 17228 [278]         visible:=not visible;
+ 767 17228 [278]         count:=0;
+ 768 17239 [278]       end;
+ 769 17243 [278]     end;
+ 770 17243 [278] 
+ 771 17243 [278]   until _isesc;
+ 772 17249 [278] 
+ 773 17252 [278]   { Remove cursor before leaving }
+ 774 17252 [278]   if visible then begin
+ 775 17256 [278]     _move(x+1,y);
+ 776 17276 [278]     _draw(x+5,y,INVERSE);
+ 777 17295 [278]   end;
+ 778 17295 [278] 
+ 779 17295 [278] end;
+ 780 17295 [278] 
+ 781 17296 [264] proc floodmode;
+ 782 17296 [265] {*************}
+ 783 17296 [265] var mode,mx,my:integer;
+ 784 17299 [268]     key:char;
+ 785 17299 [269]     found:boolean;
+ 786 17299 [270] begin
+ 787 17299 [270]   if _isesc then begin end;
+ 788 17310 [270] 
+ 789 17310 [270]   repeat
+ 790 17310 [270]     if _isesc then exit;
+ 791 17320 [270]     mode:=0;
+ 792 17322 [270]     found:=_getinput(mode,mx,my,key);
+ 793 17364 [270] 
+ 794 17368 [270]     if found then begin
+ 795 17372 [270]       if mode=2 then begin
+ 796 17382 [270]         saveundo;
+ 797 17389 [270]         floodfill(mx,my);
+ 798 17403 [270]         exit;
+ 799 17404 [270]       end;
+ 800 17404 [270] 
+ 801 17404 [270]       if key<>chr(0) then begin
+ 802 17412 [270]         nextch:=key;
+ 803 17415 [270]         exit;
+ 804 17424 [270]       end;
+ 805 17424 [270]     end else
+ 806 17424 [270]       _delay10msec(1);
+ 807 17435 [270]   until false;
+ 808 17437 [270] end;
+ 809 17440 [270] 
+ 810 17441 [265] proc paint;
+ 811 17441 [266] {*********}
+ 812 17441 [266] { This is the main painting loop }
+ 813 17441 [266] var mode,mx,my:integer;
+ 814 17444 [269]     found:boolean;
+ 815 17444 [270] begin
+ 816 17444 [270]   x:=XSIZE div 2;
+ 817 17450 [270]   y:=YSIZE div 2;
+ 818 17459 [270]   cmode:=WHITE;
+ 819 17466 [270]   dmode:=dpoint;
+ 820 17472 [270]   initpanel;
+ 821 17480 [270]   status;
+ 822 17484 [270]   nextch:=chr(0);
+ 823 17486 [270]   repeat
+ 824 17491 [270]     if nextch<>chr(0) then begin
+ 825 17499 [270]       ch:=nextch;
+ 826 17502 [270]       nextch:=chr(0);
+ 827 17512 [270]     end else begin
+ 828 17520 [270]       repeat
+ 829 17520 [270]         found:=_getinput(mode,mx,my,ch);
+ 830 17558 [270]         if not found then _delay10msec(1);
+ 831 17578 [270]         until found;
+ 832 17578 [270]     end;
+ 833 17585 [270] 
+ 834 17585 [270]     if (mode=2) and (dmode=dpoint) then
+ 835 17599 [270]       pointmode(mx,my);
+ 836 17617 [270] 
+ 837 17617 [270]       case ch of
+ 838 17617 [270] 
+ 839 17621 [270]       'C':    begin
+ 840 17628 [270]                 saveundo;
+ 841 17632 [270]                 _cleargr;
+ 842 17636 [270]               end;
+ 843 17636 [270] 
+ 844 17639 [270]       'M':    begin
+ 845 17646 [270]                 cmode:=cmode+1;
+ 846 17652 [270]                 if cmode>2 then cmode:=0;
+ 847 17669 [270]               end;
+ 848 17673 [270] 
+ 849 17676 [270]       'P':    begin
+ 850 17683 [270]                 dmode:=dpoint;
+ 851 17685 [270]               end;
+ 852 17689 [270] 
+ 853 17692 [270]       'L':    begin
+ 854 17699 [270]                 dmode:=dline;
+ 855 17701 [270]                 status;
+ 856 17709 [270]                 linemode(false);
+ 857 17717 [270]                 dmode:=dpoint;
+ 858 17719 [270]               end;
+ 859 17723 [270] 
+ 860 17726 [270]       'F':    begin
+ 861 17733 [270]                 dmode:=dflood;
+ 862 17735 [270]                 status;
+ 863 17743 [270]                 floodmode;
+ 864 17747 [270]                 dmode:=dpoint;
+ 865 17749 [270]               end;
+ 866 17753 [270] 
+ 867 17756 [270]       'R':    begin
+ 868 17763 [270]                 dmode:=drect;
+ 869 17765 [270]                 status;
+ 870 17773 [270]                 shapemode;
+ 871 17777 [270]                 dmode:=dpoint;
+ 872 17779 [270]               end;
+ 873 17783 [270] 
+ 874 17786 [270]       'E':    begin
+ 875 17793 [270]                 dmode:=derase;
+ 876 17795 [270]                 status;
+ 877 17803 [270]                 shapemode;
+ 878 17807 [270]                 dmode:=dpoint;
+ 879 17809 [270]               end;
+ 880 17813 [270] 
+ 881 17816 [270]       'O':    begin
+ 882 17823 [270]                 dmode:=dcircle;
+ 883 17825 [270]                 status;
+ 884 17833 [270]                 shapemode;
+ 885 17837 [270]                 dmode:=dpoint;
+ 886 17839 [270]               end;
+ 887 17843 [270] 
+ 888 17846 [270]       'J':    begin
+ 889 17853 [270]                 dmode:=djoin;
+ 890 17855 [270]                 status;
+ 891 17863 [270]                 linemode(true);
+ 892 17871 [270]                 dmode:=dpoint;
+ 893 17873 [270]               end;
+ 894 17877 [270] 
+ 895 17880 [270]       'T':    begin
+ 896 17887 [270]                 dmode:=dtext;
+ 897 17889 [270]                 status;
+ 898 17897 [270]                 textmode;
+ 899 17901 [270]                 dmode:=dpoint;
+ 900 17903 [270]               end;
+ 901 17907 [270] 
+ 902 17910 [270]       'S':    savecanvas;
+ 903 17921 [270] 
+ 904 17924 [270]       RUBOUT: restoreundo;
+ 905 17935 [270] 
+ 906 17938 [270]       'W','Q': begin
+ 907 17952 [270]                  savecanvas;
+ 908 17956 [270]                  _setcursor(2,14);
+ 909 17966 [270]               end
+ 910 17966 [270]     end; {case}
+ 911 17968 [270]     if (ch<>'W') and (ch<>'Q') then status;
+ 912 17990 [270]   until (ch='Q') or (ch='K');
+ 913 18004 [270] end;
+ 914 18008 [270] 
+ 915 18009 [266] begin
+ 916 18009 [266]   _grinit; _cleargr; _fullview;
+ 917 18024 [266]   undovalid:=false;
+ 918 18026 [266]   loadcanvas;
+ 919 18034 [266]   paint;
+ 920 18038 [266]   _grend;
+ 921 18042 [266] end.
+ 922 18042 [266] 
+Code length:           18041
 Compiler stack size:   290/320
-Ident stack size:      276/350
+Ident stack size:      278/350
