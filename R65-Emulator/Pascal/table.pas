@@ -629,7 +629,6 @@ begin
 
   acc1[0]:=ENDMARK;
   write(@acc1,b:colsize[j]-1:2);
-  writeln(@PRINTER,'b=',b,' ',acc1);
 
   { Skip leading blanks }
   p:=acc1;
@@ -734,7 +733,6 @@ begin
       else
         x:=conv(i-first);
       y:=fieldreal(p);
-     writeln(@PRINTER,'j=',j,' i=',i,' x=',x,' y=',y);
 
       sx:=sx+x;
       sy:=sy+y;
@@ -1615,7 +1613,7 @@ begin
 
       { Remove leading blanks from numbers }
       if (coltype[j]=T_INTEGER) or
-         (coltype[i]=T_SUM) or
+         (coltype[j]=T_SUM) or
          (coltype[j]=T_REAL) then begin
         while (len>0) and (p[start]=' ') do begin
           start:=start+1;
